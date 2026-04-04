@@ -1,0 +1,34 @@
+{
+  "name": "is-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.12",
+    "@supabase/supabase-js": "^2.101.1",
+    "@tanstack/react-query": "^5.96.2",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.10",
+    "next": "^15.3",
+    "postgres": "^3.4.8",
+    "react": "^19.1",
+    "react-dom": "^19.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "^15.3",
+    "tailwindcss": "^4",
+    "typescript": "^5.8"
+  }
+}
