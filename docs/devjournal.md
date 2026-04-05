@@ -1,8 +1,18 @@
 # Development Journal
 
-Each entry: **Date** | **Author** | **Title**, followed by description text.
+Each entry: **Date** | **Author** | **Title**, followed by description text. Most recent first.
 
 ---
+
+## 2026-04-04 | James | First end-to-end deployment live
+
+App deployed to Vercel at `app.intentionalsociety.org`. Stack verified working: Next.js serving pages, Hono API responding at `/api/*`, Drizzle querying Supabase Postgres via transaction pooler. Supabase SSR client helpers set up for future auth flows (server/client/middleware pattern using `@supabase/ssr`).
+
+## 2026-04-04 | James | Supabase Postgres requires transaction pooler for IPv4 + serverless
+
+Supabase direct database connections resolve to IPv6 only (AWS stopped offering free IPv4 addresses). Local development and Vercel serverless functions may not route IPv6 properly. The fix is to use Supabase's **Transaction Pooler** connection string (`aws-*.pooler.supabase.com:6543`) which provides IPv4 and is also the correct choice for serverless environments where connections don't persist between invocations.
+
+`DATABASE_URL` should always point to the transaction pooler, not the direct connection.
 
 ## 2026-04-04 | James | Enable Next.js typedRoutes for compile-time route safety
 
