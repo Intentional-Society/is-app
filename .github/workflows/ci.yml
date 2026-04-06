@@ -6,7 +6,7 @@ on:
 
 jobs:
   lint-and-test:
-    name: Lint & Unit Tests
+    name: Lint & Functional Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +16,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-      - run: npm test
+      - run: npm run test:functional
 
   e2e:
     name: E2E Tests

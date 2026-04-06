@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run && playwright test",
+    "test:functional": "vitest run",
+    "test:functional:watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
