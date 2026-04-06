@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm install
       - run: npm run lint
       - run: npm run test:functional
 
@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm install
 
       - name: Wait for Vercel preview
         uses: patrickedqvist/wait-for-vercel-preview@v3
