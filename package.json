@@ -9,7 +9,7 @@
     "lint": "next lint",
     "test": "vitest run && playwright test",
     "test:functional": "vitest run",
-    "test:functional:watch": "vitest",
+    "watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
