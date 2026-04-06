@@ -1,20 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiClient } from "@/lib/api";
 
 export default function Home() {
   const [message, setMessage] = useState("Loading...");
   const [serverTime, setServerTime] = useState("");
 
   useEffect(() => {
-    fetch("/api/hello")
+    apiClient.api.hello
+      .$get()
       .then((res) => res.json())
       .then((data) => setMessage(data.message))
       .catch(() => setMessage("Failed to connect to API"));
 
-    fetch("/api/health")
+    apiClient.api.health
+      .$get()
       .then((res) => res.json())
-      .then((data) => setServerTime(data.database.serverTime))
+      .then((data) => setServerTime(String(data.database.serverTime)))
       .catch(() => setServerTime("Failed to connect to database"));
   }, []);
 
