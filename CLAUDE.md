@@ -11,52 +11,48 @@ Intentional Society web application — an authenticated app for a small, global
 - `npm run dev` — start dev server (http://localhost:3000)
 - `npm run build` — production build
 - `npm run lint` — ESLint
+- `npm test` — run all test suites (functional + e2e)
+- `npm run test:functional` — Vitest only
+- `npm run test:e2e` — Playwright only (Chromium, uses port 3093)
+- `npm run watch` — Vitest watch mode
 - `npx drizzle-kit generate` — generate SQL migrations from schema changes
 - `npx drizzle-kit migrate` — apply migrations
 
 ## Architecture
 
-The application stack is documented in `docs/architecture-appstack.md`. Key points:
+Architecture specs in `docs/architecture-appstack.md` and `docs/architecture-devstack.md`.
 
-- **Next.js 15** (App Router) serves the frontend and hosts the API via a catch-all route
-- **Hono** handles all API logic, mounted inside Next.js at `src/app/api/[[...route]]/route.ts` — delegates to `src/server/api.ts`
-- **Drizzle ORM** for type-safe Postgres access with forward-only SQL migrations (expand-contract pattern required). Schema at `src/server/schema.ts`, DB client at `src/server/db.ts`
-- **Supabase** provides auth (JWT-based) and managed PostgreSQL — JWTs verified in Hono middleware, not via RLS
-- **Supabase SSR** client helpers in `src/lib/supabase/` (server.ts, client.ts, middleware.ts) for cookie-based auth session management
-- **TanStack Query** for client-side data caching/fetching (standalone, not paired with TanStack Router)
+- **Next.js 15** (App Router) serves the frontend and hosts the API via catch-all route
+- **Hono** handles all API logic at `src/app/api/[[...route]]/route.ts`, defined in `src/server/api.ts`
+- **Hono RPC client** (`apiClient` from `src/lib/api.ts`) provides type-safe API calls — use this instead of raw `fetch`
+- **Drizzle ORM** for Postgres access. Schema at `src/server/schema.ts`, connection at `src/server/db.ts`
+- **Supabase** provides auth (JWT) and managed PostgreSQL. Client helpers in `src/lib/supabase/`
+- **TanStack Query** for client-side data caching
 - **Tailwind CSS v4** for styling
 
-Routing uses Next.js App Router exclusively. `typedRoutes: true` is enabled in `next.config.ts` for compile-time route checking. (Use Zod for runtime validation of dynamic route params and search params.)
-
-The dev/test stack is documented in `docs/architecture-devstack.md`: Vitest, Playwright, MSW, Sentry, Axiom (via Vercel Log Drain).
-
-A separate static www site (Gatsby on Netlify) is documented in `docs/architecture-www.md` and is not part of this repo.
 
 ## Database
 
-- `DATABASE_URL` must use Supabase's **transaction pooler** (`aws-*.pooler.supabase.com:6543`), not the direct connection. Direct connections are IPv6-only and fail serverless environments including Vercel specifically.
-- Migration running strategy is still TBD.
+`DATABASE_URL` must use Supabase's **transaction pooler** (`aws-*.pooler.supabase.com:6543`), not the direct connection (IPv6-only, fails in most environments).
 
-## Deployment
+## Workflow
 
-- **Platform**: Vercel (serverless Node.js functions, not edge — Drizzle/Postgres requires Node.js APIs)
-- **Domain**: `app.intentionalsociety.org`
-- **Env vars**: Set in Vercel dashboard (Settings → Environment Variables). See `.env.example` for required vars.
-- **Auth emails**: Handled by Supabase directly (magic links, verification, password reset)
-- **Framework preset**: Must be set to "Next.js" in Vercel project settings
+- Trunk-based development: feature branches PR into `main`, which auto-deploys to production
+- Run `npm test` before committing. Keep docs and CLAUDE.md in sync with code changes.
+- Schema/API migrations use the **expand-contract pattern** (see `docs/doc-strategy-committing.md`)
+- Docs-only changes skip Vercel deployment (configured in `vercel.json`)
+- Add `docs/devjournal.md` entries for decisions teammates should know about
 
-## Environment Variables
+## CI/CD
 
-```
-NEXT_PUBLIC_SUPABASE_URL          — Supabase project URL
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY — Supabase publishable/anon key
-DATABASE_URL                      — Postgres connection string (transaction pooler)
-```
+- **ci.yml**: lint + functional tests on every PR (required to pass)
+- **e2e.yml**: Playwright against Vercel preview URL, triggered by `deployment_status` event (not required, but check results before merging)
+- Vercel auto-deploys `main` to production
 
-## Development Journal
+## Key docs
 
-`docs/devjournal.md` records architecture and development decisions (most recent first). Add entries for non-obvious choices that future contributors or AI agents should know about. Format: `## YYYY-MM-DD | Author | Title` followed by description.
-
-## Windows Notes
-
-This project is developed on Windows. The `[[...route]]` catch-all directory requires Node.js to create (not shell commands) due to bracket characters in the path.
+- `docs/doc-strategy-branching.md` — branching strategy and rationale
+- `docs/doc-strategy-committing.md` — commit conventions and expand-contract pattern
+- `docs/doc-vercel.md` — Vercel dashboard settings
+- `docs/doc-github.md` — GitHub settings and CI workflows
+- `docs/devjournal.md` — development decision log (most recent first)
