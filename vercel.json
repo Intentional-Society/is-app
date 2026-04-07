@@ -1,3 +1,3 @@
 {
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- . ':!docs/'"
+  "ignoreCommand": "git fetch origin main && git diff HEAD origin/main --quiet -- . ':!docs/'"
 }
