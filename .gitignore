@@ -34,9 +34,5 @@ Thumbs.db
 playwright-report/
 test-results/
 
-# supabase local
-supabase/.temp/
-supabase/.branches/
-
 # claude
 .claude/
