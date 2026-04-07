@@ -14,6 +14,7 @@ build/
 .env
 .env.*
 !.env.example
+.env.sentry-build-plugin
 
 # debug
 npm-debug.log*
