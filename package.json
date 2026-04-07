@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm run dev:db && next dev",
+    "dev:db": "npx supabase status || npx supabase start && (npx drizzle-kit migrate || true)",
+    "dev:db:stop": "npx supabase stop",
+    "dev:db:reset": "npx supabase db reset && npx drizzle-kit migrate",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -31,9 +34,11 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.1",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "^15.3",
+    "supabase": "^2.85.0",
     "tailwindcss": "^4",
     "typescript": "^5.8",
     "vitest": "^4.1.2"

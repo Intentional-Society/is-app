@@ -8,13 +8,15 @@ Intentional Society web application — an authenticated app for a small, global
 
 ## Commands
 
-- `npm run dev` — start dev server (http://localhost:3000)
+- `npm run dev` — start local Supabase (if needed) + dev server (http://localhost:3000)
 - `npm run build` — production build
 - `npm run lint` — ESLint
 - `npm test` — run all test suites (functional + e2e)
 - `npm run test:functional` — Vitest only
 - `npm run test:e2e` — Playwright only (Chromium, uses port 3093)
 - `npm run watch` — Vitest watch mode
+- `npm run dev:db:stop` — stop local Supabase containers
+- `npm run dev:db:reset` — wipe local DB and reapply migrations
 - `npx drizzle-kit generate` — generate SQL migrations from schema changes
 - `npx drizzle-kit migrate` — apply migrations
 
@@ -31,9 +33,15 @@ Architecture specs in `docs/architecture-appstack.md` and `docs/architecture-dev
 - **Tailwind CSS v4** for styling
 
 
+## Local Development
+
+Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postgres on port 54322, Auth, Studio on 54323) via Docker, then launches Next.js. Supabase containers persist after Ctrl+C — use `npm run dev:db:stop` to shut them down.
+
 ## Database
 
-`DATABASE_URL` must use Supabase's **transaction pooler** (`aws-*.pooler.supabase.com:6543`), not the direct connection (IPv6-only, fails in most environments).
+**Production:** `DATABASE_URL` must use Supabase's **transaction pooler** (`aws-*.pooler.supabase.com:6543`), not the direct connection (IPv6-only, fails in most environments).
+
+**Local:** `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`. Drizzle is the sole migration tool — do not use `supabase/migrations/`.
 
 ## Workflow
 
@@ -55,4 +63,5 @@ Architecture specs in `docs/architecture-appstack.md` and `docs/architecture-dev
 - `docs/doc-strategy-committing.md` — commit conventions and expand-contract pattern
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-github.md` — GitHub settings and CI workflows
+- `docs/setup-dev-machine.md` — system prerequisites (Node.js, Docker, etc.)
 - `docs/devjournal.md` — development decision log (most recent first)
