@@ -4,9 +4,23 @@ System prerequisites for working on is-app. These are one-time installs.
 
 ---
 
-## Node.js 22+
+## Node.js 22+ (via nvm)
 
-Install from [nodejs.org](https://nodejs.org/) (LTS) or via a version manager like `nvm` or `fnm`.
+We recommend using `nvm` to manage Node.js versions.
+
+**Mac:**
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+nvm install 22
+```
+
+**Windows:**
+
+Install [nvm-windows](https://github.com/coreybutler/nvm-windows/releases) (download and run the latest `nvm-setup.exe`), then:
+```bash
+nvm install 22
+nvm use 22
+```
 
 After install: `node --version` should show v22.x or later.
 
