@@ -9,7 +9,7 @@
     "dev:db:reset": "npx supabase db reset && npx drizzle-kit migrate",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run && playwright test",
     "test:functional": "vitest run",
     "watch": "vitest",
