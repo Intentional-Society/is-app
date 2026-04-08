@@ -63,5 +63,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - `docs/doc-strategy-committing.md` — commit conventions and expand-contract pattern
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-github.md` — GitHub settings and CI workflows
+- `docs/doc-sentry.md` — Sentry error tracking and performance monitoring
+- `docs/doc-axiom.md` — Axiom logging and Web Vitals
 - `docs/setup-dev-machine.md` — system prerequisites (Node.js, Docker, etc.)
 - `docs/devjournal.md` — development decision log (most recent first)
