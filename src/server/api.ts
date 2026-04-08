@@ -1,9 +1,21 @@
 import { Hono } from "hono";
+import { log } from "next-axiom";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 
 const api = new Hono()
   .basePath("/api")
+  .use("*", async (c, next) => {
+    const start = Date.now();
+    await next();
+    const duration = Date.now() - start;
+    log.info("api request", {
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      duration,
+    });
+  })
   .get("/hello", (c) => {
     return c.json({ message: "Hello from Intentional Society API" });
   })

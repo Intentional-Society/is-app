@@ -1,3 +1,1 @@
-{
-  "ignoreCommand": "git diff $VERCEL_GIT_PREVIOUS_SHA HEAD --quiet -- . ':!docs/'"
-}
+{}
