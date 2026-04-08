@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-07 | James | Observability: Sentry + Axiom
+
+Sentry for error tracking, performance traces, and session replay. Axiom for structured request logs via Vercel Log Drain + next-axiom. Hono middleware logs method, path, status, and duration on every API request.
+
 ## 2026-04-06 | James | Local dev environment via Supabase CLI + Docker
 
 `npm run dev` now auto-starts a local Supabase stack (Postgres, Auth, Studio) in Docker and runs Drizzle migrations. Each developer gets an isolated database. Drizzle is the sole migration tool — we don't use `supabase/migrations/`. Production still uses the hosted Supabase instance via env vars.
