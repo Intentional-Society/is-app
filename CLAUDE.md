@@ -8,6 +8,7 @@ Intentional Society web application — an authenticated app for a small, global
 
 ## Commands
 
+- `npm run setup` — one-time: generate `.env.local` with local Supabase defaults (idempotent)
 - `npm run dev` — start local Supabase (if needed) + dev server (http://localhost:3000)
 - `npm run build` — production build
 - `npm run lint` — ESLint
