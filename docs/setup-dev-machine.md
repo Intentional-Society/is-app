@@ -49,3 +49,7 @@ No specific editor is required. VS Code and JetBrains IDEs both work well with t
 ## Claude Code
 
 We use [Claude Code](https://claude.ai/code) as our AI coding assistant, configured with Claude Opus 4.6 at medium or high reasoning effort. Available as a CLI, desktop app, or IDE extension.
+
+---
+
+Once the prerequisites above are installed, clone the repo and run `npm install` followed by `npm run setup` to generate your local `.env.local` with the deterministic local Supabase defaults. Then `npm run dev`. See the [README](../README.md) for the full walkthrough.
