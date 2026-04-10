@@ -10,6 +10,12 @@ export default defineConfig({
   retries: isCI ? 2 : 0,
   workers: isCI ? 1 : undefined,
   reporter: "html",
+  expect: {
+    // Wide polling window absorbs Next.js Fast Refresh / first-compile cost
+    // without costing anything on the happy path — toBeVisible resolves as
+    // soon as the element appears.
+    timeout: 15000,
+  },
   use: {
     baseURL,
     trace: "on-first-retry",
