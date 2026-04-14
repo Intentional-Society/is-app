@@ -20,6 +20,21 @@ The IS app has Supabase auth helpers scaffolded at `src/lib/supabase/{client,ser
 
 Phase 1 does the minimum needed to prove auth works end-to-end: a user can sign in via magic link, land on `/`, and see their own minimal profile (just `displayName`). The full community profile shape — `bio`, `keywords`, `location`, `emergencyContact`, etc. — is intentionally deferred to Phase 2 so the plumbing PR stays focused on auth wiring.
 
+## Commit plan
+
+This phase lands as a single PR built from six sequential commits. Each commit keeps the app in a working state.
+
+| Commit | Scope | Key changes |
+|--------|-------|-------------|
+| **1a** | Schema + migration | `schema.ts` (4 tables), generated SQL |
+| **1b** | Next.js session-refresh middleware | `src/middleware.ts` (new) |
+| **1c** | Hono auth middleware | `api.ts` middleware, `auth-middleware.test.ts` |
+| **1d** | Auth callback + profile upsert | `auth/callback/route.ts`, `profiles.ts`, `auth-callback.test.ts`, `profiles.test.ts` |
+| **1e** | Login page | `login/page.tsx` |
+| **1f** | Protected home + `/api/me` + E2E | `page.tsx`, `api-me.test.ts`, `auth-redirect.spec.ts` |
+
+Commits 1a–1e are additive; 1f ("tie it all together") depends on all prior commits.
+
 ## Schema (`src/server/schema.ts`)
 
 Four tables, Drizzle `pg-core`. The `profiles` table ships minimal; Phase 2 alters it to add the rich fields. The other three tables are defined here to avoid splintering the initial migration — cheaper than three separate migration rounds as Phases 2 and 3 layer in.
@@ -66,13 +81,16 @@ Thin wrapper that delegates to the existing `src/lib/supabase/middleware.ts` hel
 GET handler:
 
 1. Read `code` from query string (PKCE).
+   - Missing → redirect to `/login?error=missing_code`.
 2. Call `supabase.auth.exchangeCodeForSession(code)` via the server client.
+   - Failure (expired / invalid code) → redirect to `/login?error=exchange_failed`.
 3. On success, read the user and idempotently upsert a `profiles` row:
    - If the row exists → no-op.
-   - If missing → insert with `displayName = user.user_metadata.displayName ?? <email local-part>`.
+   - If missing → insert with `displayName = user.user_metadata.displayName ?? ""`. Phase 3's signup form populates `user_metadata.displayName` via `signInWithOtp({ options: { data: { displayName } } })`; until then, new users get an empty display name.
    - Uses `ON CONFLICT (id) DO NOTHING`.
-4. Redirect to `/` (or a `next` query param if present and same-origin).
-5. On failure, redirect to `/login?error=<code>`.
+   - Database error during upsert → redirect to `/login?error=profile_error`. Session is still valid; next sign-in self-heals via the idempotent upsert.
+4. Redirect to `/`.
+5. All error redirects go to `/login?error=<code>`. The login page renders a human-readable message based on the error code.
 
 The idempotent upsert self-heals the edge case where the callback crashes between auth success and profile insert — the next sign-in just creates the profile.
 
@@ -119,13 +137,34 @@ Returns `{ id, email, profile: { id, displayName, createdAt } }`. The `profile` 
 
 ## Tests
 
-- **Functional (Vitest):**
-  - Hono auth middleware: unauthenticated → 401; authenticated (mocked server client) → handler runs; `/api/health` reachable without session.
-  - Profile upsert: double-call with same user id → one row, no duplicates, no errors.
-- **E2E (Playwright):**
-  - Unauthenticated visit to `/` → redirects to `/login`.
-  - Unauthenticated `fetch('/api/hello')` → 401.
-  - Full magic-link round-trip test is deferred to Phase 3, which introduces the session-minting helper as part of testing the invite flow.
+### Functional (Vitest)
+
+**Commit 1c — `tests/functional/auth-middleware.test.ts`:**
+- Unauthenticated request → 401 `{ error: "unauthenticated" }`.
+- Authenticated request (mocked server client) → handler runs, returns expected response.
+- `/api/health` reachable without session.
+- Allowlist regression guard: explicitly assert that only `/api/health` is public. A new route must not accidentally bypass auth.
+
+**Commit 1d — `tests/functional/auth-callback.test.ts`:**
+- Missing `code` param → redirect to `/login?error=missing_code`.
+- Invalid/expired code (mocked exchange failure) → redirect to `/login?error=exchange_failed`.
+
+**Commit 1d — `tests/functional/profiles.test.ts`:**
+- Profile upsert idempotency: double-call with same user id → one row, no errors.
+
+**Commit 1f — `tests/functional/api-me.test.ts`:**
+- Response shape: validate that `/api/me` returns exactly `{ id, email, profile: { id, displayName, createdAt } }` — no extra fields. Catches accidental field leakage as Phase 2 adds sensitive columns.
+
+### E2E (Playwright)
+
+**Commit 1f — `tests/e2e/auth-redirect.spec.ts`:**
+- Unauthenticated visit to `/` → redirects to `/login`.
+- Unauthenticated `fetch('/api/hello')` → 401.
+- `/api/health` remains accessible without auth (regression guard).
+- Login page renders for unauthenticated users: page loads, email input is visible.
+- Sign-out clears session: after sign-out, `/` redirects to `/login` and `/api/me` returns 401. Uses a lightweight Playwright fixture that mints a session via the Supabase Admin API (pulled forward from the Phase 3 session-minting helper).
+
+Full magic-link round-trip test is deferred to Phase 3, which introduces the full session-minting helper as part of testing the invite flow.
 
 ## Files touched / created
 
@@ -138,7 +177,10 @@ Returns `{ id, email, profile: { id, displayName, createdAt } }`. The `profile` 
 - `src/app/page.tsx` — converted to authed landing (server component with unauthed redirect)
 - `src/server/api.ts` — auth middleware, `Variables` type, `/api/me`, protect `/api/hello`
 - `tests/functional/auth-middleware.test.ts` — new
+- `tests/functional/auth-callback.test.ts` — new
 - `tests/functional/profiles.test.ts` — new
+- `tests/functional/api-me.test.ts` — new
+- `tests/e2e/fixtures/auth.ts` — new: lightweight session-minting fixture (Supabase Admin API)
 - `tests/e2e/auth-redirect.spec.ts` — new
 - `docs/devjournal.md` — dated entry documenting the phase split and why not RLS
 
@@ -148,7 +190,7 @@ Returns `{ id, email, profile: { id, displayName, createdAt } }`. The `profile` 
 2. `http://localhost:3000/` → redirects to `/login`.
 3. In Supabase Studio (`http://localhost:54323`), add a user via the auth UI.
 4. "Send magic link" from Studio → email appears in Inbucket (`http://localhost:54324`) → click → lands on `/`.
-5. `/` shows the user's email and freshly-upserted profile (`displayName` = email local-part).
+5. `/` shows the user's email and freshly-upserted profile (`displayName` = `""` until Phase 3 signup collects it).
 6. `curl http://localhost:3000/api/hello` (no cookie) → 401.
 7. Same endpoint from the signed-in browser → 200.
 8. `/api/me` returns `{ id, email, profile: { id, displayName, createdAt } }`.

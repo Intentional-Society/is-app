@@ -56,7 +56,7 @@ The invite code has to survive the magic-link round-trip. Flow:
      RETURNING created_by;
      ```
    - `rowcount = 0` → code was consumed/revoked/expired between check and click. Sign the user out, redirect to `/login?error=invite_invalid`.
-   - `rowcount = 1` → insert profile with `displayName` from `user_metadata`, `referredBy` from the returned `created_by`.
+   - `rowcount = 1` → insert profile with `displayName` from `user_metadata` (set by the signup form via `options.data`), `referredBy` from the returned `created_by`.
    - Both writes in one transaction: either both land or neither does.
 4. No `invite` query param → the existing Phase 1 upsert runs, `referredBy` stays null.
 
