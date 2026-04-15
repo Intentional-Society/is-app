@@ -5,12 +5,6 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(),
 }));
 
-vi.mock("@/server/db", () => ({
-  db: {
-    execute: vi.fn().mockResolvedValue([{ server_time: "2026-01-01T00:00:00Z" }]),
-  },
-}));
-
 import { createServerClient } from "@supabase/ssr";
 
 import app from "@/server/api";

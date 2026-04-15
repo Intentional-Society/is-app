@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     root: ".",
     exclude: ["tests/e2e/**", "node_modules/**"],
+    setupFiles: ["tests/functional/setup.ts"],
   },
   resolve: {
     alias: {
