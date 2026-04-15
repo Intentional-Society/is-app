@@ -26,7 +26,7 @@ This phase lands as a single PR built from six sequential commits. Each commit k
 
 | Commit | Scope | Key changes |
 |--------|-------|-------------|
-| **1a** | Schema + migration | `schema.ts` (4 tables), generated SQL |
+| **1a** | Schema + migration | `schema.ts` (2 tables), generated SQL |
 | **1b** | Next.js session-refresh middleware | `src/middleware.ts` (new) |
 | **1c** | Hono auth middleware | `api.ts` middleware, `auth-middleware.test.ts` |
 | **1d** | Auth callback + profile upsert | `auth/callback/route.ts`, `profiles.ts`, `auth-callback.test.ts`, `profiles.test.ts` |
@@ -37,36 +37,26 @@ Commits 1a–1e are additive; 1f ("tie it all together") depends on all prior co
 
 ## Schema (`src/server/schema.ts`)
 
-Four tables, Drizzle `pg-core`. The `profiles` table ships minimal; Phase 2 alters it to add the rich fields. The other three tables are defined here to avoid splintering the initial migration — cheaper than three separate migration rounds as Phases 2 and 3 layer in.
+Two tables, Drizzle `pg-core`. The `profiles` table ships minimal; Phase 2 alters it to add the rich fields. `invites` lands here too (endpoints in Phase 3) to keep the initial migration coherent. `programs` and `profilePrograms` are deferred to a dedicated micro-PR when a later phase actually needs them.
 
 ### `profiles` (minimal)
-- `id` — `uuid`, PK, references `auth.users(id)` with `onDelete: "cascade"`
-- `displayName` — `text`, not null
+- `id` — `uuid`, PK, references `auth.users(id)` (no cascade: members leave relational traces, so profile rows persist after a Supabase user is deleted; GDPR "forget me" is handled later via anonymization)
+- `displayName` — `text`, nullable (explicit "not yet collected" state until Phase 3 signup collects it)
 - `createdAt` — `timestamptz`, not null, default `now()`
+- `updatedAt` — `timestamptz`, not null, default `now()`, auto-updated via Drizzle `.$onUpdate(() => new Date())`
 
 ### `invites` (schema lands in Phase 1; endpoints in Phase 3)
 - `id` — `uuid`, PK, default `gen_random_uuid()`
 - `code` — `text`, unique, not null (12 chars base32, human-readable: `K3JA-9P2F-XQ7M`)
-- `createdBy` — `uuid`, not null, FK to `profiles.id`
+- `createdBy` — `uuid`, nullable, FK to `profiles.id`, `onDelete: "set null"` (preserves invite audit history after member deletion)
 - `note` — `text`, not null (min 10 chars enforced at API layer in Phase 3)
 - `createdAt` — `timestamptz`, not null, default `now()`
 - `expiresAt` — `timestamptz`, not null
-- `redeemedBy` — `uuid`, nullable, FK to `profiles.id`
+- `redeemedBy` — `uuid`, nullable, FK to `profiles.id`, `onDelete: "set null"`
 - `redeemedAt` — `timestamptz`, nullable
 - `revokedAt` — `timestamptz`, nullable
-
-### `programs`
-- `id` — `uuid`, PK, default `gen_random_uuid()`
-- `slug` — `text`, unique, not null (URL-safe identifier, e.g. `monthly-circle`)
-- `name` — `text`, not null
-- `description` — `text`, nullable
-- `createdAt` — `timestamptz`, not null, default `now()`
-
-### `profilePrograms` (junction)
-- `profileId` — `uuid`, not null, FK to `profiles.id`, `onDelete: "cascade"`
-- `programId` — `uuid`, not null, FK to `programs.id`, `onDelete: "cascade"`
-- `joinedAt` — `timestamptz`, not null, default `now()`
-- Composite PK `(profileId, programId)`
+- CHECK constraint: `(redeemed_by IS NULL) = (redeemed_at IS NULL)` — prevents half-redeemed states from API-layer bugs
+- CHECK constraint: `expires_at > created_at` — catches bad writes at the DB boundary
 
 Generate and apply: `npx drizzle-kit generate` → review SQL → commit → `npx drizzle-kit migrate`.
 
@@ -86,7 +76,7 @@ GET handler:
    - Failure (expired / invalid code) → redirect to `/login?error=exchange_failed`.
 3. On success, read the user and idempotently upsert a `profiles` row:
    - If the row exists → no-op.
-   - If missing → insert with `displayName = user.user_metadata.displayName ?? ""`. Phase 3's signup form populates `user_metadata.displayName` via `signInWithOtp({ options: { data: { displayName } } })`; until then, new users get an empty display name.
+   - If missing → insert with `displayName = user.user_metadata.displayName ?? null`. Phase 3's signup form populates `user_metadata.displayName` via `signInWithOtp({ options: { data: { displayName } } })`; until then, new users get a null display name.
    - Uses `ON CONFLICT (id) DO NOTHING`.
    - Database error during upsert → redirect to `/login?error=profile_error`. Session is still valid; next sign-in self-heals via the idempotent upsert.
 4. Redirect to `/`.
@@ -168,7 +158,7 @@ Full magic-link round-trip test is deferred to Phase 3, which introduces the ful
 
 ## Files touched / created
 
-- `src/server/schema.ts` — four tables (profiles minimal)
+- `src/server/schema.ts` — two tables (profiles minimal + invites)
 - `drizzle/migrations/*` — generated SQL
 - `src/server/profiles.ts` — new: single `upsertProfile(user)` helper
 - `src/middleware.ts` — new
@@ -190,7 +180,7 @@ Full magic-link round-trip test is deferred to Phase 3, which introduces the ful
 2. `http://localhost:3000/` → redirects to `/login`.
 3. In Supabase Studio (`http://localhost:54323`), add a user via the auth UI.
 4. "Send magic link" from Studio → email appears in Inbucket (`http://localhost:54324`) → click → lands on `/`.
-5. `/` shows the user's email and freshly-upserted profile (`displayName` = `""` until Phase 3 signup collects it).
+5. `/` shows the user's email and freshly-upserted profile (`displayName` = `null` until Phase 3 signup collects it).
 6. `curl http://localhost:3000/api/hello` (no cookie) → 401.
 7. Same endpoint from the signed-in browser → 200.
 8. `/api/me` returns `{ id, email, profile: { id, displayName, createdAt } }`.
