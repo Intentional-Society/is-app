@@ -11,12 +11,20 @@ jobs:
   lint-and-test:
     name: Lint & Functional Tests
     runs-on: ubuntu-latest
+    env:
+      # Local Supabase CLI Postgres defaults — matches what `supabase start` provisions.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
       - run: npm install
       - run: npm run lint
+      - run: npx drizzle-kit migrate
       - run: npm run test:functional

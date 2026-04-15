@@ -24,5 +24,5 @@ Until branch protection is enabled, rely on team discipline: don't merge a PR wi
 
 ## CI workflows
 
-- `.github/workflows/ci.yml` — lint + functional tests, triggers on `pull_request` to main
+- `.github/workflows/ci.yml` — lint + functional tests, triggers on `pull_request` to main. Spins up the full local Supabase stack via `supabase/setup-cli@v1` + `supabase start`, then applies Drizzle migrations before running Vitest. Functional tests that hit the DB (e.g. `profiles.test.ts`) run against this stack, matching the dev-box setup exactly.
 - `.github/workflows/e2e.yml` — Playwright against Vercel preview URL, triggers on `deployment_status` (fired by Vercel's GitHub integration when a preview deploy completes)
