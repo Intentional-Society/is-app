@@ -1,9 +1,11 @@
+import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { log } from "next-axiom";
-import { db } from "./db";
-import { sql } from "drizzle-orm";
 
-const api = new Hono()
+import { type ApiVariables, requireAuth } from "./auth-middleware";
+import { db } from "./db";
+
+const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
   .use("*", async (c, next) => {
     const start = Date.now();
@@ -16,6 +18,7 @@ const api = new Hono()
       duration,
     });
   })
+  .use("*", requireAuth)
   .get("/hello", (c) => {
     return c.json({ message: "Hello from Intentional Society API" });
   })
