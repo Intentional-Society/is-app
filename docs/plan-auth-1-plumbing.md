@@ -147,14 +147,12 @@ Returns `{ id, email, profile: { id, displayName, createdAt } }`. The `profile` 
 
 ### E2E (Playwright)
 
-**Commit 1f — `tests/e2e/auth-redirect.spec.ts`:**
-- Unauthenticated visit to `/` → redirects to `/login`.
+**Commit 1f — `tests/e2e/auth.spec.ts`:**
+- Unauthenticated visit to `/` → redirects to `/login` (login page renders with email input visible).
 - Unauthenticated `fetch('/api/hello')` → 401.
 - `/api/health` remains accessible without auth (regression guard).
-- Login page renders for unauthenticated users: page loads, email input is visible.
-- Sign-out clears session: after sign-out, `/` redirects to `/login` and `/api/me` returns 401. Uses a lightweight Playwright fixture that mints a session via the Supabase Admin API (pulled forward from the Phase 3 session-minting helper).
 
-Full magic-link round-trip test is deferred to Phase 3, which introduces the full session-minting helper as part of testing the invite flow.
+Signed-in coverage (sign-out clears session, authed `/api/me` shape in the browser, full magic-link round-trip) is deferred to Phase 3, which introduces the Playwright session-minting helper built on the Supabase Admin API. Phase 1 sign-out behavior is verified manually in the Verification checklist below. Avoids pulling service-role key management and cookie-injection plumbing into this phase for a single test case.
 
 ## Files touched / created
 
@@ -169,9 +167,8 @@ Full magic-link round-trip test is deferred to Phase 3, which introduces the ful
 - `tests/functional/auth-middleware.test.ts` — new
 - `tests/functional/auth-callback.test.ts` — new
 - `tests/functional/profiles.test.ts` — new
-- `tests/functional/api-me.test.ts` — new
-- `tests/e2e/fixtures/auth.ts` — new: lightweight session-minting fixture (Supabase Admin API)
-- `tests/e2e/auth-redirect.spec.ts` — new
+- `tests/functional/api-me.test.ts` — new (strict response-shape guard, real local DB)
+- `tests/e2e/auth.spec.ts` — new (unauth redirect + public/private API coverage; signed-in cases deferred to Phase 3's session fixture)
 - `docs/devjournal.md` — dated entry documenting the phase split and why not RLS
 
 ## Verification

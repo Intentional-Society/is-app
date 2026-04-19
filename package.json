@@ -5,16 +5,16 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "npm run dev:db && next dev",
-    "dev:db": "npx supabase status || npx supabase start && (npx drizzle-kit migrate || true)",
+    "dev:db": "node scripts/ensure-docker.mjs && node scripts/ensure-supabase.mjs && node scripts/migrate.mjs",
     "dev:db:stop": "npx supabase stop",
     "dev:db:reset": "npx supabase db reset && npx drizzle-kit migrate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run && playwright test",
-    "test:functional": "vitest run",
-    "watch": "vitest",
-    "test:e2e": "playwright test"
+    "test": "npm run dev:db && vitest run && playwright test",
+    "test:functional": "npm run dev:db && vitest run",
+    "watch": "npm run dev:db && vitest",
+    "test:e2e": "npm run dev:db && playwright test"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.12",

@@ -59,7 +59,7 @@ export function LoginForm() {
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         disabled={state.status === "submitting"}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-100 focus:border-gray-300 focus:outline-none"
+        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-gray-300 focus:outline-none"
       />
       <button
         type="submit"

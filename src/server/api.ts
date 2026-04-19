@@ -1,9 +1,11 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { log } from "next-axiom";
 
 import { type ApiVariables, requireAuth } from "./auth-middleware";
 import { db } from "./db";
+import { upsertProfile } from "./profiles";
+import { profiles } from "./schema";
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -21,6 +23,29 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .use("*", requireAuth)
   .get("/hello", (c) => {
     return c.json({ message: "Hello from Intentional Society API" });
+  })
+  .get("/me", async (c) => {
+    const user = c.get("user");
+
+    const selectProfile = () =>
+      db
+        .select({
+          id: profiles.id,
+          displayName: profiles.displayName,
+          createdAt: profiles.createdAt,
+        })
+        .from(profiles)
+        .where(eq(profiles.id, user.id));
+
+    let [profile] = await selectProfile();
+    if (!profile) {
+      // Self-heal: 1d's callback can leave a session without a profile
+      // row if the upsert failed there. The next authed request repairs.
+      await upsertProfile(user);
+      [profile] = await selectProfile();
+    }
+
+    return c.json({ id: user.id, email: user.email, profile });
   })
   .get("/health", async (c) => {
     const result = await db.execute(sql`SELECT now() AS server_time`);
