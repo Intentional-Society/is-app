@@ -20,9 +20,23 @@ Phase 1 created `profiles` with only `id`, `displayName`, and `createdAt` — en
 
 The underlying table is altered in place (expand step of expand-contract). Columns are added as nullable (or with safe defaults) so existing rows — there will be at most one: yourself, signed in to test Phase 1 — continue to work without backfill.
 
+Phase 1 deferred the `programs` / `profilePrograms` tables to "a dedicated micro-PR when a later phase actually needs them." Phase 2 is that moment — the tables land here as structure only (no seed data, no endpoints, not joined into any profile shape). Programs are a membership classification, not a profile field, so they are intentionally kept out of `getProfileFor*`.
+
+## Commit plan
+
+This phase lands as a single PR built from five sequential commits. Each commit keeps the app in a working state.
+
+| Commit | Scope | Key changes |
+|--------|-------|-------------|
+| **2a** | Schema expand + migration | `schema.ts` (alter profiles, add programs + profilePrograms), generated SQL |
+| **2b** | Serialization layer + `/api/me` swap | `profiles.ts` (`getProfileForSelf` + stubs), `api.ts` swap, shape-guard tests |
+| **2c** | `PUT /api/me` | `api.ts` endpoint, zod validation, functional tests |
+| **2d** | `/welcome` page + incomplete-profile redirect | `welcome/page.tsx`, `page.tsx` redirect, e2e |
+| **2e** | Login dual-mode (email + optional password) | `login-form.tsx`, e2e |
+
 ## Schema changes (`src/server/schema.ts`)
 
-Alter `profiles` to add the following columns. All nullable unless marked otherwise.
+### Alter `profiles` — add the following columns. All nullable unless marked otherwise.
 
 - `bio` — `text`, nullable
 - `keywords` — `text[]`, not null, default `{}` (Postgres array; GIN-indexable if search is needed later)
@@ -35,23 +49,28 @@ Alter `profiles` to add the following columns. All nullable unless marked otherw
 - `liveDesire` — `text`, nullable
 - `isAdmin` — `boolean`, not null, default `false`
 
-Generate and apply: `npx drizzle-kit generate` → review the SQL (should be `ALTER TABLE` statements, not `CREATE TABLE`) → commit → `npx drizzle-kit migrate`.
+### New tables (structure only, no seed)
 
-No new tables in this phase — `programs` and `profilePrograms` already exist from Phase 1.
+- `programs` — `id` (uuid PK, default `gen_random_uuid()`), `slug` (text, unique, not null), `name` (text, not null), `description` (text, nullable), `createdAt` (timestamptz, not null, default `now()`).
+- `profilePrograms` — `profileId` (uuid, FK to `profiles.id` on delete cascade), `programId` (uuid, FK to `programs.id` on delete cascade), composite PK `(profileId, programId)`, `assignedAt` (timestamptz, not null, default `now()`).
+
+No seed data, no seed script, no endpoints in this phase. A later phase will introduce admin-managed seeding and membership assignment.
+
+Generate and apply: `npx drizzle-kit generate` → review the SQL (expect `ALTER TABLE` for `profiles` and `CREATE TABLE` for the two new tables) → commit → `npx drizzle-kit migrate`.
 
 ## Sensitive field access control
 
 `emergencyContact` is PII (typically a name and phone number). Since RLS is not the primary mechanism, the Hono API enforces visibility at the serialization layer. Three shapes, all defined in `src/server/profiles.ts`:
 
-- **`getProfileForSelf(userId)`** — includes `emergencyContact`. Used by `/api/me`.
-- **`getProfileForMember(userId)`** — omits `emergencyContact`. Placeholder for a future member-directory endpoint. Not built in this phase.
-- **`getProfileForAdmin(userId)`** — includes `emergencyContact`. Placeholder for future admin tooling. Not built in this phase.
+- **`getProfileForSelf(userId)`** — includes `emergencyContact` and `isAdmin`. Used by `/api/me`.
+- **`getProfileForMember(userId)`** — stub that throws `NotImplemented`. Placeholder so the access decision is forced when member-directory work starts. Not built in this phase.
+- **`getProfileForAdmin(userId)`** — stub that throws `NotImplemented`. Placeholder for future admin tooling. Not built in this phase.
 
-Phase 2 implements only `getProfileForSelf`. The other two shapes are declared with stubs so the access pattern is decided the moment member-directory work starts. The Phase 1 `upsertProfile(user)` helper stays — it still only writes `id` + `displayName`, since no other fields are known at signup time.
+None of the shapes include programs — program membership is a separate concern and will get its own endpoint in a later phase. The Phase 1 `upsertProfile(user)` helper stays unchanged — it still only writes `id` + `displayName`, since no other fields are known at signup time.
 
 ## `/api/me` update
 
-Phase 1's `/api/me` returned `{ id, email, profile: { id, displayName, createdAt } }`. Phase 2 swaps the inline shape for `getProfileForSelf(user.id)`, which returns the full profile including `emergencyContact` and a joined list of the member's programs via `profilePrograms` → `programs`.
+Phase 1's `/api/me` returned `{ id, email, profile: { id, displayName, createdAt } }`. Phase 2 swaps the inline shape for `getProfileForSelf(user.id)`, which returns the full profile (all columns including `emergencyContact` and `isAdmin`). Programs are **not** included.
 
 ## `PUT /api/me` endpoint (new)
 
@@ -61,7 +80,7 @@ Fields not accepted: `id`, `displayName` (set at signup), `referredBy`, `referre
 
 ## Profile completion flow (`src/app/welcome/page.tsx` — new)
 
-After first sign-in, members land on `/` which detects an incomplete profile (e.g. `bio` is null) and redirects to `/welcome`. This page presents a form to fill in bio, keywords, location, etc. — the same fields accepted by `PUT /api/me`. Submitting saves the profile and redirects to `/`.
+After first sign-in, members land on `/`. The "incomplete profile" heuristic is `bio IS NULL` — bio is the one field every member must supply, and a new Phase 1 member will have it as null. If incomplete, `/` redirects to `/welcome`. This page presents a form to fill in bio, keywords, location, etc. — the same fields accepted by `PUT /api/me`. Submitting saves the profile and redirects to `/`.
 
 The form also includes an **optional password section**: "Set a password for faster sign-in (you can always use magic link instead)." This calls `supabase.auth.updateUser({ password })` client-side — GoTrue handles hashing and storage directly. No new API endpoint needed for password setting.
 
@@ -82,9 +101,10 @@ No "forgot password?" link. If a member forgets their password, they leave the f
 ## Tests
 
 - **Functional (Vitest):**
-  - `getProfileForSelf` includes `emergencyContact` (shape guard against accidental omission in future refactors).
-  - `getProfileForMember` does **not** include `emergencyContact` (shape guard for the inverse).
-  - `PUT /api/me` updates only allowed fields; rejects `isAdmin`, `referredBy`.
+  - `getProfileForSelf` includes `emergencyContact` and `isAdmin` (shape guard against accidental omission in future refactors).
+  - `getProfileForMember` / `getProfileForAdmin` throw `NotImplemented` (lock in the "decide-on-use" contract).
+  - `PUT /api/me` updates only allowed fields; rejects `isAdmin`, `referredBy`, `displayName`, and unknown keys.
+  - `PUT /api/me` rejects malformed input (e.g. `keywords` not an array of strings) with a 400.
   - Existing `upsertProfile` tests still pass — the helper is unchanged.
 - **E2E (Playwright):**
   - Member with incomplete profile redirected to `/welcome` after sign-in.
@@ -93,14 +113,17 @@ No "forgot password?" link. If a member forgets their password, they leave the f
 
 ## Files touched / created
 
-- `src/server/schema.ts` — alter `profiles` (additive column list)
-- `drizzle/migrations/*` — new SQL (expected to be `ALTER TABLE`)
-- `src/server/profiles.ts` — add `getProfileForSelf` + stubs for `getProfileForMember` / `getProfileForAdmin`
+- `src/server/schema.ts` — alter `profiles` (additive column list); add `programs` + `profilePrograms` tables
+- `drizzle/*.sql` — new generated migration (mixed `ALTER TABLE profiles` + `CREATE TABLE` for the two new tables)
+- `src/server/profiles.ts` — add `getProfileForSelf` + `NotImplemented` stubs for `getProfileForMember` / `getProfileForAdmin`
 - `src/server/api.ts` — `/api/me` swaps to `getProfileForSelf`; new `PUT /api/me`
-- `src/app/welcome/page.tsx` — new: profile completion + optional password
-- `src/app/login/page.tsx` — extended with optional password field
-- `tests/functional/profiles.test.ts` — extend with access control shape guards + `PUT /api/me` tests
-- `tests/e2e/profile-completion.spec.ts` — new
+- `src/app/page.tsx` — redirect to `/welcome` when `profile.bio === null`
+- `src/app/welcome/page.tsx` + `welcome-form.tsx` — new: profile completion + optional password
+- `src/app/login/login-form.tsx` — extended with optional password field
+- `tests/functional/profiles.test.ts` — extend with access control shape guards
+- `tests/functional/api-me.test.ts` — extend (new shape) + add `PUT /api/me` tests
+- `tests/e2e/profile-completion.spec.ts` — new (welcome redirect + form submit)
+- `tests/e2e/login-password.spec.ts` — new (dual-mode login via route interception)
 
 ## Verification
 
