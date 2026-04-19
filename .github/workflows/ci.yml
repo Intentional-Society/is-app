@@ -26,5 +26,5 @@ jobs:
       - run: supabase start
       - run: npm install
       - run: npm run lint
-      - run: npx drizzle-kit migrate
+      - run: node scripts/migrate.mjs
       - run: npm run test:functional
