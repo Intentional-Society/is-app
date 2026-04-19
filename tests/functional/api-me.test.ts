@@ -54,22 +54,34 @@ describe("GET /api/me", () => {
     );
   });
 
-  it("returns the strict shape and self-heals a missing profile row", async () => {
+  it("returns the self shape and self-heals a missing profile row", async () => {
     // No profile pre-inserted — handler must upsert on first call.
     const res = await app.request("/api/me");
 
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    // Strict equality: any accidental field leakage (e.g. Phase 2's
-    // emergencyContact) will fail this assertion loudly.
+    // Strict equality: the self shape is explicit. Any accidental
+    // field addition or omission will fail this assertion loudly.
+    // Programs intentionally absent — they're not a profile field.
     expect(body).toEqual({
       id: testUserId,
       email: "me-test@testfake.local",
       profile: {
         id: testUserId,
         displayName: "Test User",
+        bio: null,
+        keywords: [],
+        location: null,
+        supplementaryInfo: null,
+        referredBy: null,
+        referredByLegacy: null,
+        avatarUrl: null,
+        emergencyContact: null,
+        liveDesire: null,
+        isAdmin: false,
         createdAt: expect.any(String),
+        updatedAt: expect.any(String),
       },
     });
 

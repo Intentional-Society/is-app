@@ -5,7 +5,12 @@ import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/server/db";
-import { upsertProfile } from "@/server/profiles";
+import {
+  getProfileForAdmin,
+  getProfileForMember,
+  getProfileForSelf,
+  upsertProfile,
+} from "@/server/profiles";
 import { profiles } from "@/server/schema";
 
 describe("upsertProfile", () => {
@@ -67,5 +72,69 @@ describe("upsertProfile", () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.displayName).toBeNull();
+  });
+});
+
+describe("getProfileForSelf", () => {
+  let testUserId: string;
+
+  beforeEach(async () => {
+    testUserId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${testUserId}::uuid, false, false)`,
+    );
+    await db.insert(profiles).values({ id: testUserId, displayName: "Me" });
+  });
+
+  afterEach(async () => {
+    await db.delete(profiles).where(eq(profiles.id, testUserId));
+    await db.execute(
+      sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`,
+    );
+  });
+
+  it("returns null for an unknown id", async () => {
+    expect(await getProfileForSelf(randomUUID())).toBeNull();
+  });
+
+  it("returns the full self shape, including emergencyContact and isAdmin", async () => {
+    const profile = await getProfileForSelf(testUserId);
+
+    // Explicit key list guards against accidental field removal during
+    // future refactors and locks in emergencyContact visibility for
+    // self. Programs are deliberately NOT a profile field.
+    expect(profile).not.toBeNull();
+    expect(Object.keys(profile!).sort()).toEqual(
+      [
+        "id",
+        "displayName",
+        "bio",
+        "keywords",
+        "location",
+        "supplementaryInfo",
+        "referredBy",
+        "referredByLegacy",
+        "avatarUrl",
+        "emergencyContact",
+        "liveDesire",
+        "isAdmin",
+        "createdAt",
+        "updatedAt",
+      ].sort(),
+    );
+  });
+});
+
+describe("getProfileForMember / getProfileForAdmin stubs", () => {
+  it("getProfileForMember throws NotImplemented", async () => {
+    await expect(getProfileForMember(randomUUID())).rejects.toThrow(
+      /NotImplemented/,
+    );
+  });
+
+  it("getProfileForAdmin throws NotImplemented", async () => {
+    await expect(getProfileForAdmin(randomUUID())).rejects.toThrow(
+      /NotImplemented/,
+    );
   });
 });
