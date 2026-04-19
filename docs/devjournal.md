@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-18 | James | Auth Phase 1 (plumbing) complete
+
+End-to-end magic-link auth is wired. `/` is now a protected server component (unauthed → `/login`), the Hono API gates every route except `/api/health`, and `/api/me` returns a strict `{ id, email, profile }` shape that the functional test locks down so Phase 2's sensitive-field additions can't silently leak.
+
 ## 2026-04-14 | James | Drizzle migrations run in Vercel production build
 
 Every production deploy now runs `drizzle-kit migrate` before `next build` (gated on `VERCEL_ENV=production` in `vercel.json`), and a failed migration aborts the deploy with the previous build still serving traffic. Preview deploys skip the migration and continue to hit the prod DB unchanged. See `docs/doc-strategy-committing.md` for the expand-contract verification recipe that builds on this guarantee.
