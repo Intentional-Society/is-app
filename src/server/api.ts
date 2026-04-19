@@ -1,10 +1,15 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { log } from "next-axiom";
 
 import { type ApiVariables, requireAuth } from "./auth-middleware";
 import { db } from "./db";
-import { getProfileForSelf, upsertProfile } from "./profiles";
+import {
+  getProfileForSelf,
+  parseEditableProfile,
+  upsertProfile,
+} from "./profiles";
+import { profiles } from "./schema";
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -34,6 +39,35 @@ const api = new Hono<{ Variables: ApiVariables }>()
       profile = await getProfileForSelf(user.id);
     }
 
+    return c.json({ id: user.id, email: user.email, profile });
+  })
+  .put("/me", async (c) => {
+    const user = c.get("user");
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+
+    const parsed = parseEditableProfile(body);
+    if ("error" in parsed) {
+      return c.json({ error: parsed.error }, 400);
+    }
+
+    // Ensure a row exists before updating — same self-heal guarantee
+    // GET /me has, since a client can PUT /me before ever calling GET.
+    const existing = await getProfileForSelf(user.id);
+    if (!existing) {
+      await upsertProfile(user);
+    }
+
+    if (Object.keys(parsed).length > 0) {
+      await db.update(profiles).set(parsed).where(eq(profiles.id, user.id));
+    }
+
+    const profile = await getProfileForSelf(user.id);
     return c.json({ id: user.id, email: user.email, profile });
   })
   .get("/health", async (c) => {
