@@ -127,14 +127,10 @@ describe("getProfileForSelf", () => {
 
 describe("getProfileForMember / getProfileForAdmin stubs", () => {
   it("getProfileForMember throws NotImplemented", async () => {
-    await expect(getProfileForMember(randomUUID())).rejects.toThrow(
-      /NotImplemented/,
-    );
+    await expect(getProfileForMember()).rejects.toThrow(/NotImplemented/);
   });
 
   it("getProfileForAdmin throws NotImplemented", async () => {
-    await expect(getProfileForAdmin(randomUUID())).rejects.toThrow(
-      /NotImplemented/,
-    );
+    await expect(getProfileForAdmin()).rejects.toThrow(/NotImplemented/);
   });
 });

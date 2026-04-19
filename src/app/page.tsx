@@ -1,10 +1,7 @@
-import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { db } from "@/server/db";
-import { upsertProfile } from "@/server/profiles";
-import { profiles } from "@/server/schema";
+import { getProfileForSelf, upsertProfile } from "@/server/profiles";
 
 import { MeSmokeWidget } from "./me-smoke";
 
@@ -24,14 +21,18 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const readProfile = () =>
-    db.select().from(profiles).where(eq(profiles.id, user.id));
-
-  let [profile] = await readProfile();
+  let profile = await getProfileForSelf(user.id);
   if (!profile) {
     // Self-heal in case 1d's callback upsert failed.
     await upsertProfile(user);
-    [profile] = await readProfile();
+    profile = await getProfileForSelf(user.id);
+  }
+
+  // Incomplete-profile heuristic: bio null means the member has not
+  // completed /welcome yet. bio is the one field the welcome form
+  // always collects, so it's a reliable sentinel.
+  if (profile && profile.bio === null) {
+    redirect("/welcome");
   }
 
   return (

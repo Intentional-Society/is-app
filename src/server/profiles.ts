@@ -127,14 +127,12 @@ export const getProfileForSelf = async (
 // Placeholder. The member-directory endpoint is not built yet; throwing
 // here forces the access-control shape to be decided the moment that
 // work starts, instead of silently reusing the self shape.
-export const getProfileForMember = async (
-  _userId: string,
-): Promise<never> => {
+export const getProfileForMember = async (): Promise<never> => {
   throw new Error("NotImplemented: getProfileForMember");
 };
 
 // Placeholder. Same rationale as getProfileForMember — admin tooling
 // will choose its own shape when it lands.
-export const getProfileForAdmin = async (_userId: string): Promise<never> => {
+export const getProfileForAdmin = async (): Promise<never> => {
   throw new Error("NotImplemented: getProfileForAdmin");
 };

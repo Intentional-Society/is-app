@@ -107,9 +107,8 @@ No "forgot password?" link. If a member forgets their password, they leave the f
   - `PUT /api/me` rejects malformed input (e.g. `keywords` not an array of strings) with a 400.
   - Existing `upsertProfile` tests still pass — the helper is unchanged.
 - **E2E (Playwright):**
-  - Member with incomplete profile redirected to `/welcome` after sign-in.
-  - Filling out the form and submitting → profile updated, redirected to `/`.
-  - Password field on `/login`: submitting with password → `signInWithPassword` called; submitting without → `signInWithOtp` called.
+  - Password field on `/login`: submitting with password → `signInWithPassword` called; submitting without → `signInWithOtp` called. Uses route interception on the Supabase auth endpoints; `/login` is public so no session needed.
+  - Signed-in e2e coverage for the `/welcome` redirect and form submission is **deferred to Phase 3**, which owns the Playwright session-minting helper. Phase 2 verifies this flow manually (see Verification steps 3–6 below).
 
 ## Files touched / created
 
