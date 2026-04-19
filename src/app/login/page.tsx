@@ -7,7 +7,7 @@ import { LoginForm } from "./login-form";
 const ERROR_MESSAGES: Record<string, string> = {
   missing_code: "That sign-in link was incomplete. Please request a new one.",
   exchange_failed:
-    "That sign-in link is invalid or has expired. Please request a new one.",
+    "That sign-in link couldn't be verified. It must be opened in the same browser where you requested it, and before it expires. Please request a new one.",
   profile_error:
     "We signed you in but couldn't finish setting up your profile. Please try again.",
 };

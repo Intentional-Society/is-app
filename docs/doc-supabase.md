@@ -4,6 +4,14 @@ Covers both the hosted production project (configured via the Supabase dashboard
 
 ---
 
+## Magic-link flow (PKCE)
+
+The magic-link sign-in flow uses PKCE. When a user requests a link, the client stores a `code_verifier` secret in a browser cookie (`sb-<ref>-auth-token-code-verifier`). The `/auth/callback` handler needs that cookie to exchange the `code` for a session.
+
+Consequence: **the magic link must be opened in the same browser that requested it.** Clicking the link from a phone when the request came from a desktop, or opening it in an incognito window, fails with "exchange failed". Applies equally to the hosted and local stacks.
+
+---
+
 ## Production (hosted)
 
 - **Project ref:** `oyuzjowguujwhqyhijzx`
