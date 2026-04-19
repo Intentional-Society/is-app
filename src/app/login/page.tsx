@@ -31,8 +31,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <h1 className="text-4xl font-bold">Intentional Society</h1>
-      <p className="text-sm text-gray-400">
-        Enter your email to receive a sign-in link.
+      <p className="max-w-sm text-center text-sm text-gray-400">
+        Sign in with your password, or leave it blank to receive a magic
+        link by email.
       </p>
       {errorMessage && (
         <p

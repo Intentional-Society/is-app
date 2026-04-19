@@ -4,7 +4,19 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
-## 2026-04-18 | James | Auth Phase 1 (plumbing) complete
+## 2026-04-19 | James | Auth Phase 2 (profile expansion) complete
+
+`profiles` grew from three columns to the full community shape (bio, keywords, location, supplementaryInfo, referredBy, referredByLegacy, avatarUrl, emergencyContact, liveDesire, isAdmin) via additive `ALTER TABLE` statements — no backfill needed because the only existing row was a test account. `programs` and `profilePrograms` also landed as empty structural tables; they were deferred from Phase 1 and explicitly **not** joined into any profile shape, because program membership is a separate concern that will get its own endpoint.
+
+Introduced the serialization-layer access control pattern: `getProfileForSelf` returns the full self view (including `emergencyContact` and `isAdmin`), and `getProfileForMember` / `getProfileForAdmin` are `NotImplemented` stubs. The stubs exist deliberately so the next person to build a member-directory or admin tool is forced to decide the visible shape rather than silently reusing self.
+
+`PUT /api/me` accepts only the editable subset (bio, keywords, location, supplementaryInfo, avatarUrl, emergencyContact, liveDesire). Unknown keys and non-editable fields (`isAdmin`, `referredBy`, `displayName`, `id`, `createdAt`) are rejected with 400 by a compact allowlist parser — no new validation dependency.
+
+`/welcome` was added as the first-sign-in completion flow: `/` redirects there when `profile.bio IS NULL`, and the form saves via `PUT /api/me` plus an optional client-side `supabase.auth.updateUser({ password })`. Login page grew an optional password field; blank password still sends a magic link. No "forgot password" link — magic link is the recovery path.
+
+Signed-in e2e coverage for the welcome flow is deliberately deferred to Phase 3, which owns the Playwright session-minting helper. The login-page password-vs-OTP e2e uses route interception on `/auth/v1/token` and `/auth/v1/otp` — no session needed because `/login` is public.
+
+
 
 End-to-end magic-link auth is wired. `/` is now a protected server component (unauthed → `/login`), the Hono API gates every route except `/api/health`, and `/api/me` returns a strict `{ id, email, profile }` shape that the functional test locks down so Phase 2's sensitive-field additions can't silently leak.
 
