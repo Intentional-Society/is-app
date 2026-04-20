@@ -1,4 +1,10 @@
 import { defineConfig } from "@playwright/test";
+import { config as loadEnv } from "dotenv";
+
+// Load .env.local so the e2e session-minting helper can pick up
+// SUPABASE_SECRET_KEY for the Admin API. Harmless in CI where the var
+// comes from the environment instead.
+loadEnv({ path: ".env.local", quiet: true });
 
 const isCI = !!process.env.CI;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3093";
