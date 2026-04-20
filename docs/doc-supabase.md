@@ -25,11 +25,12 @@ These settings control where Supabase redirects users after magic-link sign-in. 
 
 - **Site URL:** `https://app.intentionalsociety.org`
 - **Redirect URLs** (allowlist):
-  - `https://app.intentionalsociety.org/auth/callback` — production
-  - `https://is-app-vercel-*-intentional-society-vercel.vercel.app/auth/callback` — Vercel preview deploys (wildcard)
-  - `http://localhost:3000/auth/callback` — local dev
+  - `https://app.intentionalsociety.org/auth/callback*` — production
+  - `https://is-app-vercel-*-intentional-society-vercel.vercel.app/auth/callback*` — Vercel preview deploys (wildcard)
+  - `http://localhost:3000/auth/callback*` — local dev
+  - `http://127.0.0.1:3000/auth/callback*` — local dev (alternate host)
 
-The client passes `emailRedirectTo: \`${window.location.origin}/auth/callback\`` from `src/app/login/login-form.tsx`, so adding a new deploy target only requires adding its `/auth/callback` URL to the allowlist above.
+The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRedirectTo: \`${origin}/auth/callback?invite=<code>\``, and Supabase's allowlist matches URLs verbatim unless a wildcard is present. Without the `*`, Supabase would reject that URL and silently fall back to **Site URL** — stranding the prospective member at `/` with no session. The plain sign-in path (`login-form.tsx`) passes the bare `/auth/callback`, which also matches `/auth/callback*`.
 
 ### Auth providers
 

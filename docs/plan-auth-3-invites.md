@@ -43,6 +43,7 @@ The invite code has to survive the magic-link round-trip. Flow:
      },
    });
    ```
+   The Supabase redirect allowlist uses a trailing-`*` wildcard on `/auth/callback*` so the invite query param is permitted — without that, Supabase would silently redirect to `site_url` and strand the visitor at `/login`.
 2. User clicks the magic link → lands on `/auth/callback?code=<pkce>&invite=<code>`.
 3. Callback exchanges PKCE → gets user → inside `db.transaction`:
    - Atomic redemption:

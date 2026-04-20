@@ -152,12 +152,14 @@ enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
 site_url = "http://127.0.0.1:3000"
-# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-# Must include the /auth/callback path for magic-link sign-in; cover both 127.0.0.1 and localhost
-# because window.location.origin on the client depends on which host the dev server was opened on.
+# A list of URLs that auth providers are permitted to redirect to post authentication. Supabase
+# matches these with trailing-`*` wildcard support. Cover both 127.0.0.1 and localhost because
+# window.location.origin on the client depends on which host the dev server was opened with.
+# The `/auth/callback*` pattern (instead of bare `/auth/callback`) lets the invite-signup flow
+# append `?invite=<code>` without falling off the allowlist and silently redirecting to site_url.
 additional_redirect_urls = [
-  "http://127.0.0.1:3000/auth/callback",
-  "http://localhost:3000/auth/callback",
+  "http://127.0.0.1:3000/auth/callback*",
+  "http://localhost:3000/auth/callback*",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
