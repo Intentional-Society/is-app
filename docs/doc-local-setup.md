@@ -1,5 +1,4 @@
 # Local Development Setup
----
 
 ## Prerequisites
 
