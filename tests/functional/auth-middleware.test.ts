@@ -67,10 +67,24 @@ describe("API auth middleware", () => {
     expect(mockCreateServerClient).not.toHaveBeenCalled();
   });
 
-  it("only exposes /api/health on the public allowlist", () => {
+  it("exposes only the expected public paths", () => {
     // Regression guard: if a new route needs to bypass auth, it should
     // be added here intentionally — and that change will be visible in
     // this test's diff.
-    expect(PUBLIC_PATHS).toEqual(new Set(["/api/health"]));
+    expect(PUBLIC_PATHS).toEqual([
+      "/api/health",
+      /^\/api\/invites\/[^/]+\/check$/,
+    ]);
+  });
+
+  it("allows /api/invites/:code/check without a session", async () => {
+    mockGetUser(null);
+
+    // The handler itself isn't wired yet in this test — 404 is fine.
+    // What matters is that auth didn't short-circuit with a 401.
+    const res = await app.request("/api/invites/ABC123/check");
+
+    expect(res.status).not.toBe(401);
+    expect(mockCreateServerClient).not.toHaveBeenCalled();
   });
 });

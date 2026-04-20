@@ -6,7 +6,16 @@ export type ApiVariables = { user: User };
 
 // Routes that bypass auth. Keep this tight — the regression guard in
 // auth-middleware.test.ts asserts nothing else is public.
-export const PUBLIC_PATHS = new Set<string>(["/api/health"]);
+// Strings are matched exactly; RegExps are tested against c.req.path.
+export const PUBLIC_PATHS: readonly (string | RegExp)[] = [
+  "/api/health",
+  // Prospective members check an invite code before being asked for an
+  // email, so this must be reachable without a session.
+  /^\/api\/invites\/[^/]+\/check$/,
+];
+
+const isPublicPath = (path: string): boolean =>
+  PUBLIC_PATHS.some((p) => (typeof p === "string" ? p === path : p.test(path)));
 
 const parseCookieHeader = (
   header: string | null,
@@ -20,7 +29,7 @@ const parseCookieHeader = (
 
 export const requireAuth: MiddlewareHandler<{ Variables: ApiVariables }> =
   async (c, next) => {
-    if (PUBLIC_PATHS.has(c.req.path)) {
+    if (isPublicPath(c.req.path)) {
       return next();
     }
 
