@@ -88,3 +88,22 @@ export const signInAsNewUser = async (
 export const expectAuthed = async (page: Page): Promise<void> => {
   await expect(page).not.toHaveURL(/\/login/);
 };
+
+// Fresh users land on /welcome because bio is null; tests that need
+// to exercise the post-welcome app surface (invite panel, etc.) use
+// this to fill the minimum required fields and land on /. Bio is the
+// sentinel `/` checks, so any non-empty string is enough.
+export const completeWelcome = async (
+  page: Page,
+  opts: { displayName?: string; bio?: string } = {},
+): Promise<void> => {
+  await page.waitForURL((url) => url.pathname === "/welcome", {
+    timeout: 10_000,
+  });
+  await page.getByLabel("Display name").fill(opts.displayName ?? "E2E User");
+  await page
+    .getByLabel("Bio")
+    .fill(opts.bio ?? "Short bio to clear the welcome redirect.");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.waitForURL((url) => url.pathname === "/", { timeout: 10_000 });
+};
