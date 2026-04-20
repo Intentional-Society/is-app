@@ -32,6 +32,8 @@ Because migrations always run first, the only timing constraint to think about i
 
 The expand-contract pattern naturally satisfies this: the expand phase adds schema that the old code ignores, and the contract phase only removes schema that the new code no longer references.
 
+**Preview caveat.** Preview deploys skip the migration and share the prod DB, so a PR that both adds columns *and* reads them ships new code against the still-old preview database. Any page that queries the new columns will 500 ("Application error" in production builds — the real `column "X" does not exist` message is hidden). Production itself is unaffected because its build runs the migration before `next build`, but the preview can't exercise the new flow until the PR merges. To keep previews functional end-to-end, land the schema change in its own PR (Expand) before the PR that uses it (Migrate).
+
 ### Writing safe migrations
 
 Every migration must be safe to run against a database that is actively serving requests with the *current* production code (i.e., the code from the previous deploy). Concretely:

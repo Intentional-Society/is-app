@@ -38,8 +38,10 @@ const pollUntilReady = async (budgetMs) => {
 };
 
 const runSupabaseStart = () => {
-  // Capture stderr so we can detect the "container name already in use"
-  // conflict, but also echo live output for the developer.
+  // Capture both streams so the caller can scan either for the
+  // "container name already in use" conflict — the CLI is inconsistent
+  // about which stream it picks (Windows shell: true makes it fuzzier).
+  // Output is echoed live to the developer on the way out.
   const result = spawnSync("npx", ["supabase", "start"], {
     shell: true,
     encoding: "utf8",
@@ -55,6 +57,14 @@ const clearDanglingSupabaseContainers = () => {
     ["ps", "-aq", "--filter", `name=supabase_.*_${PROJECT_ID}$`],
     { shell: true, encoding: "utf8" },
   );
+  if (list.status !== 0) {
+    // docker itself failed — don't swallow it, caller has no other way
+    // to know we gave up.
+    process.stderr.write(
+      `docker ps failed (exit ${list.status}):\n${list.stderr ?? ""}\n`,
+    );
+    return false;
+  }
   const ids = (list.stdout ?? "").split(/\s+/).filter(Boolean);
   if (ids.length === 0) return false;
   process.stdout.write(
@@ -82,8 +92,11 @@ const main = async () => {
   let start = runSupabaseStart();
   if (start.status === 0) return;
 
-  const stderr = start.stderr ?? "";
-  if (/container name .* is already in use/i.test(stderr)) {
+  // The Supabase CLI sometimes prints the docker-daemon conflict to
+  // stdout rather than stderr (shell: true on Windows makes this
+  // fuzzier), so we match against both.
+  const combined = `${start.stdout ?? ""}\n${start.stderr ?? ""}`;
+  if (/container name .* is already in use/i.test(combined)) {
     if (clearDanglingSupabaseContainers()) {
       process.stdout.write("Retrying Supabase start…\n");
       start = runSupabaseStart();

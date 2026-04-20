@@ -4,6 +4,14 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-19 | James | Auth Phase 2 (profile expansion) complete
+
+`profiles` grew from three columns to the full community shape (bio, keywords, location, supplementaryInfo, referred-by, avatar, emergency contact, live desire, isAdmin) via additive `ALTER TABLE`s. `programs` and `profilePrograms` landed as empty structural tables — deliberately **not** joined into any profile shape; program membership will get its own endpoint.
+
+Introduced serialization-layer access control: `getProfileForSelf` returns the full self view; `getProfileForMember` / `getProfileForAdmin` are `NotImplemented` stubs so the next person adding a directory or admin surface is forced to decide the visible shape rather than silently reusing self. `PUT /api/me` accepts only the editable subset and rejects unknown or privileged keys (`isAdmin`, `referredBy`, etc.) via a compact allowlist parser — no new validation dep.
+
+`/welcome` is the first-sign-in completion flow: `/` redirects there when `bio IS NULL`, and the form saves via `PUT /api/me` plus an optional client-side `supabase.auth.updateUser({ password })`. Login grew an optional password field; blank still sends a magic link, which is also the recovery path (no "forgot password" link). Signed-in e2e coverage is deferred to Phase 3, which owns the Playwright session-minting helper.
+
 ## 2026-04-18 | James | Auth Phase 1 (plumbing) complete
 
 End-to-end magic-link auth is wired. `/` is now a protected server component (unauthed → `/login`), the Hono API gates every route except `/api/health`, and `/api/me` returns a strict `{ id, email, profile }` shape that the functional test locks down so Phase 2's sensitive-field additions can't silently leak.
