@@ -10,6 +10,8 @@ const ERROR_MESSAGES: Record<string, string> = {
     "That sign-in link couldn't be verified. It must be opened in the same browser where you requested it, and before it expires. Please request a new one.",
   profile_error:
     "We signed you in but couldn't finish setting up your profile. Please try again.",
+  invite_invalid:
+    "That invite code was already used, revoked, or expired by the time you clicked the link. Ask the member who invited you for a new one.",
 };
 
 type LoginPageProps = {
