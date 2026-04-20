@@ -74,9 +74,9 @@ Phase 1's `/api/me` returned `{ id, email, profile: { id, displayName, createdAt
 
 ## `PUT /api/me` endpoint (new)
 
-Authed. Accepts the editable subset of profile fields (`bio`, `keywords`, `location`, `supplementaryInfo`, `avatarUrl`, `emergencyContact`, `liveDesire`). Validates input (e.g. `keywords` is an array of strings) and updates the caller's own profile row. Returns the updated profile via `getProfileForSelf`.
+Authed. Accepts the editable subset of profile fields (`displayName`, `bio`, `keywords`, `location`, `supplementaryInfo`, `avatarUrl`, `emergencyContact`, `liveDesire`). Validates input (e.g. `keywords` is an array of strings) and updates the caller's own profile row. Returns the updated profile via `getProfileForSelf`.
 
-Fields not accepted: `id`, `displayName` (set at signup), `referredBy`, `referredByLegacy`, `isAdmin`, `createdAt`.
+Fields not accepted: `id`, `referredBy`, `referredByLegacy`, `isAdmin`, `createdAt`.
 
 ## Profile completion flow (`src/app/welcome/page.tsx` — new)
 
@@ -103,7 +103,7 @@ No "forgot password?" link. If a member forgets their password, they leave the f
 - **Functional (Vitest):**
   - `getProfileForSelf` includes `emergencyContact` and `isAdmin` (shape guard against accidental omission in future refactors).
   - `getProfileForMember` / `getProfileForAdmin` throw `NotImplemented` (lock in the "decide-on-use" contract).
-  - `PUT /api/me` updates only allowed fields; rejects `isAdmin`, `referredBy`, `displayName`, and unknown keys.
+  - `PUT /api/me` updates only allowed fields; rejects `isAdmin`, `referredBy`, and unknown keys.
   - `PUT /api/me` rejects malformed input (e.g. `keywords` not an array of strings) with a 400.
   - Existing `upsertProfile` tests still pass — the helper is unchanged.
 - **E2E (Playwright):**

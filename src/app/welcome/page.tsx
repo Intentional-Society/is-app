@@ -28,6 +28,7 @@ export default async function WelcomePage() {
       </p>
       <WelcomeForm
         initial={{
+          displayName: profile?.displayName ?? "",
           bio: profile?.bio ?? "",
           keywords: profile?.keywords ?? [],
           location: profile?.location ?? "",

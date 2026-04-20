@@ -5,6 +5,7 @@ import { db } from "./db";
 import { profiles } from "./schema";
 
 export const EDITABLE_PROFILE_FIELDS = [
+  "displayName",
   "bio",
   "keywords",
   "location",
@@ -17,6 +18,7 @@ export const EDITABLE_PROFILE_FIELDS = [
 type EditableField = (typeof EDITABLE_PROFILE_FIELDS)[number];
 
 export type EditableProfileInput = Partial<{
+  displayName: string | null;
   bio: string | null;
   keywords: string[];
   location: string | null;
@@ -34,8 +36,8 @@ const isStringArray = (v: unknown): v is string[] =>
 
 // Returns the sanitized update payload, or a string describing the
 // first validation failure. Unknown keys are treated as failures to
-// protect fields like isAdmin / referredBy / displayName from being
-// set via the editable endpoint.
+// protect fields like isAdmin / referredBy from being set via the
+// editable endpoint.
 export const parseEditableProfile = (
   body: unknown,
 ): EditableProfileInput | { error: string } => {

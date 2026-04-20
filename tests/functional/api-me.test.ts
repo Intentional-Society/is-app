@@ -102,6 +102,7 @@ describe("GET /api/me", () => {
 
   it("PUT /me updates allowed fields and returns the self shape", async () => {
     const res = await putMe({
+      displayName: "Member Name",
       bio: "Hi, I'm a member.",
       keywords: ["curious", "writing"],
       location: "Lisbon",
@@ -110,6 +111,7 @@ describe("GET /api/me", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.profile.displayName).toBe("Member Name");
     expect(body.profile.bio).toBe("Hi, I'm a member.");
     expect(body.profile.keywords).toEqual(["curious", "writing"]);
     expect(body.profile.location).toBe("Lisbon");
@@ -119,16 +121,11 @@ describe("GET /api/me", () => {
     expect(body.profile.avatarUrl).toBeNull();
     // isAdmin stays its default.
     expect(body.profile.isAdmin).toBe(false);
-
-    // displayName came from upsert on first PUT (self-heal), not from
-    // the request body — PUT doesn't accept displayName.
-    expect(body.profile.displayName).toBe("Test User");
   });
 
   it.each([
     ["isAdmin", { isAdmin: true }],
     ["referredBy", { referredBy: "11111111-1111-1111-1111-111111111111" }],
-    ["displayName", { displayName: "New Name" }],
     ["createdAt", { createdAt: "2026-01-01T00:00:00Z" }],
     ["id", { id: "11111111-1111-1111-1111-111111111111" }],
   ])("PUT /me rejects non-editable field: %s", async (_label, body) => {

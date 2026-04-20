@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
 type Initial = {
+  displayName: string;
   bio: string;
   keywords: string[];
   location: string;
@@ -23,6 +24,7 @@ type Status =
 
 export function WelcomeForm({ initial }: { initial: Initial }) {
   const router = useRouter();
+  const [displayName, setDisplayName] = useState(initial.displayName);
   const [bio, setBio] = useState(initial.bio);
   const [keywordsText, setKeywordsText] = useState(initial.keywords.join(", "));
   const [location, setLocation] = useState(initial.location);
@@ -48,6 +50,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
 
     const res = await apiClient.api.me.$put({
       json: {
+        displayName: displayName.trim() || null,
         bio: bio.trim() || null,
         keywords,
         location: location.trim() || null,
@@ -90,6 +93,19 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
       onSubmit={handleSubmit}
       className="flex w-full max-w-md flex-col gap-3"
     >
+      <label className="text-sm text-gray-300" htmlFor="displayName">
+        Display name
+      </label>
+      <input
+        id="displayName"
+        type="text"
+        required
+        value={displayName}
+        onChange={(e) => setDisplayName(e.target.value)}
+        disabled={disabled}
+        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-gray-300 focus:outline-none"
+      />
+
       <label className="text-sm text-gray-300" htmlFor="bio">
         Bio
       </label>
@@ -140,7 +156,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
       />
 
       <label className="text-sm text-gray-300" htmlFor="supplementaryInfo">
-        Anything else
+        Supplementary info
       </label>
       <textarea
         id="supplementaryInfo"
