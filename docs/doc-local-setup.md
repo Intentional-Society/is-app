@@ -1,7 +1,4 @@
 # Local Development Setup
-
-Step-by-step guide for getting the app running on your machine.
-
 ---
 
 ## Prerequisites
