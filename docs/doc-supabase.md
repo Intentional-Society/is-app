@@ -12,6 +12,19 @@ Consequence: **the magic link must be opened in the same browser that requested 
 
 ---
 
+## `/login` vs `/signup` — who creates the user row
+
+`/login` calls `signInWithOtp({ email, options: { shouldCreateUser: false } })`. `/signup` omits `shouldCreateUser` (defaults to `true`) and passes `options: { data: { displayName } }`, which GoTrue stores as `raw_user_meta_data` on user creation. The callback reads `user_metadata.displayName` to populate the `profiles` row.
+
+Two reasons to keep `/login` non-creating:
+
+1. **Spam / accidental rows.** Without `shouldCreateUser: false`, any bot or typo-er submitting an unknown email to `/login` creates a row in `auth.users` with empty metadata. Closing that off means `/signup` is the only path to user creation.
+2. **Display-name integrity.** GoTrue only applies `options.data` on user *creation*, never on subsequent sign-ins. If a visitor had ever pre-existed (even from a mistyped `/login`), the display name they type on `/signup` would silently fail to reach `user_metadata` and their profile would land with `display_name = NULL`.
+
+Tradeoff: GoTrue returns HTTP 422 (`otp_disabled`) for unknown emails and 200 for known ones, so the `/otp` endpoint is an account-enumeration oracle at the network layer. The login form surfaces the 422 as a human-readable "no account found" message rather than swallowing it — UI-level hiding wouldn't change the network-visible signal, and silently showing "check your email" confuses genuine typo-ers. Closing enumeration for real would require proxying OTP through our own endpoint (shuttling a PKCE challenge round-trip) or adding CAPTCHA.
+
+---
+
 ## Production (hosted)
 
 - **Project ref:** `oyuzjowguujwhqyhijzx`
