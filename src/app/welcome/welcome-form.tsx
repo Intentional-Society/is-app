@@ -43,47 +43,58 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
     event.preventDefault();
     setStatus({ kind: "submitting" });
 
-    const keywords = keywordsText
-      .split(",")
-      .map((k) => k.trim())
-      .filter(Boolean);
+    try {
+      const keywords = keywordsText
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean);
 
-    const res = await apiClient.api.me.$put({
-      json: {
-        displayName: displayName.trim() || null,
-        bio: bio.trim() || null,
-        keywords,
-        location: location.trim() || null,
-        supplementaryInfo: supplementaryInfo.trim() || null,
-        avatarUrl: avatarUrl.trim() || null,
-        emergencyContact: emergencyContact.trim() || null,
-        liveDesire: liveDesire.trim() || null,
-      },
-    });
-
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setStatus({
-        kind: "error",
-        message: body.error ?? "Failed to save profile.",
+      const res = await apiClient.api.me.$put({
+        json: {
+          displayName: displayName.trim() || null,
+          bio: bio.trim() || null,
+          keywords,
+          location: location.trim() || null,
+          supplementaryInfo: supplementaryInfo.trim() || null,
+          avatarUrl: avatarUrl.trim() || null,
+          emergencyContact: emergencyContact.trim() || null,
+          liveDesire: liveDesire.trim() || null,
+        },
       });
-      return;
-    }
 
-    if (password.length > 0) {
-      const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) {
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
         setStatus({
           kind: "error",
-          message: `Profile saved, but password update failed: ${error.message}`,
+          message: body.error ?? "Failed to save profile.",
         });
         return;
       }
-    }
 
-    router.push("/");
-    router.refresh();
+      if (password.length > 0) {
+        const supabase = createClient();
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) {
+          setStatus({
+            kind: "error",
+            message: `Profile saved, but password update failed: ${error.message}`,
+          });
+          return;
+        }
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      // Unexpected throws (network drop, CORS, a thrown Supabase client
+      // bug) must not leave the button stuck on "Saving…" with no UI
+      // feedback. Surface the message and release the form.
+      setStatus({
+        kind: "error",
+        message:
+          err instanceof Error ? err.message : "Unexpected error while saving.",
+      });
+    }
   };
 
   const disabled = status.kind === "submitting";
