@@ -10,6 +10,14 @@ Added `npm run seed:dev` to populate a fresh local database with believable test
 
 One thing worth knowing: creating auth users in the seed script turned out to be trickier than expected. The `profiles` table has a foreign key to Supabase's `auth.users`, so you can't just insert profiles directly. The obvious approach — using the Supabase Admin API with the service-role key — broke when we found the new Supabase CLI (v2.89+) moved away from JWT keys to a new `sb_secret_*` format that the JS client couldn't parse. Ended up inserting directly into `auth.users` via the postgres superuser connection instead, which is simpler and doesn't care about key formats.
 
+## 2026-04-20 | James | Auth Phase 3 (invites) complete
+
+Member-generated invites are live. Any signed-in member mints a 10-char code (31-char alphabet — A–Z minus I/O, 2–9 minus 0/1) from `/`, with a 10-active-per-member cap, a 30-day expiry, and a required note that travels with the invite. `/signup` is the new front door: enter code → public `GET /api/invites/:code/check` surfaces the inviter's note (so the visitor recognises what the code is for) → enter email + display name → magic link goes through `/auth/callback?invite=<code>`.
+
+Redemption is atomic inside `/auth/callback`: a single transaction inserts the profile row, runs the guarded `UPDATE invites SET redeemed_by = …` (active predicates plus Postgres row locking serialise concurrent redeemers), then stamps `referredBy`. If the UPDATE returns 0 rows the whole transaction rolls back, the session is signed out, and the visitor lands on `/login?error=invite_invalid`. The profile-first ordering is forced by the `invites.redeemed_by → profiles.id` FK — only a single transaction can satisfy both constraints cleanly.
+
+Playwright can finally drive signed-in flows. The Phase 3a session helper provisions a test user via the Supabase Admin API, signs in through the real login form, and tears the user down (profile row first, since the FK has no cascade). The Phase 2 welcome e2e is backfilled in the same PR.
+
 ## 2026-04-19 | James | Auth Phase 2 (profile expansion) complete
 
 `profiles` grew from three columns to the full community shape (bio, keywords, location, supplementaryInfo, referred-by, avatar, emergency contact, live desire, isAdmin) via additive `ALTER TABLE`s. `programs` and `profilePrograms` landed as empty structural tables — deliberately **not** joined into any profile shape; program membership will get its own endpoint.
