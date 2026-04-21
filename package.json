@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "update_main_branch_protection": "node scripts/update-main-branch-protection.mjs",
     "dev": "npm run dev:db && next dev",
     "dev:db": "node scripts/ensure-docker.mjs && node scripts/ensure-supabase.mjs && node scripts/migrate.mjs && node scripts/seed-e2e-users.mjs",
     "dev:db:stop": "npx supabase stop",
