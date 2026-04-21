@@ -26,6 +26,12 @@ jobs:
         run: npx playwright test
         env:
           PLAYWRIGHT_BASE_URL: ${{ github.event.deployment_status.target_url }}
+          # Seeded test-user passwords + reset-endpoint token. See
+          # docs/doc-supabase.md for how these are provisioned in prod
+          # Supabase and the matching Vercel env var.
+          E2E_REGULAR_PASSWORD: ${{ secrets.E2E_REGULAR_PASSWORD }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          CI_RESET_TOKEN: ${{ secrets.CI_RESET_TOKEN }}
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

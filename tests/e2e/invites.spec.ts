@@ -1,80 +1,76 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  completeWelcome,
-  deleteTestUser,
-  signInAsNewUser,
-} from "./helpers/session";
+import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
 
-// These tests exercise the authed invite UI end-to-end against a real
-// session minted by the Phase 3a helper. /signup is partially stubbed
-// because we don't want to drive Inbucket for every run — the magic-
-// link callback itself is covered by functional tests.
+// These tests exercise the authed invite UI end-to-end against the
+// regular seeded user. Each test in the authed describe resets the
+// user's state first so the invite-count assertions hold regardless
+// of CI retries or prior tests. /signup is partially stubbed because
+// we don't want to drive Inbucket for every run — the magic-link
+// callback itself is covered by functional tests.
+//
+// Serial mode: all the authed tests in this file share the regular
+// user, so parallel runs would race on beforeEach resets / invite
+// creation. Local Playwright defaults to workers > 1; CI runs single-
+// worker regardless.
+test.describe.configure({ mode: "serial" });
 
 test.describe("invites — authed member flow", () => {
+  test.beforeEach(async ({ page, baseURL }) => {
+    if (!baseURL) throw new Error("invites.spec.ts: baseURL is not configured");
+    await resetSeededUsers(baseURL);
+    await signInAs(page, "regular");
+    await completeWelcome(page, { displayName: "Member Under Test" });
+  });
+
   test("create an invite, see it listed, revoke it", async ({ page }) => {
-    const user = await signInAsNewUser(page, "invites-member");
-    try {
-      await completeWelcome(page, { displayName: "Member Under Test" });
+    await expect(
+      page.getByRole("heading", { name: "Invite a member" }),
+    ).toBeVisible();
 
-      await expect(
-        page.getByRole("heading", { name: "Invite a member" }),
-      ).toBeVisible();
+    await page
+      .getByLabel(/Note \(for your records/)
+      .fill("bringing a friend from the meditation group");
+    await page.getByRole("button", { name: "Create invite" }).click();
 
-      await page
-        .getByLabel(/Note \(for your records/)
-        .fill("bringing a friend from the meditation group");
-      await page.getByRole("button", { name: "Create invite" }).click();
+    const codeLocator = page.locator("code").first();
+    await expect(codeLocator).toHaveText(/^[A-HJ-NP-Z2-9]{10}$/);
+    await expect(page.getByText("active", { exact: false })).toBeVisible();
 
-      const codeLocator = page.locator("code").first();
-      await expect(codeLocator).toHaveText(/^[A-HJ-NP-Z2-9]{10}$/);
-      await expect(page.getByText("active", { exact: false })).toBeVisible();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Revoke" }).click();
 
-      // Native confirm dialog pops on revoke — accept it.
-      page.once("dialog", (dialog) => dialog.accept());
-      await page.getByRole("button", { name: "Revoke" }).click();
-
-      await expect(page.getByText("revoked", { exact: false })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Revoke" })).toHaveCount(0);
-    } finally {
-      await deleteTestUser(user.id);
-    }
+    await expect(page.getByText("revoked", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Revoke" })).toHaveCount(0);
   });
 
   test("429 from the API surfaces a friendly cap message", async ({ page }) => {
-    const user = await signInAsNewUser(page, "invites-cap");
-    try {
-      await completeWelcome(page, { displayName: "Cap Tester" });
+    // Stub POST /api/invites to return 429 — we don't want to seed
+    // ten real invites per test run, and we only need to verify the
+    // UI's error branch for the cap case.
+    await page.route("**/api/invites", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 429,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: "too_many_active_invites",
+            limit: 10,
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
 
-      // Stub POST /api/invites to return 429 — we don't want to seed
-      // ten real invites per test run, and we only need to verify the
-      // UI's error branch for the cap case.
-      await page.route("**/api/invites", async (route) => {
-        if (route.request().method() === "POST") {
-          await route.fulfill({
-            status: 429,
-            contentType: "application/json",
-            body: JSON.stringify({
-              error: "too_many_active_invites",
-              limit: 10,
-            }),
-          });
-          return;
-        }
-        await route.continue();
-      });
+    await page
+      .getByLabel(/Note \(for your records/)
+      .fill("this should trigger the cap message");
+    await page.getByRole("button", { name: "Create invite" }).click();
 
-      await page
-        .getByLabel(/Note \(for your records/)
-        .fill("this should trigger the cap message");
-      await page.getByRole("button", { name: "Create invite" }).click();
-
-      await expect(
-        page.getByText(/You already have 10 active invites/),
-      ).toBeVisible();
-    } finally {
-      await deleteTestUser(user.id);
-    }
+    await expect(
+      page.getByText(/You already have 10 active invites/),
+    ).toBeVisible();
   });
 });
 
@@ -88,14 +84,17 @@ test.describe("/signup — unauthed invite flow", () => {
 
   test("valid code → note displayed → submitting email shows 'check your email'", async ({
     browser,
+    baseURL,
   }) => {
-    // Phase 1: as a logged-in member, generate a real invite code.
+    if (!baseURL) throw new Error("invites.spec.ts: baseURL is not configured");
+    await resetSeededUsers(baseURL);
+
+    // Phase 1: as the regular member, generate a real invite code.
     const memberContext = await browser.newContext();
     const memberPage = await memberContext.newPage();
-    const member = await signInAsNewUser(memberPage, "invites-creator");
-
     let code: string;
     try {
+      await signInAs(memberPage, "regular");
       await completeWelcome(memberPage, { displayName: "Inviter" });
       await memberPage
         .getByLabel(/Note \(for your records/)
@@ -145,7 +144,6 @@ test.describe("/signup — unauthed invite flow", () => {
       ).toBeVisible();
     } finally {
       await guestContext.close();
-      await deleteTestUser(member.id);
     }
   });
 });

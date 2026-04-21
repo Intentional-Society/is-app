@@ -23,6 +23,15 @@ NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
 SUPABASE_SECRET_KEY=sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+# E2E test-user credentials + reset-endpoint token. Values are
+# arbitrary for local dev — they just need to match what
+# scripts/seed-e2e-users.mjs applies and what Playwright reads.
+# Production uses separate values set in Vercel + GH Actions secrets
+# (see docs/doc-supabase.md).
+E2E_REGULAR_PASSWORD=local-e2e-regular-pw
+E2E_ADMIN_PASSWORD=local-e2e-admin-pw
+CI_RESET_TOKEN=local-reset-token
 `;
 
 function ensureLocalEnv() {

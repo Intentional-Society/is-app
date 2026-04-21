@@ -74,6 +74,7 @@ describe("API auth middleware", () => {
     expect(PUBLIC_PATHS).toEqual([
       "/api/health",
       /^\/api\/invites\/[^/]+\/check$/,
+      "/api/_test/reset",
     ]);
   });
 

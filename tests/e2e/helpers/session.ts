@@ -1,86 +1,49 @@
 import { type Page, expect } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
 
-// Shared password for every e2e-provisioned user. These accounts live only
-// for the span of a single test and are deleted on teardown, so the value
-// is immaterial — it just needs to be a valid string that satisfies the
-// project's minimum-length policy.
-const TEST_PASSWORD = "phase3-e2e-pw-a9f41";
+// Two long-lived test users seeded manually in prod Supabase. We sign
+// in through the real /login form with a known password rather than
+// minting a fresh user per test, which keeps the service-role key out
+// of CI. Per-run state cleanup happens via POST /api/_test/reset in the
+// Playwright setup project (see tests/e2e/reset.setup.ts).
+export type TestRole = "regular" | "admin";
 
-const adminClient = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secret = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !secret) {
+const EMAILS: Record<TestRole, string> = {
+  regular: "e2e-regular@testfake.local",
+  admin: "e2e-admin@testfake.local",
+};
+
+const passwordFor = (role: TestRole): string => {
+  const envVar =
+    role === "admin" ? "E2E_ADMIN_PASSWORD" : "E2E_REGULAR_PASSWORD";
+  const value = process.env[envVar];
+  if (!value) {
     throw new Error(
-      "e2e session helper requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY — " +
-        "re-run `npm run setup` to regenerate .env.local.",
+      `e2e session helper requires ${envVar} — set it in .env.local for ` +
+        `local runs and as a GH Actions secret for CI.`,
     );
   }
-  return createClient(url, secret, { auth: { persistSession: false } });
+  return value;
 };
 
-export type TestUser = { id: string; email: string };
+export type TestUser = { role: TestRole; email: string };
 
-// Creates a confirmed auth.users row with a known password. The profile row
-// is not inserted here — the app's /auth/callback upsert creates it on first
-// sign-in, which keeps the helper agnostic of profile-schema changes.
-export const createTestUser = async (email: string): Promise<TestUser> => {
-  const { data, error } = await adminClient().auth.admin.createUser({
-    email,
-    password: TEST_PASSWORD,
-    email_confirm: true,
-  });
-  if (error || !data.user) {
-    throw new Error(`createTestUser failed: ${error?.message ?? "no user"}`);
-  }
-  return { id: data.user.id, email };
-};
-
-export const deleteTestUser = async (id: string): Promise<void> => {
-  const client = adminClient();
-  // /auth/callback (and /) self-heals a missing profile row, so by the
-  // time the test finishes there is almost always a profiles row here.
-  // It must go first because profiles.id FKs to auth.users with no
-  // ON DELETE CASCADE. Row may not exist → `.eq` with no match is a no-op.
-  const { error: profileError } = await client
-    .from("profiles")
-    .delete()
-    .eq("id", id);
-  if (profileError) {
-    throw new Error(`deleteTestUser profile cleanup: ${profileError.message}`);
-  }
-  const { error } = await client.auth.admin.deleteUser(id);
-  if (error) throw new Error(`deleteTestUser failed: ${error.message}`);
-};
-
-// Drives the real login form with a known password. Using the production
-// sign-in path avoids a parallel "set the cookies directly" implementation
-// that would drift from how sessions actually get established.
-export const signIn = async (page: Page, email: string): Promise<void> => {
+// Drives the real /login form with the seeded password. Using the
+// production sign-in path avoids a parallel "set the cookies directly"
+// implementation that would drift from how sessions actually get
+// established.
+export const signInAs = async (
+  page: Page,
+  role: TestRole,
+): Promise<TestUser> => {
+  const email = EMAILS[role];
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password (optional)").fill(TEST_PASSWORD);
+  await page.getByLabel("Password (optional)").fill(passwordFor(role));
   await page.getByRole("button", { name: "Sign in" }).click();
-  // Successful sign-in redirects off /login. /welcome is the common
-  // landing spot for fresh users (bio is null).
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
     timeout: 10_000,
   });
-};
-
-// Convenience wrapper for the common case: "I need an authed session on
-// page X." Returns the user id so the test can pass it to deleteTestUser
-// in afterEach/afterAll.
-export const signInAsNewUser = async (
-  page: Page,
-  emailPrefix = "e2e",
-): Promise<TestUser> => {
-  const email = `${emailPrefix}-${Date.now()}-${Math.floor(
-    Math.random() * 1e6,
-  )}@testfake.local`;
-  const user = await createTestUser(email);
-  await signIn(page, email);
-  return user;
+  return { role, email };
 };
 
 // Small assertion helper callers can use to confirm a successful sign-in
@@ -89,10 +52,8 @@ export const expectAuthed = async (page: Page): Promise<void> => {
   await expect(page).not.toHaveURL(/\/login/);
 };
 
-// Fresh users land on /welcome because bio is null; tests that need
-// to exercise the post-welcome app surface (invite panel, etc.) use
-// this to fill the minimum required fields and land on /. Bio is the
-// sentinel `/` checks, so any non-empty string is enough.
+// After reset, bio is null and `/` redirects to `/welcome`. Tests that
+// want to land on `/` (e.g. invite panel) call this to fill the form.
 export const completeWelcome = async (
   page: Page,
   opts: { displayName?: string; bio?: string } = {},
@@ -106,4 +67,26 @@ export const completeWelcome = async (
     .fill(opts.bio ?? "Short bio to clear the welcome redirect.");
   await page.getByRole("button", { name: "Save" }).click();
   await page.waitForURL((url) => url.pathname === "/", { timeout: 10_000 });
+};
+
+// Hits the CI-only /api/_test/reset endpoint to wipe profile fields and
+// delete invites for both seeded users. The setup project calls this
+// once at the top of each run; tests don't need to call it themselves.
+export const resetSeededUsers = async (baseURL: string): Promise<void> => {
+  const token = process.env.CI_RESET_TOKEN;
+  if (!token) {
+    throw new Error(
+      "CI_RESET_TOKEN is required to run the e2e suite. Set it in " +
+        ".env.local (must match the Vercel preview env var of the same name).",
+    );
+  }
+  const res = await fetch(`${baseURL}/api/_test/reset`, {
+    method: "POST",
+    headers: { "x-ci-reset-token": token },
+  });
+  if (!res.ok) {
+    throw new Error(
+      `reset endpoint returned ${res.status}: ${await res.text().catch(() => "")}`,
+    );
+  }
 };

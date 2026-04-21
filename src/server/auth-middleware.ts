@@ -12,6 +12,10 @@ export const PUBLIC_PATHS: readonly (string | RegExp)[] = [
   // Prospective members check an invite code before being asked for an
   // email, so this must be reachable without a session.
   /^\/api\/invites\/[^/]+\/check$/,
+  // CI-only test-reset endpoint. The endpoint itself is gated by
+  // VERCEL_ENV + a shared-secret header — the CI token is the auth here,
+  // not a Supabase session.
+  "/api/_test/reset",
 ];
 
 const isPublicPath = (path: string): boolean =>
