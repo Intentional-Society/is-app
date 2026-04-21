@@ -28,11 +28,50 @@ if (!supabaseUrl.includes("localhost") && !supabaseUrl.includes("127.0.0.1")) {
 const client = postgres(process.env.DATABASE_URL!);
 const db = drizzle(client);
 
+type SeedProfile = {
+  id: string;
+  email: string;
+  displayName: string;
+  bio: string | null;
+  keywords: string[];
+  location: string | null;
+  referredBy: string | null;
+  referredByLegacy: string | null;
+  avatarUrl: string | null;
+  emergencyContact: string | null;
+  liveDesire: string | null;
+  isAdmin: boolean;
+  supplementaryInfo: string | null;
+};
+type SeedProgram = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+};
+type SeedProfilePrograms = { profileId: string; programId: string };
+type SeedInvite = {
+  id: string;
+  code: string;
+  createdBy: string;
+  note: string;
+  createdAt: string;
+  expiresAt: string;
+  redeemedBy: string | null;
+  redeemedAt: string | null;
+};
+type SeedData = {
+  profiles: SeedProfile[];
+  programs: SeedProgram[];
+  profilePrograms: SeedProfilePrograms[];
+  invites: SeedInvite[];
+};
+
 // Load seed data relative to this file's location.
 const scriptDir = fileURLToPath(new URL(".", import.meta.url));
 const seedData = JSON.parse(
   readFileSync(resolve(scriptDir, "seed-dev.json"), "utf-8")
-);
+) as SeedData;
 
 type SeedResult = { inserted: number; skipped: number };
 
