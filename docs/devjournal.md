@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-21 | Ola | Seed script for local development
+
+Added `npm run seed:dev` to populate a fresh local database with believable test data — 15 member profiles, 3 programs (The Gumball Machine, Presence Pods, Thematic Crews), memberships spread realistically across them, and 5 redeemed invites that trace a real invite chain. All IDs are fixed so E2E tests can reference known values. Running it twice does nothing harmful.
+
+One thing worth knowing: creating auth users in the seed script turned out to be trickier than expected. The `profiles` table has a foreign key to Supabase's `auth.users`, so you can't just insert profiles directly. The obvious approach — using the Supabase Admin API with the service-role key — broke when we found the new Supabase CLI (v2.89+) moved away from JWT keys to a new `sb_secret_*` format that the JS client couldn't parse. Ended up inserting directly into `auth.users` via the postgres superuser connection instead, which is simpler and doesn't care about key formats.
+
 ## 2026-04-19 | James | Auth Phase 2 (profile expansion) complete
 
 `profiles` grew from three columns to the full community shape (bio, keywords, location, supplementaryInfo, referred-by, avatar, emergency contact, live desire, isAdmin) via additive `ALTER TABLE`s. `programs` and `profilePrograms` landed as empty structural tables — deliberately **not** joined into any profile shape; program membership will get its own endpoint.

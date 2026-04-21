@@ -130,3 +130,17 @@ Stopping is optional — the containers are lightweight and persist safely betwe
 
 **`.env.local` has wrong values**
 : Delete it and re-run `npm run setup` to regenerate from the known-good defaults.
+
+---
+
+## Seed development data
+
+After starting local Supabase and running migrations, populate the database with realistic test data:
+
+```bash
+npm run seed:dev
+```
+
+This inserts 15 member profiles, 3 programs (The Gumball Machine, Presence Pods, Thematic Crews), 24 program memberships, and 5 invites representing a realistic invite chain. All records use fixed UUIDs so E2E tests can reference known values.
+
+The script is idempotent — running it a second time produces no duplicates and reports how many rows were inserted vs skipped per table.
