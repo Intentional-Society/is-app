@@ -1,0 +1,43 @@
+name: CodeQL
+
+# Static analysis for JS/TS. Runs on every PR into main (same gate as
+# the functional CI), on every push to main so main's baseline is always
+# scanned, and weekly so newly-published query updates catch issues in
+# code that hasn't changed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # security-extended includes the default queries plus a broader
+          # set of lower-severity checks. Worth the extra runtime on a
+          # project this size.
+          queries: security-extended
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
