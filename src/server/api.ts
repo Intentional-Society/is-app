@@ -5,11 +5,19 @@ import { log } from "next-axiom";
 import { type ApiVariables, requireAuth } from "./auth-middleware";
 import { db } from "./db";
 import {
+  checkInvite,
+  createInvite,
+  getInvitesForCreator,
+  revokeInvite,
+  validateNote,
+} from "./invites";
+import {
   getProfileForSelf,
   parseEditableProfile,
   upsertProfile,
 } from "./profiles";
 import { profiles } from "./schema";
+import { isResetEnabled, resetE2EUsers } from "./test-reset";
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -70,6 +78,70 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const profile = await getProfileForSelf(user.id);
     return c.json({ id: user.id, email: user.email, profile });
   })
+  .post("/invites", async (c) => {
+    const user = c.get("user");
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "body must be a JSON object" }, 400);
+    }
+
+    const noteCheck = validateNote((body as Record<string, unknown>).note);
+    if (typeof noteCheck !== "string") {
+      return c.json({ error: noteCheck.error }, 400);
+    }
+
+    const result = await createInvite({ createdBy: user.id, note: noteCheck });
+    if ("error" in result) {
+      return c.json(
+        { error: "too_many_active_invites", limit: result.limit },
+        429,
+      );
+    }
+    return c.json(result, 201);
+  })
+  .get("/invites/mine", async (c) => {
+    const user = c.get("user");
+    const invites = await getInvitesForCreator(user.id);
+    return c.json({ invites });
+  })
+  .post("/invites/:code/revoke", async (c) => {
+    const user = c.get("user");
+    const code = c.req.param("code");
+
+    const [row] = await db
+      .select({ isAdmin: profiles.isAdmin })
+      .from(profiles)
+      .where(eq(profiles.id, user.id));
+    const isAdmin = row?.isAdmin ?? false;
+
+    const result = await revokeInvite({ code, userId: user.id, isAdmin });
+    if ("error" in result) {
+      if (result.error === "not_found") {
+        return c.json({ error: "not_found" }, 404);
+      }
+      if (result.error === "forbidden") {
+        return c.json({ error: "forbidden" }, 403);
+      }
+      if (result.error === "already_redeemed") {
+        return c.json({ error: "already_redeemed" }, 409);
+      }
+    }
+    return c.json({ ok: true });
+  })
+  .get("/invites/:code/check", async (c) => {
+    const code = c.req.param("code");
+    const result = await checkInvite(code);
+    if (result.valid) {
+      return c.json({ valid: true, note: result.note });
+    }
+    return c.json({ valid: false, reason: result.reason });
+  })
   .get("/health", async (c) => {
     const result = await db.execute(sql`SELECT now() AS server_time`);
     return c.json({
@@ -79,6 +151,20 @@ const api = new Hono<{ Variables: ApiVariables }>()
         serverTime: result[0].server_time,
       },
     });
+  })
+  // CI-only reset for the two seeded e2e users. Gated by VERCEL_ENV
+  // (never live in production) and a shared-secret header. Both gates
+  // return 404 on failure to avoid advertising the endpoint.
+  .post("/_test/reset", async (c) => {
+    if (!isResetEnabled()) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    const token = c.req.header("x-ci-reset-token");
+    if (!token || token !== process.env.CI_RESET_TOKEN) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    const result = await resetE2EUsers();
+    return c.json(result);
   });
 
 export type ApiRoutes = typeof api;

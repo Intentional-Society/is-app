@@ -44,11 +44,30 @@ export function LoginForm() {
       email,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        // Block auto-creation of users via this form. Keeps auth.users
+        // from accumulating rows when a bot (or a typo) submits unknown
+        // emails, and closes the loophole where a pre-existing row with
+        // empty user_metadata silently swallows the displayName that
+        // /signup tries to set via options.data on first sign-in.
+        //
+        // Supabase's /otp endpoint returns 422 (otp_disabled) for
+        // unknown emails — we surface that error directly. It makes
+        // the endpoint an account-enumeration oracle at the HTTP
+        // layer, but hiding the error in the UI wouldn't change that
+        // (anyone can read the Network tab), so there's no point
+        // pretending otherwise.
+        shouldCreateUser: false,
       },
     });
 
     if (error) {
-      setState({ status: "error", message: error.message });
+      // GoTrue's "Signups not allowed for otp" is literal-true but
+      // reads as gibberish. Rewrite it to something a human can act on.
+      const message =
+        error.code === "otp_disabled"
+          ? "No account found for that email. If you have an invite code, head to /signup."
+          : error.message;
+      setState({ status: "error", message });
       return;
     }
 

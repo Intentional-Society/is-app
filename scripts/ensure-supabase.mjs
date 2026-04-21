@@ -52,29 +52,35 @@ const runSupabaseStart = () => {
 };
 
 const clearDanglingSupabaseContainers = () => {
+  // Filter client-side: `docker ps --filter name=` is a substring match,
+  // not regex, so earlier attempts at `supabase_.*_${PROJECT_ID}$` matched
+  // nothing and recovery silently no-op'd. List all containers and match
+  // names in JS instead.
   const list = spawnSync(
     "docker",
-    ["ps", "-aq", "--filter", `name=supabase_.*_${PROJECT_ID}$`],
+    ["ps", "-a", "--format", "{{.Names}}"],
     { shell: true, encoding: "utf8" },
   );
   if (list.status !== 0) {
-    // docker itself failed — don't swallow it, caller has no other way
-    // to know we gave up.
     process.stderr.write(
       `docker ps failed (exit ${list.status}):\n${list.stderr ?? ""}\n`,
     );
     return false;
   }
-  const ids = (list.stdout ?? "").split(/\s+/).filter(Boolean);
-  if (ids.length === 0) return false;
+  const pattern = new RegExp(`^supabase_.+_${PROJECT_ID}$`);
+  const names = (list.stdout ?? "")
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter((n) => pattern.test(n));
+  if (names.length === 0) return false;
   process.stdout.write(
-    `Removing ${ids.length} dangling Supabase container(s)…\n`,
+    `Removing ${names.length} dangling Supabase container(s): ${names.join(", ")}\n`,
   );
-  spawnSync("docker", ["rm", "-f", ...ids], {
+  const rm = spawnSync("docker", ["rm", "-f", ...names], {
     stdio: "inherit",
     shell: true,
   });
-  return true;
+  return rm.status === 0;
 };
 
 const main = async () => {

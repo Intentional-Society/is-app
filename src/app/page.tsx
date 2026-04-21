@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf, upsertProfile } from "@/server/profiles";
 
+import { InvitesPanel } from "./invites-panel";
 import { MeSmokeWidget } from "./me-smoke";
 
 async function signOut() {
@@ -36,7 +37,7 @@ export default async function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
+    <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <h1 className="text-4xl font-bold">Intentional Society</h1>
       <p className="text-sm">Signed in as {user.email}</p>
       <p className="text-sm">Display name: {profile?.displayName ?? "—"}</p>
@@ -48,6 +49,7 @@ export default async function Home() {
           Sign out
         </button>
       </form>
+      <InvitesPanel />
       <MeSmokeWidget />
     </main>
   );

@@ -77,3 +77,39 @@ test("password blank → signInWithOtp is called", async ({ page }) => {
   expect(sawOtpCall).toBe(true);
   expect(sawPasswordCall).toBe(false);
 });
+
+test("unknown email on magic-link surfaces the otp_disabled error", async ({
+  page,
+}) => {
+  // With shouldCreateUser=false, GoTrue returns 422 for unknown
+  // emails. The form shows that error to the user directly — the
+  // endpoint is already an enumeration oracle at the network layer,
+  // so hiding the message in the UI would only hurt genuine
+  // typo-ers without closing the leak.
+  await page.route(SUPABASE_AUTH, async (route) => {
+    const url = route.request().url();
+    if (url.includes("/otp")) {
+      // Matches what GoTrue actually returns for unknown emails when
+      // shouldCreateUser=false — verified against the local stack.
+      await route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: 422,
+          error_code: "otp_disabled",
+          msg: "Signups not allowed for otp",
+        }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 200, body: "{}" });
+  });
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("stranger@example.test");
+  await page.getByRole("button", { name: "Send sign-in link" }).click();
+
+  await expect(
+    page.getByText(/No account found for that email/),
+  ).toBeVisible();
+});
