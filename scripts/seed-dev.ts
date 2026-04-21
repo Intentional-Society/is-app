@@ -67,7 +67,7 @@ async function seedAuthUsers(): Promise<SeedResult> {
 }
 
 async function seedProfiles(): Promise<SeedResult> {
-  const values = seedData.profiles.map((p: any) => ({
+  const values = seedData.profiles.map((p) => ({
     id: p.id,
     displayName: p.displayName,
     bio: p.bio,
@@ -90,7 +90,7 @@ async function seedProfiles(): Promise<SeedResult> {
 }
 
 async function seedPrograms(): Promise<SeedResult> {
-  const values = seedData.programs.map((p: any) => ({
+  const values = seedData.programs.map((p) => ({
     id: p.id,
     slug: p.slug,
     name: p.name,
@@ -105,7 +105,7 @@ async function seedPrograms(): Promise<SeedResult> {
 }
 
 async function seedProfilePrograms(): Promise<SeedResult> {
-  const values = seedData.profilePrograms.map((pp: any) => ({
+  const values = seedData.profilePrograms.map((pp) => ({
     profileId: pp.profileId,
     programId: pp.programId,
   }));
@@ -118,7 +118,7 @@ async function seedProfilePrograms(): Promise<SeedResult> {
 }
 
 async function seedInvites(): Promise<SeedResult> {
-  const values = seedData.invites.map((inv: any) => ({
+  const values = seedData.invites.map((inv) => ({
     id: inv.id,
     code: inv.code,
     createdBy: inv.createdBy,
