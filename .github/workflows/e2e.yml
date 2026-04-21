@@ -3,6 +3,11 @@ name: E2E Tests
 on:
   deployment_status:
 
+# See ci.yml for the rationale. upload-artifact@v4 works with contents:
+# read — it doesn't need write scope on any top-level resource.
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

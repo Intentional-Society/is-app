@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  # npm dependencies — production and dev. Weekly so PR noise stays
+  # bounded; security advisories arrive immediately regardless of this
+  # schedule.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Batch patch/minor bumps together so Dependabot doesn't open one
+      # PR per transitively-related package. Majors still land as their
+      # own PRs so the breaking-change review happens in isolation.
+      minor-and-patch:
+        update-types:
+          - patch
+          - minor
+
+  # GitHub Actions used in workflows (actions/checkout, setup-node, etc.)
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
