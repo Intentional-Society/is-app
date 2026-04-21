@@ -1,9 +1,13 @@
 name: CodeQL
 
-# Static analysis for JS/TS. Runs on every PR into main (same gate as
-# the functional CI), on every push to main so main's baseline is always
-# scanned, and weekly so newly-published query updates catch issues in
-# code that hasn't changed.
+# Static analysis. Runs on every PR into main, on every push to main
+# so main's baseline is always scanned, and weekly so newly-published
+# query updates catch issues in code that hasn't changed.
+#
+# Two languages are scanned:
+#   - javascript-typescript: the app itself.
+#   - actions: the workflow YAMLs — catches patterns like unpinned
+#     third-party actions or pwn-request misconfigurations.
 
 on:
   push:
@@ -11,33 +15,46 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+    - cron: "37 22 * * 5" # Friday 22:37 UTC
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   analyze:
-    name: Analyze (javascript-typescript)
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
+      # Required to upload results to the Security tab.
       security-events: write
+      # Required to fetch private / internal CodeQL query packs.
+      packages: read
+      # Required for private repos; harmless on public ones.
       actions: read
       contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - actions
+          - javascript-typescript
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
-          languages: javascript-typescript
-          # security-extended includes the default queries plus a broader
-          # set of lower-severity checks. Worth the extra runtime on a
-          # project this size.
+          languages: ${{ matrix.language }}
+          # Neither language is compiled, so no build is needed.
+          build-mode: none
+          # security-extended adds a broader set of lower-severity
+          # checks on top of the default query pack. Worth the extra
+          # runtime on a project this size.
           queries: security-extended
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
-          category: "/language:javascript-typescript"
+          category: "/language:${{ matrix.language }}"
