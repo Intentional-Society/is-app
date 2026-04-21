@@ -4,6 +4,12 @@ on:
   pull_request:
     branches: [main]
 
+# Minimum GITHUB_TOKEN scope the job actually needs. Default on public
+# repos is `write` on most resources, which would let a compromised
+# dependency in `npm install` push to main or open PRs under our name.
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
