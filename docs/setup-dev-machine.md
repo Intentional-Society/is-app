@@ -24,6 +24,8 @@ nvm use 22
 
 After install: `node --version` should show v22.x or later.
 
+The repo includes an `.nvmrc` file, so running `nvm use` inside the project directory will automatically switch to the correct version.
+
 ## Docker Desktop
 
 Required for the local Supabase stack (Postgres, Auth, Studio).

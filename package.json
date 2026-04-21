@@ -8,6 +8,7 @@
     "dev:db": "node scripts/ensure-docker.mjs && node scripts/ensure-supabase.mjs && node scripts/migrate.mjs",
     "dev:db:stop": "npx supabase stop",
     "dev:db:reset": "npx supabase db reset && npx drizzle-kit migrate",
+    "seed:dev": "npx tsx scripts/seed-dev.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -45,5 +46,8 @@
     "tailwindcss": "^4",
     "typescript": "^5.8",
     "vitest": "^4.1.2"
+  },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-darwin-arm64": "^4.2.2"
   }
 }
