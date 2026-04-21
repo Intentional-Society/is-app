@@ -114,7 +114,10 @@ test.describe("/signup — unauthed invite flow", () => {
     try {
       // Intercept only the OTP call — let /api/invites/:code/check hit
       // the real app so it returns the real note from the DB.
-      await guestPage.route("**/auth/v1/otp", (route) =>
+      // Note the regex (not a glob): supabase-js sends the redirect URL
+      // as ?redirect_to=..., and Playwright's **/auth/v1/otp glob does
+      // not match URLs that have a query string. A regex matches both.
+      await guestPage.route(/\/auth\/v1\/otp(\?|$)/, (route) =>
         route.fulfill({
           status: 200,
           contentType: "application/json",
