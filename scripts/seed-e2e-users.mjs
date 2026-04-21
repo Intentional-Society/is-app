@@ -28,10 +28,21 @@ const USERS = [
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secret = process.env.SUPABASE_SECRET_KEY;
 const dbUrl = process.env.DATABASE_URL;
-if (!url || !secret || !dbUrl) {
-  process.stderr.write(
-    "seed-e2e-users: missing env vars. Did you run `npm run setup`?\n",
+const regularPw = process.env.E2E_REGULAR_PASSWORD;
+const adminPw = process.env.E2E_ADMIN_PASSWORD;
+
+// Local dev + local e2e: all vars set by `npm run setup`, so we seed.
+// CI functional job: only DATABASE_URL is present (CI runs its own
+// Supabase for vitest but doesn't touch auth). Skip silently so
+// `npm run dev:db` stays usable as a shared prerequisite step.
+if (!url || !secret || !regularPw || !adminPw) {
+  process.stdout.write(
+    "seed-e2e-users: skipping (auth/password env vars not set — expected in CI functional job)\n",
   );
+  process.exit(0);
+}
+if (!dbUrl) {
+  process.stderr.write("seed-e2e-users: DATABASE_URL is required\n");
   process.exit(1);
 }
 
@@ -46,13 +57,6 @@ try {
 
   for (const user of USERS) {
     const password = process.env[user.envVar];
-    if (!password) {
-      process.stderr.write(
-        `seed-e2e-users: ${user.envVar} is not set in .env.local\n`,
-      );
-      process.exit(1);
-    }
-
     const existing = list.users.find((u) => u.email === user.email);
     let userId;
     if (existing) {
