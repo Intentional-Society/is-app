@@ -49,7 +49,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - Trunk-based development: feature branches PR into `main`, which auto-deploys to production
 - Run `npm test` before committing. Keep docs and CLAUDE.md in sync with code changes.
 - Schema/API migrations use the **expand-contract pattern** (see `docs/doc-strategy-committing.md`)
-- All pushes trigger Vercel deployment
+- All pushes trigger Vercel deployment; docs-only changes (`docs/**`, root `CLAUDE.md`) skip automatically (see `docs/doc-strategy-committing.md`)
 - Add `docs/devjournal.md` entries for decisions teammates should know about
 
 ## CI/CD

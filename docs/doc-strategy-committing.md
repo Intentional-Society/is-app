@@ -12,6 +12,28 @@ Run `npm test` (all suites) and confirm green before committing. Don't push code
 
 Always commit on a feature branch, never directly to `main`. PRs into `main` require CI to pass before merge.
 
+## Skipping deploys for docs-only changes
+
+Every push to a branch with an open PR triggers a Vercel preview deploy, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` automatically skips builds whose only changes since the last successful deploy are inside `docs/` or the root `CLAUDE.md`. Nothing for the author to remember.
+
+How it works:
+
+1. `git fetch --depth=1 origin $VERCEL_GIT_PREVIOUS_SHA` pulls the last-deployed commit into Vercel's shallow clone. (`VERCEL_GIT_PREVIOUS_SHA` is set by Vercel to the SHA of the previous successful deploy on this branch.)
+2. `git diff --quiet $VERCEL_GIT_PREVIOUS_SHA HEAD -- . ':!docs/' ':!CLAUDE.md'` exits 0 if no non-docs files differ, 1 if any do.
+3. Vercel skips on exit 0, deploys on exit non-zero.
+
+This compares against the last *deployed* state rather than against `HEAD^`, so a mixed push (code commits followed by a docs commit) deploys correctly — the diff still sees the code changes.
+
+Failure modes all default to deploying (the safe direction):
+
+- First deploy on a branch — no previous SHA, fetch fails, deploy runs.
+- Force-pushed or rewritten history — previous SHA missing, fetch fails, deploy runs.
+- Anything unexpected — deploy runs.
+
+Playwright e2e skips downstream because it's triggered by Vercel's `deployment_status` event, which only fires on a real deploy.
+
+CI (lint + functional tests) still runs on every PR — branch protection requires its status check, and `paths-ignore` would leave the check stuck at "expected" and block merge. CI is cheap compared to Vercel's build minutes; the Vercel skip is where the savings come from.
+
 ## Schema and data migrations: expand-contract pattern
 
 When a change touches the database schema or API response shape, deploy it in phases:

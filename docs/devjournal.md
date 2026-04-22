@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-22 | James | Skip Vercel preview for docs-only changes
+
+Vercel's `ignoreCommand` now diffs HEAD against the previous successful deploy and skips the build when only `docs/` or root `CLAUDE.md` changed. See `docs/doc-strategy-committing.md`.
+
 ## 2026-04-21 | Ola | Seed script for local development
 
 Added `npm run seed:dev` to populate a fresh local database with believable test data — 15 member profiles, 3 programs (The Gumball Machine, Presence Pods, Thematic Crews), memberships spread realistically across them, and 5 redeemed invites that trace a real invite chain. All IDs are fixed so E2E tests can reference known values. Running it twice does nothing harmful.
