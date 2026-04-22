@@ -62,6 +62,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 
 - `docs/doc-strategy-branching.md` — branching strategy and rationale
 - `docs/doc-strategy-committing.md` — commit conventions and expand-contract pattern
+- `docs/doc-strategy-project-management.md` — GitHub Projects board conventions
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-supabase.md` — Supabase dashboard settings (auth URLs, API keys)
 - `docs/doc-github.md` — GitHub settings and CI workflows
