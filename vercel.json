@@ -1,4 +1,4 @@
 {
   "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then node scripts/migrate.mjs; fi && next build",
-  "ignoreCommand": "git fetch --depth=1 origin $VERCEL_GIT_PREVIOUS_SHA 2>/dev/null && git diff --quiet $VERCEL_GIT_PREVIOUS_SHA HEAD -- . ':!docs/' ':!CLAUDE.md'"
+  "ignoreCommand": "{ [ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ] && git fetch --depth=1 origin main 2>/dev/null && git diff --quiet origin/main HEAD -- . ':!docs/' ':!CLAUDE.md' ; } || exit 1"
 }

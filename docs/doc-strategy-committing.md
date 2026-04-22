@@ -14,20 +14,20 @@ Always commit on a feature branch, never directly to `main`. PRs into `main` req
 
 ## Skipping deploys for docs-only changes
 
-Every push to a branch with an open PR triggers a Vercel preview deploy, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` automatically skips builds whose only changes since the last successful deploy are inside `docs/` or the root `CLAUDE.md`. Nothing for the author to remember.
+Every push to a branch with an open PR triggers a Vercel preview deploy, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` automatically skips builds whose entire branch diff vs `main` is confined to `docs/` or the root `CLAUDE.md`. Nothing for the author to remember.
 
 How it works:
 
-1. `git fetch --depth=1 origin $VERCEL_GIT_PREVIOUS_SHA` pulls the last-deployed commit into Vercel's shallow clone. (`VERCEL_GIT_PREVIOUS_SHA` is set by Vercel to the SHA of the previous successful deploy on this branch.)
-2. `git diff --quiet $VERCEL_GIT_PREVIOUS_SHA HEAD -- . ':!docs/' ':!CLAUDE.md'` exits 0 if no non-docs files differ, 1 if any do.
-3. Vercel skips on exit 0, deploys on exit non-zero.
+1. If the branch is `main`, deploy (production builds always run, including for docs-only merges, so the deploy record exists and migrations get a chance to run).
+2. Otherwise, `git fetch --depth=1 origin main` pulls main's tip into Vercel's shallow clone.
+3. `git diff --quiet origin/main HEAD -- . ':!docs/' ':!CLAUDE.md'` exits 0 if no non-docs files differ between this branch and main, 1 if any do.
+4. The trailing `|| exit 1` normalises every failure path to exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly.
 
-This compares against the last *deployed* state rather than against `HEAD^`, so a mixed push (code commits followed by a docs commit) deploys correctly — the diff still sees the code changes.
+Comparing against `origin/main` (rather than `VERCEL_GIT_PREVIOUS_SHA`) makes the skip work on the *first* push of a branch — which matters because trunk-based branches are usually short-lived and most PRs are single-push. It also handles mixed pushes correctly: any non-docs file in the branch's diff vs main triggers a deploy.
 
 Failure modes all default to deploying (the safe direction):
 
-- First deploy on a branch — no previous SHA, fetch fails, deploy runs.
-- Force-pushed or rewritten history — previous SHA missing, fetch fails, deploy runs.
+- `git fetch origin main` fails (network, missing ref) — deploy runs.
 - Anything unexpected — deploy runs.
 
 Playwright e2e skips downstream because it's triggered by Vercel's `deployment_status` event, which only fires on a real deploy.
