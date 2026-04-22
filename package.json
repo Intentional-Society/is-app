@@ -19,7 +19,7 @@
     "test:e2e": "npm run dev:db && playwright test"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.12",
+    "@hono/node-server": "^2.0.0",
     "@sentry/nextjs": "^10.49.0",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.104.0",
