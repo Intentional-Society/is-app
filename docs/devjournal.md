@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-23 | Blake | GitHub CLI documented as optional prerequisite
+
+Added `## GitHub CLI` to `docs/setup-dev-machine.md` and a pointer in `docs/doc-local-setup.md`. Not required to run the app, but required for PR / issue workflows from the terminal — including via Claude Code, which can't drive a browser. Install via `winget` on Windows or `brew` on Mac, then `gh auth login` once per OS user. Credentials live in the OS keyring, so one login covers every same-user shell including the VS Code / Claude Code integrated terminal; WSL has its own state and needs a separate login.
+
 ## 2026-04-22 | James | Skip Vercel preview for docs-only changes
 
 Vercel's `ignoreCommand` now diffs HEAD against the previous successful deploy and skips the build when only `docs/` or root `CLAUDE.md` changed. See `docs/doc-strategy-committing.md`.

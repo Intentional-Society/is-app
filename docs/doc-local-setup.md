@@ -18,6 +18,8 @@ nvm use               # switches to the version in .nvmrc
 
 **Windows:** Allocate at least 7 GB RAM to Docker Desktop (Settings → Resources → Memory). WSL 2 backend required.
 
+**Optional:** The [GitHub CLI](setup-dev-machine.md#github-cli) (`gh`) — Not required to run the app, but required for PR review / issue management from the terminal or Claude Code (web UI is the alternative, but only works for humans — Claude operates from the terminal).
+
 ---
 
 ## Clone and install
