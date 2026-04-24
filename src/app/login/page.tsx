@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -46,6 +47,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </p>
       )}
       <LoginForm />
+      <p className="text-sm text-gray-500">
+        Have an invite code?{" "}
+        <Link href="/signup" className="underline text-gray-400 hover:text-gray-200">
+          Sign up
+        </Link>
+      </p>
     </main>
   );
 }

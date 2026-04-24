@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -13,13 +14,52 @@ async function signOut() {
   redirect("/login");
 }
 
+function LoggedOutHome() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
+      <h1 className="text-4xl font-bold">Intentional Society</h1>
+      <p className="max-w-md text-center text-gray-400">
+        A community of people practicing relational growth together.
+      </p>
+
+      <div className="flex w-full max-w-sm flex-col gap-3">
+        <Link
+          href="/login"
+          className="block rounded bg-gray-100 px-3 py-2 text-center text-sm font-medium text-gray-900"
+        >
+          Sign in
+        </Link>
+        <Link
+          href="/signup"
+          className="block rounded border border-gray-600 px-3 py-2 text-center text-sm font-medium text-gray-300"
+        >
+          Join with an invite code
+        </Link>
+      </div>
+
+      <p className="max-w-sm text-center text-sm text-gray-500">
+        Don&apos;t have an invite?{" "}
+        <a
+          href="https://www.intentionalsociety.org/get-involved#connection-calls"
+          className="underline text-gray-400 hover:text-gray-200"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Join a Connection Call
+        </a>{" "}
+        to meet the community and learn more.
+      </p>
+    </main>
+  );
+}
+
 export default async function Home() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login");
+    return <LoggedOutHome />;
   }
 
   let profile = await getProfileForSelf(user.id);
