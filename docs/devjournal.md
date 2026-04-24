@@ -4,6 +4,14 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-23 | Blake | `.env.local.example` as single source of truth + preflight drift check
+
+The local-dev env template used to live as a string literal inside `scripts/setup.mjs`, and `ensureLocalEnv` was "create `.env.local` if missing, otherwise leave it alone." That's fine until the template grows — `.env.local` is gitignored, so existing devs silently keep stale files. We hit this when adding the e2e auth vars (`SUPABASE_SECRET_KEY`, `E2E_*_PASSWORD`, `CI_RESET_TOKEN`): old `.env.local` files kept working for `npm run dev` but blew up ten layers deep in Playwright setup with errors like "CI_RESET_TOKEN is required to run the e2e suite."
+
+The fix is the standard `.env.local.example` pattern with a twist. `.env.local.example` is now committed as the canonical key list (values are the deterministic Supabase-CLI defaults plus non-sensitive local passwords, same as before). `scripts/setup.mjs` simplified to a `copyFileSync`. New `scripts/check-env.mjs` runs as the first step of `npm run dev:db` and diffs keys — if `.env.local` is missing anything declared in `.env.local.example`, it fails with the exact missing keys and the fix. Because every dev/test entry point (`npm run dev`, `npm run test:functional`, `npm run test:e2e`, `npm test`) chains through `dev:db`, the check runs everywhere for free.
+
+Workflow when adding a new env var going forward: add the key + local default to `.env.local.example`, and every existing dev gets a clear, actionable error on their next `npm run dev` instead of a mystery test failure. Values in `.env.local` are never touched — devs are free to override locally.
+
 ## 2026-04-23 | Benji | Logged-out home page (#66)
 
 `/` no longer redirects unauthenticated visitors to `/login`. Instead it renders a landing page with a "Sign in" button, a "Join with an invite code" link to `/signup`, and a friendly nudge for non-members to join a Connection Call (links to the www site's get-involved page). `/login` and `/signup` now cross-link to each other so visitors can always find the right path. Updated the auth and logout e2e tests to match the new behavior.
