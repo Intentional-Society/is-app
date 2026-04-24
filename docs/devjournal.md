@@ -12,6 +12,10 @@ The fix is the standard `.env.local.example` pattern with a twist. `.env.local.e
 
 Workflow when adding a new env var going forward: add the key + local default to `.env.local.example`, and every existing dev gets a clear, actionable error on their next `npm run dev` instead of a mystery test failure. Values in `.env.local` are never touched — devs are free to override locally.
 
+## 2026-04-23 | Benji | Logged-out home page (#66)
+
+`/` no longer redirects unauthenticated visitors to `/login`. Instead it renders a landing page with a "Sign in" button, a "Join with an invite code" link to `/signup`, and a friendly nudge for non-members to join a Connection Call (links to the www site's get-involved page). `/login` and `/signup` now cross-link to each other so visitors can always find the right path. Updated the auth and logout e2e tests to match the new behavior.
+
 ## 2026-04-22 | James | Skip Vercel preview for docs-only changes
 
 Vercel's `ignoreCommand` now diffs HEAD against the previous successful deploy and skips the build when only `docs/` or root `CLAUDE.md` changed. See `docs/doc-strategy-committing.md`.
