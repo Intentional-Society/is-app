@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +28,12 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
         Joining by invite? Enter the code a member shared with you.
       </p>
       <SignupForm initialCode={code ?? ""} />
+      <p className="text-sm text-gray-500">
+        Already a member?{" "}
+        <Link href="/login" className="underline text-gray-400 hover:text-gray-200">
+          Sign in
+        </Link>
+      </p>
     </main>
   );
 }
