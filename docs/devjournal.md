@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-23 | Blake | GitHub CLI documented as optional prerequisite
+
+Added `## GitHub CLI` to `docs/setup-dev-machine.md` and a pointer in `docs/doc-local-setup.md`. Not required to run the app, but required for PR / issue workflows from the terminal — including via Claude Code, which can't drive a browser. Install via `winget` on Windows or `brew` on Mac, then `gh auth login` once per OS user. Credentials live in the OS keyring, so one login covers every same-user shell including the VS Code / Claude Code integrated terminal; WSL has its own state and needs a separate login.
+
 ## 2026-04-23 | Blake | `.env.local.example` as single source of truth + preflight drift check
 
 The local-dev env template used to live as a string literal inside `scripts/setup.mjs`, and `ensureLocalEnv` was "create `.env.local` if missing, otherwise leave it alone." That's fine until the template grows — `.env.local` is gitignored, so existing devs silently keep stale files. We hit this when adding the e2e auth vars (`SUPABASE_SECRET_KEY`, `E2E_*_PASSWORD`, `CI_RESET_TOKEN`): old `.env.local` files kept working for `npm run dev` but blew up ten layers deep in Playwright setup with errors like "CI_RESET_TOKEN is required to run the e2e suite."

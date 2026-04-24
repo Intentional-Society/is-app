@@ -44,6 +44,35 @@ Docker Desktop must be **running** before `npm run dev` — the dev script start
 
 **Mac:** Included with Xcode Command Line Tools (`xcode-select --install`).
 
+## GitHub CLI
+
+Optional — Not required to build or run the app. **Required for GitHub PR / issue workflows from the terminal**, which includes anything driven by Claude Code (Claude can't operate a web browser). The GitHub web UI is the alternative for humans.
+
+**Windows (PowerShell, Command Prompt, or Git Bash):**
+```powershell
+winget install --id GitHub.cli
+```
+
+**Mac:**
+```bash
+brew install gh
+```
+
+After installing, open a **new terminal** so PATH picks up the new binary, then authenticate:
+```bash
+gh auth login
+```
+Answer: `GitHub.com` → `HTTPS` → `Y` (manage Git credentials) → `Login with a web browser`. Paste the printed one-time code into the browser tab, then confirm the grant. Success line: `✓ Logged in as <your-username>`.
+
+Verify with `gh --version` and `gh auth status`.
+
+> **Auth scope:** Credentials live in your OS keyring (Windows Credential Manager / macOS Keychain) plus a user-home config file, so one login covers every shell running as the same user — including the VS Code / Claude Code terminal. A different OS user or a WSL shell needs its own login.
+
+**If a new shell still can't find `gh`** (Rare — Usually a stale PATH cache), call it by full path:
+- Windows PowerShell: `& "C:\Program Files\GitHub CLI\gh.exe" auth login`
+- Windows Git Bash: `"/c/Program Files/GitHub CLI/gh.exe" auth login`
+- Mac (brew at /opt/homebrew): `/opt/homebrew/bin/gh auth login`
+
 ## Editor
 
 No specific editor is required. VS Code and JetBrains IDEs both work well with this stack.
