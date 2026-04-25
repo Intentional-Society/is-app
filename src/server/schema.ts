@@ -19,6 +19,12 @@ const authUsers = authSchema.table("users", {
   id: uuid("id").primaryKey(),
 });
 
+// All public tables have RLS enabled with no policies. Drizzle connects as the
+// `postgres` superuser, which bypasses RLS, so the app is unaffected. The
+// hosted Data API is also disabled (see docs/doc-supabase.md), so the anon /
+// authenticated roles have no path to these tables — RLS is the backstop in
+// case that toggle ever flips on.
+
 export const profiles = pgTable("profiles", {
   id: uuid("id")
     .primaryKey()
@@ -46,7 +52,7 @@ export const profiles = pgTable("profiles", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}).enableRLS();
 
 export const programs = pgTable("programs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -56,7 +62,7 @@ export const programs = pgTable("programs", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const profilePrograms = pgTable(
   "profile_programs",
@@ -72,7 +78,7 @@ export const profilePrograms = pgTable(
       .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.profileId, table.programId] })],
-);
+).enableRLS();
 
 export const invites = pgTable(
   "invites",
@@ -103,4 +109,4 @@ export const invites = pgTable(
       sql`${table.expiresAt} > ${table.createdAt}`,
     ),
   ],
-);
+).enableRLS();
