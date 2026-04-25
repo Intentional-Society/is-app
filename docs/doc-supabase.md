@@ -82,6 +82,14 @@ The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRed
 
 Both are set as Vercel environment variables (see `docs/doc-vercel.md`), not committed to the repo.
 
+### Data API (PostgREST / GraphQL) — kept off
+
+The hosted project's auto-generated **Data API** is disabled at the dashboard toggle: Project → Integrations → Data API → "Enable Data API". With it off, requests to `https://<project>.supabase.co/rest/v1/*` and `/graphql/v1` return HTTP 503 (`PGRST002`) for every table — the publishable key remains valid for `auth/v1` but cannot reach data.
+
+**Why it stays off.** Authorization logic lives in the Hono middleware (`src/server/auth-middleware.ts`), so PostgREST and pg_graphql add attack surface without adding capability. RLS denies `anon` and `authenticated` on every table as a backstop (see `docs/architecture-appstack.md`), so flipping the toggle on would not directly expose data — but it would put every table one RLS-policy bug away from a leak, and create a parallel access path that bypasses the request logging, validation, and shape-checking in the Hono layer.
+
+Keeping the Data API off leaves a single door to the database: the Hono API at `src/server/api.ts`, which connects via the `postgres` superuser in `DATABASE_URL` (a server-only env var).
+
 ---
 
 ## Local stack
