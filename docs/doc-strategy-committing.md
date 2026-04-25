@@ -19,11 +19,11 @@ Every push to a branch with an open PR triggers a Vercel preview deploy, which e
 How it works:
 
 1. If the branch is `main`, deploy (production builds always run, including for docs-only merges, so the deploy record exists and migrations get a chance to run).
-2. Otherwise, `git fetch --depth=1 origin main` pulls main's tip into Vercel's shallow clone.
-3. `git diff --quiet origin/main HEAD -- . ':!docs/' ':!CLAUDE.md'` exits 0 if no non-docs files differ between this branch and main, 1 if any do.
-4. The trailing `|| exit 1` normalises every failure path to exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly.
+2. Otherwise, `git fetch --depth=1 origin main` pulls main's tip into `FETCH_HEAD`.
+3. `git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!CLAUDE.md'` exits 0 if no non-docs files differ between this branch and main's tip, 1 if any do. We diff against `FETCH_HEAD` (rather than `origin/main`) because Vercel's clone is single-branch — its fetch refspec only tracks the deployed branch, so `git fetch origin main` populates `FETCH_HEAD` but never creates a `refs/remotes/origin/main` ref. Locally, full clones do create `origin/main`, which is why the `origin/main` form passes a local test and silently fails on Vercel.
+4. The trailing `|| exit 1` normalises every failure path to exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly. `git fetch` errors are not redirected to `/dev/null` — if the next breakage is also a fetch issue, we want it visible in the Vercel build log.
 
-Comparing against `origin/main` (rather than `VERCEL_GIT_PREVIOUS_SHA`) makes the skip work on the *first* push of a branch — which matters because trunk-based branches are usually short-lived and most PRs are single-push. It also handles mixed pushes correctly: any non-docs file in the branch's diff vs main triggers a deploy.
+Comparing against main's tip (rather than `VERCEL_GIT_PREVIOUS_SHA`) makes the skip work on the *first* push of a branch — which matters because trunk-based branches are usually short-lived and most PRs are single-push. It also handles mixed pushes correctly: any non-docs file in the branch's diff vs main triggers a deploy.
 
 Failure modes all default to deploying (the safe direction):
 
