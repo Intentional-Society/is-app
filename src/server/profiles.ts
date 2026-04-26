@@ -28,13 +28,25 @@ export type EditableProfileInput = Partial<{
   liveDesire: string | null;
 }>;
 
+const FIELD_MAX_LENGTHS: Partial<Record<EditableField, number>> = {
+  displayName: 100,
+  bio: 2000,
+  location: 200,
+  supplementaryInfo: 2000,
+  avatarUrl: 500,
+  emergencyContact: 500,
+  liveDesire: 1000,
+};
+const KEYWORDS_MAX_COUNT = 20;
+const KEYWORD_MAX_LENGTH = 50;
+
 const isNullableString = (v: unknown): v is string | null =>
   v === null || typeof v === "string";
 
 const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((s) => typeof s === "string");
 
-// Returns the sanitized update payload, or a string describing the
+// Returns the sanitized update payload, or an object describing the
 // first validation failure. Unknown keys are treated as failures to
 // protect fields like isAdmin / referredBy from being set via the
 // editable endpoint.
@@ -61,10 +73,21 @@ export const parseEditableProfile = (
       if (!isStringArray(value)) {
         return { error: "keywords must be an array of strings" };
       }
+      if (value.length > KEYWORDS_MAX_COUNT) {
+        return { error: `keywords may contain at most ${KEYWORDS_MAX_COUNT} items` };
+      }
+      const longKeyword = value.find((k) => k.length > KEYWORD_MAX_LENGTH);
+      if (longKeyword) {
+        return { error: `each keyword must be ${KEYWORD_MAX_LENGTH} characters or fewer` };
+      }
       out.keywords = value;
     } else {
       if (!isNullableString(value)) {
         return { error: `${key} must be a string or null` };
+      }
+      const max = FIELD_MAX_LENGTHS[key as Exclude<EditableField, "keywords">];
+      if (max !== undefined && value !== null && value.length > max) {
+        return { error: `${key} must be ${max} characters or fewer` };
       }
       out[key as Exclude<EditableField, "keywords">] = value;
     }
