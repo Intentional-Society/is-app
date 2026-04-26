@@ -35,6 +35,7 @@ export function SiteHeader() {
           </SheetHeader>
           <nav className="flex flex-col gap-1 px-4 pb-4">
             <SheetClose
+              nativeButton={false}
               render={
                 <Link href="/" className="rounded px-2 py-2 hover:bg-muted">
                   Home
@@ -42,6 +43,7 @@ export function SiteHeader() {
               }
             />
             <SheetClose
+              nativeButton={false}
               render={
                 <Link
                   href="/welcome"
