@@ -84,7 +84,8 @@ async function seedAuthUsers(): Promise<SeedResult> {
         id, instance_id, aud, role, email,
         raw_app_meta_data, raw_user_meta_data,
         email_confirmed_at, created_at, updated_at,
-        is_sso_user, is_anonymous
+        is_sso_user, is_anonymous,
+        confirmation_token, recovery_token, email_change_token_new, email_change
       ) VALUES (
         ${profile.id}::uuid,
         '00000000-0000-0000-0000-000000000000'::uuid,
@@ -94,7 +95,8 @@ async function seedAuthUsers(): Promise<SeedResult> {
         ${JSON.stringify({ provider: "email", providers: ["email"] })}::jsonb,
         ${JSON.stringify({ displayName: profile.displayName })}::jsonb,
         now(), now(), now(),
-        false, false
+        false, false,
+        '', '', '', ''
       )
       ON CONFLICT (id) DO NOTHING
       RETURNING id
