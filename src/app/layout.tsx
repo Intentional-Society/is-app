@@ -1,9 +1,20 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Gudea, Ovo } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const gudea = Gudea({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-gudea",
+});
+
+const ovo = Ovo({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-ovo",
+});
 
 export const metadata: Metadata = {
   title: "Intentional Society",
@@ -16,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang="en" className={cn("font-sans", gudea.variable, ovo.variable)}>
       <body className="antialiased">{children}</body>
     </html>
   );
