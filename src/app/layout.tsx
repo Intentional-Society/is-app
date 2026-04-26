@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Gudea, Ovo } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { SiteHeader } from "@/components/site-header";
 
 const gudea = Gudea({
   subsets: ["latin"],
@@ -28,7 +29,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn("font-sans", gudea.variable, ovo.variable)}>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <SiteHeader />
+        {children}
+      </body>
     </html>
   );
 }
