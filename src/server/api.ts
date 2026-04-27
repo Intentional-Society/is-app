@@ -151,14 +151,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
         serverTime: result[0].server_time,
       },
     });
-  })
-  // CI-only reset for the two seeded e2e users. Gated by VERCEL_ENV
-  // (never live in production) and a shared-secret header. Both gates
-  // return 404 on failure to avoid advertising the endpoint.
-  .post("/_test/reset", async (c) => {
-    if (!isResetEnabled()) {
-      return c.json({ error: "not_found" }, 404);
-    }
+  });
+
+// CI-only reset for the two seeded e2e users. Only registered in
+// non-production environments so the route is absent from the production
+// bundle entirely. Token header is the second gate.
+if (isResetEnabled()) {
+  api.post("/_test/reset", async (c) => {
     const token = c.req.header("x-ci-reset-token");
     if (!token || token !== process.env.CI_RESET_TOKEN) {
       return c.json({ error: "not_found" }, 404);
@@ -166,6 +165,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const result = await resetE2EUsers();
     return c.json(result);
   });
+}
 
 export type ApiRoutes = typeof api;
 export default api;

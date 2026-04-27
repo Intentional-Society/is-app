@@ -4,6 +4,16 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-26 | Benji | Move invite management to its own page
+
+Extracted the `InvitesPanel` from the logged-in home page into a new `/invites` route (auth-gated, redirects to `/login` if unauthenticated). Home page now shows a "Manage invites" link instead of the inline panel. Updated e2e tests to navigate to `/invites` instead of expecting the panel on `/`.
+
+## 2026-04-26 | James | shadcn widget library, client tests
+
+Added shadcn/ui (4.5.0, Base Nova style, neutral palette, lucide icons), starting from a clean `shadcn init` so subsequent component additions diff cleanly. Typography matches www: Gudea sans for UI/headings, Ovo serif for prose. First real surface is a site header with a Sheet-based hamburger menu (Home, Welcome) that only renders for signed-in users — a client component reading `useAuth()` from a new `AuthProvider`. The provider seeds from a single server-side `getUser()` in the layout and stays live via `onAuthStateChange`, so sign-in/out and cross-tab updates propagate without per-navigation round-trips.
+
+To make React component tests first-class, split Vitest into two projects — `functional-server` (Node, existing API tests, needs DB) and `functional-client` (jsdom + `@vitejs/plugin-react`, no DB, ~5s) — and enhanced `npm test` to include lint → typecheck → functional (both) → e2e. New client tests cover `AuthProvider` and `SiteHeader`, and TDD'd a fix where the tests can assert no `console.error` happens.
+
 ## 2026-04-23 | Blake | GitHub CLI documented as optional prerequisite
 
 Added `## GitHub CLI` to `docs/setup-dev-machine.md` and a pointer in `docs/doc-local-setup.md`. Not required to run the app, but required for PR / issue workflows from the terminal — including via Claude Code, which can't drive a browser. Install via `winget` on Windows or `brew` on Mac, then `gh auth login` once per OS user. Credentials live in the OS keyring, so one login covers every same-user shell including the VS Code / Claude Code integrated terminal; WSL has its own state and needs a separate login.
