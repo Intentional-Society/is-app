@@ -53,7 +53,7 @@ export const expectAuthed = async (page: Page): Promise<void> => {
 };
 
 // After reset, bio is null and `/` redirects to `/welcome`. Tests that
-// want to land on `/` (e.g. invite panel) call this to fill the form.
+// want to land on `/` (e.g. to navigate to /invites) call this to fill the form.
 export const completeWelcome = async (
   page: Page,
   opts: { displayName?: string; bio?: string } = {},

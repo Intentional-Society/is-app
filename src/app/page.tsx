@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf, upsertProfile } from "@/server/profiles";
 
-import { InvitesPanel } from "./invites-panel";
 import { MeSmokeWidget } from "./me-smoke";
 
 async function signOut() {
@@ -81,6 +80,12 @@ export default async function Home() {
       <h1 className="text-4xl font-bold">Intentional Society</h1>
       <p className="text-sm">Signed in as {user.email}</p>
       <p className="text-sm">Display name: {profile?.displayName ?? "—"}</p>
+      <Link
+        href="/invites"
+        className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-800"
+      >
+        Manage invites
+      </Link>
       <form action={signOut}>
         <button
           type="submit"
@@ -89,7 +94,6 @@ export default async function Home() {
           Sign out
         </button>
       </form>
-      <InvitesPanel />
       <MeSmokeWidget />
     </main>
   );

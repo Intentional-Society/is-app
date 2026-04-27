@@ -24,6 +24,8 @@ test.describe("invites — authed member flow", () => {
   });
 
   test("create an invite, see it listed, revoke it", async ({ page }) => {
+    await page.getByRole("link", { name: "Manage invites" }).click();
+    await page.waitForURL((u) => u.pathname === "/invites", { timeout: 10_000 });
     await expect(
       page.getByRole("heading", { name: "Invite a member" }),
     ).toBeVisible();
@@ -45,6 +47,8 @@ test.describe("invites — authed member flow", () => {
   });
 
   test("429 from the API surfaces a friendly cap message", async ({ page }) => {
+    await page.getByRole("link", { name: "Manage invites" }).click();
+    await page.waitForURL((u) => u.pathname === "/invites", { timeout: 10_000 });
     // Stub POST /api/invites to return 429 — we don't want to seed
     // ten real invites per test run, and we only need to verify the
     // UI's error branch for the cap case.
@@ -96,6 +100,8 @@ test.describe("/signup — unauthed invite flow", () => {
     try {
       await signInAs(memberPage, "regular");
       await completeWelcome(memberPage, { displayName: "Inviter" });
+      await memberPage.getByRole("link", { name: "Manage invites" }).click();
+      await memberPage.waitForURL((u) => u.pathname === "/invites", { timeout: 10_000 });
       await memberPage
         .getByLabel(/Note \(for your records/)
         .fill("e2e signup-flow invite — come on in");

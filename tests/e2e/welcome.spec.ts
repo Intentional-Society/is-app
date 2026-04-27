@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 import { resetSeededUsers, signInAs } from "./helpers/session";
 
 // Phase 2 backfill: verify that a fresh user lands on /welcome, can
-// save the form, and is then allowed through to / where the invite
-// panel is visible. Both tests in this file depend on the regular
+// save the form, and is then allowed through to / where the "Manage
+// invites" link is visible. Both tests in this file depend on the regular
 // seeded user having bio=null, so we re-run the reset per-test to
 // survive CI retries cleanly.
 
@@ -62,6 +62,6 @@ test("fresh user lands on /welcome and can complete their profile", async ({
 
   await page.waitForURL((u) => u.pathname === "/", { timeout: 10_000 });
   await expect(
-    page.getByRole("heading", { name: "Invite a member" }),
+    page.getByRole("link", { name: "Manage invites" }),
   ).toBeVisible();
 });
