@@ -13,7 +13,7 @@ function ensureLocalEnv() {
   if (existsSync(target)) {
     console.log("  .env.local already exists — leaving it alone");
     console.log(
-      "  (if tests complain about missing keys, run `node scripts/check-env.mjs`)",
+      "  (if tests complain about missing keys, run `node scripts/check-env.mjs --fix`)",
     );
     return;
   }
