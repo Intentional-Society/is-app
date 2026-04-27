@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-26 | Benji | Move invite management to its own page
+
+Extracted the `InvitesPanel` from the logged-in home page into a new `/invites` route (auth-gated, redirects to `/login` if unauthenticated). Home page now shows a "Manage invites" link instead of the inline panel. Updated e2e tests to navigate to `/invites` instead of expecting the panel on `/`.
+
 ## 2026-04-26 | James | shadcn widget library, client tests
 
 Added shadcn/ui (4.5.0, Base Nova style, neutral palette, lucide icons), starting from a clean `shadcn init` so subsequent component additions diff cleanly. Typography matches www: Gudea sans for UI/headings, Ovo serif for prose. First real surface is a site header with a Sheet-based hamburger menu (Home, Welcome) that only renders for signed-in users — a client component reading `useAuth()` from a new `AuthProvider`. The provider seeds from a single server-side `getUser()` in the layout and stays live via `onAuthStateChange`, so sign-in/out and cross-tab updates propagate without per-navigation round-trips.
