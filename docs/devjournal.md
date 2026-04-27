@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-26 | James | Security headers locked down
+
+App now ships CSP, HSTS, frame/referrer/permissions headers from `next.config.ts`. See `docs/doc-strategy-security.md` for per-directive rationale.
+
 ## 2026-04-26 | Benji | Move invite management to its own page
 
 Extracted the `InvitesPanel` from the logged-in home page into a new `/invites` route (auth-gated, redirects to `/login` if unauthenticated). Home page now shows a "Manage invites" link instead of the inline panel. Updated e2e tests to navigate to `/invites` instead of expecting the panel on `/`.
