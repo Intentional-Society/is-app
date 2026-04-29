@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'CLAUDE.md'
 
 # Minimum GITHUB_TOKEN scope the job actually needs. Default on public
 # repos is `write` on most resources, which would let a compromised
