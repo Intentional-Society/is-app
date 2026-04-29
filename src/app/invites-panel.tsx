@@ -43,6 +43,9 @@ export function InvitesPanel() {
   }, []);
 
   useEffect(() => {
+    // reload() is async; setState calls run after await, not in the effect body.
+    // Long-term: move to TanStack Query (already a dependency).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload();
   }, [reload]);
 
