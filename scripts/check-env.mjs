@@ -82,17 +82,13 @@ if (missing.length > 0) {
   );
   for (const key of missing) console.error(`  - ${key}`);
   console.error(
-    "  Fix: run `node scripts/check-env.mjs --fix` to append the missing keys",
+    "  Fix: run `node scripts/check-env.mjs --fix` to append them from .env.local.example",
   );
+  console.error("       (existing values are preserved).");
   console.error(
-    "       (preserves any custom values you've added).",
+    "       Or to start fresh (wipes local customizations): delete .env.local",
   );
-  console.error(
-    "       Or (destructive, wipes local customizations): delete .env.local",
-  );
-  console.error(
-    "       and run `npm run setup` to regenerate from the template.",
-  );
+  console.error("       and run `npm run setup`.");
   process.exit(1);
 }
 
