@@ -32,7 +32,12 @@ Failure modes all default to deploying (the safe direction):
 
 Playwright e2e skips downstream because it's triggered by Vercel's `deployment_status` event, which only fires on a real deploy.
 
-CI (lint + functional tests) still runs on every PR — branch protection requires its status check, and `paths-ignore` would leave the check stuck at "expected" and block merge. CI is cheap compared to Vercel's build minutes; the Vercel skip is where the savings come from.
+CI (lint + functional tests) is also skipped on docs-only PRs, but the mechanism is different from Vercel's. Branch protection requires the "Lint & Functional Tests" status check, so a plain `paths-ignore` on `ci.yml` would leave the check stuck at "expected" and block merge. The fix is two workflow files:
+
+- `ci.yml` — runs the real tests, with `paths-ignore: ['docs/**', 'CLAUDE.md']`.
+- `ci-docs-skip.yml` — a no-op job whose `name` matches ("Lint & Functional Tests"), with the inverse `paths: ['docs/**', 'CLAUDE.md']`.
+
+Their path filters union to "everything," so exactly one (or, on mixed PRs, both) triggers. Either way, a status check called "Lint & Functional Tests" reports success and branch protection is satisfied.
 
 ## Schema and data migrations: expand-contract pattern
 

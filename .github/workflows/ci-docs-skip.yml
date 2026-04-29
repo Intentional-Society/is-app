@@ -1,0 +1,26 @@
+name: CI
+
+# Companion to ci.yml. Branch protection requires the "Lint & Functional
+# Tests" status check, which means ci.yml's `paths-ignore` alone would
+# leave the check stuck at "expected" on docs-only PRs and block merge.
+# This workflow's `paths` filter is the inverse, so docs-only PRs trigger
+# this no-op instead — same job name → same status context → satisfied.
+#
+# Mixed PRs (docs + code) trigger both workflows; both report under the
+# same name, both pass, branch protection is happy.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'CLAUDE.md'
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint & Functional Tests
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Docs-only PR — lint and functional tests skipped."
