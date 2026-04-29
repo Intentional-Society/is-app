@@ -8,7 +8,7 @@
 // Pass --fix to append any missing key lines from .env.local.example to
 // .env.local. Non-destructive: existing values are untouched.
 
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const fixMode = process.argv.slice(2).includes("--fix");
@@ -28,7 +28,11 @@ function extractKeys(contents) {
   return keys;
 }
 
-if (!existsSync(examplePath)) {
+let exampleContents;
+try {
+  exampleContents = readFileSync(examplePath, "utf8");
+} catch (err) {
+  if (err.code !== "ENOENT") throw err;
   console.error("check-env: .env.local.example is missing from the repo.");
   console.error(
     "  This file is the canonical list of env keys and should be committed.",
@@ -36,14 +40,16 @@ if (!existsSync(examplePath)) {
   process.exit(1);
 }
 
-if (!existsSync(localPath)) {
+let localContents;
+try {
+  localContents = readFileSync(localPath, "utf8");
+} catch (err) {
+  if (err.code !== "ENOENT") throw err;
   console.error("check-env: .env.local is missing.");
   console.error("  Fix: run `npm run setup`.");
   process.exit(1);
 }
 
-const exampleContents = readFileSync(examplePath, "utf8");
-const localContents = readFileSync(localPath, "utf8");
 const exampleKeys = extractKeys(exampleContents);
 const localKeys = extractKeys(localContents);
 
