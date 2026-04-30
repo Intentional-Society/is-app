@@ -38,7 +38,7 @@ function LoggedOutHome() {
         Don&apos;t have an invite?{" "}
         <a
           href="https://www.intentionalsociety.org/get-involved#connection-calls"
-          className="underline text-gray-400 hover:text-gray-200"
+          className="underline text-gray-400 hover:text-gray-500"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -82,7 +82,7 @@ export default async function Home() {
         href="/profile"
         className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-800"
       >
-        Edit profile
+        My profile
       </Link>
       <Link
         href="/invites"
