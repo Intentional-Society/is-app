@@ -52,6 +52,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  experimental: {
+    // Lingui macro: transforms <T> JSX and t`...` template tags at build time,
+    // inlining the English source as the message fallback so no catalog is
+    // required. See docs/doc-strategy-i18n.md.
+    swcPlugins: [["@lingui/swc-plugin", {}]],
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

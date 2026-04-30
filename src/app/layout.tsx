@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Gudea, Ovo } from "next/font/google";
+import { setupI18n } from "@lingui/core";
+import { setI18n } from "@lingui/react/server";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/components/auth-provider";
+import { LinguiClientProvider } from "@/components/lingui-client-provider";
 import { SiteHeader } from "@/components/site-header";
 import { createClient } from "@/lib/supabase/server";
+
+// Server-side i18n for RSC <T> usage. Mirrors the client-side setup in
+// LinguiClientProvider. With no catalogs loaded, the macro's inlined English
+// source is what renders. See docs/doc-strategy-i18n.md.
+setI18n(setupI18n({ locale: "en", messages: { en: {} } }));
 
 const gudea = Gudea({
   subsets: ["latin"],
@@ -37,10 +45,12 @@ export default async function RootLayout({
   return (
     <html lang="en" className={cn("font-sans", gudea.variable, ovo.variable)}>
       <body className="antialiased">
-        <AuthProvider initialUser={user}>
-          <SiteHeader />
-          {children}
-        </AuthProvider>
+        <LinguiClientProvider>
+          <AuthProvider initialUser={user}>
+            <SiteHeader />
+            {children}
+          </AuthProvider>
+        </LinguiClientProvider>
       </body>
     </html>
   );

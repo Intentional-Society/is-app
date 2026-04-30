@@ -4,6 +4,17 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-30 | James | i18n strategy + Lingui scaffolding
+
+Picked an i18n approach now so future copy lands in the right shape from day one, even though we're English-only with no plan to localize. Strategy doc is `docs/doc-strategy-i18n.md`: source-as-key via Lingui v6, with `<T>` for JSX content and `` t`...` `` for plain strings. No catalogs, no extract step — the macro inlines the English source as the runtime fallback so strings render with no catalog loaded.
+
+Two implementation notes worth remembering:
+
+1. **Imports are direct, not through a chokepoint.** The first design re-exported `Trans as T` from `src/lib/i18n.ts` so call sites could `import { T } from "@/lib/i18n"`. It does not work: the SWC plugin transforms macro **usages** (JSX/template tags), not bare re-exports. A re-export pulls the macro's runtime fallback file into the bundle untransformed, and the build fails resolving its `babel-plugin-macros` dependency. Direct imports at each call site (`import { Trans as T } from "@lingui/react/macro"`) are the working path. Strategy doc records this so we don't try the chokepoint again.
+2. **Lingui v6 split the macros across two packages**: `@lingui/react/macro` (Trans, Plural) and `@lingui/core/macro` (t). The legacy v5 single-package `@lingui/macro` is deprecated and is now blocked by ESLint.
+
+What landed: SWC plugin in `next.config.ts`, `LinguiClientProvider` for the client tree, `setI18n` in the root layout for the RSC tree, ESLint rule blocking the deprecated v5 package. No existing strings were wrapped — that's a separate, mechanical migration when we're ready.
+
 ## 2026-04-29 | James | Next.js 16 upgrade
 
 Bumped to Next 16; production builds now use Turbopack by default.
