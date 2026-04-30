@@ -66,6 +66,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
       }
 
       setStatus({ kind: "success" });
+      router.push("/profile");
       router.refresh();
     } catch (err) {
       setStatus({

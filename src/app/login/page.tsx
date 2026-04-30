@@ -49,7 +49,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <LoginForm />
       <p className="text-sm text-gray-500">
         Have an invite code?{" "}
-        <Link href="/signup" className="underline text-gray-400 hover:text-gray-200">
+        <Link href="/signup" className="underline text-gray-400 hover:text-gray-500">
           Sign up
         </Link>
       </p>

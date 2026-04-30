@@ -108,7 +108,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         onSubmit={sendMagicLink}
         className="flex w-full max-w-sm flex-col gap-3"
       >
-        <p className="rounded border border-gray-700 bg-gray-900/40 p-3 text-sm text-gray-200">
+        <p className="rounded border border-gray-700 bg-gray-900/40 p-3 text-sm text-gray-500">
           <span className="block text-xs uppercase tracking-wide text-gray-400">
             Your invite note
           </span>

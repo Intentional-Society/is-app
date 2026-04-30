@@ -30,7 +30,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       <SignupForm initialCode={code ?? ""} />
       <p className="text-sm text-gray-500">
         Already a member?{" "}
-        <Link href="/login" className="underline text-gray-400 hover:text-gray-200">
+        <Link href="/login" className="underline text-gray-400 hover:text-gray-500">
           Sign in
         </Link>
       </p>
