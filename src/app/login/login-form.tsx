@@ -1,15 +1,70 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 type FormState =
   | { status: "idle" }
   | { status: "submitting" }
   | { status: "sent"; email: string }
+  | { status: "resending" }
   | { status: "error"; message: string };
+
+function SentView({ email, origin }: { email: string; origin: string }) {
+  const [secondsLeft, setSecondsLeft] = useState(RESEND_COOLDOWN_SECONDS);
+  const [sending, setSending] = useState(false);
+  const [resent, setResent] = useState(false);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [secondsLeft]);
+
+  const handleResend = async () => {
+    setSending(true);
+    const supabase = createClient();
+    await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${origin}/auth/callback`,
+        shouldCreateUser: false,
+      },
+    });
+    setSending(false);
+    setResent(true);
+    setSecondsLeft(RESEND_COOLDOWN_SECONDS);
+  };
+
+  const canResend = secondsLeft <= 0 && !sending && !resent;
+
+  return (
+    <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+      <p className="text-sm text-gray-300">
+        Check <span className="font-semibold">{email}</span> for a sign-in link.
+      </p>
+      {resent ? (
+        <p className="text-sm text-green-400">Link resent.</p>
+      ) : (
+        <button
+          onClick={handleResend}
+          disabled={!canResend}
+          className="text-sm text-gray-400 underline disabled:no-underline disabled:opacity-50"
+        >
+          {sending
+            ? "Resending…"
+            : secondsLeft > 0
+              ? `Resend in ${secondsLeft}s`
+              : "Resend email"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -17,7 +72,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [state, setState] = useState<FormState>({ status: "idle" });
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setState({ status: "submitting" });
 
@@ -76,10 +131,7 @@ export function LoginForm() {
 
   if (state.status === "sent") {
     return (
-      <p className="max-w-sm text-center text-sm text-gray-300">
-        Check <span className="font-semibold">{state.email}</span> for a
-        sign-in link.
-      </p>
+      <SentView email={state.email} origin={window.location.origin} />
     );
   }
 
