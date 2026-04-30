@@ -50,7 +50,7 @@ export default async function ProfilePage() {
 
       <Link
         href="/profile/edit"
-        className="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-500"
+        className="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-300"
       >
         Edit profile
       </Link>
