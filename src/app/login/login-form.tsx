@@ -16,19 +16,17 @@ type FormState =
 
 function SentView({ email, origin }: { email: string; origin: string }) {
   const [secondsLeft, setSecondsLeft] = useState(RESEND_COOLDOWN_SECONDS);
-  const [resendState, setResendState] = useState<"waiting" | "ready" | "sending" | "done">("waiting");
+  const [sending, setSending] = useState(false);
+  const [resent, setResent] = useState(false);
 
   useEffect(() => {
-    if (secondsLeft <= 0) {
-      setResendState("ready");
-      return;
-    }
+    if (secondsLeft <= 0) return;
     const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(id);
   }, [secondsLeft]);
 
   const handleResend = async () => {
-    setResendState("sending");
+    setSending(true);
     const supabase = createClient();
     await supabase.auth.signInWithOtp({
       email,
@@ -37,26 +35,29 @@ function SentView({ email, origin }: { email: string; origin: string }) {
         shouldCreateUser: false,
       },
     });
-    setResendState("done");
+    setSending(false);
+    setResent(true);
     setSecondsLeft(RESEND_COOLDOWN_SECONDS);
   };
+
+  const canResend = secondsLeft <= 0 && !sending && !resent;
 
   return (
     <div className="flex max-w-sm flex-col items-center gap-4 text-center">
       <p className="text-sm text-gray-300">
         Check <span className="font-semibold">{email}</span> for a sign-in link.
       </p>
-      {resendState === "done" ? (
+      {resent ? (
         <p className="text-sm text-green-400">Link resent.</p>
       ) : (
         <button
           onClick={handleResend}
-          disabled={resendState !== "ready"}
+          disabled={!canResend}
           className="text-sm text-gray-400 underline disabled:no-underline disabled:opacity-50"
         >
-          {resendState === "sending"
+          {sending
             ? "Resending…"
-            : resendState === "waiting"
+            : secondsLeft > 0
               ? `Resend in ${secondsLeft}s`
               : "Resend email"}
         </button>
