@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-29 | James | Next.js 16 upgrade
+
+Bumped to Next 16; production builds now use Turbopack by default.
+
 ## 2026-04-26 | James | Security headers locked down
 
 App now ships CSP, HSTS, frame/referrer/permissions headers from `next.config.ts`. See `docs/doc-strategy-security.md` for per-directive rationale.

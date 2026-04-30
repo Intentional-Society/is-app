@@ -45,7 +45,7 @@ export const requireAuth: MiddlewareHandler<{ Variables: ApiVariables }> =
       {
         cookies: {
           getAll: () => cookies,
-          // Root middleware (src/middleware.ts) is responsible for
+          // Root proxy (src/proxy.ts) is responsible for
           // token refresh; this layer only reads.
           setAll: () => {},
         },
