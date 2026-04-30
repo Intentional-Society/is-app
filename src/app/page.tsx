@@ -4,8 +4,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf, upsertProfile } from "@/server/profiles";
 
-import { MeSmokeWidget } from "./me-smoke";
-
 async function signOut() {
   "use server";
   const supabase = await createClient();
@@ -81,6 +79,12 @@ export default async function Home() {
       <p className="text-sm">Signed in as {user.email}</p>
       <p className="text-sm">Display name: {profile?.displayName ?? "—"}</p>
       <Link
+        href="/profile"
+        className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-800"
+      >
+        Edit profile
+      </Link>
+      <Link
         href="/invites"
         className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-800"
       >
@@ -94,7 +98,6 @@ export default async function Home() {
           Sign out
         </button>
       </form>
-      <MeSmokeWidget />
     </main>
   );
 }
