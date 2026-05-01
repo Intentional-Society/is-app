@@ -6,6 +6,11 @@ import { useState } from "react";
 import { apiClient } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
 type Initial = {
   displayName: string;
   bio: string;
@@ -104,102 +109,94 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
       onSubmit={handleSubmit}
       className="flex w-full max-w-md flex-col gap-3"
     >
-      <label className="text-sm text-foreground" htmlFor="displayName">
+      <Label htmlFor="displayName">
         Display name
-      </label>
-      <input
+      </Label>
+      <Input
         id="displayName"
         type="text"
         required
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
         disabled={disabled}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-foreground" htmlFor="bio">
+      <Label htmlFor="bio">
         Bio
-      </label>
-      <textarea
+      </Label>
+      <Textarea
         id="bio"
         required
         value={bio}
         onChange={(e) => setBio(e.target.value)}
         disabled={disabled}
         rows={4}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-foreground" htmlFor="keywords">
+      <Label htmlFor="keywords">
         Keywords (comma-separated)
-      </label>
-      <input
+      </Label>
+      <Input
         id="keywords"
         type="text"
         value={keywordsText}
         onChange={(e) => setKeywordsText(e.target.value)}
         disabled={disabled}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-foreground" htmlFor="location">
+      <Label htmlFor="location">
         Location
-      </label>
-      <input
+      </Label>
+      <Input
         id="location"
         type="text"
         value={location}
         onChange={(e) => setLocation(e.target.value)}
         disabled={disabled}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-foreground" htmlFor="liveDesire">
+      <Label htmlFor="liveDesire">
         Live desire
-      </label>
-      <textarea
+      </Label>
+      <Textarea
         id="liveDesire"
         value={liveDesire}
         onChange={(e) => setLiveDesire(e.target.value)}
         disabled={disabled}
         rows={3}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-foreground" htmlFor="supplementaryInfo">
+      <Label htmlFor="supplementaryInfo">
         Supplementary info
-      </label>
-      <textarea
+      </Label>
+      <Textarea
         id="supplementaryInfo"
         value={supplementaryInfo}
         onChange={(e) => setSupplementaryInfo(e.target.value)}
         disabled={disabled}
         rows={3}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-foreground" htmlFor="avatarUrl">
+      <Label htmlFor="avatarUrl">
         Avatar URL
-      </label>
-      <input
+      </Label>
+      <Input
         id="avatarUrl"
         type="url"
         value={avatarUrl}
         onChange={(e) => setAvatarUrl(e.target.value)}
         disabled={disabled}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-foreground" htmlFor="emergencyContact">
+      <Label htmlFor="emergencyContact">
         Emergency contact
-      </label>
-      <input
+      </Label>
+      <Input
         id="emergencyContact"
         type="text"
         value={emergencyContact}
         onChange={(e) => setEmergencyContact(e.target.value)}
         disabled={disabled}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
       <p className="text-xs text-muted-foreground">
         Visible only to you (and admins in case of emergency).
@@ -207,10 +204,10 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
 
       <hr className="my-3 border-border" />
 
-      <label className="text-sm text-foreground" htmlFor="password">
+      <Label htmlFor="password">
         Set a password (optional)
-      </label>
-      <input
+      </Label>
+      <Input
         id="password"
         type="password"
         autoComplete="new-password"
@@ -218,19 +215,19 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         disabled={disabled}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
       <p className="text-xs text-muted-foreground">
         You can always sign in with a magic link instead.
       </p>
 
-      <button
+      <Button
         type="submit"
+        variant="secondary"
+        className="mt-3"
         disabled={disabled}
-        className="mt-3 rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
       >
         {disabled ? "Saving…" : "Save"}
-      </button>
+      </Button>
 
       {status.kind === "error" && (
         <p role="alert" className="text-sm text-destructive">

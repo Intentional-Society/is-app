@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 const RESEND_COOLDOWN_SECONDS = 60;
 
 type FormState =
@@ -140,10 +144,8 @@ export function LoginForm() {
       onSubmit={handleSubmit}
       className="flex w-full max-w-sm flex-col gap-3"
     >
-      <label htmlFor="email" className="text-sm text-foreground">
-        Email
-      </label>
-      <input
+      <Label htmlFor="email">Email</Label>
+      <Input
         id="email"
         type="email"
         required
@@ -151,12 +153,9 @@ export function LoginForm() {
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         disabled={state.status === "submitting"}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
-      <label htmlFor="password" className="text-sm text-foreground">
-        Password (optional)
-      </label>
-      <input
+      <Label htmlFor="password">Password (optional)</Label>
+      <Input
         id="password"
         type="password"
         autoComplete="current-password"
@@ -164,12 +163,11 @@ export function LoginForm() {
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         disabled={state.status === "submitting"}
-        className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
       />
-      <button
+      <Button
         type="submit"
+        variant="secondary"
         disabled={state.status === "submitting"}
-        className="rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
       >
         {state.status === "submitting"
           ? password.length > 0
@@ -178,7 +176,7 @@ export function LoginForm() {
           : password.length > 0
             ? "Sign in"
             : "Send sign-in link"}
-      </button>
+      </Button>
       {state.status === "error" && (
         <p role="alert" className="text-sm text-destructive">
           {state.message}

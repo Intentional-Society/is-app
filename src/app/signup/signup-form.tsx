@@ -5,6 +5,10 @@ import { useState } from "react";
 import { apiClient } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 type Step =
   | { kind: "enter-code"; error?: string }
   | { kind: "code-checking" }
@@ -114,10 +118,8 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           </span>
           {step.note}
         </p>
-        <label htmlFor="displayName" className="text-sm text-foreground">
-          Display name
-        </label>
-        <input
+        <Label htmlFor="displayName">Display name</Label>
+        <Input
           id="displayName"
           type="text"
           required
@@ -125,12 +127,9 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
           disabled={submitting}
-          className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
         />
-        <label htmlFor="email" className="text-sm text-foreground">
-          Email
-        </label>
-        <input
+        <Label htmlFor="email">Email</Label>
+        <Input
           id="email"
           type="email"
           required
@@ -138,15 +137,10 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           disabled={submitting}
-          className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
         />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
-        >
+        <Button type="submit" variant="secondary" disabled={submitting}>
           {submitting ? "Sending…" : "Send sign-in link"}
-        </button>
+        </Button>
         {step.kind === "error" && (
           <p role="alert" className="text-sm text-destructive">
             {step.message}
@@ -159,10 +153,8 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
   const checking = step.kind === "code-checking";
   return (
     <form onSubmit={checkCode} className="flex w-full max-w-sm flex-col gap-3">
-      <label htmlFor="code" className="text-sm text-foreground">
-        Invite code
-      </label>
-      <input
+      <Label htmlFor="code">Invite code</Label>
+      <Input
         id="code"
         type="text"
         required
@@ -172,15 +164,11 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         value={codeInput}
         onChange={(event) => setCodeInput(event.target.value)}
         disabled={checking}
-        className="rounded border border-input bg-transparent px-3 py-2 font-mono text-sm uppercase text-foreground focus:border-ring focus:outline-none"
+        className="font-mono uppercase"
       />
-      <button
-        type="submit"
-        disabled={checking}
-        className="rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
-      >
+      <Button type="submit" variant="secondary" disabled={checking}>
         {checking ? "Checking…" : "Check code"}
-      </button>
+      </Button>
       {step.kind === "enter-code" && step.error && (
         <p role="alert" className="text-sm text-destructive">
           {step.error}

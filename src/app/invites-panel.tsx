@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 
 import { apiClient } from "@/lib/api";
 
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
 type InviteRow = {
   code: string;
   note: string;
@@ -128,10 +132,10 @@ export function InvitesPanel() {
         Invite a member
       </h2>
       <form onSubmit={create} className="flex flex-col gap-2">
-        <label htmlFor="invite-note" className="text-sm text-foreground">
+        <Label htmlFor="invite-note">
           Note (for your records and theirs — who are you inviting?)
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id="invite-note"
           required
           minLength={10}
@@ -139,15 +143,15 @@ export function InvitesPanel() {
           value={note}
           onChange={(event) => setNote(event.target.value)}
           disabled={state.kind === "creating"}
-          className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
         />
-        <button
+        <Button
           type="submit"
+          variant="secondary"
           disabled={state.kind === "creating"}
-          className="self-start rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
+          className="self-start"
         >
           {state.kind === "creating" ? "Creating…" : "Create invite"}
-        </button>
+        </Button>
         {state.kind === "error" && (
           <p role="alert" className="text-sm text-destructive">
             {state.message}
