@@ -94,7 +94,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
 
   if (step.kind === "sent") {
     return (
-      <p className="max-w-sm text-center text-sm text-gray-300">
+      <p className="max-w-sm text-center text-sm text-foreground">
         Check <span className="font-semibold">{step.email}</span> for a
         sign-in link. Open it in this same browser within 15 minutes.
       </p>
@@ -108,13 +108,13 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         onSubmit={sendMagicLink}
         className="flex w-full max-w-sm flex-col gap-3"
       >
-        <p className="rounded border border-gray-700 bg-gray-900/40 p-3 text-sm text-gray-500">
-          <span className="block text-xs uppercase tracking-wide text-gray-400">
+        <p className="rounded border border-border bg-muted p-3 text-sm text-foreground">
+          <span className="block text-xs uppercase tracking-wide text-muted-foreground">
             Your invite note
           </span>
           {step.note}
         </p>
-        <label htmlFor="displayName" className="text-sm text-gray-300">
+        <label htmlFor="displayName" className="text-sm text-foreground">
           Display name
         </label>
         <input
@@ -125,9 +125,9 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
           disabled={submitting}
-          className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-gray-300 focus:outline-none"
+          className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
         />
-        <label htmlFor="email" className="text-sm text-gray-300">
+        <label htmlFor="email" className="text-sm text-foreground">
           Email
         </label>
         <input
@@ -138,17 +138,17 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           disabled={submitting}
-          className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-gray-300 focus:outline-none"
+          className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
         />
         <button
           type="submit"
           disabled={submitting}
-          className="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50"
+          className="rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
         >
           {submitting ? "Sending…" : "Send sign-in link"}
         </button>
         {step.kind === "error" && (
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-destructive">
             {step.message}
           </p>
         )}
@@ -159,7 +159,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
   const checking = step.kind === "code-checking";
   return (
     <form onSubmit={checkCode} className="flex w-full max-w-sm flex-col gap-3">
-      <label htmlFor="code" className="text-sm text-gray-300">
+      <label htmlFor="code" className="text-sm text-foreground">
         Invite code
       </label>
       <input
@@ -172,17 +172,17 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         value={codeInput}
         onChange={(event) => setCodeInput(event.target.value)}
         disabled={checking}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 font-mono text-sm uppercase text-gray-900 focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 font-mono text-sm uppercase text-foreground focus:border-ring focus:outline-none"
       />
       <button
         type="submit"
         disabled={checking}
-        className="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50"
+        className="rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
       >
         {checking ? "Checking…" : "Check code"}
       </button>
       {step.kind === "enter-code" && step.error && (
-        <p role="alert" className="text-sm text-red-300">
+        <p role="alert" className="text-sm text-destructive">
           {step.error}
         </p>
       )}

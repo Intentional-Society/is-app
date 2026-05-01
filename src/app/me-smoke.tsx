@@ -23,5 +23,5 @@ export function MeSmokeWidget() {
       .catch(() => setStatus("authed RPC: failed"));
   }, []);
 
-  return <p className="text-xs text-gray-400">{status}</p>;
+  return <p className="text-xs text-muted-foreground">{status}</p>;
 }

@@ -122,13 +122,13 @@ export function InvitesPanel() {
   return (
     <section
       aria-labelledby="invites-heading"
-      className="flex w-full max-w-xl flex-col gap-4 rounded border border-gray-700 p-4"
+      className="flex w-full max-w-xl flex-col gap-4 rounded border border-border p-4"
     >
       <h2 id="invites-heading" className="text-lg font-semibold">
         Invite a member
       </h2>
       <form onSubmit={create} className="flex flex-col gap-2">
-        <label htmlFor="invite-note" className="text-sm text-gray-300">
+        <label htmlFor="invite-note" className="text-sm text-foreground">
           Note (for your records and theirs — who are you inviting?)
         </label>
         <textarea
@@ -139,36 +139,36 @@ export function InvitesPanel() {
           value={note}
           onChange={(event) => setNote(event.target.value)}
           disabled={state.kind === "creating"}
-          className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-gray-300 focus:outline-none"
+          className="rounded border border-input bg-transparent px-3 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
         />
         <button
           type="submit"
           disabled={state.kind === "creating"}
-          className="self-start rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50"
+          className="self-start rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
         >
           {state.kind === "creating" ? "Creating…" : "Create invite"}
         </button>
         {state.kind === "error" && (
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-destructive">
             {state.message}
           </p>
         )}
       </form>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-400">
+        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           My invites
         </h3>
         {rows === null ? (
-          <p className="text-sm text-gray-400">Loading…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-gray-400">No invites yet.</p>
+          <p className="text-sm text-muted-foreground">No invites yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((row) => (
               <li
                 key={row.code}
-                className="flex flex-col gap-1 rounded border border-gray-800 p-3 text-sm"
+                className="flex flex-col gap-1 rounded border border-border p-3 text-sm"
               >
                 <div className="flex items-center gap-3">
                   <code className="font-mono text-base">{row.code}</code>
@@ -178,22 +178,22 @@ export function InvitesPanel() {
                       <button
                         type="button"
                         onClick={() => copy(row.code)}
-                        className="ml-auto rounded border border-gray-600 px-2 py-1 text-xs"
+                        className="ml-auto rounded border border-input px-2 py-1 text-xs"
                       >
                         {copiedCode === row.code ? "Copied" : "Copy"}
                       </button>
                       <button
                         type="button"
                         onClick={() => revoke(row.code)}
-                        className="rounded border border-red-500/40 px-2 py-1 text-xs text-red-300"
+                        className="rounded border border-destructive/40 px-2 py-1 text-xs text-destructive"
                       >
                         Revoke
                       </button>
                     </>
                   )}
                 </div>
-                <p className="text-gray-300">{row.note}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-foreground">{row.note}</p>
+                <p className="text-xs text-muted-foreground">
                   Expires {formatDate(row.expiresAt)}
                 </p>
               </li>
@@ -207,10 +207,10 @@ export function InvitesPanel() {
 
 function StatusBadge({ status }: { status: InviteRow["status"] }) {
   const tone: Record<InviteRow["status"], string> = {
-    active: "border-green-500/40 text-green-300",
-    redeemed: "border-blue-500/40 text-blue-300",
-    revoked: "border-gray-500/40 text-gray-400",
-    expired: "border-gray-500/40 text-gray-400",
+    active: "border-green-600/40 text-green-700",
+    redeemed: "border-blue-600/40 text-blue-700",
+    revoked: "border-border text-muted-foreground",
+    expired: "border-border text-muted-foreground",
   };
   return (
     <span

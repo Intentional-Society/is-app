@@ -80,7 +80,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-3">
-      <label className="text-sm text-gray-300" htmlFor="displayName">
+      <label className="text-sm text-foreground" htmlFor="displayName">
         Display name
       </label>
       <input
@@ -90,10 +90,10 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
         disabled={disabled}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-gray-300" htmlFor="bio">
+      <label className="text-sm text-foreground" htmlFor="bio">
         Bio
       </label>
       <textarea
@@ -103,11 +103,11 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         onChange={(e) => setBio(e.target.value)}
         disabled={disabled}
         rows={4}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-gray-300" htmlFor="keywords">
-        Keywords <span className="text-gray-500">(comma-separated)</span>
+      <label className="text-sm text-foreground" htmlFor="keywords">
+        Keywords <span className="text-muted-foreground">(comma-separated)</span>
       </label>
       <input
         id="keywords"
@@ -115,10 +115,10 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         value={keywordsText}
         onChange={(e) => setKeywordsText(e.target.value)}
         disabled={disabled}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-gray-300" htmlFor="location">
+      <label className="text-sm text-foreground" htmlFor="location">
         Location
       </label>
       <input
@@ -127,10 +127,10 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         value={location}
         onChange={(e) => setLocation(e.target.value)}
         disabled={disabled}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-gray-300" htmlFor="liveDesire">
+      <label className="text-sm text-foreground" htmlFor="liveDesire">
         Live desire
       </label>
       <textarea
@@ -139,10 +139,10 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         onChange={(e) => setLiveDesire(e.target.value)}
         disabled={disabled}
         rows={3}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-gray-300" htmlFor="supplementaryInfo">
+      <label className="text-sm text-foreground" htmlFor="supplementaryInfo">
         Supplementary info
       </label>
       <textarea
@@ -151,10 +151,10 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         onChange={(e) => setSupplementaryInfo(e.target.value)}
         disabled={disabled}
         rows={3}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-gray-300" htmlFor="avatarUrl">
+      <label className="text-sm text-foreground" htmlFor="avatarUrl">
         Avatar URL
       </label>
       <input
@@ -163,10 +163,10 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         value={avatarUrl}
         onChange={(e) => setAvatarUrl(e.target.value)}
         disabled={disabled}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
 
-      <label className="text-sm text-gray-300" htmlFor="emergencyContact">
+      <label className="text-sm text-foreground" htmlFor="emergencyContact">
         Emergency contact
       </label>
       <input
@@ -175,27 +175,27 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         value={emergencyContact}
         onChange={(e) => setEmergencyContact(e.target.value)}
         disabled={disabled}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm focus:border-gray-300 focus:outline-none"
+        className="rounded border border-input bg-transparent px-3 py-2 text-sm focus:border-ring focus:outline-none"
       />
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-muted-foreground">
         Visible only to you and admins in case of emergency.
       </p>
 
       <button
         type="submit"
         disabled={disabled}
-        className="mt-3 rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50"
+        className="mt-3 rounded bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground disabled:opacity-50"
       >
         {disabled ? "Saving…" : "Save changes"}
       </button>
 
       {status.kind === "success" && (
-        <p role="status" className="text-sm text-green-400">
+        <p role="status" className="text-sm text-success">
           Profile saved.
         </p>
       )}
       {status.kind === "error" && (
-        <p role="alert" className="text-sm text-red-300">
+        <p role="alert" className="text-sm text-destructive">
           {status.message}
         </p>
       )}

@@ -15,30 +15,30 @@ function LoggedOutHome() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
       <h1 className="text-4xl font-bold">Intentional Society</h1>
-      <p className="max-w-md text-center text-gray-400">
+      <p className="max-w-md text-center text-muted-foreground">
         A community of people practicing relational growth together.
       </p>
 
       <div className="flex w-full max-w-sm flex-col gap-3">
         <Link
           href="/login"
-          className="block rounded bg-gray-100 px-3 py-2 text-center text-sm font-medium text-gray-900"
+          className="block rounded bg-secondary px-3 py-2 text-center text-sm font-medium text-secondary-foreground"
         >
           Sign in
         </Link>
         <Link
           href="/signup"
-          className="block rounded border border-gray-600 px-3 py-2 text-center text-sm font-medium text-gray-300"
+          className="block rounded border border-input px-3 py-2 text-center text-sm font-medium text-foreground"
         >
           Join with an invite code
         </Link>
       </div>
 
-      <p className="max-w-sm text-center text-sm text-gray-500">
+      <p className="max-w-sm text-center text-sm text-muted-foreground">
         Don&apos;t have an invite?{" "}
         <a
           href="https://www.intentionalsociety.org/get-involved#connection-calls"
-          className="underline text-gray-400 hover:text-gray-500"
+          className="underline text-muted-foreground hover:text-foreground"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -80,20 +80,20 @@ export default async function Home() {
       <p className="text-sm">Display name: {profile?.displayName ?? "—"}</p>
       <Link
         href="/profile"
-        className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-800"
+        className="rounded border border-input px-4 py-2 text-sm font-medium hover:bg-accent"
       >
         My profile
       </Link>
       <Link
         href="/invites"
-        className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-800"
+        className="rounded border border-input px-4 py-2 text-sm font-medium hover:bg-accent"
       >
         Manage invites
       </Link>
       <form action={signOut}>
         <button
           type="submit"
-          className="rounded border border-gray-600 px-3 py-2 text-sm"
+          className="rounded border border-input px-3 py-2 text-sm"
         >
           Sign out
         </button>
