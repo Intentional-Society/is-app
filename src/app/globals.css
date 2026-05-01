@@ -4,6 +4,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Maps the design tokens defined in :root / .dark below onto Tailwind utility
+   classes — e.g. --primary becomes available as bg-primary, text-primary, etc.
+   Add a line here when you add a new token in :root. */
 @theme inline {
     --font-sans: var(--font-gudea);
     --font-serif: var(--font-ovo);
@@ -50,33 +53,65 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Token roles. Names follow shadcn/ui convention so `npx shadcn add ...` works
+   without remapping. Palette is grayscale today (chroma 0) except destructive
+   and success — we have not chosen brand colors yet. .dark below flips values;
+   roles are identical. */
 :root {
+    /* Surface — page background and body text. */
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
+
+    /* Card — elevated surface. Unused today; kept for future panels. */
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
+
+    /* Popover — floating panels (used by components/ui/sheet.tsx). */
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
+
+    /* Primary — default CTA (Button default variant). */
     --primary: oklch(0.205 0 0);
     --primary-foreground: oklch(0.985 0 0);
+
+    /* Secondary — alt CTA / quiet button (Save, Profile card link). */
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
+
+    /* Muted — subdued text and low-emphasis surfaces (helper copy, info
+       banners, nav hover). */
     --muted: oklch(0.97 0 0);
     --muted-foreground: oklch(0.556 0 0);
+
+    /* Accent — hover/highlight surface. Same value as muted in this palette;
+       kept distinct so shadcn components that expect it just work. */
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
+
+    /* Destructive — errors and destructive actions. */
     --destructive: oklch(0.577 0.245 27.325);
+
+    /* Form-control chrome — border = dividers/card edges, input = field
+       borders, ring = focus ring. */
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
+
+    /* Chart — unused today; reserved for future data viz. */
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
+
+    /* Success — save/resend confirmations. Custom token (not stock shadcn). */
     --success: oklch(0.527 0.154 150);
     --success-foreground: oklch(0.985 0 0);
+
     --radius: 0.625rem;
+
+    /* Sidebar — unused today (no sidebar component). Kept so a future shadcn
+       sidebar install works without re-adding tokens. */
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
     --sidebar-primary: oklch(0.205 0 0);
