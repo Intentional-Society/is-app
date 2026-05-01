@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-04-30 | Benji | Read-only profile view, edit moved to /profile/edit
+
+`/profile` is now a read-only view of the user's profile info, with serif font (Ovo) for user-entered content and sans-serif labels. The edit form moved to `/profile/edit`, accessible via an "Edit profile" button. After saving, the form redirects back to `/profile`. Home page link updated from "Edit profile" to "My profile". Also bumped all `gray-200` hover/text classes to `gray-500` across the app for better contrast.
+
 ## 2026-04-29 | James | Next.js 16 upgrade
 
 Bumped to Next 16; production builds now use Turbopack by default.
