@@ -22,7 +22,7 @@ describe("SiteHeader", () => {
   it("renders nothing when there is no user", () => {
     const { container } = render(
       <AuthProvider initialUser={null}>
-        <SiteHeader />
+        <SiteHeader displayName={null} />
       </AuthProvider>,
     );
     expect(container).toBeEmptyDOMElement();
@@ -31,7 +31,7 @@ describe("SiteHeader", () => {
   it("renders the menu trigger when a user is present", () => {
     render(
       <AuthProvider initialUser={user}>
-        <SiteHeader />
+        <SiteHeader displayName={null} />
       </AuthProvider>,
     );
     expect(screen.getByRole("button", { name: /open menu/i })).toBeVisible();
@@ -41,7 +41,7 @@ describe("SiteHeader", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     render(
       <AuthProvider initialUser={user}>
-        <SiteHeader />
+        <SiteHeader displayName={null} />
       </AuthProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /open menu/i }));

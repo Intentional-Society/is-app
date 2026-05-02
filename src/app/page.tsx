@@ -5,17 +5,15 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf, upsertProfile } from "@/server/profiles";
 
-async function signOut() {
-  "use server";
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  redirect("/login");
-}
-
 function LoggedOutHome() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <h1 className="text-4xl font-bold">Intentional Society</h1>
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-4xl font-bold">Intentional Society</h1>
+        <p className="font-serif italic text-2xl text-muted-foreground">
+          The IS Web App
+        </p>
+      </div>
       <p className="max-w-md text-center text-muted-foreground">
         A community of people practicing relational growth together.
       </p>
@@ -70,20 +68,18 @@ export default async function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <h1 className="text-4xl font-bold">Intentional Society</h1>
-      <p className="text-sm">Signed in as {user.email}</p>
-      <p className="text-sm">Display name: {profile?.displayName ?? "—"}</p>
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-4xl font-bold">Intentional Society</h1>
+        <p className="font-serif italic text-2xl text-muted-foreground">
+          The IS Web App
+        </p>
+      </div>
       <Button render={<Link href="/profile" />}>
         My profile
       </Button>
       <Button render={<Link href="/invites" />}>
         Manage invites
       </Button>
-      <form action={signOut}>
-        <Button type="submit">
-          Sign out
-        </Button>
-      </form>
     </main>
   );
 }

@@ -14,7 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-export function SiteHeader() {
+export function SiteHeader({ displayName }: { displayName: string | null }) {
   const { user } = useAuth();
 
   if (!user) return null;
@@ -29,9 +29,17 @@ export function SiteHeader() {
         >
           <Menu />
         </SheetTrigger>
-        <SheetContent side="right">
+        <SheetContent
+          side="right"
+          className="data-[side=right]:w-[40%] data-[side=right]:sm:max-w-[12.5rem]"
+        >
           <SheetHeader>
             <SheetTitle>Menu</SheetTitle>
+            {displayName ? (
+              <p className="font-serif italic text-sm text-muted-foreground">
+                {displayName}
+              </p>
+            ) : null}
           </SheetHeader>
           <nav className="flex flex-col gap-1 px-4 pb-4">
             <SheetClose
@@ -46,13 +54,36 @@ export function SiteHeader() {
               nativeButton={false}
               render={
                 <Link
-                  href="/welcome"
+                  href="/invites"
                   className="rounded px-2 py-2 hover:bg-muted"
                 >
-                  Welcome
+                  Invite a friend
                 </Link>
               }
             />
+            <SheetClose
+              nativeButton={false}
+              render={
+                <Link
+                  href="/profile"
+                  className="rounded px-2 py-2 hover:bg-muted"
+                >
+                  My profile
+                </Link>
+              }
+            />
+            <form action="/logout" method="post">
+              <SheetClose
+                render={
+                  <button
+                    type="submit"
+                    className="w-full cursor-pointer rounded px-2 py-2 text-left hover:bg-muted"
+                  >
+                    Sign out
+                  </button>
+                }
+              />
+            </form>
           </nav>
         </SheetContent>
       </Sheet>
