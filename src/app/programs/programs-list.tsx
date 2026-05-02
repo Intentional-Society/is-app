@@ -99,7 +99,7 @@ export function ProgramsList() {
             <div className="flex flex-col gap-1">
               <h2 className="text-lg font-semibold">{program.name}</h2>
               {program.description && (
-                <p className="font-serif text-sm text-gray-300">
+                <p className="font-serif text-sm text-gray-500">
                   {program.description}
                 </p>
               )}
