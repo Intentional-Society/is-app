@@ -36,18 +36,18 @@ The Playwright e2e suite signs in as two long-lived users instead of admin-provi
 
 Both users should be created with "Auto Confirm User" checked so they can sign in with a password immediately.
 
-**Secrets (set in GitHub Actions → Settings → Secrets → Actions, and as Vercel preview/dev env vars for `CI_RESET_TOKEN`):**
+**Secrets (set in GitHub Actions → Settings → Secrets → Actions, and as a Vercel env var across all environments for `CI_RESET_TOKEN`):**
 
 - `E2E_REGULAR_PASSWORD` — the password for `e2e-regular@testfake.local`. GH Actions only.
 - `E2E_ADMIN_PASSWORD` — the password for `e2e-admin@testfake.local`. GH Actions only.
-- `CI_RESET_TOKEN` — arbitrary random string. Must be identical in GH Actions **and** Vercel's Preview + Development env vars. The Playwright suite sends it in the `x-ci-reset-token` header; the server accepts the call only when the header matches and `VERCEL_ENV !== "production"`.
+- `CI_RESET_TOKEN` — arbitrary random string. Must be identical in GH Actions **and** Vercel's Production + Preview + Development env vars. The Playwright suite sends it in the `x-ci-reset-token` header; the server accepts the call only when the header matches.
 
 **Blast radius if leaked:**
 
 - Passwords: attacker can sign in as one of two fake accounts. Regular sees its own profile + up to 10 self-created invites. Admin sees whatever admin surface exists (currently a `NotImplemented` stub). Rotate by changing the password in the Supabase dashboard.
-- Reset token: attacker can wipe the profile fields + delete invites for those two accounts, on preview/dev only (404s in production). Rotate by generating a new string and updating both the GH secret and Vercel env var.
+- Reset token: attacker can wipe the profile fields + delete invites for those two accounts, on any environment (preview and prod share the same Supabase). Rotate by generating a new string and updating both the GH secret and Vercel env var.
 
-**Reset endpoint:** `POST /api/_test/reset`, token-gated + `VERCEL_ENV`-gated. Defined in `src/server/test-reset.ts`; the Playwright setup project (`tests/e2e/reset.setup.ts`) calls it once at the top of every run.
+**Reset endpoint:** `POST /api/_test/reset`, token-gated. Defined in `src/server/test-reset.ts`; the Playwright setup project (`tests/e2e/reset.setup.ts`) calls it once at the top of every run. The token is the sole gate — preview and prod share one Supabase, so an environment gate would be theatre against a token that already mutates prod data either way. The destructive scope is fixed at the seeded e2e users, not arbitrary rows.
 
 ---
 

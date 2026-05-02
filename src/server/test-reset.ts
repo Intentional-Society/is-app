@@ -12,13 +12,6 @@ export const E2E_EMAILS = [
   "e2e-admin@testfake.local",
 ] as const;
 
-// The endpoint is gated two ways: it's absent in production even if a
-// token happens to be set, and it requires a matching header otherwise.
-// Preview and local both satisfy the VERCEL_ENV gate; CI supplies the
-// token via GH Actions secret.
-export const isResetEnabled = (): boolean =>
-  process.env.VERCEL_ENV !== "production" && !!process.env.CI_RESET_TOKEN;
-
 // Clears out everything a welcome/invites test might leave behind on
 // the seeded users. isAdmin is preserved so the admin account keeps
 // its flag across runs. auth.users is not touched — the password and
