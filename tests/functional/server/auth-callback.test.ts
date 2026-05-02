@@ -62,24 +62,24 @@ describe("GET /auth/callback", () => {
     mockCreateClient.mockReset();
   });
 
-  it("redirects to /login?error=missing_code when the code query param is absent", async () => {
+  it("redirects to /signin?error=missing_code when the code query param is absent", async () => {
     const res = await GET(makeRequest("/auth/callback"));
 
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe(
-      "http://testfake.local/login?error=missing_code",
+      "http://testfake.local/signin?error=missing_code",
     );
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
 
-  it("redirects to /login?error=exchange_failed when exchangeCodeForSession errors", async () => {
+  it("redirects to /signin?error=exchange_failed when exchangeCodeForSession errors", async () => {
     mockSupabase(null);
 
     const res = await GET(makeRequest("/auth/callback?code=bad-code"));
 
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe(
-      "http://testfake.local/login?error=exchange_failed",
+      "http://testfake.local/signin?error=exchange_failed",
     );
   });
 });
@@ -156,7 +156,7 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
 
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe(
-      "http://testfake.local/login?error=invite_invalid",
+      "http://testfake.local/signin?error=invite_invalid",
     );
     expect(signOut).toHaveBeenCalledOnce();
 
@@ -180,7 +180,7 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
 
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe(
-      "http://testfake.local/login?error=invite_invalid",
+      "http://testfake.local/signin?error=invite_invalid",
     );
     expect(signOut).toHaveBeenCalledOnce();
   });

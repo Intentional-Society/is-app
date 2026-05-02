@@ -11,7 +11,7 @@ export default async function InvitesPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login");
+    redirect("/signin");
   }
 
   return (

@@ -6,11 +6,11 @@ import { expectAuthed, signInAs } from "./helpers/session";
 // this helper — if sign-in doesn't work, the rest of the signed-in
 // e2e surface is meaningless.
 
-test("session helper lands an authed user off /login", async ({ page }) => {
+test("session helper lands an authed user off /signin", async ({ page }) => {
   await signInAs(page, "regular");
   await expectAuthed(page);
   // By the time this file runs, welcome.spec.ts has filled bio, so the
   // regular user lands on /. If it ever runs before welcome completes,
-  // /welcome is the next-best landing spot — either is past /login.
+  // /welcome is the next-best landing spot — either is past /signin.
   await expect(page).toHaveURL(/\/welcome|\/$/);
 });

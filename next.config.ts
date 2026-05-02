@@ -32,7 +32,7 @@ const securityHeaders = [
       "default-src 'self'",
       scriptSrc,
       "style-src 'self' 'unsafe-inline'",
-      // Supabase auth: login/signup forms and the AuthProvider's token refresh
+      // Supabase auth: signin/signup forms and the AuthProvider's token refresh
       // call GoTrue directly from the browser. Database queries go through Hono
       // ('self'), so PostgREST is not listed. Realtime is not used.
       // Sentry ingest goes through the /monitoring tunnel and next-axiom proxies

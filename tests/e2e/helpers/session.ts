@@ -1,7 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
 // Two long-lived test users seeded manually in prod Supabase. We sign
-// in through the real /login form with a known password rather than
+// in through the real /signin form with a known password rather than
 // minting a fresh user per test, which keeps the service-role key out
 // of CI. Per-run state cleanup happens via POST /api/_test/reset in the
 // Playwright setup project (see tests/e2e/reset.setup.ts).
@@ -27,7 +27,7 @@ const passwordFor = (role: TestRole): string => {
 
 export type TestUser = { role: TestRole; email: string };
 
-// Drives the real /login form with the seeded password. Using the
+// Drives the real /signin form with the seeded password. Using the
 // production sign-in path avoids a parallel "set the cookies directly"
 // implementation that would drift from how sessions actually get
 // established.
@@ -36,20 +36,20 @@ export const signInAs = async (
   role: TestRole,
 ): Promise<TestUser> => {
   const email = EMAILS[role];
-  await page.goto("/login");
+  await page.goto("/signin");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password (optional)").fill(passwordFor(role));
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
+  await page.waitForURL((url) => !url.pathname.startsWith("/signin"), {
     timeout: 10_000,
   });
   return { role, email };
 };
 
 // Small assertion helper callers can use to confirm a successful sign-in
-// without coupling to where the post-login redirect actually lands.
+// without coupling to where the post-sign-in redirect actually lands.
 export const expectAuthed = async (page: Page): Promise<void> => {
-  await expect(page).not.toHaveURL(/\/login/);
+  await expect(page).not.toHaveURL(/\/signin/);
 };
 
 // After reset, bio is null and `/` redirects to `/welcome`. Tests that

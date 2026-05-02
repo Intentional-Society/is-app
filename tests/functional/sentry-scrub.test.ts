@@ -19,15 +19,15 @@ describe("scrubClientEvent", () => {
     expect(result.request?.query_string).toBeUndefined();
   });
 
-  it("strips the query string from /login URLs", () => {
+  it("strips the query string from /signin URLs", () => {
     const event = makeEvent({
-      url: "https://app.example/login?redirect=/dashboard",
+      url: "https://app.example/signin?redirect=/dashboard",
       query_string: "redirect=/dashboard",
     });
 
     const result = scrubClientEvent(event);
 
-    expect(result.request?.url).toBe("https://app.example/login");
+    expect(result.request?.url).toBe("https://app.example/signin");
     expect(result.request?.query_string).toBeUndefined();
   });
 

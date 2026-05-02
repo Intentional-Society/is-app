@@ -11,7 +11,7 @@ export default async function WelcomePage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login");
+    redirect("/signin");
   }
 
   let profile = await getProfileForSelf(user.id);
