@@ -64,5 +64,5 @@ export default withSentryConfig(withAxiom(nextConfig), {
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
   silent: !process.env.CI,
-  disableSourceMapUpload: process.env.VERCEL_ENV !== "production",
+  sourcemaps: { disable: process.env.VERCEL_ENV !== "production" },
 });
