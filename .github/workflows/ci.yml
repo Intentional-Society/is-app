@@ -35,6 +35,7 @@ jobs:
       - run: supabase start
       - run: npm install
       - run: npm run lint
+      - run: npm run typecheck
       - run: node scripts/migrate.mjs
       # check-env (first step of dev:db) requires .env.local. CI's
       # DATABASE_URL env var above still wins over the file value

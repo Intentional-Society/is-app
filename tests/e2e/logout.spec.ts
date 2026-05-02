@@ -6,6 +6,7 @@ test("sign-out button signs the user out and lands on /login", async ({ page }) 
   await signInAs(page, "regular");
 
   await page.goto("/");
+  await page.getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await page.waitForURL((url) => url.pathname === "/login", {
     timeout: 10_000,
@@ -13,5 +14,5 @@ test("sign-out button signs the user out and lands on /login", async ({ page }) 
 
   // Confirm the session really is gone.
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });

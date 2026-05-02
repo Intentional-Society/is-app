@@ -34,22 +34,22 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <h1 className="text-4xl font-bold">Intentional Society</h1>
-      <p className="max-w-sm text-center text-sm text-gray-400">
+      <p className="max-w-sm text-center text-base text-muted-foreground">
         Sign in with your password, or leave it blank to receive a magic
         link by email.
       </p>
       {errorMessage && (
         <p
           role="alert"
-          className="max-w-sm rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300"
+          className="max-w-sm rounded border border-destructive/40 bg-destructive/10 p-3 text-base text-destructive"
         >
           {errorMessage}
         </p>
       )}
       <LoginForm />
-      <p className="text-sm text-gray-500">
+      <p className="text-base text-muted-foreground">
         Have an invite code?{" "}
-        <Link href="/signup" className="underline text-gray-400 hover:text-gray-500">
+        <Link href="/signup" className="underline text-muted-foreground hover:text-foreground">
           Sign up
         </Link>
       </p>

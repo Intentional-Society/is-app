@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf } from "@/server/profiles";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <dt className="text-xs uppercase tracking-wide text-gray-400">{label}</dt>
-      <dd className="font-serif text-sm">{children || <span className="text-gray-500">—</span>}</dd>
+      <dt className="text-sm uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="font-serif text-base">{children || <span className="text-muted-foreground">—</span>}</dd>
     </div>
   );
 }
@@ -28,7 +29,7 @@ export default async function ProfilePage() {
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <div className="flex w-full max-w-md items-center justify-between">
         <h1 className="text-2xl font-bold">My profile</h1>
-        <Link href="/" className="text-sm text-gray-400 hover:text-gray-500">
+        <Link href="/" className="text-base text-muted-foreground hover:text-foreground">
           ← Back
         </Link>
       </div>
@@ -48,12 +49,9 @@ export default async function ProfilePage() {
         <Field label="Emergency contact">{profile.emergencyContact}</Field>
       </dl>
 
-      <Link
-        href="/profile/edit"
-        className="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-300"
-      >
+      <Button render={<Link href="/profile/edit" />}>
         Edit profile
-      </Link>
+      </Button>
     </main>
   );
 }

@@ -6,9 +6,9 @@ test("unauthenticated visit to / shows logged-out home page", async ({ page }) =
   await expect(
     page.getByRole("heading", { name: "Intentional Society" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Join with an invite code" }),
+    page.getByRole("button", { name: "Join with an invite code" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Join a Connection Call" }),

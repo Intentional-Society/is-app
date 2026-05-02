@@ -1,44 +1,37 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf, upsertProfile } from "@/server/profiles";
-
-async function signOut() {
-  "use server";
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  redirect("/login");
-}
 
 function LoggedOutHome() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <h1 className="text-4xl font-bold">Intentional Society</h1>
-      <p className="max-w-md text-center text-gray-400">
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-4xl font-bold">Intentional Society</h1>
+        <p className="font-serif italic text-2xl text-muted-foreground">
+          The IS Web App
+        </p>
+      </div>
+      <p className="max-w-md text-center text-muted-foreground">
         A community of people practicing relational growth together.
       </p>
 
       <div className="flex w-full max-w-sm flex-col gap-3">
-        <Link
-          href="/login"
-          className="block rounded bg-gray-100 px-3 py-2 text-center text-sm font-medium text-gray-900"
-        >
+        <Button className="w-full" render={<Link href="/login" />}>
           Sign in
-        </Link>
-        <Link
-          href="/signup"
-          className="block rounded border border-gray-600 px-3 py-2 text-center text-sm font-medium text-gray-300"
-        >
+        </Button>
+        <Button className="w-full" render={<Link href="/signup" />}>
           Join with an invite code
-        </Link>
+        </Button>
       </div>
 
-      <p className="max-w-sm text-center text-sm text-gray-500">
+      <p className="max-w-sm text-center text-base text-muted-foreground">
         Don&apos;t have an invite?{" "}
         <a
           href="https://www.intentionalsociety.org/get-involved#connection-calls"
-          className="underline text-gray-400 hover:text-gray-500"
+          className="underline text-muted-foreground hover:text-foreground"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -75,35 +68,21 @@ export default async function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <h1 className="text-4xl font-bold">Intentional Society</h1>
-      <p className="text-sm">Signed in as {user.email}</p>
-      <p className="text-sm">Display name: {profile?.displayName ?? "—"}</p>
-      <Link
-        href="/profile"
-        className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-100"
-      >
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-4xl font-bold">Intentional Society</h1>
+        <p className="font-serif italic text-2xl text-muted-foreground">
+          The IS Web App
+        </p>
+      </div>
+      <Button render={<Link href="/profile" />}>
         My profile
-      </Link>
-      <Link
-        href="/invites"
-        className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-100"
-      >
+      </Button>
+      <Button render={<Link href="/invites" />}>
         Manage invites
-      </Link>
-      <Link
-        href="/programs"
-        className="rounded border border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-100"
-      >
+      </Button>
+      <Button render={<Link href="/programs" />}>
         Programs
-      </Link>
-      <form action={signOut}>
-        <button
-          type="submit"
-          className="rounded border border-gray-600 px-3 py-2 text-sm"
-        >
-          Sign out
-        </button>
-      </form>
+      </Button>
     </main>
   );
 }

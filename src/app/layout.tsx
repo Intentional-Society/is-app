@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/components/auth-provider";
 import { SiteHeader } from "@/components/site-header";
 import { createClient } from "@/lib/supabase/server";
+import { getProfileForSelf } from "@/server/profiles";
 
 const gudea = Gudea({
   subsets: ["latin"],
@@ -33,12 +34,13 @@ export default async function RootLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const profile = user ? await getProfileForSelf(user.id) : null;
 
   return (
     <html lang="en" className={cn("font-sans", gudea.variable, ovo.variable)}>
       <body className="antialiased">
         <AuthProvider initialUser={user}>
-          <SiteHeader />
+          <SiteHeader displayName={profile?.displayName ?? null} />
           {children}
         </AuthProvider>
       </body>

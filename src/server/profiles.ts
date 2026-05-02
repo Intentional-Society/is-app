@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 
@@ -100,7 +101,13 @@ export type ProfileForSelf = {
   updatedAt: Date;
 };
 
-export const getProfileForSelf = async (
+// Per-request memoization: the root layout fetches the profile to show
+// displayName in the header, and `/` fetches it again for the bio-null
+// /welcome redirect gate. Without cache(), that's two DB roundtrips on
+// every signed-in render — enough to push Vercel-preview cold-starts
+// past e2e's 10s waitForURL budget. cache() keys on the arg tuple, so
+// only co-located callers with the same userId share the result.
+export const getProfileForSelf = cache(async (
   userId: string,
 ): Promise<ProfileForSelf | null> => {
   const [row] = await db
@@ -124,7 +131,7 @@ export const getProfileForSelf = async (
     .where(eq(profiles.id, userId));
 
   return row ?? null;
-};
+});
 
 // Placeholder. The member-directory endpoint is not built yet; throwing
 // here forces the access-control shape to be decided the moment that

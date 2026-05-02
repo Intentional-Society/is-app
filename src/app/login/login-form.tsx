@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 const RESEND_COOLDOWN_SECONDS = 60;
 
 type FormState =
@@ -44,16 +48,16 @@ function SentView({ email, origin }: { email: string; origin: string }) {
 
   return (
     <div className="flex max-w-sm flex-col items-center gap-4 text-center">
-      <p className="text-sm text-gray-300">
+      <p className="text-base text-foreground">
         Check <span className="font-semibold">{email}</span> for a sign-in link.
       </p>
       {resent ? (
-        <p className="text-sm text-green-400">Link resent.</p>
+        <p className="text-base text-success">Link resent.</p>
       ) : (
         <button
           onClick={handleResend}
           disabled={!canResend}
-          className="text-sm text-gray-400 underline disabled:no-underline disabled:opacity-50"
+          className="text-base text-muted-foreground underline disabled:no-underline disabled:opacity-50"
         >
           {sending
             ? "Resending…"
@@ -140,10 +144,8 @@ export function LoginForm() {
       onSubmit={handleSubmit}
       className="flex w-full max-w-sm flex-col gap-3"
     >
-      <label htmlFor="email" className="text-sm text-gray-300">
-        Email
-      </label>
-      <input
+      <Label htmlFor="email">Email</Label>
+      <Input
         id="email"
         type="email"
         required
@@ -151,12 +153,9 @@ export function LoginForm() {
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         disabled={state.status === "submitting"}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-gray-300 focus:outline-none"
       />
-      <label htmlFor="password" className="text-sm text-gray-300">
-        Password (optional)
-      </label>
-      <input
+      <Label htmlFor="password">Password (optional)</Label>
+      <Input
         id="password"
         type="password"
         autoComplete="current-password"
@@ -164,12 +163,10 @@ export function LoginForm() {
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         disabled={state.status === "submitting"}
-        className="rounded border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-gray-300 focus:outline-none"
       />
-      <button
+      <Button
         type="submit"
         disabled={state.status === "submitting"}
-        className="rounded bg-gray-100 px-3 py-2 text-sm font-medium text-gray-900 disabled:opacity-50"
       >
         {state.status === "submitting"
           ? password.length > 0
@@ -178,9 +175,9 @@ export function LoginForm() {
           : password.length > 0
             ? "Sign in"
             : "Send sign-in link"}
-      </button>
+      </Button>
       {state.status === "error" && (
-        <p role="alert" className="text-sm text-red-300">
+        <p role="alert" className="text-base text-destructive">
           {state.message}
         </p>
       )}
