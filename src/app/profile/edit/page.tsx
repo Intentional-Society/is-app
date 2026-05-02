@@ -21,7 +21,7 @@ export default async function EditProfilePage() {
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <div className="flex w-full max-w-md items-center justify-between">
         <h1 className="text-2xl font-bold">Edit profile</h1>
-        <Link href="/profile" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/profile" className="text-base text-muted-foreground hover:text-foreground">
           ← Back to profile
         </Link>
       </div>

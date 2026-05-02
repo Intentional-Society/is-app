@@ -152,26 +152,26 @@ export function InvitesPanel() {
           {state.kind === "creating" ? "Creating…" : "Create invite"}
         </Button>
         {state.kind === "error" && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-base text-destructive">
             {state.message}
           </p>
         )}
       </form>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h3 className="mb-2 text-base font-semibold uppercase tracking-wide text-muted-foreground">
           My invites
         </h3>
         {rows === null ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-base text-muted-foreground">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No invites yet.</p>
+          <p className="text-base text-muted-foreground">No invites yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((row) => (
               <li
                 key={row.code}
-                className="flex flex-col gap-1 rounded border border-border p-3 text-sm"
+                className="flex flex-col gap-1 rounded border border-border p-3 text-base"
               >
                 <div className="flex items-center gap-3">
                   <code className="font-mono text-base">{row.code}</code>
@@ -196,7 +196,7 @@ export function InvitesPanel() {
                   )}
                 </div>
                 <p className="text-foreground">{row.note}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Expires {formatDate(row.expiresAt)}
                 </p>
               </li>
@@ -216,7 +216,7 @@ function StatusBadge({ status }: { status: InviteRow["status"] }) {
     expired: "text-muted-foreground",
   };
   return (
-    <span className={`text-xs font-semibold uppercase tracking-wide ${tone[status]}`}>
+    <span className={`text-sm font-semibold uppercase tracking-wide ${tone[status]}`}>
       {status}
     </span>
   );

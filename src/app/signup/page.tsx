@@ -24,11 +24,11 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <h1 className="text-4xl font-bold">Intentional Society</h1>
-      <p className="max-w-sm text-center text-sm text-muted-foreground">
+      <p className="max-w-sm text-center text-base text-muted-foreground">
         Joining by invite? Enter the code a member shared with you.
       </p>
       <SignupForm initialCode={code ?? ""} />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         Already a member?{" "}
         <Link href="/login" className="underline text-muted-foreground hover:text-foreground">
           Sign in

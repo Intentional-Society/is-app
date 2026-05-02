@@ -178,6 +178,10 @@
     }
   html {
     @apply font-sans;
+    /* 112.5% of the user's browser default (typically 16px → 18px), so
+       text-base = 18px and rem-based sizes scale proportionally. Using %
+       rather than px preserves user font-size accessibility preferences. */
+    font-size: 112.5%;
     }
   h1, h2, h3, h4, h5, h6 {
     @apply font-sans;

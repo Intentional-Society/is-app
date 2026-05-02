@@ -48,16 +48,16 @@ function SentView({ email, origin }: { email: string; origin: string }) {
 
   return (
     <div className="flex max-w-sm flex-col items-center gap-4 text-center">
-      <p className="text-sm text-foreground">
+      <p className="text-base text-foreground">
         Check <span className="font-semibold">{email}</span> for a sign-in link.
       </p>
       {resent ? (
-        <p className="text-sm text-success">Link resent.</p>
+        <p className="text-base text-success">Link resent.</p>
       ) : (
         <button
           onClick={handleResend}
           disabled={!canResend}
-          className="text-sm text-muted-foreground underline disabled:no-underline disabled:opacity-50"
+          className="text-base text-muted-foreground underline disabled:no-underline disabled:opacity-50"
         >
           {sending
             ? "Resending…"
@@ -177,7 +177,7 @@ export function LoginForm() {
             : "Send sign-in link"}
       </Button>
       {state.status === "error" && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-base text-destructive">
           {state.message}
         </p>
       )}

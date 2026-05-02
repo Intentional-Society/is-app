@@ -29,7 +29,7 @@ function LoggedOutHome() {
         </Button>
       </div>
 
-      <p className="max-w-sm text-center text-sm text-muted-foreground">
+      <p className="max-w-sm text-center text-base text-muted-foreground">
         Don&apos;t have an invite?{" "}
         <a
           href="https://www.intentionalsociety.org/get-involved#connection-calls"

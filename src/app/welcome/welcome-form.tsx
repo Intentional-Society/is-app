@@ -198,7 +198,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         onChange={(e) => setEmergencyContact(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Visible only to you (and admins in case of emergency).
       </p>
 
@@ -216,7 +216,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         onChange={(e) => setPassword(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         You can always sign in with a magic link instead.
       </p>
 
@@ -229,7 +229,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
       </Button>
 
       {status.kind === "error" && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-base text-destructive">
           {status.message}
         </p>
       )}

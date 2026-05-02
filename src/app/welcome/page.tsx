@@ -23,7 +23,7 @@ export default async function WelcomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <h1 className="text-4xl font-bold">Welcome</h1>
-      <p className="max-w-md text-center text-sm text-muted-foreground">
+      <p className="max-w-md text-center text-base text-muted-foreground">
         Tell us a little about yourself. You can edit this later.
       </p>
       <WelcomeForm

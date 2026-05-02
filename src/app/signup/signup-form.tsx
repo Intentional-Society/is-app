@@ -98,7 +98,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
 
   if (step.kind === "sent") {
     return (
-      <p className="max-w-sm text-center text-sm text-foreground">
+      <p className="max-w-sm text-center text-base text-foreground">
         Check <span className="font-semibold">{step.email}</span> for a
         sign-in link. Open it in this same browser within 15 minutes.
       </p>
@@ -112,8 +112,8 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         onSubmit={sendMagicLink}
         className="flex w-full max-w-sm flex-col gap-3"
       >
-        <p className="rounded border border-border bg-muted p-3 text-sm text-foreground">
-          <span className="block text-xs uppercase tracking-wide text-muted-foreground">
+        <p className="rounded border border-border bg-muted p-3 text-base text-foreground">
+          <span className="block text-sm uppercase tracking-wide text-muted-foreground">
             Your invite note
           </span>
           {step.note}
@@ -142,7 +142,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           {submitting ? "Sending…" : "Send sign-in link"}
         </Button>
         {step.kind === "error" && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-base text-destructive">
             {step.message}
           </p>
         )}
@@ -170,7 +170,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         {checking ? "Checking…" : "Check code"}
       </Button>
       {step.kind === "enter-code" && step.error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-base text-destructive">
           {step.error}
         </p>
       )}

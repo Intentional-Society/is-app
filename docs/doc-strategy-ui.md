@@ -28,6 +28,22 @@ Use it when:
 - Verifying that a new role behaves as intended in both light and dark.
 - Onboarding — it's the fastest way to see what the design system actually looks like.
 
+## Typography
+
+Root font size on `<html>` is `112.5%` — 1.125× the user's browser default, so `1rem` resolves to 18px when the browser default is 16. Using `%` rather than `px` lets a user's accessibility-driven browser font-size choice flow through.
+
+All Tailwind size utilities (`text-xs` → `text-4xl`, plus the rem-based spacing/heights like `px-4` and `h-8`) scale with this root, so adjusting it scales the whole UI proportionally.
+
+Conventions for prose, descending:
+
+- **`text-base`** — body copy, default UI text. Tailwind's "base" size.
+- **`text-sm`** — secondary/helper text, microcopy, labels.
+- **`text-xs`** — dense secondary annotations (timestamps, fine print).
+
+The `@layer base` rule in `globals.css` makes a plain `<p>` resolve to `text-base`, so most paragraphs don't need a size class at all.
+
+Button size variants align with the same names: `size="xs"` → `text-xs`, `size="sm"` → `text-sm`, default → `text-base`, `size="lg"` → `text-lg`. Heights step up with the text size.
+
 ## Button variants — mental model
 
 | Variant | Looks like | When to use |
@@ -53,10 +69,12 @@ Action-y interactions (form submits, onClick handlers, things that don't change 
 Pattern for a navigation button — Base UI's `render` prop layers Button styling on top of `next/link`'s anchor:
 
 ```tsx
-<Button variant="primary" render={<Link href="/profile" />}>
+<Button render={<Link href="/profile" />}>
   My profile
 </Button>
 ```
+
+(`variant="primary"` is omitted because primary is the default.)
 
 The rendered DOM is `<a class="…button-classes…" href="/profile">My profile</a>`. It gets the `<a>` semantics, `next/link`'s prefetching, and Button's focus-visible ring all at once.
 

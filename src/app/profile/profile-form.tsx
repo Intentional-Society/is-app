@@ -174,7 +174,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         onChange={(e) => setEmergencyContact(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Visible only to you and admins in case of emergency.
       </p>
 
@@ -187,12 +187,12 @@ export function ProfileForm({ initial }: ProfileFormProps) {
       </Button>
 
       {status.kind === "success" && (
-        <p role="status" className="text-sm text-success">
+        <p role="status" className="text-base text-success">
           Profile saved.
         </p>
       )}
       {status.kind === "error" && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-base text-destructive">
           {status.message}
         </p>
       )}
