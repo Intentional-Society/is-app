@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// /login is public, so these tests run without a session. The Supabase
+// /signin is public, so these tests run without a session. The Supabase
 // auth endpoints are intercepted at the Playwright level, which lets us
 // verify which method the form chooses (password vs magic link) without
 // needing a real session-minting helper (that's Phase 3's territory).
@@ -33,7 +33,7 @@ test("password provided → signInWithPassword is called", async ({ page }) => {
     await route.fulfill({ status: 200, body: "{}" });
   });
 
-  await page.goto("/login");
+  await page.goto("/signin");
   await page.getByLabel("Email").fill("member@example.test");
   await page.getByLabel("Password (optional)").fill("hunter2");
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -66,7 +66,7 @@ test("password blank → signInWithOtp is called", async ({ page }) => {
     await route.fulfill({ status: 200, body: "{}" });
   });
 
-  await page.goto("/login");
+  await page.goto("/signin");
   await page.getByLabel("Email").fill("member@example.test");
   // Leave password blank intentionally.
   await page.getByRole("button", { name: "Send sign-in link" }).click();
@@ -105,7 +105,7 @@ test("unknown email on magic-link surfaces the otp_disabled error", async ({
     await route.fulfill({ status: 200, body: "{}" });
   });
 
-  await page.goto("/login");
+  await page.goto("/signin");
   await page.getByLabel("Email").fill("stranger@example.test");
   await page.getByRole("button", { name: "Send sign-in link" }).click();
 

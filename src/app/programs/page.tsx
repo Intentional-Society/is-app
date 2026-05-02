@@ -11,7 +11,7 @@ export default async function ProgramsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/signin");
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

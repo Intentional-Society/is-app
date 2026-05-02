@@ -70,7 +70,7 @@ function SentView({ email, origin }: { email: string; origin: string }) {
   );
 }
 
-export function LoginForm() {
+export function SigninForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

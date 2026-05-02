@@ -72,7 +72,7 @@ export function SiteHeader({ displayName }: { displayName: string | null }) {
                 </Link>
               }
             />
-            <form action="/logout" method="post">
+            <form action="/signout" method="post">
               <SheetClose
                 render={
                   <button

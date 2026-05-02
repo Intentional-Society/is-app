@@ -1,6 +1,6 @@
 import type { ErrorEvent } from "@sentry/nextjs";
 
-const AUTH_ROUTE_FRAGMENTS = ["/auth/", "/login", "/signup"] as const;
+const AUTH_ROUTE_FRAGMENTS = ["/auth/", "/signin", "/signup"] as const;
 
 const isAuthRoute = (url: string): boolean =>
   AUTH_ROUTE_FRAGMENTS.some((fragment) => url.includes(fragment));

@@ -12,10 +12,10 @@ export default async function EditProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/signin");
 
   const profile = await getProfileForSelf(user.id);
-  if (!profile) redirect("/login");
+  if (!profile) redirect("/signin");
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
-import { LoginForm } from "./login-form";
+import { SigninForm } from "./signin-form";
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing_code: "That sign-in link was incomplete. Please request a new one.",
@@ -15,11 +15,11 @@ const ERROR_MESSAGES: Record<string, string> = {
     "That invite code was already used, revoked, or expired by the time you clicked the link. Ask the member who invited you for a new one.",
 };
 
-type LoginPageProps = {
+type SigninPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
+export default async function SigninPage({ searchParams }: SigninPageProps) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -46,7 +46,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {errorMessage}
         </p>
       )}
-      <LoginForm />
+      <SigninForm />
       <p className="text-base text-muted-foreground">
         Have an invite code?{" "}
         <Link href="/signup" className="underline text-muted-foreground hover:text-foreground">

@@ -19,7 +19,7 @@ function LoggedOutHome() {
       </p>
 
       <div className="flex w-full max-w-sm flex-col gap-3">
-        <Button className="w-full" render={<Link href="/login" />}>
+        <Button className="w-full" render={<Link href="/signin" />}>
           Sign in
         </Button>
         <Button className="w-full" render={<Link href="/signup" />}>

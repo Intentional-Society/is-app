@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const invite = request.nextUrl.searchParams.get("invite");
   if (!code) {
     return NextResponse.redirect(
-      new URL("/login?error=missing_code", request.url),
+      new URL("/signin?error=missing_code", request.url),
     );
   }
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error || !data.user) {
     return NextResponse.redirect(
-      new URL("/login?error=exchange_failed", request.url),
+      new URL("/signin?error=exchange_failed", request.url),
     );
   }
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       await upsertProfile(data.user);
     } catch {
       return NextResponse.redirect(
-        new URL("/login?error=profile_error", request.url),
+        new URL("/signin?error=profile_error", request.url),
       );
     }
     return NextResponse.redirect(new URL("/", request.url));
@@ -89,17 +89,17 @@ export async function GET(request: NextRequest) {
     if (err instanceof InviteInvalid) {
       await supabase.auth.signOut();
       return NextResponse.redirect(
-        new URL("/login?error=invite_invalid", request.url),
+        new URL("/signin?error=invite_invalid", request.url),
       );
     }
     return NextResponse.redirect(
-      new URL("/login?error=profile_error", request.url),
+      new URL("/signin?error=profile_error", request.url),
     );
   }
 
   if (!ok) {
     return NextResponse.redirect(
-      new URL("/login?error=profile_error", request.url),
+      new URL("/signin?error=profile_error", request.url),
     );
   }
 

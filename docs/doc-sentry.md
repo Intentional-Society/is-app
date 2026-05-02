@@ -32,7 +32,7 @@ Auth tokens are generated at Settings → Auth Tokens in the Sentry dashboard.
 
 Two `beforeSend` scrubbers in `src/lib/sentry-scrub.ts` provide defense-in-depth:
 
-- **Client** (`scrubClientEvent`): on `/auth/`, `/login`, and `/signup` URLs, the query string is dropped from `event.request.url` so OAuth tokens like `?code=...` don't ship. The event itself is still sent so genuine errors on these routes remain visible.
+- **Client** (`scrubClientEvent`): on `/auth/`, `/signin`, and `/signup` URLs, the query string is dropped from `event.request.url` so OAuth tokens like `?code=...` don't ship. The event itself is still sent so genuine errors on these routes remain visible.
 - **Server** (`scrubServerEvent`): deletes `event.request.cookies` and removes the `authorization` and `cookie` headers from every event.
 
 Session replay is configured with `maskAllText: true` and `blockAllMedia: true`, so recordings show only structural placeholders for text and no images/video.
