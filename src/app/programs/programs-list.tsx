@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { apiClient } from "@/lib/api";
 
@@ -22,24 +22,31 @@ type ListState =
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [pendingId, setPendingId] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await apiClient.api.programs.$get();
-      if (!res.ok) {
-        setState({ kind: "error", message: `Failed to load programs (${res.status}).` });
-        return;
-      }
-      const body = await res.json();
-      setState({ kind: "loaded", programs: body.programs as Program[] });
-    } catch {
-      setState({ kind: "error", message: "Network error loading programs." });
-    }
-  }, []);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    async function fetchPrograms() {
+      try {
+        const res = await apiClient.api.programs.$get();
+        if (cancelled) return;
+        if (!res.ok) {
+          setState({ kind: "error", message: `Failed to load programs (${res.status}).` });
+          return;
+        }
+        const body = await res.json();
+        setState({ kind: "loaded", programs: body.programs as Program[] });
+      } catch {
+        if (!cancelled) {
+          setState({ kind: "error", message: "Network error loading programs." });
+        }
+      }
+    }
+    void fetchPrograms();
+    return () => { cancelled = true; };
+  }, [reloadKey]);
+
+  const reload = () => setReloadKey((k) => k + 1);
 
   const join = async (programId: string) => {
     setPendingId(programId);
@@ -51,7 +58,7 @@ export function ProgramsList() {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         alert(body.error === "already_joined" ? "You've already joined this program." : "Failed to join.");
       }
-      await load();
+      reload();
     } catch {
       alert("Network error joining program.");
     } finally {
@@ -68,7 +75,7 @@ export function ProgramsList() {
       if (!res.ok) {
         alert("Failed to leave program.");
       }
-      await load();
+      reload();
     } catch {
       alert("Network error leaving program.");
     } finally {
