@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "./db";
-import { profilePrograms, programs } from "./schema";
+import { profilePrograms, profiles, programs } from "./schema";
 
 export type ProgramWithMembership = {
   id: string;
@@ -13,6 +13,10 @@ export type ProgramWithMembership = {
   joinedAt: string | null;
 };
 
+// Note: memberCount and joinedAt use correlated subqueries which is
+// fine for a small number of programs. If the programs table grows
+// significantly, refactor to LEFT JOIN + GROUP BY with a conditional
+// aggregate for the current user's assigned_at.
 export const listPrograms = async (
   userId: string,
 ): Promise<ProgramWithMembership[]> => {
@@ -27,7 +31,7 @@ export const listPrograms = async (
         WHERE ${profilePrograms.programId} = ${programs.id}
       )`,
       joinedAt: sql<string | null>`(
-        SELECT ${profilePrograms.assignedAt}::text FROM ${profilePrograms}
+        SELECT to_json(${profilePrograms.assignedAt}) #>> '{}' FROM ${profilePrograms}
         WHERE ${profilePrograms.programId} = ${programs.id}
           AND ${profilePrograms.profileId} = ${userId}
       )`,
@@ -41,6 +45,24 @@ export const listPrograms = async (
   }));
 };
 
+// Ensures the profile row exists before inserting into profile_programs,
+// matching the self-heal pattern used by GET /api/me. Without this,
+// the FK from profile_programs.profile_id → profiles.id would throw
+// if a session exists but the profile upsert in /auth/callback failed.
+const ensureProfile = async (userId: string): Promise<void> => {
+  const [existing] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(eq(profiles.id, userId));
+
+  if (!existing) {
+    await db
+      .insert(profiles)
+      .values({ id: userId })
+      .onConflictDoNothing();
+  }
+};
+
 export const joinProgram = async (
   userId: string,
   programId: string,
@@ -52,6 +74,9 @@ export const joinProgram = async (
     .where(eq(programs.id, programId));
 
   if (!program) return { error: "not_found" };
+
+  // Self-heal: ensure profile row exists before FK insert
+  await ensureProfile(userId);
 
   // Insert membership — conflict means already joined
   const result = await db
