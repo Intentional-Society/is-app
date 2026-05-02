@@ -19,7 +19,7 @@ A review of the repo, code, CI, and deployment. What we already have that's good
 - **Sentry PII collection scrubbed** (PR #84) — `sendDefaultPii` and `includeLocalVariables` are off; `beforeSend` callbacks in `src/lib/sentry-scrub.ts` strip cookies and the `authorization` header server-side, and drop query strings on `/auth/`, `/login`, `/signup` URLs client-side. Replay uses `maskAllText: true` and `blockAllMedia: true`.
 - **Security headers in place** (PR #83) — CSP (env-conditional), HSTS, `X-Frame-Options`, `Referrer-Policy`, etc. via `next.config.ts`.
 - **`/logout` is POST-only** (PR #82) — `<form action="/logout" method="post">` closes the CSRF sign-out vector.
-- **`/api/_test/reset` is conditionally registered** (PR #81) — wrapped in `isResetEnabled()` so the handler does not exist in the production bundle. Token gate is the second line of defence.
+- **`/api/_test/reset` is token-gated** — `CI_RESET_TOKEN` shared-secret header is the sole gate; the destructive scope is fixed to the two seeded e2e users (`src/server/test-reset.ts`). Previously also gated on `VERCEL_ENV !== "production"`, but preview and prod share the same Supabase, so the environment gate was theatre against a token that already mutates prod data on preview runs.
 - **`hono` bumped past GHSA-458j-xx4x-4375** — `npm audit` is clean.
 - **Dependabot + CodeQL + secret-scanning push protection** are all configured (`.github/dependabot.yml`, `.github/workflows/codeql.yml`).
 

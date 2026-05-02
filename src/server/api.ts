@@ -18,7 +18,7 @@ import {
 } from "./profiles";
 import { joinProgram, leaveProgram, listPrograms } from "./programs";
 import { profiles } from "./schema";
-import { isResetEnabled, resetE2EUsers } from "./test-reset";
+import { resetE2EUsers } from "./test-reset";
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -180,19 +180,18 @@ const api = new Hono<{ Variables: ApiVariables }>()
     });
   });
 
-// CI-only reset for the two seeded e2e users. Only registered in
-// non-production environments so the route is absent from the production
-// bundle entirely. Token header is the second gate.
-if (isResetEnabled()) {
-  api.post("/_test/reset", async (c) => {
-    const token = c.req.header("x-ci-reset-token");
-    if (!token || token !== process.env.CI_RESET_TOKEN) {
-      return c.json({ error: "not_found" }, 404);
-    }
-    const result = await resetE2EUsers();
-    return c.json(result);
-  });
-}
+// CI-only reset for the two seeded e2e users. Token header is the only
+// gate — preview and prod share the same Supabase, so a VERCEL_ENV gate
+// here would be theatre against a token that already mutates prod data.
+// 404s on missing/wrong token to avoid advertising the endpoint.
+api.post("/_test/reset", async (c) => {
+  const token = c.req.header("x-ci-reset-token");
+  if (!token || token !== process.env.CI_RESET_TOKEN) {
+    return c.json({ error: "not_found" }, 404);
+  }
+  const result = await resetE2EUsers();
+  return c.json(result);
+});
 
 export type ApiRoutes = typeof api;
 export default api;
