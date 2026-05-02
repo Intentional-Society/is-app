@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf } from "@/server/profiles";
 
@@ -48,12 +49,9 @@ export default async function ProfilePage() {
         <Field label="Emergency contact">{profile.emergencyContact}</Field>
       </dl>
 
-      <Link
-        href="/profile/edit"
-        className="rounded bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
-      >
+      <Button render={<Link href="/profile/edit" />}>
         Edit profile
-      </Link>
+      </Button>
     </main>
   );
 }

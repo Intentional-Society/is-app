@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForSelf, upsertProfile } from "@/server/profiles";
 
@@ -20,18 +21,12 @@ function LoggedOutHome() {
       </p>
 
       <div className="flex w-full max-w-sm flex-col gap-3">
-        <Link
-          href="/login"
-          className="block rounded bg-secondary px-3 py-2 text-center text-sm font-medium text-secondary-foreground"
-        >
+        <Button className="w-full" render={<Link href="/login" />}>
           Sign in
-        </Link>
-        <Link
-          href="/signup"
-          className="block rounded border border-input px-3 py-2 text-center text-sm font-medium text-foreground"
-        >
+        </Button>
+        <Button className="w-full" render={<Link href="/signup" />}>
           Join with an invite code
-        </Link>
+        </Button>
       </div>
 
       <p className="max-w-sm text-center text-sm text-muted-foreground">
@@ -78,25 +73,16 @@ export default async function Home() {
       <h1 className="text-4xl font-bold">Intentional Society</h1>
       <p className="text-sm">Signed in as {user.email}</p>
       <p className="text-sm">Display name: {profile?.displayName ?? "—"}</p>
-      <Link
-        href="/profile"
-        className="rounded border border-input px-4 py-2 text-sm font-medium hover:bg-accent"
-      >
+      <Button render={<Link href="/profile" />}>
         My profile
-      </Link>
-      <Link
-        href="/invites"
-        className="rounded border border-input px-4 py-2 text-sm font-medium hover:bg-accent"
-      >
+      </Button>
+      <Button render={<Link href="/invites" />}>
         Manage invites
-      </Link>
+      </Button>
       <form action={signOut}>
-        <button
-          type="submit"
-          className="rounded border border-input px-3 py-2 text-sm"
-        >
+        <Button type="submit">
           Sign out
-        </button>
+        </Button>
       </form>
     </main>
   );

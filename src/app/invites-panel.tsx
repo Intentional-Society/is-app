@@ -146,7 +146,6 @@ export function InvitesPanel() {
         />
         <Button
           type="submit"
-          variant="secondary"
           disabled={state.kind === "creating"}
           className="self-start"
         >
@@ -179,20 +178,20 @@ export function InvitesPanel() {
                   <StatusBadge status={row.status} />
                   {row.status === "active" && (
                     <>
-                      <button
-                        type="button"
+                      <Button
+                        size="xs"
+                        className="ml-auto"
                         onClick={() => copy(row.code)}
-                        className="ml-auto rounded border border-input px-2 py-1 text-xs"
                       >
                         {copiedCode === row.code ? "Copied" : "Copy"}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="xs"
                         onClick={() => revoke(row.code)}
-                        className="rounded border border-destructive/40 px-2 py-1 text-xs text-destructive"
                       >
                         Revoke
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
@@ -211,15 +210,13 @@ export function InvitesPanel() {
 
 function StatusBadge({ status }: { status: InviteRow["status"] }) {
   const tone: Record<InviteRow["status"], string> = {
-    active: "border-green-600/40 text-green-700",
-    redeemed: "border-blue-600/40 text-blue-700",
-    revoked: "border-border text-muted-foreground",
-    expired: "border-border text-muted-foreground",
+    active: "text-success",
+    redeemed: "text-primary",
+    revoked: "text-muted-foreground",
+    expired: "text-muted-foreground",
   };
   return (
-    <span
-      className={`rounded border px-2 py-0.5 text-xs uppercase tracking-wide ${tone[status]}`}
-    >
+    <span className={`text-xs font-semibold uppercase tracking-wide ${tone[status]}`}>
       {status}
     </span>
   );

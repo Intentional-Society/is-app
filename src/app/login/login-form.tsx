@@ -166,7 +166,6 @@ export function LoginForm() {
       />
       <Button
         type="submit"
-        variant="secondary"
         disabled={state.status === "submitting"}
       >
         {state.status === "submitting"

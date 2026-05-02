@@ -138,7 +138,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           onChange={(event) => setEmail(event.target.value)}
           disabled={submitting}
         />
-        <Button type="submit" variant="secondary" disabled={submitting}>
+        <Button type="submit" disabled={submitting}>
           {submitting ? "Sending…" : "Send sign-in link"}
         </Button>
         {step.kind === "error" && (
@@ -166,7 +166,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         disabled={checking}
         className="font-mono uppercase"
       />
-      <Button type="submit" variant="secondary" disabled={checking}>
+      <Button type="submit" disabled={checking}>
         {checking ? "Checking…" : "Check code"}
       </Button>
       {step.kind === "enter-code" && step.error && (

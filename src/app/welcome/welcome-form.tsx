@@ -222,7 +222,6 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
 
       <Button
         type="submit"
-        variant="secondary"
         className="mt-3"
         disabled={disabled}
       >

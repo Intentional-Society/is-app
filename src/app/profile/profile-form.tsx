@@ -180,7 +180,6 @@ export function ProfileForm({ initial }: ProfileFormProps) {
 
       <Button
         type="submit"
-        variant="secondary"
         className="mt-3"
         disabled={disabled}
       >
