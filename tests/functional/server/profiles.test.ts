@@ -97,6 +97,19 @@ describe("getProfileForSelf", () => {
     expect(await getProfileForSelf(randomUUID())).toBeNull();
   });
 
+  // Skipped: getProfileForSelf is wrapped in React.cache() so the root
+  // layout (header displayName) and `/` (bio-null /welcome redirect)
+  // share one DB roundtrip per request. cache()'s dedup only activates
+  // inside an active RSC render or Next.js server-request scope —
+  // vitest doesn't set that up, so the wrapper is a no-op here and
+  // both awaits hit the DB independently. Verified instead by the
+  // Playwright e2e suite running against a real Vercel preview.
+  it.skip("memoizes per request — same userId returns the same reference", async () => {
+    const a = await getProfileForSelf(testUserId);
+    const b = await getProfileForSelf(testUserId);
+    expect(b).toBe(a);
+  });
+
   it("returns the full self shape, including emergencyContact and isAdmin", async () => {
     const profile = await getProfileForSelf(testUserId);
 
