@@ -58,7 +58,7 @@ For this project, Actions handles: running Vitest and Playwright on every PR, ru
 
 ### Playwright — End-to-End Testing
 
-**What it does:** Automates real browser interactions for testing complete user flows — login, join a group, update a profile, navigate between pages. Runs tests against Chromium, Firefox, and WebKit. Provides built-in tracing (screenshots + DOM snapshots at every step), auto-waiting, parallel execution, and network interception.
+**What it does:** Automates real browser interactions for testing complete user flows — sign-in, join a group, update a profile, navigate between pages. Runs tests against Chromium, Firefox, and WebKit. Provides built-in tracing (screenshots + DOM snapshots at every step), auto-waiting, parallel execution, and network interception.
 
 **Connects to:** MSW (API mocking for most tests), Next.js dev server or preview deployment (the application under test), Vitest (can share test utilities and mock definitions).
 

@@ -12,16 +12,16 @@ Consequence: **the magic link must be opened in the same browser that requested 
 
 ---
 
-## `/login` vs `/signup` — who creates the user row
+## `/signin` vs `/signup` — who creates the user row
 
-`/login` calls `signInWithOtp({ email, options: { shouldCreateUser: false } })`. `/signup` omits `shouldCreateUser` (defaults to `true`) and passes `options: { data: { displayName } }`, which GoTrue stores as `raw_user_meta_data` on user creation. The callback reads `user_metadata.displayName` to populate the `profiles` row.
+`/signin` calls `signInWithOtp({ email, options: { shouldCreateUser: false } })`. `/signup` omits `shouldCreateUser` (defaults to `true`) and passes `options: { data: { displayName } }`, which GoTrue stores as `raw_user_meta_data` on user creation. The callback reads `user_metadata.displayName` to populate the `profiles` row.
 
-Two reasons to keep `/login` non-creating:
+Two reasons to keep `/signin` non-creating:
 
-1. **Spam / accidental rows.** Without `shouldCreateUser: false`, any bot or typo-er submitting an unknown email to `/login` creates a row in `auth.users` with empty metadata. Closing that off means `/signup` is the only path to user creation.
-2. **Display-name integrity.** GoTrue only applies `options.data` on user *creation*, never on subsequent sign-ins. If a visitor had ever pre-existed (even from a mistyped `/login`), the display name they type on `/signup` would silently fail to reach `user_metadata` and their profile would land with `display_name = NULL`.
+1. **Spam / accidental rows.** Without `shouldCreateUser: false`, any bot or typo-er submitting an unknown email to `/signin` creates a row in `auth.users` with empty metadata. Closing that off means `/signup` is the only path to user creation.
+2. **Display-name integrity.** GoTrue only applies `options.data` on user *creation*, never on subsequent sign-ins. If a visitor had ever pre-existed (even from a mistyped `/signin`), the display name they type on `/signup` would silently fail to reach `user_metadata` and their profile would land with `display_name = NULL`.
 
-Tradeoff: GoTrue returns HTTP 422 (`otp_disabled`) for unknown emails and 200 for known ones, so the `/otp` endpoint is an account-enumeration oracle at the network layer. The login form surfaces the 422 as a human-readable "no account found" message rather than swallowing it — UI-level hiding wouldn't change the network-visible signal, and silently showing "check your email" confuses genuine typo-ers. Closing enumeration for real would require proxying OTP through our own endpoint (shuttling a PKCE challenge round-trip) or adding CAPTCHA.
+Tradeoff: GoTrue returns HTTP 422 (`otp_disabled`) for unknown emails and 200 for known ones, so the `/otp` endpoint is an account-enumeration oracle at the network layer. The sign-in form surfaces the 422 as a human-readable "no account found" message rather than swallowing it — UI-level hiding wouldn't change the network-visible signal, and silently showing "check your email" confuses genuine typo-ers. Closing enumeration for real would require proxying OTP through our own endpoint (shuttling a PKCE challenge round-trip) or adding CAPTCHA.
 
 ---
 
@@ -31,7 +31,7 @@ The Playwright e2e suite signs in as two long-lived users instead of admin-provi
 
 **Accounts (seed these once via the Supabase dashboard → Authentication → Users → Add user):**
 
-- `e2e-regular@testfake.local` — standard member. Used by welcome/invites/logout/session-helper specs.
+- `e2e-regular@testfake.local` — standard member. Used by welcome/invites/signout/session-helper specs.
 - `e2e-admin@testfake.local` — admin member. Not yet used by any spec; reserved for future admin-surface tests. After creating the user, set `profiles.is_admin = true` for this row via the SQL editor.
 
 Both users should be created with "Auto Confirm User" checked so they can sign in with a password immediately.
@@ -69,7 +69,7 @@ These settings control where Supabase redirects users after magic-link sign-in. 
 
 Local dev does **not** need entries here — it hits the local Supabase stack, whose allowlist is in `supabase/config.toml`. Only add `localhost` / `127.0.0.1` to this prod allowlist if a developer intentionally points their local frontend at prod Supabase (rare, and sends real magic-link emails).
 
-The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRedirectTo: \`${origin}/auth/callback?invite=<code>\``, and Supabase's allowlist matches URLs verbatim unless a wildcard is present. Without the `*`, Supabase would reject that URL and silently fall back to **Site URL** — stranding the prospective member at `/` with no session. The plain sign-in path (`login-form.tsx`) passes the bare `/auth/callback`, which also matches `/auth/callback*`.
+The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRedirectTo: \`${origin}/auth/callback?invite=<code>\``, and Supabase's allowlist matches URLs verbatim unless a wildcard is present. Without the `*`, Supabase would reject that URL and silently fall back to **Site URL** — stranding the prospective member at `/` with no session. The plain sign-in path (`signin-form.tsx`) passes the bare `/auth/callback`, which also matches `/auth/callback*`.
 
 ### Auth providers
 

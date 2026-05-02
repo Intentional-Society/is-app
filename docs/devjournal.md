@@ -4,6 +4,14 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-02 | James | Rename /login → /signin and /logout → /signout
+
+Hard rename of "log" to "sign" based vocabulary for app-wide terminology consistency, no redirects or compat shims since there are no users yet.
+
+## 2026-05-01 | James | UI / colors / visuals pass
+
+Theme palette set to a mint surface with a dusty teal brand (with a dev-only `/colors` page to visualize it), Button primitive revamped and regularized across the app, root font size rebalanced around 18px, and the nav menu + home page reworked.
+
 ## 2026-05-01 | Benji | Programs list and self-join management
 
 New `/programs` page lists all programs with title, description, and member count. Signed-in users can join or leave programs with a single click. The join/leave state is tracked via the existing `profile_programs` table with its `assigned_at` timestamp. Three new API endpoints: `GET /api/programs` (lists all programs with the current user's membership status), `POST /api/programs/:id/join`, and `POST /api/programs/:id/leave`. Home page now links to Programs alongside My profile and Manage invites.

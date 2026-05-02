@@ -86,7 +86,7 @@ Hono deploys to Vercel with zero configuration and runs on Node.js serverless fu
 
 **What it does:** Provides two services: (1) authentication (email/password, OAuth, magic links) with JWT issuance and self-managed auth email delivery (magic links, verification, password reset emails are sent by Supabase directly), and (2) a managed PostgreSQL database. The auth JWTs are verified in the Hono middleware layer. The Postgres instance is accessed via Drizzle ORM, not Supabase's auto-generated REST API.
 
-**Connects to:** Hono middleware (JWT verification), Drizzle ORM (database queries), React frontend (Supabase client library for auth flows — login, signup, password reset).
+**Connects to:** Hono middleware (JWT verification), Drizzle ORM (database queries), React frontend (Supabase client library for auth flows — sign-in, signup, password reset).
 
 **Why this choice:** Supabase provides auth and database as a unified service with a generous free tier. The auth system handles email verification, password resets, OAuth providers, and JWT issuance out of the box — eliminating an entire category of security-sensitive code. The database is standard Postgres (not a proprietary engine), and Supabase is open source and self-hostable — the strongest escape hatch of any BaaS. The dashboard includes database query logs, API logs, auth logs, and a SQL editor, providing built-in observability for the data layer.
 
