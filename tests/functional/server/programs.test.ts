@@ -36,7 +36,7 @@ describe("Programs API", () => {
 
     await db.execute(
       sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous)
-          VALUES (${userId}::uuid, 'programs-test@testfake.local', false, false)`,
+          VALUES (${userId}::uuid, ${`programs-${userId.slice(0, 8)}@testfake.local`}, false, false)`,
     );
     await db.insert(profiles).values({ id: userId });
     await db.insert(programs).values({
@@ -49,7 +49,7 @@ describe("Programs API", () => {
     mockCreateServerClient.mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
-          data: { user: makeUser(userId, "programs-test@testfake.local") },
+          data: { user: makeUser(userId, `programs-${userId.slice(0, 8)}@testfake.local`) },
           error: null,
         }),
       },
@@ -133,6 +133,14 @@ describe("Programs API", () => {
     it("returns 404 for non-existent program", async () => {
       const fakeId = randomUUID();
       const res = await app.request(`/api/programs/${fakeId}/join`, {
+        method: "POST",
+      });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "not_found" });
+    });
+
+    it("returns 404 for invalid UUID", async () => {
+      const res = await app.request("/api/programs/not-a-uuid/join", {
         method: "POST",
       });
       expect(res.status).toBe(404);

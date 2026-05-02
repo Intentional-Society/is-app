@@ -22,6 +22,7 @@ type ListState =
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -50,17 +51,18 @@ export function ProgramsList() {
 
   const join = async (programId: string) => {
     setPendingId(programId);
+    setActionError(null);
     try {
       const res = await apiClient.api.programs[":id"].join.$post({
         param: { id: programId },
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        alert(body.error === "already_joined" ? "You've already joined this program." : "Failed to join.");
+        setActionError(body.error === "already_joined" ? "You've already joined this program." : "Failed to join program.");
       }
       reload();
     } catch {
-      alert("Network error joining program.");
+      setActionError("Network error joining program.");
     } finally {
       setPendingId(null);
     }
@@ -68,16 +70,17 @@ export function ProgramsList() {
 
   const leave = async (programId: string) => {
     setPendingId(programId);
+    setActionError(null);
     try {
       const res = await apiClient.api.programs[":id"].leave.$post({
         param: { id: programId },
       });
       if (!res.ok) {
-        alert("Failed to leave program.");
+        setActionError("Failed to leave program.");
       }
       reload();
     } catch {
-      alert("Network error leaving program.");
+      setActionError("Network error leaving program.");
     } finally {
       setPendingId(null);
     }
@@ -96,7 +99,13 @@ export function ProgramsList() {
   }
 
   return (
-    <ul className="flex w-full max-w-xl flex-col gap-4">
+    <>
+      {actionError && (
+        <p role="alert" className="w-full max-w-xl text-sm text-red-300">
+          {actionError}
+        </p>
+      )}
+      <ul className="flex w-full max-w-xl flex-col gap-4">
       {state.programs.map((program) => (
         <li
           key={program.id}
@@ -144,6 +153,7 @@ export function ProgramsList() {
         </li>
       ))}
     </ul>
+    </>
   );
 }
 

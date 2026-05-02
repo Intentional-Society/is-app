@@ -3,6 +3,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { profilePrograms, profiles, programs } from "./schema";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isValidUuid = (s: string): boolean => UUID_RE.test(s);
+
 export type ProgramWithMembership = {
   id: string;
   slug: string;
@@ -67,6 +70,8 @@ export const joinProgram = async (
   userId: string,
   programId: string,
 ): Promise<{ ok: true } | { error: "not_found" | "already_joined" }> => {
+  if (!isValidUuid(programId)) return { error: "not_found" };
+
   // Verify program exists
   const [program] = await db
     .select({ id: programs.id })
@@ -94,6 +99,8 @@ export const leaveProgram = async (
   userId: string,
   programId: string,
 ): Promise<{ ok: true } | { error: "not_found" }> => {
+  if (!isValidUuid(programId)) return { error: "not_found" };
+
   const result = await db
     .delete(profilePrograms)
     .where(
