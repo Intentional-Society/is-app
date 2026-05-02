@@ -16,6 +16,7 @@ import {
   parseEditableProfile,
   upsertProfile,
 } from "./profiles";
+import { joinProgram, leaveProgram, listPrograms } from "./programs";
 import { profiles } from "./schema";
 import { isResetEnabled, resetE2EUsers } from "./test-reset";
 
@@ -141,6 +142,32 @@ const api = new Hono<{ Variables: ApiVariables }>()
       return c.json({ valid: true, note: result.note });
     }
     return c.json({ valid: false, reason: result.reason });
+  })
+  .get("/programs", async (c) => {
+    const user = c.get("user");
+    const programsList = await listPrograms(user.id);
+    return c.json({ programs: programsList });
+  })
+  .post("/programs/:id/join", async (c) => {
+    const user = c.get("user");
+    const programId = c.req.param("id");
+    const result = await joinProgram(user.id, programId);
+    if ("error" in result) {
+      if (result.error === "not_found") {
+        return c.json({ error: "not_found" }, 404);
+      }
+      return c.json({ error: "already_joined" }, 409);
+    }
+    return c.json({ ok: true });
+  })
+  .post("/programs/:id/leave", async (c) => {
+    const user = c.get("user");
+    const programId = c.req.param("id");
+    const result = await leaveProgram(user.id, programId);
+    if ("error" in result) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    return c.json({ ok: true });
   })
   .get("/health", async (c) => {
     const result = await db.execute(sql`SELECT now() AS server_time`);

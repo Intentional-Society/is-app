@@ -80,6 +80,9 @@ export default async function Home() {
       <Button render={<Link href="/invites" />}>
         Manage invites
       </Button>
+      <Button render={<Link href="/programs" />}>
+        Programs
+      </Button>
     </main>
   );
 }
