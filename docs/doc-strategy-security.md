@@ -1,5 +1,7 @@
 # Security Strategy
 
+# HTTP Headers
+
 This doc explains the security headers we serve from `next.config.ts` — what each one does, why it's set the way it is, and what would make us reconsider. Headers are applied to every route via Next's `headers()` config; they are part of the production response and we accept that they also constrain `next dev`.
 
 ## Threat model in one paragraph
@@ -136,3 +138,38 @@ Three rules:
 1. **Add to `connect-src` only when a real request is being blocked.** Don't pre-emptively whitelist a service we might integrate with.
 2. **Verify in the browser, not just in tests.** CSP violations appear in the DevTools console; functional and e2e tests almost never catch them because Playwright runs against a permissive headless Chromium. Open the deployed site, look for `Refused to ...` errors, fix them.
 3. **Loosening is a one-way ratchet.** Anything added here is harder to remove than to add — every addition needs a one-line justification in the comment next to it, like the existing `connect-src` comment.
+
+# Secret rotation
+
+If a secret is suspected compromised, rotate it immediately using the steps below.
+
+## `CI_RESET_TOKEN`
+
+**Impact if leaked:** An attacker can POST to `/api/_test/reset` on and wipe profile fields + invites for the two e2e test accounts.
+
+**To rotate:**
+1. Generate a new random string (e.g. `openssl rand -hex 32`)
+2. Update the `CI_RESET_TOKEN` secret in GitHub Actions (Settings → Secrets → Actions)
+3. Update the `CI_RESET_TOKEN` env var in Vercel for Preview and Development environments
+4. Optionally update `CI_RESET_TOKEN` in `.env.local.example` (the value there is arbitrary — any string works locally)
+
+## `E2E_REGULAR_PASSWORD` / `E2E_ADMIN_PASSWORD`
+
+**Impact if leaked:** An attacker can sign in as one of two fake e2e accounts (`e2e-regular@testfake.local` / `e2e-admin@testfake.local`). These accounts contain no real member data.
+
+**To rotate:**
+1. Change the password in the Supabase dashboard → Authentication → Users (production project)
+2. Update the corresponding secret in GitHub Actions (Settings → Secrets → Actions)
+3. Update `.env.local.example` if the local default changed (though local values are arbitrary)
+
+## `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
+
+**Impact if leaked:** Valid for `auth/v1` endpoints only — it cannot reach application data because the Supabase Data API is disabled. An attacker could submit OTP requests against real email addresses, but cannot read or write member data.
+
+**To rotate:** Generate a new key in the Supabase dashboard → Project Settings → API → Reset publishable key. Update Vercel env vars and re-deploy.
+
+## `SENTRY_AUTH_TOKEN`
+
+**Impact if leaked:** Attacker can upload source maps to or delete releases in the Sentry project. No member data is accessible.
+
+**To rotate:** Revoke the token in Sentry → Settings → Auth Tokens. Generate a new one and update the Vercel env var.
