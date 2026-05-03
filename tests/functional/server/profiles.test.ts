@@ -138,11 +138,45 @@ describe("getProfileForSelf", () => {
   });
 });
 
-describe("getProfileForMember / getProfileForAdmin stubs", () => {
-  it("getProfileForMember throws NotImplemented", async () => {
-    await expect(getProfileForMember()).rejects.toThrow(/NotImplemented/);
+describe("getProfileForMember", () => {
+  let memberId: string;
+
+  beforeEach(async () => {
+    memberId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, instance_id, aud, role, email, email_confirmed_at, created_at, updated_at, is_sso_user, is_anonymous, confirmation_token, recovery_token, email_change_token_new, email_change)
+          VALUES (${memberId}::uuid, '00000000-0000-0000-0000-000000000000'::uuid, 'authenticated', 'authenticated', ${`member-${memberId}@test.local`}, now(), now(), now(), false, false, '', '', '', '')`,
+    );
+    await db.insert(profiles).values({ id: memberId, displayName: "Test Member", bio: "Hello" });
   });
 
+  afterEach(async () => {
+    await db.delete(profiles).where(eq(profiles.id, memberId));
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${memberId}::uuid`);
+  });
+
+  it("returns public fields for an existing member", async () => {
+    const profile = await getProfileForMember(memberId);
+    expect(profile).not.toBeNull();
+    expect(profile?.displayName).toBe("Test Member");
+    expect(Object.keys(profile!).sort()).toEqual(
+      ["id", "displayName", "bio", "keywords", "location", "supplementaryInfo", "avatarUrl", "liveDesire", "createdAt"].sort(),
+    );
+  });
+
+  it("does not include emergencyContact or isAdmin", async () => {
+    const profile = await getProfileForMember(memberId);
+    expect(profile).not.toHaveProperty("emergencyContact");
+    expect(profile).not.toHaveProperty("isAdmin");
+  });
+
+  it("returns null for an unknown id", async () => {
+    const profile = await getProfileForMember(randomUUID());
+    expect(profile).toBeNull();
+  });
+});
+
+describe("getProfileForAdmin stub", () => {
   it("getProfileForAdmin throws NotImplemented", async () => {
     await expect(getProfileForAdmin()).rejects.toThrow(/NotImplemented/);
   });

@@ -133,11 +133,37 @@ export const getProfileForSelf = cache(async (
   return row ?? null;
 });
 
-// Placeholder. The member-directory endpoint is not built yet; throwing
-// here forces the access-control shape to be decided the moment that
-// work starts, instead of silently reusing the self shape.
-export const getProfileForMember = async (): Promise<never> => {
-  throw new Error("NotImplemented: getProfileForMember");
+export type ProfileForMember = {
+  id: string;
+  displayName: string | null;
+  bio: string | null;
+  keywords: string[];
+  location: string | null;
+  supplementaryInfo: string | null;
+  avatarUrl: string | null;
+  liveDesire: string | null;
+  createdAt: Date;
+};
+
+export const getProfileForMember = async (
+  memberId: string,
+): Promise<ProfileForMember | null> => {
+  const [row] = await db
+    .select({
+      id: profiles.id,
+      displayName: profiles.displayName,
+      bio: profiles.bio,
+      keywords: profiles.keywords,
+      location: profiles.location,
+      supplementaryInfo: profiles.supplementaryInfo,
+      avatarUrl: profiles.avatarUrl,
+      liveDesire: profiles.liveDesire,
+      createdAt: profiles.createdAt,
+    })
+    .from(profiles)
+    .where(eq(profiles.id, memberId));
+
+  return row ?? null;
 };
 
 // Placeholder. Same rationale as getProfileForMember — admin tooling
