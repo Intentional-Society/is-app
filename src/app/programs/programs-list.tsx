@@ -3,16 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { apiClient } from "@/lib/api";
-
-type Program = {
-  id: string;
-  slug: string;
-  name: string;
-  description: string | null;
-  memberCount: number;
-  joined: boolean;
-  joinedAt: string | null;
-};
+import type { Program } from "@/lib/api-types";
 
 type ListState =
   | { kind: "loading" }
@@ -36,7 +27,7 @@ export function ProgramsList() {
           return;
         }
         const body = await res.json();
-        setState({ kind: "loaded", programs: body.programs as Program[] });
+        setState({ kind: "loaded", programs: body.programs });
       } catch {
         if (!cancelled) {
           setState({ kind: "error", message: "Network error loading programs." });

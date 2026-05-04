@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-03 | James | Server Components now actually use the API
+
+The architecture doc has said since initial auth-phase 1 that the Hono API is the contract boundary "for every request regardless of origin (browser, Server Component, future mobile client)." In practice every Server Component had been skipping the API entirely! New `src/lib/api-server.ts` exposes `serverApiClient` (Hono RPC dispatched through an in-process `app.fetch`) and a `cache()`-wrapped `loadMe()`. Pages now go through the API for both data and auth-gating. Explicit (vs inferred) end-to-end types come from `InferResponseType`, exposed as named shapes (`Me`, `MemberProfile`, `Program`) in `src/lib/api-types.ts`. Dropped a hand-rolled `Program` type and an `as` cast in favor of the inferred one. The auth-callback route still talks to the DB directly because it's the route that creates the session in the first place.
+
 ## 2026-05-02 | James | Rename /login → /signin and /logout → /signout
 
 Hard rename of "log" to "sign" based vocabulary for app-wide terminology consistency, no redirects or compat shims since there are no users yet.

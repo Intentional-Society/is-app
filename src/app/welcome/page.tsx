@@ -1,24 +1,13 @@
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
-import { getProfileForSelf, upsertProfile } from "@/server/profiles";
+import { loadMe } from "@/lib/api-server";
 
 import { WelcomeForm } from "./welcome-form";
 
 export default async function WelcomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/signin");
-  }
-
-  let profile = await getProfileForSelf(user.id);
-  if (!profile) {
-    await upsertProfile(user);
-    profile = await getProfileForSelf(user.id);
-  }
+  const me = await loadMe();
+  if (!me) redirect("/signin");
+  const profile = me.profile;
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
