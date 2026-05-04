@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { loadMe } from "@/lib/api-server";
+import { requireUser } from "@/lib/api-server";
+import type { Me } from "@/lib/api-types";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -14,9 +14,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default async function ProfilePage() {
-  const me = await loadMe();
-  if (!me || !me.profile) redirect("/signin");
-  const { profile } = me;
+  const me: Me = await requireUser();
+  const profile = me.profile!;
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

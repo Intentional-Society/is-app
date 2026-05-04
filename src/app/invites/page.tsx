@@ -1,18 +1,11 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/api-server";
 
 import { InvitesPanel } from "./invites-panel";
 
 export default async function InvitesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/signin");
-  }
+  await requireUser();
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

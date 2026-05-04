@@ -42,19 +42,7 @@ function LoggedOutHome() {
   );
 }
 
-export default async function Home() {
-  const me = await loadMe();
-  if (!me) {
-    return <LoggedOutHome />;
-  }
-
-  // Incomplete-profile heuristic: bio null means the member has not
-  // completed /welcome yet. bio is the one field the welcome form
-  // always collects, so it's a reliable sentinel.
-  if (me.profile && me.profile.bio === null) {
-    redirect("/welcome");
-  }
-
+function LoggedInHome() {
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <div className="flex flex-col items-center gap-1">
@@ -74,4 +62,20 @@ export default async function Home() {
       </Button>
     </main>
   );
+}
+
+export default async function Home() {
+  const me = await loadMe();
+  if (!me) {
+    return <LoggedOutHome />;
+  }
+
+  // Incomplete-profile heuristic: bio null means the member has not
+  // completed /welcome yet. bio is the one field the welcome form
+  // always collects, so it's a reliable sentinel.
+  if (me.profile && me.profile.bio === null) {
+    redirect("/welcome");
+  }
+
+  return <LoggedInHome />;
 }
