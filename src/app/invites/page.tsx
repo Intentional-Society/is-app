@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
-import { InvitesPanel } from "../invites-panel";
+import { InvitesPanel } from "./invites-panel";
 
 export default async function InvitesPage() {
   const supabase = await createClient();
