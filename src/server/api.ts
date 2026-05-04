@@ -12,6 +12,7 @@ import {
   validateNote,
 } from "./invites";
 import {
+  getProfileForMember,
   getProfileForSelf,
   parseEditableProfile,
   upsertProfile,
@@ -142,6 +143,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
       return c.json({ valid: true, note: result.note });
     }
     return c.json({ valid: false, reason: result.reason });
+  })
+  .get("/members/:id", async (c) => {
+    const memberId = c.req.param("id");
+    const profile = await getProfileForMember(memberId);
+    if (!profile) return c.json({ error: "not_found" }, 404);
+    return c.json({ profile });
   })
   .get("/programs", async (c) => {
     const user = c.get("user");
