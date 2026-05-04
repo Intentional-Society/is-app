@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
-import { getProfileForSelf } from "@/server/profiles";
+import { loadMe } from "@/lib/api-server";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -15,15 +14,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default async function ProfilePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/signin");
-
-  const profile = await getProfileForSelf(user.id);
-  if (!profile) redirect("/signin");
+  const me = await loadMe();
+  if (!me || !me.profile) redirect("/signin");
+  const { profile } = me;
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

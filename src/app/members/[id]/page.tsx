@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
-import { getProfileForMember } from "@/server/profiles";
+import { serverApiClient } from "@/lib/api-server";
+import type { MemberProfile } from "@/lib/api-types";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -18,18 +18,14 @@ export default async function MemberProfilePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/signin");
-
   const { id } = await params;
-  const profile = await getProfileForMember(id);
-  if (!profile) notFound();
+  const res = await serverApiClient.api.members[":id"].$get({ param: { id } });
+  if (res.status === 401) redirect("/signin");
+  if (res.status === 404) notFound();
+  if (!res.ok) throw new Error(`Failed to load member ${id}: ${res.status}`);
+  const { profile }: { profile: MemberProfile } = await res.json();
 
-  const memberSince = profile.createdAt.getFullYear();
+  const memberSince = new Date(profile.createdAt).getFullYear();
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

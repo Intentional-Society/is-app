@@ -43,8 +43,9 @@ const api = new Hono<{ Variables: ApiVariables }>()
 
     let profile = await getProfileForSelf(user.id);
     if (!profile) {
-      // Self-heal: 1d's callback can leave a session without a profile
-      // row if the upsert failed there. The next authed request repairs.
+      // Self-heal: profiles are normally inserted by /auth/callback
+      // during sign-in. If that upsert failed but the session still
+      // landed, the next authed request creates the row here.
       await upsertProfile(user);
       profile = await getProfileForSelf(user.id);
     }

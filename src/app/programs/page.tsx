@@ -1,17 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { loadMe } from "@/lib/api-server";
 
 import { ProgramsList } from "./programs-list";
 
 export default async function ProgramsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/signin");
+  const me = await loadMe();
+  if (!me) redirect("/signin");
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

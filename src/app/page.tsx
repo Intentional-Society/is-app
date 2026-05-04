@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
-import { getProfileForSelf, upsertProfile } from "@/server/profiles";
+import { loadMe } from "@/lib/api-server";
 
 function LoggedOutHome() {
   return (
@@ -44,25 +43,15 @@ function LoggedOutHome() {
 }
 
 export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const me = await loadMe();
+  if (!me) {
     return <LoggedOutHome />;
-  }
-
-  let profile = await getProfileForSelf(user.id);
-  if (!profile) {
-    // Self-heal in case 1d's callback upsert failed.
-    await upsertProfile(user);
-    profile = await getProfileForSelf(user.id);
   }
 
   // Incomplete-profile heuristic: bio null means the member has not
   // completed /welcome yet. bio is the one field the welcome form
   // always collects, so it's a reliable sentinel.
-  if (profile && profile.bio === null) {
+  if (me.profile && me.profile.bio === null) {
     redirect("/welcome");
   }
 
