@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { loadMe } from "@/lib/api-server";
+import { requireUser } from "@/lib/api-server";
 
 import { ProgramsList } from "./programs-list";
 
 export default async function ProgramsPage() {
-  const me = await loadMe();
-  if (!me) redirect("/signin");
+  await requireUser();
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

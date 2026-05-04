@@ -2,6 +2,7 @@ import "server-only";
 
 import { hc } from "hono/client";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import type { Me } from "@/lib/api-types";
@@ -41,3 +42,13 @@ export const loadMe = cache(async (): Promise<Me | null> => {
   if (!res.ok) throw new Error(`Failed to load /api/me: ${res.status}`);
   return res.json();
 });
+
+// Page-level auth gate. Use at the top of any Server Component that
+// requires a signed-in user; redirects to /signin otherwise. Returns a
+// non-null Me so the rest of the page can use the data without
+// narrowing.
+export const requireUser = async (): Promise<Me> => {
+  const me = await loadMe();
+  if (!me) redirect("/signin");
+  return me;
+};

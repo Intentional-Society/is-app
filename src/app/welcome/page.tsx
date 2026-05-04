@@ -1,12 +1,10 @@
-import { redirect } from "next/navigation";
-
-import { loadMe } from "@/lib/api-server";
+import { requireUser } from "@/lib/api-server";
+import type { Me } from "@/lib/api-types";
 
 import { WelcomeForm } from "./welcome-form";
 
 export default async function WelcomePage() {
-  const me = await loadMe();
-  if (!me) redirect("/signin");
+  const me: Me = await requireUser();
   const profile = me.profile;
 
   return (
