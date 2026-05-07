@@ -146,3 +146,31 @@ npm run seed:dev
 This inserts 15 member profiles, 3 programs (The Gumball Machine, Presence Pods, Thematic Crews), 24 program memberships, and 5 invites representing a realistic invite chain. All records use fixed UUIDs so E2E tests can reference known values.
 
 The script is idempotent — running it a second time produces no duplicates and reports how many rows were inserted vs skipped per table.
+
+---
+
+## Signing in locally
+
+The local Supabase database is completely separate from production. Your real IS account doesn't exist here — signing in with your production email will return "No account found for that email."
+
+**Quickest path:**
+
+1. Run `npm run seed:dev` (if you haven't already)
+2. Go to http://localhost:3000/signin
+3. Enter one of the seeded emails — e.g. `aria.chen@example.com`
+4. Leave the password field blank and click **Send sign-in link**
+5. Open **Inbucket** at http://localhost:54324, click the email, and click the magic link
+
+The signin page shows an amber banner on localhost reminding you of this and linking directly to Inbucket.
+
+**Seeded member emails** (any of these work):
+
+```
+aria.chen@example.com
+marcus.webb@example.com
+leila.osei@example.com
+tobias.keller@example.com
+priya.nair@example.com
+```
+
+The full list of 15 profiles is in `scripts/seed-dev.json`.
