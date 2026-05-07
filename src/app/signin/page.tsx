@@ -31,10 +31,6 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
   const { error } = await searchParams;
   const errorMessage = error ? ERROR_MESSAGES[error] : undefined;
 
-  const isLocalDev =
-    process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("localhost") ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("127.0.0.1");
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <h1 className="text-4xl font-bold">Intentional Society</h1>
@@ -42,7 +38,7 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
         Sign in with your password, or leave it blank to receive a magic
         link by email.
       </p>
-      {isLocalDev && (
+      {process.env.NODE_ENV === "development" && (
         <p className="max-w-sm rounded border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
           <strong>Local dev:</strong> this database is separate from production.
           Use a seeded email (e.g. <code>aria.chen@example.com</code>) or run{" "}
