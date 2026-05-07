@@ -33,6 +33,7 @@ export const resetE2EUsers = async (): Promise<{ reset: number }> => {
       .update(profiles)
       .set({
         displayName: null,
+        slug: null,
         bio: null,
         keywords: sql`'{}'::text[]`,
         location: null,
