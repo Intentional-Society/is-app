@@ -22,6 +22,33 @@ if (!branch || branch === "HEAD") {
   process.exit(1);
 }
 
+const dirty = run("git status --porcelain");
+if (dirty) {
+  console.error(
+    "Refusing to run with uncommitted changes — commit or stash first.\n" +
+      "The workflow runs against the remote branch state; local-only edits would be invisible.",
+  );
+  process.exit(1);
+}
+
+try {
+  run(`git fetch origin ${branch} --quiet`);
+} catch {
+  console.error(
+    `origin/${branch} not found — push the branch first so the workflow can check it out.`,
+  );
+  process.exit(1);
+}
+const localSha = run("git rev-parse HEAD");
+const remoteSha = run(`git rev-parse origin/${branch}`);
+if (localSha !== remoteSha) {
+  console.error(
+    `Local ${branch} (${localSha.slice(0, 8)}) is out of sync with origin/${branch} (${remoteSha.slice(0, 8)}).\n` +
+      "Push your latest commits before triggering the workflow.",
+  );
+  process.exit(1);
+}
+
 console.log(
   `Dispatching forward-migrate-prod-schema-expansion against ref=${branch}`,
 );
