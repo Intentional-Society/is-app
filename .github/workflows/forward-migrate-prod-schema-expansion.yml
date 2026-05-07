@@ -1,0 +1,77 @@
+name: Forward-migrate prod schema (expansion)
+
+# Manually triggered. Applies additive (expand) drizzle migrations to
+# the prod DB ahead of opening a PR, so previews can exercise new code
+# paths against the migrated schema (drizzle's typed schema must match
+# the DB it queries — see docs/strategy-committing.md). Contract
+# migrations do NOT use this workflow — they ride the standard
+# merge-to-main path so they only apply once the new code is live.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA whose migrations should be applied to prod"
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Apply expand migrations to production DB
+    runs-on: ubuntu-latest
+    environment: prod-db    # required-reviewer gate lives here
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          # Need history beyond the dispatched ref so we can diff
+          # against main for the show-migrations + destructive-guard
+          # steps below.
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Show migrations to be applied
+        run: |
+          set -e
+          git fetch --depth=1 origin main
+          echo "## Migration files changed vs main"
+          git diff --stat origin/main...HEAD -- drizzle/ || true
+          changed=$(git diff --name-only origin/main...HEAD -- 'drizzle/*.sql')
+          if [ -z "$changed" ]; then
+            echo "No new .sql migrations vs main. Nothing to apply — failing fast."
+            exit 1
+          fi
+          echo ""
+          echo "## Migration file contents"
+          for f in $changed; do
+            echo "----- $f -----"
+            cat "$f"
+            echo ""
+          done
+
+      - name: Guard against destructive migrations
+        run: |
+          set -e
+          # Expand-only workflow. Contract migrations (DROP, RENAME, type
+          # changes) must ride the merge-to-main path so they only apply
+          # once the new code is live.
+          patterns='drop column|drop table|drop constraint|rename column|rename to|alter column.*drop'
+          matches=$(git diff origin/main...HEAD -- 'drizzle/*.sql' | grep -iE "^\+[^+].*($patterns)" || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Destructive migration pattern detected. This workflow is expand-only — use the merge-to-main path for contract migrations."
+            echo "Offending lines:"
+            echo "$matches"
+            exit 1
+          fi
+
+      - name: Run drizzle-kit migrate
+        run: node scripts/migrate.mjs
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
