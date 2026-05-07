@@ -54,6 +54,9 @@ function LoggedInHome() {
       <Button render={<Link href="/profile" />}>
         My profile
       </Button>
+      <Button render={<Link href="/members" />}>
+        Member directory
+      </Button>
       <Button render={<Link href="/invites" />}>
         Manage invites
       </Button>
