@@ -1,0 +1,38 @@
+name: Forward-migrate prod schema (expansion)
+
+# Manually triggered. Applies additive (expand) drizzle migrations to
+# the prod DB ahead of opening a PR, so previews can exercise new code
+# paths against the migrated schema (drizzle's typed schema must match
+# the DB it queries — see docs/strategy-committing.md). Contract
+# migrations do NOT use this workflow — they ride the standard
+# merge-to-main path so they only apply once the new code is live.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA whose migrations should be applied to prod"
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Apply expand migrations to production DB
+    runs-on: ubuntu-latest
+    environment: prod-db    # required-reviewer gate lives here
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run drizzle-kit migrate
+        run: node scripts/migrate.mjs
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}

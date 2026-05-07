@@ -25,6 +25,14 @@ Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-pr
 - `.github/workflows/ci.yml` — lint + functional tests, triggers on `pull_request` to main. Spins up the full local Supabase stack via `supabase/setup-cli@v1` + `supabase start`, then applies Drizzle migrations before running Vitest. Functional tests that hit the DB (e.g. `profiles.test.ts`) run against this stack, matching the dev-box setup exactly.
 - `.github/workflows/e2e.yml` — Playwright against Vercel preview URL, triggers on `deployment_status` (fired by Vercel's GitHub integration when a preview deploy completes).
 - `.github/workflows/codeql.yml` — CodeQL static analysis on JS/TS and workflow YAMLs, triggers on PRs + pushes to main + weekly cron. Uses the `security-extended` query pack.
+- `.github/workflows/forward-migrate-prod-schema-expansion.yml` — `workflow_dispatch`-only. Applies additive (expand) drizzle migrations to the prod DB ahead of opening a PR, so previews can exercise new code paths against the migrated schema. Bound to the `prod-db` environment (see below) for the reviewer gate. Triggered locally via `npm run prod:db:expand` (uses the current branch). Contract migrations do NOT use this workflow — they ride the standard merge-to-main path.
+
+## Environments
+
+- **`prod-db`** — gates write access to the production Supabase database from any `workflow_dispatch` workflow. Configured in Settings → Environments.
+  - **Required reviewers:** James (self-approval permitted; this is a single-maintainer setup).
+  - **Environment secret:** `PRODUCTION_DATABASE_URL` — the prod transaction-pooler URL (same value Vercel uses on production deploys, copied from the Vercel project's env).
+  - The name is deliberately distinct from "production" to avoid visual collision with Vercel's `VERCEL_ENV=production`, which has its own meaning in `vercel.json`.
 
 ## Advanced Security
 
