@@ -28,12 +28,12 @@ export default async function MemberProfilePage({
       <main className="flex min-h-screen flex-col items-center gap-6 p-8">
         <div className="flex w-full max-w-md items-center justify-between">
           <h1 className="text-2xl font-bold">Member not found</h1>
-          <Link href="/" className="text-base text-muted-foreground hover:text-foreground">
-            ← Back
+          <Link href="/members" className="text-base text-muted-foreground hover:text-foreground">
+            ← Directory
           </Link>
         </div>
         <p className="text-muted-foreground">
-          We couldn&apos;t find a member with that ID.
+          We couldn&apos;t find a member with that name or ID.
         </p>
       </main>
     );
@@ -51,8 +51,8 @@ export default async function MemberProfilePage({
           </h1>
           <p className="text-sm text-muted-foreground">Member since {memberSince}</p>
         </div>
-        <Link href="/" className="text-base text-muted-foreground hover:text-foreground">
-          ← Back
+        <Link href="/members" className="text-base text-muted-foreground hover:text-foreground">
+          ← Directory
         </Link>
       </div>
 

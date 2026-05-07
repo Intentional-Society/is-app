@@ -160,7 +160,7 @@ describe("getProfileForMember", () => {
     expect(profile).not.toBeNull();
     expect(profile?.displayName).toBe("Test Member");
     expect(Object.keys(profile!).sort()).toEqual(
-      ["id", "displayName", "bio", "keywords", "location", "supplementaryInfo", "avatarUrl", "liveDesire", "createdAt"].sort(),
+      ["id", "slug", "displayName", "bio", "keywords", "location", "supplementaryInfo", "avatarUrl", "liveDesire", "createdAt"].sort(),
     );
   });
 

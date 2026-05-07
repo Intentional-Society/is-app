@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
-import { asc, eq, isNotNull } from "drizzle-orm";
+import { asc, eq, isNotNull, or } from "drizzle-orm";
 
 import { db } from "./db";
 import { profiles } from "./schema";
@@ -74,13 +74,20 @@ export const parseEditableProfile = (
   return out;
 };
 
+export const toSlug = (displayName: string): string =>
+  displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
 export const upsertProfile = async (user: User) => {
   const displayName =
     (user.user_metadata?.displayName as string | undefined) ?? null;
+  const slug = displayName ? toSlug(displayName) : null;
 
   await db
     .insert(profiles)
-    .values({ id: user.id, displayName })
+    .values({ id: user.id, displayName, slug })
     .onConflictDoNothing({ target: profiles.id });
 };
 
@@ -135,6 +142,7 @@ export const getProfileForSelf = cache(async (
 
 export type ProfileForMember = {
   id: string;
+  slug: string | null;
   displayName: string | null;
   bio: string | null;
   keywords: string[];
@@ -145,12 +153,23 @@ export type ProfileForMember = {
   createdAt: Date;
 };
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Accepts either a UUID or a slug so /members/aria-chen and
+// /members/<uuid> both work. UUID-shaped strings go straight to the id
+// column; anything else is treated as a slug lookup.
 export const getProfileForMember = async (
-  memberId: string,
+  idOrSlug: string,
 ): Promise<ProfileForMember | null> => {
+  const where = UUID_RE.test(idOrSlug)
+    ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
+    : eq(profiles.slug, idOrSlug);
+
   const [row] = await db
     .select({
       id: profiles.id,
+      slug: profiles.slug,
       displayName: profiles.displayName,
       bio: profiles.bio,
       keywords: profiles.keywords,
@@ -161,13 +180,14 @@ export const getProfileForMember = async (
       createdAt: profiles.createdAt,
     })
     .from(profiles)
-    .where(eq(profiles.id, memberId));
+    .where(where);
 
   return row ?? null;
 };
 
 export type MemberSummary = {
   id: string;
+  slug: string | null;
   displayName: string;
   location: string | null;
   keywords: string[];
@@ -177,6 +197,7 @@ export const listMembers = async (): Promise<MemberSummary[]> => {
   return db
     .select({
       id: profiles.id,
+      slug: profiles.slug,
       displayName: profiles.displayName,
       location: profiles.location,
       keywords: profiles.keywords,

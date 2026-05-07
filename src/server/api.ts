@@ -16,6 +16,7 @@ import {
   getProfileForSelf,
   listMembers,
   parseEditableProfile,
+  toSlug,
   upsertProfile,
 } from "./profiles";
 import { joinProgram, leaveProgram, listPrograms } from "./programs";
@@ -76,7 +77,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
     }
 
     if (Object.keys(parsed).length > 0) {
-      await db.update(profiles).set(parsed).where(eq(profiles.id, user.id));
+      const update = {
+        ...parsed,
+        ...(parsed.displayName !== undefined
+          ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null }
+          : {}),
+      };
+      await db.update(profiles).set(update).where(eq(profiles.id, user.id));
     }
 
     const profile = await getProfileForSelf(user.id);
