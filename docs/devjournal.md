@@ -4,6 +4,14 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-06 | James | Relations schema: PR 1 of the four-PR Relations ship
+
+New `relations` and `invite_hints` tables, plus nullable `profiles.last_updated_web` and `invites.creator_value`. Schema-only — no API or UI yet — so previews (which skip migrate) keep serving the existing surface unchanged. See `docs/design-relations.md` and `docs/plan-relations.md`.
+
+## 2026-05-06 | James | Doc categories: introduced `design-*`, dropped `doc-` prefix from strategy docs
+
+`design-*.md` is a doc category for feature-scoped designs — sibling to `plan-*`, `strategy-*`, and `architecture-*`.
+
 ## 2026-05-03 | James | Server Components now actually use the API
 
 The architecture doc has said since initial auth-phase 1 that the Hono API is the contract boundary "for every request regardless of origin (browser, Server Component, future mobile client)." In practice every Server Component had been skipping the API entirely! New `src/lib/api-server.ts` exposes `serverApiClient` (Hono RPC dispatched through an in-process `app.fetch`) and a `cache()`-wrapped `loadMe()`. Pages now go through the API for both data and auth-gating. Explicit (vs inferred) end-to-end types come from `InferResponseType`, exposed as named shapes (`Me`, `MemberProfile`, `Program`) in `src/lib/api-types.ts`. Dropped a hand-rolled `Program` type and an `as` cast in favor of the inferred one. The auth-callback route still talks to the DB directly because it's the route that creates the session in the first place.
@@ -30,7 +38,7 @@ Bumped to Next 16; production builds now use Turbopack by default.
 
 ## 2026-04-26 | James | Security headers locked down
 
-App now ships CSP, HSTS, frame/referrer/permissions headers from `next.config.ts`. See `docs/doc-strategy-security.md` for per-directive rationale.
+App now ships CSP, HSTS, frame/referrer/permissions headers from `next.config.ts`. See `docs/strategy-security.md` for per-directive rationale.
 
 ## 2026-04-26 | Benji | Move invite management to its own page
 
@@ -64,7 +72,7 @@ Workflow when adding a new env var going forward: add the key + local default to
 
 ## 2026-04-22 | James | Skip Vercel preview for docs-only changes
 
-Vercel's `ignoreCommand` now diffs HEAD against the previous successful deploy and skips the build when only `docs/` or root `CLAUDE.md` changed. See `docs/doc-strategy-committing.md`.
+Vercel's `ignoreCommand` now diffs HEAD against the previous successful deploy and skips the build when only `docs/` or root `CLAUDE.md` changed. See `docs/strategy-committing.md`.
 
 ## 2026-04-21 | Ola | Seed script for local development
 
@@ -94,7 +102,7 @@ End-to-end magic-link auth is wired. `/` is now a protected server component (un
 
 ## 2026-04-14 | James | Drizzle migrations run in Vercel production build
 
-Every production deploy now runs `drizzle-kit migrate` before `next build` (gated on `VERCEL_ENV=production` in `vercel.json`), and a failed migration aborts the deploy with the previous build still serving traffic. Preview deploys skip the migration and continue to hit the prod DB unchanged. See `docs/doc-strategy-committing.md` for the expand-contract verification recipe that builds on this guarantee.
+Every production deploy now runs `drizzle-kit migrate` before `next build` (gated on `VERCEL_ENV=production` in `vercel.json`), and a failed migration aborts the deploy with the previous build still serving traffic. Preview deploys skip the migration and continue to hit the prod DB unchanged. See `docs/strategy-committing.md` for the expand-contract verification recipe that builds on this guarantee.
 
 ## 2026-04-07 | James | Observability: Sentry + Axiom
 

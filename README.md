@@ -75,8 +75,8 @@ drizzle/            Database migration files
 | [architecture-appstack.md](docs/architecture-appstack.md) | Production stack and architecture decisions |
 | [architecture-devstack.md](docs/architecture-devstack.md) | Dev/test tooling |
 | [setup-dev-machine.md](docs/setup-dev-machine.md) | System prerequisites for new developers |
-| [doc-strategy-branching.md](docs/doc-strategy-branching.md) | Branching strategy |
-| [doc-strategy-committing.md](docs/doc-strategy-committing.md) | Commit conventions |
+| [strategy-branching.md](docs/strategy-branching.md) | Branching strategy |
+| [strategy-committing.md](docs/strategy-committing.md) | Commit conventions |
 | [doc-sentry.md](docs/doc-sentry.md) | Sentry error tracking config |
 | [doc-axiom.md](docs/doc-axiom.md) | Axiom logging config |
 | [doc-vercel.md](docs/doc-vercel.md) | Vercel dashboard settings |
