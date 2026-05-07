@@ -14,6 +14,7 @@ import {
 import {
   getProfileForMember,
   getProfileForSelf,
+  listMembers,
   parseEditableProfile,
   upsertProfile,
 } from "./profiles";
@@ -144,6 +145,10 @@ const api = new Hono<{ Variables: ApiVariables }>()
       return c.json({ valid: true, note: result.note });
     }
     return c.json({ valid: false, reason: result.reason });
+  })
+  .get("/members", async (c) => {
+    const members = await listMembers();
+    return c.json({ members });
   })
   .get("/members/:id", async (c) => {
     const memberId = c.req.param("id");

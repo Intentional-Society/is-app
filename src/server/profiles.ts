@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
-import { eq } from "drizzle-orm";
+import { asc, eq, isNotNull } from "drizzle-orm";
 
 import { db } from "./db";
 import { profiles } from "./schema";
@@ -164,6 +164,26 @@ export const getProfileForMember = async (
     .where(eq(profiles.id, memberId));
 
   return row ?? null;
+};
+
+export type MemberSummary = {
+  id: string;
+  displayName: string;
+  location: string | null;
+  keywords: string[];
+};
+
+export const listMembers = async (): Promise<MemberSummary[]> => {
+  return db
+    .select({
+      id: profiles.id,
+      displayName: profiles.displayName,
+      location: profiles.location,
+      keywords: profiles.keywords,
+    })
+    .from(profiles)
+    .where(isNotNull(profiles.displayName))
+    .orderBy(asc(profiles.displayName)) as Promise<MemberSummary[]>;
 };
 
 // Placeholder. Same rationale as getProfileForMember — admin tooling

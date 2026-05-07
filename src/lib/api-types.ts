@@ -14,6 +14,11 @@ export type MemberProfile = InferResponseType<
   200
 >["profile"];
 
+export type MemberSummary = InferResponseType<
+  (typeof apiClient.api.members)["$get"],
+  200
+>["members"][number];
+
 export type Me = InferResponseType<
   (typeof apiClient.api.me)["$get"],
   200
