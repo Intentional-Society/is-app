@@ -195,4 +195,4 @@ Signed-in coverage (sign-out clears session, authed `/api/me` shape in the brows
 - `src/server/db.ts` — Drizzle connection, unchanged
 - `src/lib/api.ts` — Hono RPC `apiClient`
 - `docs/architecture-appstack.md` — "Supabase — Auth + Managed PostgreSQL" and "Authentication Flow" sections document the contract this plan implements
-- `docs/doc-strategy-committing.md` — expand-contract pattern
+- `docs/strategy-committing.md` — expand-contract pattern

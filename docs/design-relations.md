@@ -2,7 +2,7 @@
 
 Status: design captured 2026-05-04. Not yet implemented. Author: collaborative interview between James and Claude.
 
-This is a design doc — concrete decisions, schema, and flows for one feature, with rationale captured for future-us. It sits between strategy (less prescriptive than `doc-strategy-*`) and architecture (less sweeping than `architecture-*`).
+This is a design doc — concrete decisions, schema, and flows for one feature, with rationale captured for future-us. It sits between strategy (less prescriptive than `strategy-*`) and architecture (less sweeping than `architecture-*`).
 
 ## Purpose
 
