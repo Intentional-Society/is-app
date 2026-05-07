@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-07 | Ola | Readable slug-based profile URLs
+
+Profiles now have readable slug URLs (e.g. `/members/aria-chen` instead of `/members/00000000-...`). Added a nullable unique `slug` column to the profiles schema. Slugs are auto-generated from display name on profile create and update — "Aria Chen" becomes `aria-chen`. `getProfileForMember` accepts either slug or UUID so old UUID links don't break. If two members share a display name the second keeps a UUID URL until they update their name to something distinct. Directory cards link by slug when available, UUID otherwise.
+
+One thing to know: existing profiles in a local DB won't have slugs until you either run `npm run seed:dev` (updated to populate slugs) or trigger a profile save. A Postgres-side backfill on deploy handles production.
+
 ## 2026-05-06 | James | Relations schema: PR 1 of the four-PR Relations ship
 
 New `relations` and `invite_hints` tables, plus nullable `profiles.last_updated_web` and `invites.creator_value`. Schema-only — no API or UI yet — so previews (which skip migrate) keep serving the existing surface unchanged. See `docs/design-relations.md` and `docs/plan-relations.md`.
