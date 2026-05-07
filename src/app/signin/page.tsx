@@ -38,6 +38,22 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
         Sign in with your password, or leave it blank to receive a magic
         link by email.
       </p>
+      {process.env.NODE_ENV === "development" && (
+        <p className="max-w-sm rounded border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+          <strong>Local dev:</strong> this database is separate from production.
+          Use a seeded email (e.g. <code>aria.chen@example.com</code>) or run{" "}
+          <code>npm run seed:dev</code> first. Magic links arrive at{" "}
+          <a
+            href="http://localhost:54324"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            Inbucket
+          </a>
+          .
+        </p>
+      )}
       {errorMessage && (
         <p
           role="alert"
