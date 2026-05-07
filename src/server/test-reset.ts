@@ -27,31 +27,32 @@ export const resetE2EUsers = async (): Promise<{ reset: number }> => {
   const ids = (rows as unknown as { id: string }[]).map((r) => r.id);
   if (ids.length === 0) return { reset: 0 };
 
-  const baseReset = {
-    displayName: null,
-    bio: null,
-    keywords: sql`'{}'::text[]`,
-    location: null,
-    supplementaryInfo: null,
-    referredBy: null,
-    referredByLegacy: null,
-    avatarUrl: null,
-    emergencyContact: null,
-    liveDesire: null,
-  };
-
-  // slug column may not exist before the migration runs on shared DBs.
-  // Fall back to resetting without it so E2E reset still succeeds.
   await db.transaction(async (tx) => {
     await tx.delete(invites).where(inArray(invites.createdBy, ids));
     await tx
       .update(profiles)
-      .set({ ...baseReset, slug: null })
-      .where(inArray(profiles.id, ids))
-      .catch(() =>
-        tx.update(profiles).set(baseReset).where(inArray(profiles.id, ids))
-      );
+      .set({
+        displayName: null,
+        bio: null,
+        keywords: sql`'{}'::text[]`,
+        location: null,
+        supplementaryInfo: null,
+        referredBy: null,
+        referredByLegacy: null,
+        avatarUrl: null,
+        emergencyContact: null,
+        liveDesire: null,
+      })
+      .where(inArray(profiles.id, ids));
   });
+
+  // Best-effort slug reset outside the transaction — the slug column may
+  // not exist yet on shared DBs before the forward-migrate workflow runs.
+  await db
+    .update(profiles)
+    .set({ slug: null })
+    .where(inArray(profiles.id, ids))
+    .catch(() => {});
 
   return { reset: ids.length };
 };
