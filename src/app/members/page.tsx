@@ -1,13 +1,14 @@
 import Link from "next/link";
+import type { UrlObject } from "url";
 
-import { requireUser } from "@/lib/api-server";
-import { serverApiClient } from "@/lib/api-server";
+import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberSummary } from "@/lib/api-types";
 
 function MemberCard({ member }: { member: MemberSummary }) {
+  const href: UrlObject = { pathname: `/members/${member.slug ?? member.id}` };
   return (
     <Link
-      href={`/members/${member.id}`}
+      href={href}
       className="flex flex-col gap-1 rounded border border-border p-4 hover:bg-muted/50 transition-colors"
     >
       <span className="font-semibold">{member.displayName}</span>

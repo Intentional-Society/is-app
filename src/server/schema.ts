@@ -31,6 +31,7 @@ export const profiles = pgTable("profiles", {
     .primaryKey()
     .references(() => authUsers.id),
   displayName: text("display_name"),
+  slug: text("slug").unique(),
   bio: text("bio"),
   keywords: text("keywords")
     .array()

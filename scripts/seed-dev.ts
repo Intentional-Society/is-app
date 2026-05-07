@@ -107,10 +107,18 @@ async function seedAuthUsers(): Promise<SeedResult> {
   return { inserted, skipped };
 }
 
+function toSlug(displayName: string): string {
+  return displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 async function seedProfiles(): Promise<SeedResult> {
   const values = seedData.profiles.map((p) => ({
     id: p.id,
     displayName: p.displayName,
+    slug: p.displayName ? toSlug(p.displayName) : null,
     bio: p.bio,
     keywords: p.keywords,
     location: p.location,
