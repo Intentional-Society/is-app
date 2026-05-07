@@ -4,7 +4,7 @@
 >
 > **Status:** v2, supersedes `docs/spec-portable-ai-procedures.md` (v1) for design-decision purposes. v1 is preserved as a reference artifact and reflects the prior shape of the design before incorporating insights from a parallel Codex-authored spec.
 >
-> v2 changes vs v1: corrected Codex skills location (`.agents/skills/`), Claude adapter migrated from slash commands to Skills format for cross-tool consistency, procedure folder renamed to `docs/ai-procedures/` with a discoverable `index.md`, `npm test` escalation triggers added to `/commit`, auto-merge moved out of `/pr` and into `/ship`-only, explicit `gh`-unavailable guardrail, resumability promoted to a guardrail, sharpened issue-linkage rule, OQ-7 (E2E policy) closed conservatively with a 5-min bounded wait + extension option, AI-attribution OQs consolidated, and a reproducible-analysis script + monthly drift-monitor workflow added to keep the empirically-grounded 5-min default honest over time.
+> v2 incorporates 13 approved edits over v1 (E-1 through E-13), driven by alignment with a parallel Codex-authored spec and adoption of Codex Skills as the cross-tool adapter format. The OQ table marks closed items; the Phase 1 deliverables list captures what's new.
 >
 > **Last verified against repo realities:** 2026-05-06.
 > Authored 2026-05-06 by Blake Pusztai with Claude Opus 4.7. Synthesizes inputs from `docs/plan-portable-ai-procedures.md`, `docs/plan-ai-checkin-procedure.md`, and a parallel Codex-authored spec.
@@ -47,7 +47,7 @@ These are the real-world constraints the design is shaped against.
 - **No uniform slash-command abstraction across assistants.** Claude Code supports both first-class slash commands and Skills; Codex supports user-local prompts plus repo-shared Skills under `.agents/skills/`; Copilot's prompt files work only in VS Code / Visual Studio / JetBrains. The portable artifact has to be the procedure doc; per-tool slash UX is surfacing.
 - **GitHub access is uneven across agents.** Some agents have `gh` CLI, some have GitHub MCP, some have neither. Procedures must be written to work with whatever GitHub access the agent has, and to stop-and-ask cleanly when none is available.
 - **Hooks tempt us but aren't portable.** A Claude Code `PreToolUse` hook on `Bash(git commit*)` would enforce gates cleanly, but it's Claude-only and CLI-only. Hooks may be added later as belt-and-suspenders enforcement; the procedure must stand on its own.
-- **Aider has its own opinionated `/commit` and auto-commits by default.** Trying to override it isn't worth v1 effort. Aider users can read the procedure docs by hand; first-class shim deferred.
+- **Aider has its own `/commit` that auto-commits by default.** First-class shim deferred; Aider users can read the procedure docs by hand.
 - **GitHub Copilot's coding agent runs server-side on PRs**, not on a developer's checkout. Different mental model from CLI assistants. v1 design supports it via AGENTS.md (no slash UX needed).
 - **`npm test` includes Playwright e2e** (slow, flaky, port 3093). The default pre-commit gate must not run the full suite — `lint + typecheck + test:functional` is the right local gate, matching what CI's required check covers anyway. The procedure escalates to full `npm test` only on user request or for high-risk/e2e-sensitive changes (see `/commit` step 5). **This contradicts current `CLAUDE.md`** ("Run `npm test` before committing"); resolved by editing CLAUDE.md in Phase 1.
 - **Existing `/review` and `/security-review` skills already work as Claude Code commands.** The procedure should *compose* with them ("for security-touching changes, run `/security-review` before `/ship`"), not absorb them.
@@ -157,13 +157,13 @@ scripts/
 
 ### Why this layout
 
-- `docs/ai-procedures/{commit,pr,ship}.md` are the **only** files containing procedure logic. Every per-tool adapter points at them. The `ai-` prefix disambiguates from any other "procedures" the team might add later (deployment, security, onboarding) and matches the repo's existing purpose-prefixed `docs/` convention.
-- **`docs/ai-procedures/index.md` is the discoverable map.** It explains which files are canonical, which are adapters, how to add a new command, how to add a new assistant, and which existing docs remain policy/reference. AGENTS.md and CLAUDE.md are kept tiny by pointing at this index rather than carrying the extension recipe themselves.
-- `AGENTS.md` at root is the cross-tool index for Codex, Copilot coding agent, Cursor, etc. — ≤30 lines: a one-paragraph orientation, three pointers (`commit` → procedure, `pr` → procedure, `ship` → procedure), a "Maintenance" section listing touch-trigger files for drift detection, and a `Last verified` date for external platform assumptions only.
-- `CLAUDE.md` stays as Claude Code's index because Claude Code does not yet read AGENTS.md; it gets a small "for `/commit`, `/pr`, `/ship` work, see `docs/ai-procedures/index.md`" addition and a forward-compat pointer to AGENTS.md. When Claude Code ships AGENTS.md support, CLAUDE.md collapses to a one-line pointer.
-- `.claude/skills/<name>/SKILL.md` provides the Claude Code adapter. Skills format (rather than slash-command format at `.claude/commands/<name>.md`) is chosen for **single maintenance path**: the same folder shape works on Codex (`.agents/skills/`) and likely on Copilot Chat — one mental model across all three tools, with implicit-invocation parity as a bonus.
-- `.agents/skills/<name>/SKILL.md` is the **repo-shared Codex location**, scanned from cwd up to repo root. VS Code Agent Skills also discover this path, so it likely covers Copilot Chat without a Copilot-specific shim.
-- `.github/skills/` and `.github/copilot-instructions.md` are **conditional Phase 3 deliverables** — added only if OQ-1 verification shows that `.agents/skills/` discovery in the team's Copilot environment isn't sufficient.
+The Files table above lists every artifact and its status. The non-obvious choices in this layout are:
+
+- **`ai-` prefix on `docs/ai-procedures/`** disambiguates from any other "procedures" the team might add later (deployment, security, onboarding) and matches the repo's existing purpose-prefixed `docs/` convention.
+- **AGENTS.md and CLAUDE.md stay tiny** by pointing at `docs/ai-procedures/index.md` rather than carrying the extension recipe themselves. CLAUDE.md exists only because Claude Code does not yet read AGENTS.md natively; it collapses to a one-line pointer when Anthropic ships AGENTS.md support.
+- **Skills format over slash commands for Claude.** The same folder shape works on Codex (`.agents/skills/`) and likely on Copilot Chat — one mental model across all three tools, with implicit-invocation parity as a bonus. Cost: using Claude's slightly newer/less-documented Skills feature instead of the more-mature `.claude/commands/<name>.md`.
+- **`.agents/skills/` is the cross-tool location**, not Codex-specific. VS Code Agent Skills also discover this path, so it likely covers Copilot Chat without a Copilot-specific shim.
+- **`.github/skills/` and `.github/copilot-instructions.md` are conditional Phase 3 deliverables** — added only if OQ-1 verification shows that `.agents/skills/` discovery in the team's Copilot environment isn't sufficient.
 
 ### Trade-offs explicitly chosen
 
@@ -319,14 +319,12 @@ This keeps the agent in the loop where it adds value (helping resolve), not just
 
 ### Out of scope for v1 (deferred to v1.1+ or later)
 
-- First-class `/journal`, `/migrate` commands as separate triggerable shims. Their behaviors live inside `/commit` for v1; promoting them later is purely additive.
 - `procedures/devjournal.md` and `procedures/migrate.md` as separate files (inlined in commit.md for v1).
 - Procedure-doc CI lint that asserts every procedure doc has the required sections and that referenced strategy-doc anchors still exist. The lighter v1 alternative ships in P0.17.
 - Per-procedure observability (Axiom hooks).
 - Per-tool shims for Cursor / Aider / other assistants beyond the named three.
 - Aider-specific design (Aider's opinionated `/commit` auto-commits by default; not worth fighting in v1).
 - `/pr --ship` chained flag and/or `/pr --auto-merge` opt-in. Revisit in v1.1+ once `/pr` and `/ship` have stabilized in dogfooding.
-- `/rollback` and `/revert` first-class commands.
 - Coverage delta tooling (Vitest coverage provider + baseline-storage CI step).
 - Docs-only-skip awareness in `/pr` (unnecessary — `ci-docs-skip.yml` already reports the same status name within seconds).
 
@@ -367,20 +365,60 @@ For humans: a short "Working with AI assistants" section in `README.md` pointing
 
 For agents: AGENTS.md and CLAUDE.md both point at the index, which lists every procedure doc with a one-sentence "use when" pointer. Procedure doc filenames are predictable (`commit.md`, `pr.md`, `ship.md`).
 
-### Drift detection summary (P0.17 + P0.18)
+### Drift detection
 
-A procedure doc is only as good as the repo realities it claims to encode. v1 ships layered, edit-point-anchored safeguards plus one scheduled monitor for the most data-grounded number:
-
-1. **Cross-reference footers** in each procedure doc.
-2. **Bidirectional back-links** in high-impact policy docs.
-3. **Inverse pointers** in volatile depended-on files.
-4. **Maintenance section** in `AGENTS.md` and `CLAUDE.md`.
-5. **`Last verified` dates** scoped to external platform assumptions only.
-6. **PR-template checklist items** for `docs/ai-procedures/**` and `ship.md` wait-window edits.
-7. **`scripts/analyze-ci-e2e-timing.mjs`** + `npm run analyze:ci-e2e-timing` — reproducible analysis behind the 5-min default.
-8. **`.github/workflows/drift-monitor.yml`** — monthly cron; opens an issue if 5-min coverage drops below 90%.
+See **P0.17** (drift-aware documentation: cross-reference footers, bidirectional back-links, inverse pointers, scoped `Last verified` dates, PR-template checklist) and **P0.18** (reproducible analysis script + monthly drift-monitor workflow) for the full set of layered safeguards.
 
 ## Phased rollout
+
+**Phase 0 — Pre-implementation spike (recommended, optional).**
+
+A throwaway smoke test that de-risks the architecture before Phase 1 commits to it. Cost: ~15-30 minutes, ~30 lines across 4 files. Easily reverted.
+
+What it tests (three yes/no questions):
+
+1. Does Claude Code discover and invoke `.claude/skills/<name>/SKILL.md`?
+2. Does Codex CLI discover and invoke `.agents/skills/<name>/SKILL.md` both implicitly (natural-language match) and explicitly (`$<name>`)?
+3. Does VS Code/Copilot Chat pick up `.agents/skills/` *without* a Copilot-specific shim? (A "yes" pre-resolves OQ-1 and collapses Phase 3 to a verification-only PR.)
+
+Spike files (all marked throwaway via the `_spike-` filename prefix or `hello` skill name; deleted before Phase 1 lands):
+
+```
+docs/ai-procedures/_spike-hello.md       # canonical procedure (~10 lines)
+.claude/skills/hello/SKILL.md            # Claude adapter (~5 lines)
+.agents/skills/hello/SKILL.md            # Codex + Copilot adapter (~5 lines)
+```
+
+Spike procedure content (`docs/ai-procedures/_spike-hello.md`):
+
+```markdown
+# Spike: hello procedure
+
+Smoke test for the portable AI procedure framework. Throwaway; delete before Phase 1.
+
+When invoked:
+1. Print "✓ Skill discovered" and which adapter file invoked you.
+2. Print "✓ Procedure doc loaded from docs/ai-procedures/_spike-hello.md."
+3. Print the current branch (`git rev-parse --abbrev-ref HEAD`).
+4. Stop.
+```
+
+Adapter content (each `SKILL.md`):
+
+```markdown
+---
+name: hello
+description: Smoke test for the portable procedure framework. Verifies skill discovery and the procedure-doc indirection pattern.
+---
+
+Read `docs/ai-procedures/_spike-hello.md` and follow its instructions.
+```
+
+How to run: open the repo in each tool in turn; invoke `/hello` (Claude Code), say "run the hello smoke test" (Codex implicit) or `$hello` (Codex explicit), and `/hello` (Copilot Chat). Each should walk through the three prints. Note any tool that fails to discover the skill or fails the indirection.
+
+Acceptance: at minimum, Claude Code passes (validates the indirection pattern + Skills format). Codex and Copilot pass results feed OQ-1 and Phase 2/3 sequencing. A failure on any tool changes the architecture meaningfully before Phase 1; that's exactly what the spike is for.
+
+Cleanup: the spike files are not part of v1 deliverables. Delete the three files (or merge + revert the spike branch) before Phase 1 lands. Capture the verification outcome in `docs/ai-procedures/index.md` or a brief devjournal entry.
 
 **Phase 1 — Framework + Claude (one PR).**
 - `docs/ai-procedures/index.md` + `commit.md` + `pr.md` + `ship.md` with cross-reference footers (P0.17).
@@ -430,19 +468,20 @@ Acceptance: a Copilot user dogfoods one PR end-to-end. The Copilot coding agent 
 
 For v1 to be considered shipped:
 
-1. A Claude Code user in a fresh clone can run `/commit`, `/pr`, and `/ship` (via Claude Code Skills) and produce **equivalent procedure behavior** (not necessarily identical UX) to a manually-executed checkin per `doc-strategy-committing.md`.
-2. A Codex CLI user in a fresh clone can say "commit this" / "open a PR for this" / "ship this" and the agent invokes the corresponding Codex Skill from `.agents/skills/`, producing equivalent procedure behavior to the Claude path.
-3. A Copilot Chat IDE user in a fresh clone produces equivalent procedure behavior either via `.agents/skills/` discovery (if OQ-1 verifies positive) or via Phase-3 `.github/skills/`. Copilot CLI and other Copilot surfaces produce conformant output via AGENTS.md.
-4. A Copilot coding-agent run from an issue inherits the procedure via AGENTS.md (no slash UX, but procedure-conformant output).
-5. A docs-only PR opened via `/pr` completes within seconds of CI's no-op job posting status (verifies the existing workflow handles it without special-casing).
-6. CLAUDE.md, AGENTS.md, `docs/ai-procedures/index.md`, and `doc-strategy-committing.md` are internally consistent (no contradictory pre-commit gate guidance, no contradictory commit-message rules).
-7. The procedure docs reference rather than restate `doc-strategy-committing.md`'s Conventions section, and each procedure doc has a cross-reference footer to its policy/config-file dependencies (P0.17).
-8. The high-impact policy docs (`doc-strategy-committing.md`, `doc-strategy-branching.md`, `doc-github.md`, `doc-strategy-project-management.md`) each carry a "Related AI procedures" back-link section (P0.17 bidirectional links).
-9. A change to a procedure doc is a normal PR (no special workflow needed); the PR-template checklist (P0.17) fires when `docs/ai-procedures/**` is touched. The `ship.md` wait-window-specific checklist item fires when that section is touched or when `e2e.yml`/`vercel.json` are touched.
-10. The repo dogfoods cleanly for one week per phase with no convention-drift PR comments.
-11. AI-opened PRs carry the `Co-Authored-By:` trailer in both the commit and the PR body (P0.15).
-12. **Human-in-the-loop enforcement** (per design principle): commit text, PR text, AI attribution, advisory check failures, and ambiguous working-tree states all require explicit human review before the agent proceeds.
-13. `npm run analyze:ci-e2e-timing` runs locally and reports a coherent percentile distribution. The drift-monitor workflow runs successfully on its first scheduled tick and either reports "≥90% covered" silently or opens a single issue with the data inline. Re-running the workflow with no underlying state change does not open a duplicate issue (idempotency check verified).
+1. A user in a fresh clone produces **equivalent procedure behavior** (not necessarily identical UX) to a manually-executed checkin per `doc-strategy-committing.md`, regardless of which assistant they use:
+   - **Claude Code:** `/commit`, `/pr`, `/ship` via `.claude/skills/`.
+   - **Codex CLI:** "commit this" / "open a PR for this" / "ship this" (implicit) or `$commit` / `$pr` / `$ship` (explicit) via `.agents/skills/`.
+   - **Copilot Chat IDE:** `/commit`, `/pr`, `/ship` via `.agents/skills/` (if OQ-1 verifies positive) or Phase-3 `.github/skills/`.
+   - **Copilot coding agent and Copilot CLI:** procedure-conformant output via AGENTS.md (no slash UX).
+2. A docs-only PR opened via `/pr` completes within seconds of CI's no-op job posting status (verifies the existing workflow handles it without special-casing).
+3. CLAUDE.md, AGENTS.md, `docs/ai-procedures/index.md`, and `doc-strategy-committing.md` are internally consistent (no contradictory pre-commit gate guidance, no contradictory commit-message rules).
+4. The procedure docs reference rather than restate `doc-strategy-committing.md`'s Conventions section, and each procedure doc has a cross-reference footer to its policy/config-file dependencies (P0.17).
+5. The high-impact policy docs (`doc-strategy-committing.md`, `doc-strategy-branching.md`, `doc-github.md`, `doc-strategy-project-management.md`) each carry a "Related AI procedures" back-link section (P0.17 bidirectional links).
+6. A change to a procedure doc is a normal PR (no special workflow needed); the PR-template checklist (P0.17) fires when `docs/ai-procedures/**` is touched. The `ship.md` wait-window-specific checklist item fires when that section is touched or when `e2e.yml`/`vercel.json` are touched.
+7. The repo dogfoods cleanly for one week per phase with no convention-drift PR comments.
+8. AI-opened PRs carry the `Co-Authored-By:` trailer in both the commit and the PR body (P0.15).
+9. **Human-in-the-loop enforcement** (per design principle): commit text, PR text, AI attribution, advisory check failures, and ambiguous working-tree states all require explicit human review before the agent proceeds.
+10. `npm run analyze:ci-e2e-timing` runs locally and reports a coherent percentile distribution. The drift-monitor workflow runs successfully on its first scheduled tick and either reports "≥90% covered" silently or opens a single issue with the data inline. Re-running the workflow with no underlying state change does not open a duplicate issue (idempotency check verified).
 
 ## Worked example — how PR #90 plays out under v2
 
@@ -452,16 +491,15 @@ To validate the spec against real iteration, walk [PR #90](https://github.com/In
 - **Commit 2 (CodeQL fix).** Human fixes the TOCTOU pattern; runs `/commit`. Agent re-verifies CI checks. `/pr` dispatches to the **Update-existing-PR path** and pushes — the PR's CI re-runs.
 - **CodeQL re-run flips the advisory check.** Human runs `/ship`. Required check is green. CodeQL alert has cleared on the new commit; E2E is still pending. Agent waits up to 5 minutes (P0.11). E2E completes successfully within the window. Agent merges via `gh pr merge --merge --delete-branch`, tidies the local branch, reports the merge SHA + Vercel deploy URL.
 - **Commit 3 (self-review polish).** Same iteration shape. Human runs `/review` first (existing skill) to surface wording issues; the procedure composes cleanly. Final push, then `/ship` again.
-- **If CodeQL had not cleared on commit 2's push**, `/ship` would have surfaced the failure via the **Supervised-auto handoff** with proceed / abort / troubleshoot / wait-another-5 options instead of merging through it.
-- **If E2E had not completed within 5 minutes** on the final push, `/ship` would have offered the same handoff with the wait-another-5 option, letting the human extend without re-invoking.
+- **If either advisory had been red, unavailable, or still pending past the 5-minute wait** (CodeQL not clearing, E2E flaking on cold start, etc.), `/ship` would have run the **Supervised-auto handoff** with proceed / abort / troubleshoot / wait-another-5 options instead of merging through.
 
 ## Open questions
 
 | ID | Question | Blocking | Why | Mitigation / options | Recommendation |
 |---|---|---|---|---|---|
-| **OQ-1** | What's the right Copilot adapter surface in the team's actual environment? Does `.agents/skills/` get picked up adequately by Copilot Chat in our IDE configuration, or do we need `.github/skills/` and/or `.github/copilot-instructions.md`? | **Blocks Phase 3 implementation.** Not blocking for spec / Phase 1 / Phase 2. | VS Code/Copilot Agent Skills documents discovery from `.github/skills/`, `.claude/skills/`, and `.agents/skills/`. Real-world coverage may vary by Copilot product surface and version. | Verify in the team's actual VS Code or Copilot CLI environment after Phases 1+2 land. If `.agents/skills/` is sufficient, Phase 3 collapses to a documentation-only PR. If not, add the Copilot-specific files. | Resolve during Phase 3 verification. |
+| **OQ-1** | What's the right Copilot adapter surface in the team's actual environment? Does `.agents/skills/` get picked up adequately by Copilot Chat in our IDE configuration, or do we need `.github/skills/` and/or `.github/copilot-instructions.md`? | **Blocks Phase 3 implementation.** Not blocking for spec / Phase 1 / Phase 2. **Phase 0 spike may pre-resolve.** | VS Code/Copilot Agent Skills documents discovery from `.github/skills/`, `.claude/skills/`, and `.agents/skills/`. Real-world coverage may vary by Copilot product surface and version. | Run the Phase 0 spike (recommended): if Copilot Chat picks up `.agents/skills/hello/SKILL.md`, Phase 3 collapses to a verification-only PR. Otherwise verify in the team's actual VS Code/Copilot environment after Phases 1+2 land and add Copilot-specific files if needed. | Run Phase 0 spike before Phase 1 commits; otherwise resolve during Phase 3 verification. |
 | **OQ-2** | Local-gate policy alignment between `docs/doc-strategy-committing.md` and the v1 AI procedure. | Blocking for Phase 1 implementation; not blocking for the spec. | Current `doc-strategy-committing.md` says "run `npm test`" (full suite). The v1 AI procedure runs lint + typecheck + functional by default and escalates per the P0.7 trigger list. | Update `doc-strategy-committing.md` to match the v1 AI policy in Phase 1. The human-vs-agent guidance must agree. | Adopt the v1 AI gate; resolve the doc-policy mismatch in Phase 1. |
-| **OQ-3** | Exact `Co-Authored-By:` form per provider. (Consolidates the prior OQ-1 / OQ-2 / OQ-3 from v1.) | Blocks final commit/PR-body trailer text per provider; partially deferrable by phase. | `doc-strategy-committing.md` references AI co-author trailers; existing repo history has Claude-specific examples. GitHub documents the generic format as `Co-authored-by: name <email>`. Codex source defines the default identity as `Codex <noreply@openai.com>` but the repo can require model-specificity when visible. Copilot's underlying model varies (GPT-4o, Claude, Gemini) per user setting. | (a) Lift each provider's documented form verbatim where possible; (b) For Claude — `Co-Authored-By: Claude <model/version> <noreply@anthropic.com>`; (c) For Codex — `Co-Authored-By: Codex <model/version> <noreply@openai.com>` when model is visible; verified-fallback `Co-Authored-By: Codex <noreply@openai.com>` only with explicit human confirmation; (d) For Copilot — verify during Phase 3 against the team's actual Copilot configuration. (e) Co-author detection: default-include when agent ran `/commit`; ask once per session to confirm and cache. | Resolve Claude form during Phase 1; Codex form during Phase 2; Copilot form during Phase 3. Default-include with model specificity is the single ask-once-per-session policy across all three. |
+| **OQ-3** | Exact `Co-Authored-By:` form per provider. (Consolidates the prior OQ-1 / OQ-2 / OQ-3 from v1.) | Blocks final commit/PR-body trailer text per provider; partially deferrable by phase. | `doc-strategy-committing.md` references AI co-author trailers; existing repo history has Claude-specific examples. GitHub documents the generic format as `Co-authored-by: name <email>`. Codex source defines the default identity as `Codex <noreply@openai.com>` but the repo can require model-specificity when visible. Copilot's underlying model varies (GPT-4o, Claude, Gemini) per user setting. | (a) Lift documented forms verbatim where possible. (b) Claude: `Co-Authored-By: Claude <model/version> <noreply@anthropic.com>`. (c) Codex: `Co-Authored-By: Codex <model/version> <noreply@openai.com>` when model is visible; verified-fallback `Codex <noreply@openai.com>` requires explicit human confirmation. (d) Copilot: verify during Phase 3 against the team's Copilot config. (e) Detection: default-include on agent-run `/commit`; ask once per session, cache. | Resolve Claude form during Phase 1; Codex form during Phase 2; Copilot form during Phase 3. Default-include with model specificity is the single ask-once-per-session policy across all three. |
 | **OQ-4** | When (and how) do we migrate `CLAUDE.md` → `AGENTS.md` once Claude Code ships AGENTS.md support? | Non-blocking. Future planning. | Currently Claude Code only reads CLAUDE.md; once it reads AGENTS.md, dual-maintenance is wasted effort. | (a) Watch [anthropics/claude-code#6235](https://github.com/anthropics/claude-code/issues/6235); when shipped, collapse CLAUDE.md to a one-line pointer at AGENTS.md; (b) Move CLAUDE.md content into AGENTS.md and `@import` from CLAUDE.md if Claude Code adds an import mechanism. | Defer. The tracking link in AGENTS.md or CLAUDE.md is the watcher. |
 | **OQ-5** | Should `/pr --ship` (chained sequence) or `/pr --auto-merge` (opt-in flag) enter v1.1+? | Non-blocking; deferred. | Chaining or auto-merge increases convenience but combines the riskiest operations. The team can learn from separate `/pr` and `/ship` use first. | (a) Defer. Add later as a thin sequence only after both procedures are stable. (b) Require a clean state and passing required checks before any chained ship behavior. | Defer to v1.1+. |
 | **OQ-6** | Should `CODEOWNERS` require a second-pair-of-eyes review on `docs/ai-procedures/**`? | Non-blocking. Process choice. | Tiny team; CODEOWNERS may add friction without payoff. | (a) Add CODEOWNERS for `docs/ai-procedures/**`; (b) Trust normal PR review. | Defer. Tiny team; trust normal PR review + the P0.17 PR-template checklist. Revisit if a regression bites. |
