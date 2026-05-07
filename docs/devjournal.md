@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-06 | James | Relations schema: PR 1 of the four-PR Relations ship
+
+New `relations` and `invite_hints` tables, plus nullable `profiles.last_updated_web` and `invites.creator_value`. Schema-only — no API or UI yet — so previews (which skip migrate) keep serving the existing surface unchanged. See `docs/design-relations.md` and `docs/plan-relations.md`.
+
 ## 2026-05-06 | James | Doc categories: introduced `design-*`, dropped `doc-` prefix from strategy docs
 
 `design-*.md` is a doc category for feature-scoped designs — sibling to `plan-*`, `strategy-*`, and `architecture-*`.

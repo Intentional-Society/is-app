@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  integer,
   pgSchema,
   pgTable,
   primaryKey,
@@ -45,6 +46,7 @@ export const profiles = pgTable("profiles", {
   emergencyContact: text("emergency_contact"),
   liveDesire: text("live_desire"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  lastUpdatedWeb: timestamp("last_updated_web", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -98,6 +100,7 @@ export const invites = pgTable(
     }),
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    creatorValue: integer("creator_value"),
   },
   (table) => [
     check(
@@ -108,5 +111,62 @@ export const invites = pgTable(
       "invites_expires_after_created",
       sql`${table.expiresAt} > ${table.createdAt}`,
     ),
+    check(
+      "invites_creator_value_range",
+      sql`${table.creatorValue} IS NULL OR (${table.creatorValue} BETWEEN 1 AND 4)`,
+    ),
   ],
+).enableRLS();
+
+export const relations = pgTable(
+  "relations",
+  {
+    raterId: uuid("rater_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    rateeId: uuid("ratee_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    value: integer("value"),
+    isHint: boolean("is_hint").notNull().default(false),
+    hintedBy: uuid("hinted_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.raterId, table.rateeId] }),
+    check("relations_no_self", sql`${table.raterId} != ${table.rateeId}`),
+    check(
+      "relations_value_range",
+      sql`${table.value} IS NULL OR (${table.value} BETWEEN 1 AND 4)`,
+    ),
+    check(
+      "relations_hint_state",
+      sql`(NOT ${table.isHint} AND ${table.value} IS NOT NULL)
+       OR (${table.isHint} AND ${table.value} IS NULL)`,
+    ),
+  ],
+).enableRLS();
+
+export const inviteHints = pgTable(
+  "invite_hints",
+  {
+    inviteId: uuid("invite_id")
+      .notNull()
+      .references(() => invites.id, { onDelete: "cascade" }),
+    rateeId: uuid("ratee_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.inviteId, table.rateeId] })],
 ).enableRLS();
