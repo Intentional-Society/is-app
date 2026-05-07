@@ -33,6 +33,7 @@ export const resetE2EUsers = async (): Promise<{ reset: number }> => {
       .update(profiles)
       .set({
         displayName: null,
+        slug: null,
         bio: null,
         keywords: sql`'{}'::text[]`,
         location: null,
@@ -45,14 +46,6 @@ export const resetE2EUsers = async (): Promise<{ reset: number }> => {
       })
       .where(inArray(profiles.id, ids));
   });
-
-  // Best-effort slug reset outside the transaction — the slug column may
-  // not exist yet on shared DBs before the forward-migrate workflow runs.
-  await db
-    .update(profiles)
-    .set({ slug: null })
-    .where(inArray(profiles.id, ids))
-    .catch(() => {});
 
   return { reset: ids.length };
 };

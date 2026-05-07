@@ -83,12 +83,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
           ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null }
           : {}),
       };
-      // slug column may not exist on older deployments before migration runs.
-      // Fall back to the update without slug so the save still succeeds.
-      await db.update(profiles).set(update).where(eq(profiles.id, user.id))
-        .catch(() =>
-          db.update(profiles).set(parsed).where(eq(profiles.id, user.id))
-        );
+      await db.update(profiles).set(update).where(eq(profiles.id, user.id));
     }
 
     const profile = await getProfileForSelf(user.id);

@@ -85,18 +85,10 @@ export const upsertProfile = async (user: User) => {
     (user.user_metadata?.displayName as string | undefined) ?? null;
   const slug = displayName ? toSlug(displayName) : null;
 
-  // slug column may not exist before the migration runs on shared DBs.
-  // Fall back to inserting without it so auth callbacks still succeed.
   await db
     .insert(profiles)
     .values({ id: user.id, displayName, slug })
-    .onConflictDoNothing({ target: profiles.id })
-    .catch(() =>
-      db
-        .insert(profiles)
-        .values({ id: user.id, displayName })
-        .onConflictDoNothing({ target: profiles.id })
-    );
+    .onConflictDoNothing({ target: profiles.id });
 };
 
 export type ProfileForSelf = {
