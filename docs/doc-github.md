@@ -23,7 +23,7 @@ Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-pr
 ## CI workflows
 
 - `.github/workflows/ci.yml` — lint + functional tests, triggers on `pull_request` to main. Spins up the full local Supabase stack via `supabase/setup-cli@v1` + `supabase start`, then applies Drizzle migrations before running Vitest. Functional tests that hit the DB (e.g. `profiles.test.ts`) run against this stack, matching the dev-box setup exactly.
-- `.github/workflows/e2e.yml` — Playwright against Vercel preview URL, triggers on `deployment_status` (fired by Vercel's GitHub integration when a preview deploy completes).
+- `.github/workflows/e2e.yml` — Playwright against Vercel preview URL, triggers on `deployment_status` (fired by Vercel's GitHub integration when a preview deploy completes). Job-level `if:` filters on `environment` ∈ {`Production`, `Preview`} so unrelated GitHub Deployments (e.g. `prod-db`) don't accidentally invoke Playwright with a github.com URL.
 - `.github/workflows/codeql.yml` — CodeQL static analysis on JS/TS and workflow YAMLs, triggers on PRs + pushes to main + weekly cron. Uses the `security-extended` query pack.
 - `.github/workflows/forward-migrate-prod-schema-expansion.yml` — `workflow_dispatch`-only. Applies additive (expand) drizzle migrations to the prod DB ahead of opening a PR, so previews can exercise new code paths against the migrated schema. Bound to the `prod-db` environment (see below) for the reviewer gate. Triggered locally via `npm run prod:db:expand` (uses the current branch). Contract migrations do NOT use this workflow — they ride the standard merge-to-main path.
 
