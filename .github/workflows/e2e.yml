@@ -15,7 +15,13 @@ jobs:
   e2e:
     name: Playwright
     runs-on: ubuntu-latest
-    if: github.event.deployment_status.state == 'success'
+    # Only run for Vercel deployments. Other GitHub Deployments (e.g. the
+    # `prod-db` migration workflow) also fire `deployment_status: success`,
+    # but their `target_url` points at a GitHub Actions job, not the app —
+    # without this filter Playwright would hit github.com and fail at setup.
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      contains(fromJSON('["Production","Preview"]'), github.event.deployment_status.environment)
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -26,6 +32,19 @@ jobs:
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
+
+      - name: Fail fast if base URL isn't Vercel
+        # The job-level `if:` already filters by environment, but a malformed
+        # or unexpected target_url here would still send Playwright at the
+        # wrong host (e.g. a github.com URL). Bail loudly instead.
+        run: |
+          case "$PLAYWRIGHT_BASE_URL" in
+            https://*.vercel.app*) ;;
+            https://app.intentionalsociety.org*) ;;
+            *) echo "Unexpected PLAYWRIGHT_BASE_URL: $PLAYWRIGHT_BASE_URL" >&2; exit 1 ;;
+          esac
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ github.event.deployment_status.target_url }}
 
       - name: Run Playwright tests
         run: npx playwright test
