@@ -1,10 +1,11 @@
 import Link from "next/link";
+import type { UrlObject } from "url";
 
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberSummary } from "@/lib/api-types";
 
 function MemberCard({ member }: { member: MemberSummary }) {
-  const href = `/members/${member.slug ?? member.id}`;
+  const href: UrlObject = { pathname: `/members/${member.slug ?? member.id}` };
   return (
     <Link
       href={href}
