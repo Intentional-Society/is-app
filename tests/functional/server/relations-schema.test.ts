@@ -1,21 +1,12 @@
 import { randomUUID } from "node:crypto";
-
 import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
-import {
-  inviteHints,
-  invites,
-  profiles,
-  relations,
-} from "@/server/schema";
+import { inviteHints, invites, profiles, relations } from "@/server/schema";
 
-const expectConstraintViolation = async (
-  promise: Promise<unknown>,
-  expected: string,
-) => {
+const expectConstraintViolation = async (promise: Promise<unknown>, expected: string) => {
   try {
     await promise;
   } catch (err) {
@@ -59,10 +50,7 @@ describe("relations table constraints", () => {
 
   it("accepts a confirmed rating in the 1..4 range", async () => {
     await db.insert(relations).values({ raterId, rateeId, value: 3 });
-    const [row] = await db
-      .select()
-      .from(relations)
-      .where(eq(relations.raterId, raterId));
+    const [row] = await db.select().from(relations).where(eq(relations.raterId, raterId));
     expect(row.value).toBe(3);
     expect(row.isHint).toBe(false);
   });
@@ -102,10 +90,7 @@ describe("relations table constraints", () => {
       isHint: true,
       hintedBy: rateeId,
     });
-    const [row] = await db
-      .select()
-      .from(relations)
-      .where(eq(relations.raterId, raterId));
+    const [row] = await db.select().from(relations).where(eq(relations.raterId, raterId));
     expect(row.value).toBeNull();
     expect(row.isHint).toBe(true);
     expect(row.hintedBy).toBe(rateeId);
@@ -144,22 +129,16 @@ describe("relations table constraints", () => {
 
   it("rejects duplicate (rater, ratee) pair (composite PK)", async () => {
     await db.insert(relations).values({ raterId, rateeId, value: 3 });
-    await expect(
-      db.insert(relations).values({ raterId, rateeId, value: 4 }),
-    ).rejects.toThrow();
+    await expect(db.insert(relations).values({ raterId, rateeId, value: 4 })).rejects.toThrow();
   });
 
   it("permits the reverse direction as a separate row", async () => {
     await db.insert(relations).values({ raterId, rateeId, value: 3 });
-    await db
-      .insert(relations)
-      .values({ raterId: rateeId, rateeId: raterId, value: 2 });
+    await db.insert(relations).values({ raterId: rateeId, rateeId: raterId, value: 2 });
     const rows = await db.select().from(relations);
     const pairs = rows
       .filter(
-        (r) =>
-          (r.raterId === raterId && r.rateeId === rateeId) ||
-          (r.raterId === rateeId && r.rateeId === raterId),
+        (r) => (r.raterId === raterId && r.rateeId === rateeId) || (r.raterId === rateeId && r.rateeId === raterId),
       )
       .map((r) => ({ raterId: r.raterId, rateeId: r.rateeId, value: r.value }));
     expect(pairs).toHaveLength(2);
@@ -184,10 +163,7 @@ describe("invites.creator_value range", () => {
       note: "creator value null is fine",
     });
     if ("error" in r) throw new Error("seed failed");
-    const [row] = await db
-      .select({ creatorValue: invites.creatorValue })
-      .from(invites)
-      .where(eq(invites.code, r.code));
+    const [row] = await db.select({ creatorValue: invites.creatorValue }).from(invites).where(eq(invites.code, r.code));
     expect(row.creatorValue).toBeNull();
   });
 
@@ -198,10 +174,7 @@ describe("invites.creator_value range", () => {
         note: `creator value ${value} accepted`,
       });
       if ("error" in r) throw new Error("seed failed");
-      await db
-        .update(invites)
-        .set({ creatorValue: value })
-        .where(eq(invites.code, r.code));
+      await db.update(invites).set({ creatorValue: value }).where(eq(invites.code, r.code));
     }
   });
 
@@ -212,10 +185,7 @@ describe("invites.creator_value range", () => {
     });
     if ("error" in r) throw new Error("seed failed");
     await expectConstraintViolation(
-      db
-        .update(invites)
-        .set({ creatorValue: 0 })
-        .where(eq(invites.code, r.code)),
+      db.update(invites).set({ creatorValue: 0 }).where(eq(invites.code, r.code)),
       "invites_creator_value_range",
     );
   });
@@ -227,10 +197,7 @@ describe("invites.creator_value range", () => {
     });
     if ("error" in r) throw new Error("seed failed");
     await expectConstraintViolation(
-      db
-        .update(invites)
-        .set({ creatorValue: 5 })
-        .where(eq(invites.code, r.code)),
+      db.update(invites).set({ creatorValue: 5 }).where(eq(invites.code, r.code)),
       "invites_creator_value_range",
     );
   });
@@ -251,10 +218,7 @@ describe("invite_hints table constraints", () => {
       note: "invite_hints constraint test invite",
     });
     if ("error" in r) throw new Error("seed failed");
-    const [row] = await db
-      .select({ id: invites.id })
-      .from(invites)
-      .where(eq(invites.code, r.code));
+    const [row] = await db.select({ id: invites.id }).from(invites).where(eq(invites.code, r.code));
     inviteId = row.id;
   });
 
@@ -266,9 +230,7 @@ describe("invite_hints table constraints", () => {
 
   it("rejects duplicate (invite, ratee) pair (composite PK)", async () => {
     await db.insert(inviteHints).values({ inviteId, rateeId });
-    await expect(
-      db.insert(inviteHints).values({ inviteId, rateeId }),
-    ).rejects.toThrow();
+    await expect(db.insert(inviteHints).values({ inviteId, rateeId })).rejects.toThrow();
   });
 
   it("permits the same ratee across different invites", async () => {
@@ -278,20 +240,14 @@ describe("invite_hints table constraints", () => {
       note: "second invite for cross-invite hint",
     });
     if ("error" in r2) throw new Error("seed failed");
-    const [row2] = await db
-      .select({ id: invites.id })
-      .from(invites)
-      .where(eq(invites.code, r2.code));
+    const [row2] = await db.select({ id: invites.id }).from(invites).where(eq(invites.code, r2.code));
     await db.insert(inviteHints).values({ inviteId: row2.id, rateeId });
   });
 
   it("cascades to invite_hints when the invite is deleted", async () => {
     await db.insert(inviteHints).values({ inviteId, rateeId });
     await db.delete(invites).where(eq(invites.id, inviteId));
-    const remaining = await db
-      .select()
-      .from(inviteHints)
-      .where(eq(inviteHints.inviteId, inviteId));
+    const remaining = await db.select().from(inviteHints).where(eq(inviteHints.inviteId, inviteId));
     expect(remaining).toHaveLength(0);
   });
 });

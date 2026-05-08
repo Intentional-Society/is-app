@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import type { User } from "@supabase/supabase-js";
 import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,9 +48,7 @@ describe("GET /api/me", () => {
   afterEach(async () => {
     mockCreateServerClient.mockReset();
     await db.delete(profiles).where(eq(profiles.id, testUserId));
-    await db.execute(
-      sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`,
-    );
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`);
   });
 
   const putMe = (body: unknown) =>
@@ -93,10 +90,7 @@ describe("GET /api/me", () => {
     });
 
     // Confirm the self-heal actually wrote a row.
-    const rows = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, testUserId));
+    const rows = await db.select().from(profiles).where(eq(profiles.id, testUserId));
     expect(rows).toHaveLength(1);
   });
 
@@ -133,10 +127,7 @@ describe("GET /api/me", () => {
     expect(res.status).toBe(400);
 
     // Confirm nothing leaked through: isAdmin stays false in DB.
-    const [row] = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, testUserId));
+    const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
     expect(row?.isAdmin ?? false).toBe(false);
   });
 

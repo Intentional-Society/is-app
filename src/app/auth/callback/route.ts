@@ -1,5 +1,5 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
@@ -10,17 +10,13 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const invite = request.nextUrl.searchParams.get("invite");
   if (!code) {
-    return NextResponse.redirect(
-      new URL("/signin?error=missing_code", request.url),
-    );
+    return NextResponse.redirect(new URL("/signin?error=missing_code", request.url));
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error || !data.user) {
-    return NextResponse.redirect(
-      new URL("/signin?error=exchange_failed", request.url),
-    );
+    return NextResponse.redirect(new URL("/signin?error=exchange_failed", request.url));
   }
 
   // Ordinary sign-in — Phase 1 upsert, referredBy stays null.
@@ -28,9 +24,7 @@ export async function GET(request: NextRequest) {
     try {
       await upsertProfile(data.user);
     } catch {
-      return NextResponse.redirect(
-        new URL("/signin?error=profile_error", request.url),
-      );
+      return NextResponse.redirect(new URL("/signin?error=profile_error", request.url));
     }
     return NextResponse.redirect(new URL("/", request.url));
   }
@@ -43,8 +37,7 @@ export async function GET(request: NextRequest) {
   // member doesn't end up with a profile but no invite link. The
   // single-row UPDATE guarded by the active predicates serializes
   // concurrent redeemers via row locks — exactly one winner.
-  const displayName =
-    (data.user.user_metadata?.displayName as string | undefined) ?? null;
+  const displayName = (data.user.user_metadata?.displayName as string | undefined) ?? null;
 
   const userId = data.user.id;
   let ok = false;
@@ -78,29 +71,20 @@ export async function GET(request: NextRequest) {
         throw new InviteInvalid();
       }
 
-      await tx
-        .update(profiles)
-        .set({ referredBy: rows[0].inviterId })
-        .where(eq(profiles.id, userId));
+      await tx.update(profiles).set({ referredBy: rows[0].inviterId }).where(eq(profiles.id, userId));
 
       return true;
     });
   } catch (err) {
     if (err instanceof InviteInvalid) {
       await supabase.auth.signOut();
-      return NextResponse.redirect(
-        new URL("/signin?error=invite_invalid", request.url),
-      );
+      return NextResponse.redirect(new URL("/signin?error=invite_invalid", request.url));
     }
-    return NextResponse.redirect(
-      new URL("/signin?error=profile_error", request.url),
-    );
+    return NextResponse.redirect(new URL("/signin?error=profile_error", request.url));
   }
 
   if (!ok) {
-    return NextResponse.redirect(
-      new URL("/signin?error=profile_error", request.url),
-    );
+    return NextResponse.redirect(new URL("/signin?error=profile_error", request.url));
   }
 
   return NextResponse.redirect(new URL("/", request.url));

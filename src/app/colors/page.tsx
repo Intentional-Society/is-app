@@ -53,9 +53,7 @@ function Palette({ label }: { label: string }) {
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6 last:mb-0">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">{children}</div>
     </div>
   );
@@ -64,9 +62,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 function BlockGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6 last:mb-0">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
       {children}
     </div>
   );
@@ -90,10 +86,7 @@ function Pair({ name, fgName }: { name: string; fgName: string }) {
 function Single({ name }: { name: string }) {
   return (
     <div className="flex flex-col">
-      <div
-        className="h-20 rounded border border-border"
-        style={{ backgroundColor: `var(--${name})` }}
-      />
+      <div className="h-20 rounded border border-border" style={{ backgroundColor: `var(--${name})` }} />
       <div className="mt-2 font-mono text-sm">--{name}</div>
     </div>
   );
@@ -112,19 +105,13 @@ function ChromeRow() {
         <div className="mt-2 font-mono text-sm">--border</div>
       </div>
       <div className="flex flex-col">
-        <div
-          className="flex h-20 items-center justify-center rounded border-2"
-          style={{ borderColor: "var(--input)" }}
-        >
+        <div className="flex h-20 items-center justify-center rounded border-2" style={{ borderColor: "var(--input)" }}>
           <span className="text-sm text-muted-foreground">input border</span>
         </div>
         <div className="mt-2 font-mono text-sm">--input</div>
       </div>
       <div className="flex flex-col">
-        <div
-          className="flex h-20 items-center justify-center rounded"
-          style={{ boxShadow: "0 0 0 3px var(--ring)" }}
-        >
+        <div className="flex h-20 items-center justify-center rounded" style={{ boxShadow: "0 0 0 3px var(--ring)" }}>
           <span className="text-sm text-muted-foreground">focus ring</span>
         </div>
         <div className="mt-2 font-mono text-sm">--ring</div>
@@ -132,4 +119,3 @@ function ChromeRow() {
     </div>
   );
 }
-

@@ -36,9 +36,7 @@ const adminPw = process.env.E2E_ADMIN_PASSWORD;
 // Supabase for vitest but doesn't touch auth). Skip silently so
 // `npm run dev:db` stays usable as a shared prerequisite step.
 if (!url || !secret || !regularPw || !adminPw) {
-  process.stdout.write(
-    "seed-e2e-users: skipping (auth/password env vars not set — expected in CI functional job)\n",
-  );
+  process.stdout.write("seed-e2e-users: skipping (auth/password env vars not set — expected in CI functional job)\n");
   process.exit(0);
 }
 if (!dbUrl) {
@@ -90,9 +88,7 @@ try {
       ON CONFLICT (id) DO UPDATE SET is_admin = ${user.isAdmin}
     `;
 
-    process.stdout.write(
-      `  seeded ${user.email} (is_admin=${user.isAdmin})\n`,
-    );
+    process.stdout.write(`  seeded ${user.email} (is_admin=${user.isAdmin})\n`);
   }
 } finally {
   await sql.end();

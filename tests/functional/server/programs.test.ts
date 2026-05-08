@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import type { User } from "@supabase/supabase-js";
 import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -62,9 +61,7 @@ describe("Programs API", () => {
     await db.delete(profilePrograms).where(eq(profilePrograms.profileId, userId));
     await db.delete(profiles).where(eq(profiles.id, userId));
     await db.delete(programs).where(eq(programs.id, programId));
-    await db.execute(
-      sql`DELETE FROM auth.users WHERE id = ${userId}::uuid`,
-    );
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${userId}::uuid`);
   });
 
   describe("GET /api/programs", () => {
@@ -94,9 +91,7 @@ describe("Programs API", () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      const program = body.programs.find(
-        (p: { id: string }) => p.id === programId,
-      );
+      const program = body.programs.find((p: { id: string }) => p.id === programId);
       expect(program.joined).toBe(true);
       expect(program.joinedAt).toBeTruthy();
       expect(program.memberCount).toBe(1);
@@ -112,10 +107,7 @@ describe("Programs API", () => {
       expect(await res.json()).toEqual({ ok: true });
 
       // Verify DB row
-      const [row] = await db
-        .select()
-        .from(profilePrograms)
-        .where(eq(profilePrograms.profileId, userId));
+      const [row] = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
       expect(row).toBeTruthy();
       expect(row.programId).toBe(programId);
     });
@@ -159,10 +151,7 @@ describe("Programs API", () => {
       expect(await res.json()).toEqual({ ok: true });
 
       // Verify row deleted
-      const rows = await db
-        .select()
-        .from(profilePrograms)
-        .where(eq(profilePrograms.profileId, userId));
+      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
       expect(rows).toHaveLength(0);
     });
 

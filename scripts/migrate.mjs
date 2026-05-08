@@ -14,9 +14,7 @@ config({ path: ".env.local", quiet: true });
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  process.stderr.write(
-    "DATABASE_URL is not set. Did you run `npm run setup`?\n",
-  );
+  process.stderr.write("DATABASE_URL is not set. Did you run `npm run setup`?\n");
   process.exit(1);
 }
 

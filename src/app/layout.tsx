@@ -1,11 +1,13 @@
-import type { Metadata } from "next";
 import "./globals.css";
+
+import type { Metadata } from "next";
 import { Gudea, Ovo } from "next/font/google";
-import { cn } from "@/lib/utils";
+
 import { AuthProvider } from "@/components/auth-provider";
 import { SiteHeader } from "@/components/site-header";
 import { loadMe } from "@/lib/api-server";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 const gudea = Gudea({
   subsets: ["latin"],

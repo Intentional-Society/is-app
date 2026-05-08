@@ -71,11 +71,7 @@ describe("API auth middleware", () => {
     // Regression guard: if a new route needs to bypass auth, it should
     // be added here intentionally — and that change will be visible in
     // this test's diff.
-    expect(PUBLIC_PATHS).toEqual([
-      "/api/health",
-      /^\/api\/invites\/[^/]+\/check$/,
-      "/api/_test/reset",
-    ]);
+    expect(PUBLIC_PATHS).toEqual(["/api/health", /^\/api\/invites\/[^/]+\/check$/, "/api/_test/reset"]);
   });
 
   it("allows /api/invites/:code/check without a session", async () => {

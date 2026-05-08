@@ -3,13 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { apiClient } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { apiClient } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 
 type Initial = {
   displayName: string;
@@ -22,10 +21,7 @@ type Initial = {
   liveDesire: string;
 };
 
-type Status =
-  | { kind: "idle" }
-  | { kind: "submitting" }
-  | { kind: "error"; message: string };
+type Status = { kind: "idle" } | { kind: "submitting" } | { kind: "error"; message: string };
 
 export function WelcomeForm({ initial }: { initial: Initial }) {
   const router = useRouter();
@@ -33,13 +29,9 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
   const [bio, setBio] = useState(initial.bio);
   const [keywordsText, setKeywordsText] = useState(initial.keywords.join(", "));
   const [location, setLocation] = useState(initial.location);
-  const [supplementaryInfo, setSupplementaryInfo] = useState(
-    initial.supplementaryInfo,
-  );
+  const [supplementaryInfo, setSupplementaryInfo] = useState(initial.supplementaryInfo);
   const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl);
-  const [emergencyContact, setEmergencyContact] = useState(
-    initial.emergencyContact,
-  );
+  const [emergencyContact, setEmergencyContact] = useState(initial.emergencyContact);
   const [liveDesire, setLiveDesire] = useState(initial.liveDesire);
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -96,8 +88,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
       // feedback. Surface the message and release the form.
       setStatus({
         kind: "error",
-        message:
-          err instanceof Error ? err.message : "Unexpected error while saving.",
+        message: err instanceof Error ? err.message : "Unexpected error while saving.",
       });
     }
   };
@@ -105,13 +96,8 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
   const disabled = status.kind === "submitting";
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex w-full max-w-md flex-col gap-3"
-    >
-      <Label htmlFor="displayName">
-        Display name
-      </Label>
+    <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-3">
+      <Label htmlFor="displayName">Display name</Label>
       <Input
         id="displayName"
         type="text"
@@ -121,21 +107,10 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         disabled={disabled}
       />
 
-      <Label htmlFor="bio">
-        Bio
-      </Label>
-      <Textarea
-        id="bio"
-        required
-        value={bio}
-        onChange={(e) => setBio(e.target.value)}
-        disabled={disabled}
-        rows={4}
-      />
+      <Label htmlFor="bio">Bio</Label>
+      <Textarea id="bio" required value={bio} onChange={(e) => setBio(e.target.value)} disabled={disabled} rows={4} />
 
-      <Label htmlFor="keywords">
-        Keywords (comma-separated)
-      </Label>
+      <Label htmlFor="keywords">Keywords (comma-separated)</Label>
       <Input
         id="keywords"
         type="text"
@@ -144,9 +119,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         disabled={disabled}
       />
 
-      <Label htmlFor="location">
-        Location
-      </Label>
+      <Label htmlFor="location">Location</Label>
       <Input
         id="location"
         type="text"
@@ -155,9 +128,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         disabled={disabled}
       />
 
-      <Label htmlFor="liveDesire">
-        Live desire
-      </Label>
+      <Label htmlFor="liveDesire">Live desire</Label>
       <Textarea
         id="liveDesire"
         value={liveDesire}
@@ -166,9 +137,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         rows={3}
       />
 
-      <Label htmlFor="supplementaryInfo">
-        Supplementary info
-      </Label>
+      <Label htmlFor="supplementaryInfo">Supplementary info</Label>
       <Textarea
         id="supplementaryInfo"
         value={supplementaryInfo}
@@ -177,9 +146,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         rows={3}
       />
 
-      <Label htmlFor="avatarUrl">
-        Avatar URL
-      </Label>
+      <Label htmlFor="avatarUrl">Avatar URL</Label>
       <Input
         id="avatarUrl"
         type="url"
@@ -188,9 +155,7 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         disabled={disabled}
       />
 
-      <Label htmlFor="emergencyContact">
-        Emergency contact
-      </Label>
+      <Label htmlFor="emergencyContact">Emergency contact</Label>
       <Input
         id="emergencyContact"
         type="text"
@@ -198,15 +163,11 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         onChange={(e) => setEmergencyContact(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-sm text-muted-foreground">
-        Visible only to you (and admins in case of emergency).
-      </p>
+      <p className="text-sm text-muted-foreground">Visible only to you (and admins in case of emergency).</p>
 
       <hr className="my-3 border-border" />
 
-      <Label htmlFor="password">
-        Set a password (optional)
-      </Label>
+      <Label htmlFor="password">Set a password (optional)</Label>
       <Input
         id="password"
         type="password"
@@ -216,15 +177,9 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         onChange={(e) => setPassword(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-sm text-muted-foreground">
-        You can always sign in with a magic link instead.
-      </p>
+      <p className="text-sm text-muted-foreground">You can always sign in with a magic link instead.</p>
 
-      <Button
-        type="submit"
-        className="mt-3"
-        disabled={disabled}
-      >
+      <Button type="submit" className="mt-3" disabled={disabled}>
         {disabled ? "Saving…" : "Save"}
       </Button>
 

@@ -29,11 +29,7 @@ export default async function ProfilePage() {
       <dl className="flex w-full max-w-md flex-col gap-4">
         <Field label="Display name">{profile.displayName}</Field>
         <Field label="Bio">{profile.bio}</Field>
-        <Field label="Keywords">
-          {profile.keywords.length > 0
-            ? profile.keywords.join(", ")
-            : null}
-        </Field>
+        <Field label="Keywords">{profile.keywords.length > 0 ? profile.keywords.join(", ") : null}</Field>
         <Field label="Location">{profile.location}</Field>
         <Field label="Live desire">{profile.liveDesire}</Field>
         <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
@@ -41,9 +37,7 @@ export default async function ProfilePage() {
         <Field label="Emergency contact">{profile.emergencyContact}</Field>
       </dl>
 
-      <Button render={<Link href="/profile/edit" />}>
-        Edit profile
-      </Button>
+      <Button render={<Link href="/profile/edit" />}>Edit profile</Button>
     </main>
   );
 }

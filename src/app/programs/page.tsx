@@ -15,9 +15,7 @@ export default async function ProgramsPage() {
           ← Back
         </Link>
       </div>
-      <p className="w-full max-w-xl text-sm text-gray-400">
-        Browse programs and join the ones that interest you.
-      </p>
+      <p className="w-full max-w-xl text-sm text-gray-400">Browse programs and join the ones that interest you.</p>
       <ProgramsList />
     </main>
   );

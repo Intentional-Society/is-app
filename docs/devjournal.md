@@ -6,7 +6,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-05-07 | James | Replace ESLint with Biome
 
-Why? `npm run lint` performance goes from 49 s → 0.9 s.
+Why? `npm run lint` performance goes from 49 s → 0.9 s. Also we now have an automatic formatter tool (see biome.json).
 
 ## 2026-05-07 | Ola | Readable slug-based profile URLs
 

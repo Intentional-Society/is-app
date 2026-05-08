@@ -1,17 +1,7 @@
 import { randomUUID } from "node:crypto";
-
 import type { User } from "@supabase/supabase-js";
 import { eq, sql } from "drizzle-orm";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(),
@@ -156,10 +146,7 @@ describe("invites module", () => {
       note: "revoked invite for checkInvite test",
     });
     if ("error" in revoked) throw new Error("seed failed");
-    await db
-      .update(invites)
-      .set({ revokedAt: sql`now()` })
-      .where(eq(invites.code, revoked.code));
+    await db.update(invites).set({ revokedAt: sql`now()` }).where(eq(invites.code, revoked.code));
     expect(await checkInvite(revoked.code)).toEqual({
       valid: false,
       reason: "revoked",
@@ -215,10 +202,7 @@ describe("invites module", () => {
     });
     expect(result).toEqual({ ok: true });
 
-    const [row] = await db
-      .select({ revokedAt: invites.revokedAt })
-      .from(invites)
-      .where(eq(invites.code, r.code));
+    const [row] = await db.select({ revokedAt: invites.revokedAt }).from(invites).where(eq(invites.code, r.code));
     expect(row.revokedAt).not.toBeNull();
   });
 
@@ -260,10 +244,7 @@ describe("invites module", () => {
       note: "already redeemed cannot be revoked",
     });
     if ("error" in r) throw new Error("seed failed");
-    await db
-      .update(invites)
-      .set({ redeemedBy: creatorId, redeemedAt: sql`now()` })
-      .where(eq(invites.code, r.code));
+    await db.update(invites).set({ redeemedBy: creatorId, redeemedAt: sql`now()` }).where(eq(invites.code, r.code));
 
     const result = await revokeInvite({
       code: r.code,
@@ -284,10 +265,7 @@ describe("invites module", () => {
     });
     if ("error" in a || "error" in b) throw new Error("seed failed");
 
-    await db
-      .update(invites)
-      .set({ revokedAt: sql`now()` })
-      .where(eq(invites.code, a.code));
+    await db.update(invites).set({ revokedAt: sql`now()` }).where(eq(invites.code, a.code));
 
     const list = await getInvitesForCreator(creatorId);
     expect(list).toHaveLength(2);

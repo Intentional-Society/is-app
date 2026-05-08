@@ -1,13 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import { act, render, renderHook, screen } from "@testing-library/react";
 import type { User } from "@supabase/supabase-js";
+import { act, render, renderHook, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "@/components/auth-provider";
 
-type AuthChangeHandler = (
-  event: string,
-  session: { user: User | null } | null,
-) => void;
+type AuthChangeHandler = (event: string, session: { user: User | null } | null) => void;
 
 const unsubscribe = vi.fn();
 let lastHandler: AuthChangeHandler | null = null;
@@ -28,16 +25,12 @@ const otherUser = { id: "u2", email: "x@y.z" } as unknown as User;
 
 describe("useAuth", () => {
   it("throws when used outside AuthProvider", () => {
-    expect(() => renderHook(() => useAuth())).toThrow(
-      /must be used within AuthProvider/,
-    );
+    expect(() => renderHook(() => useAuth())).toThrow(/must be used within AuthProvider/);
   });
 
   it("returns the initial user from the provider", () => {
     const { result } = renderHook(() => useAuth(), {
-      wrapper: ({ children }) => (
-        <AuthProvider initialUser={mockUser}>{children}</AuthProvider>
-      ),
+      wrapper: ({ children }) => <AuthProvider initialUser={mockUser}>{children}</AuthProvider>,
     });
     expect(result.current.user).toBe(mockUser);
   });

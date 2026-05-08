@@ -3,12 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { apiClient } from "@/lib/api";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { apiClient } from "@/lib/api";
 
 type ProfileFormProps = {
   initial: {
@@ -23,11 +22,7 @@ type ProfileFormProps = {
   };
 };
 
-type Status =
-  | { kind: "idle" }
-  | { kind: "submitting" }
-  | { kind: "success" }
-  | { kind: "error"; message: string };
+type Status = { kind: "idle" } | { kind: "submitting" } | { kind: "success" } | { kind: "error"; message: string };
 
 export function ProfileForm({ initial }: ProfileFormProps) {
   const router = useRouter();
@@ -85,9 +80,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-3">
-      <Label htmlFor="displayName">
-        Display name
-      </Label>
+      <Label htmlFor="displayName">Display name</Label>
       <Input
         id="displayName"
         type="text"
@@ -97,17 +90,8 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         disabled={disabled}
       />
 
-      <Label htmlFor="bio">
-        Bio
-      </Label>
-      <Textarea
-        id="bio"
-        required
-        value={bio}
-        onChange={(e) => setBio(e.target.value)}
-        disabled={disabled}
-        rows={4}
-      />
+      <Label htmlFor="bio">Bio</Label>
+      <Textarea id="bio" required value={bio} onChange={(e) => setBio(e.target.value)} disabled={disabled} rows={4} />
 
       <Label htmlFor="keywords">
         Keywords <span className="text-muted-foreground">(comma-separated)</span>
@@ -120,9 +104,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         disabled={disabled}
       />
 
-      <Label htmlFor="location">
-        Location
-      </Label>
+      <Label htmlFor="location">Location</Label>
       <Input
         id="location"
         type="text"
@@ -131,9 +113,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         disabled={disabled}
       />
 
-      <Label htmlFor="liveDesire">
-        Live desire
-      </Label>
+      <Label htmlFor="liveDesire">Live desire</Label>
       <Textarea
         id="liveDesire"
         value={liveDesire}
@@ -142,9 +122,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         rows={3}
       />
 
-      <Label htmlFor="supplementaryInfo">
-        Supplementary info
-      </Label>
+      <Label htmlFor="supplementaryInfo">Supplementary info</Label>
       <Textarea
         id="supplementaryInfo"
         value={supplementaryInfo}
@@ -153,9 +131,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         rows={3}
       />
 
-      <Label htmlFor="avatarUrl">
-        Avatar URL
-      </Label>
+      <Label htmlFor="avatarUrl">Avatar URL</Label>
       <Input
         id="avatarUrl"
         type="url"
@@ -164,9 +140,7 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         disabled={disabled}
       />
 
-      <Label htmlFor="emergencyContact">
-        Emergency contact
-      </Label>
+      <Label htmlFor="emergencyContact">Emergency contact</Label>
       <Input
         id="emergencyContact"
         type="text"
@@ -174,15 +148,9 @@ export function ProfileForm({ initial }: ProfileFormProps) {
         onChange={(e) => setEmergencyContact(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-sm text-muted-foreground">
-        Visible only to you and admins in case of emergency.
-      </p>
+      <p className="text-sm text-muted-foreground">Visible only to you and admins in case of emergency.</p>
 
-      <Button
-        type="submit"
-        className="mt-3"
-        disabled={disabled}
-      >
+      <Button type="submit" className="mt-3" disabled={disabled}>
         {disabled ? "Saving…" : "Save changes"}
       </Button>
 

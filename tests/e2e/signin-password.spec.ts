@@ -71,16 +71,12 @@ test("password blank → signInWithOtp is called", async ({ page }) => {
   // Leave password blank intentionally.
   await page.getByRole("button", { name: "Send sign-in link" }).click();
 
-  await expect(
-    page.getByText("Check member@example.test for a sign-in link."),
-  ).toBeVisible();
+  await expect(page.getByText("Check member@example.test for a sign-in link.")).toBeVisible();
   expect(sawOtpCall).toBe(true);
   expect(sawPasswordCall).toBe(false);
 });
 
-test("unknown email on magic-link surfaces the otp_disabled error", async ({
-  page,
-}) => {
+test("unknown email on magic-link surfaces the otp_disabled error", async ({ page }) => {
   // With shouldCreateUser=false, GoTrue returns 422 for unknown
   // emails. The form shows that error to the user directly — the
   // endpoint is already an enumeration oracle at the network layer,
@@ -109,7 +105,5 @@ test("unknown email on magic-link surfaces the otp_disabled error", async ({
   await page.getByLabel("Email").fill("stranger@example.test");
   await page.getByRole("button", { name: "Send sign-in link" }).click();
 
-  await expect(
-    page.getByText(/No account found for that email/),
-  ).toBeVisible();
+  await expect(page.getByText(/No account found for that email/)).toBeVisible();
 });

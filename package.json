@@ -14,6 +14,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome lint .",
+    "format": "biome check --write .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "npm run lint && npm run typecheck && npm run dev:db && vitest run && playwright test",
     "test:functional": "npm run dev:db && vitest run",

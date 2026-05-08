@@ -18,9 +18,7 @@ test.beforeEach(async ({ baseURL }) => {
 // Declared BEFORE the happy-path test so the file's final state leaves
 // regular with bio filled — downstream specs in the chromium project
 // expect to land on / rather than bouncing through /welcome.
-test("welcome form surfaces a validation failure instead of getting stuck", async ({
-  page,
-}) => {
+test("welcome form surfaces a validation failure instead of getting stuck", async ({ page }) => {
   await signInAs(page, "regular");
   await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 10_000 });
 
@@ -45,23 +43,17 @@ test("welcome form surfaces a validation failure instead of getting stuck", asyn
   await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
 });
 
-test("fresh user lands on /welcome and can complete their profile", async ({
-  page,
-}) => {
+test("fresh user lands on /welcome and can complete their profile", async ({ page }) => {
   await signInAs(page, "regular");
   await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 10_000 });
 
   await page.getByLabel("Display name").fill("Welcome Tester");
   await page.getByLabel("Bio").fill("Loves writing, hikes, long coffees.");
-  await page
-    .getByLabel("Keywords (comma-separated)")
-    .fill("writing, coffee, hiking");
+  await page.getByLabel("Keywords (comma-separated)").fill("writing, coffee, hiking");
   await page.getByLabel("Location").fill("Lisbon");
 
   await page.getByRole("button", { name: "Save" }).click();
 
   await page.waitForURL((u) => u.pathname === "/", { timeout: 10_000 });
-  await expect(
-    page.getByRole("button", { name: "Manage invites" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Manage invites" })).toBeVisible();
 });

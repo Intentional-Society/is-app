@@ -6,10 +6,25 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!.next/**", "!next-env.d.ts"]
+    "includes": ["**", "!.next", "!next-env.d.ts"]
   },
   "formatter": {
-    "enabled": false
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "arrowParentheses": "always",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "bracketSameLine": false,
+      "quoteProperties": "asNeeded"
+    }
   },
   "css": {
     "parser": {
@@ -20,6 +35,19 @@
     "enabled": true,
     "rules": {
       "recommended": true
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [[":NODE:", ":PACKAGE:"], ":BLANK_LINE:", ":ALIAS:", ":BLANK_LINE:", ":PATH:"]
+          }
+        }
+      }
     }
   },
   "overrides": [

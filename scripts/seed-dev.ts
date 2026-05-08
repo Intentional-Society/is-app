@@ -1,15 +1,11 @@
-import { config } from "dotenv";
-import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import {
-  profiles,
-  programs,
-  profilePrograms,
-  invites,
-} from "../src/server/schema.js";
+
+import { invites, profilePrograms, profiles, programs } from "../src/server/schema.js";
 
 // Load .env.local so this script works standalone via `npx tsx`.
 config({ path: resolve(process.cwd(), ".env.local") });
@@ -19,7 +15,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 if (!supabaseUrl.includes("localhost") && !supabaseUrl.includes("127.0.0.1")) {
   throw new Error(
     `Refusing to seed: NEXT_PUBLIC_SUPABASE_URL is "${supabaseUrl}".\n` +
-      `This script only runs against local Supabase (localhost / 127.0.0.1).`
+      `This script only runs against local Supabase (localhost / 127.0.0.1).`,
   );
 }
 
@@ -69,9 +65,7 @@ type SeedData = {
 
 // Load seed data relative to this file's location.
 const scriptDir = fileURLToPath(new URL(".", import.meta.url));
-const seedData = JSON.parse(
-  readFileSync(resolve(scriptDir, "seed-dev.json"), "utf-8")
-) as SeedData;
+const seedData = JSON.parse(readFileSync(resolve(scriptDir, "seed-dev.json"), "utf-8")) as SeedData;
 
 type SeedResult = { inserted: number; skipped: number };
 
@@ -130,11 +124,7 @@ async function seedProfiles(): Promise<SeedResult> {
     isAdmin: p.isAdmin,
     supplementaryInfo: p.supplementaryInfo,
   }));
-  const result = await db
-    .insert(profiles)
-    .values(values)
-    .onConflictDoNothing()
-    .returning({ id: profiles.id });
+  const result = await db.insert(profiles).values(values).onConflictDoNothing().returning({ id: profiles.id });
   return { inserted: result.length, skipped: values.length - result.length };
 }
 
@@ -145,11 +135,7 @@ async function seedPrograms(): Promise<SeedResult> {
     name: p.name,
     description: p.description,
   }));
-  const result = await db
-    .insert(programs)
-    .values(values)
-    .onConflictDoNothing()
-    .returning({ id: programs.id });
+  const result = await db.insert(programs).values(values).onConflictDoNothing().returning({ id: programs.id });
   return { inserted: result.length, skipped: values.length - result.length };
 }
 
@@ -178,11 +164,7 @@ async function seedInvites(): Promise<SeedResult> {
     redeemedAt: inv.redeemedAt ? new Date(inv.redeemedAt) : null,
     revokedAt: null,
   }));
-  const result = await db
-    .insert(invites)
-    .values(values)
-    .onConflictDoNothing()
-    .returning({ id: invites.id });
+  const result = await db.insert(invites).values(values).onConflictDoNothing().returning({ id: invites.id });
   return { inserted: result.length, skipped: values.length - result.length };
 }
 

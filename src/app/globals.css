@@ -8,49 +8,49 @@
    classes — e.g. --primary becomes available as bg-primary, text-primary, etc.
    Add a line here when you add a new token in :root. */
 @theme inline {
-    --font-sans: var(--font-gudea);
-    --font-serif: var(--font-ovo);
-    --font-heading: var(--font-gudea);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --color-success: var(--success);
-    --color-success-foreground: var(--success-foreground);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+  --font-sans: var(--font-gudea);
+  --font-serif: var(--font-ovo);
+  --font-heading: var(--font-gudea);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 /* Token roles. Names follow shadcn/ui convention so `npx shadcn add ...` works
@@ -59,134 +59,139 @@
    on a barely-tinted off-white surface. .dark below mirrors the palette;
    roles are identical. */
 :root {
-    /* Surface — page background and body text. Background sits halfway
+  /* Surface — page background and body text. Background sits halfway
        between near-white and the www.intentionalsociety.org bg (#E7EFEB) —
        a faint mint tint, not the full site cast. */
-    --background: oklch(0.965 0.007 165);
-    --foreground: oklch(0.18 0.012 250);
+  --background: oklch(0.965 0.007 165);
+  --foreground: oklch(0.18 0.012 250);
 
-    /* Card — elevated surface. Unused today; kept for future panels. */
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.18 0.012 250);
+  /* Card — elevated surface. Unused today; kept for future panels. */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.012 250);
 
-    /* Popover — floating panels (used by components/ui/sheet.tsx). */
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.18 0.012 250);
+  /* Popover — floating panels (used by components/ui/sheet.tsx). */
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.012 250);
 
-    /* Primary — the dusty teal IS brand color. Used as bg of the Button
+  /* Primary — the dusty teal IS brand color. Used as bg of the Button
        "secondary" variant (the emphasized CTA), the focus ring, and as a
        hover-border accent on Button "primary". The variant naming inverts
        shadcn's convention; the CSS token name follows shadcn. */
-    --primary: oklch(0.45 0.080 205);
-    --primary-foreground: oklch(0.985 0.002 165);
+  --primary: oklch(0.45 0.08 205);
+  --primary-foreground: oklch(0.985 0.002 165);
 
-    /* Secondary — unused today. Button "secondary" variant fills with
+  /* Secondary — unused today. Button "secondary" variant fills with
        --primary (dark teal), not this token. Kept for future use. */
-    --secondary: oklch(0.93 0.007 165);
-    --secondary-foreground: oklch(0.30 0.025 220);
+  --secondary: oklch(0.93 0.007 165);
+  --secondary-foreground: oklch(0.3 0.025 220);
 
-    /* Muted — subdued text and low-emphasis surfaces (helper copy, info
+  /* Muted — subdued text and low-emphasis surfaces (helper copy, info
        banners, nav hover). */
-    --muted: oklch(0.93 0.005 220);
-    --muted-foreground: oklch(0.50 0.018 220);
+  --muted: oklch(0.93 0.005 220);
+  --muted-foreground: oklch(0.5 0.018 220);
 
-    /* Accent — hover/highlight surface; bluer and slightly more saturated
+  /* Accent — hover/highlight surface; bluer and slightly more saturated
        than muted, to read as a hover state and contrast the mint background. */
-    --accent: oklch(0.895 0.030 220);
-    --accent-foreground: oklch(0.25 0.030 220);
+  --accent: oklch(0.895 0.03 220);
+  --accent-foreground: oklch(0.25 0.03 220);
 
-    /* Destructive — errors and destructive actions. Terracotta rather than
+  /* Destructive — errors and destructive actions. Terracotta rather than
        pure red, to sit in the same earthy palette. */
-    --destructive: oklch(0.52 0.14 28);
+  --destructive: oklch(0.52 0.14 28);
 
-    /* Form-control chrome — all in the primary teal family at low chroma,
+  /* Form-control chrome — all in the primary teal family at low chroma,
        to signal "this is an interactive UI element" rather than a flat
        gray frame. border = dividers/button edges, input = field borders,
        ring = focus ring. */
-    --border: oklch(0.86 0.045 205);
-    --input: oklch(0.86 0.045 205);
-    --ring: oklch(0.55 0.085 205);
+  --border: oklch(0.86 0.045 205);
+  --input: oklch(0.86 0.045 205);
+  --ring: oklch(0.55 0.085 205);
 
-    /* Chart — unused today; reserved for future data viz. */
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+  /* Chart — unused today; reserved for future data viz. */
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
 
-    /* Success — save/resend confirmations. Custom token (not stock shadcn).
+  /* Success — save/resend confirmations. Custom token (not stock shadcn).
        Sage rather than pure green, to match the earthy palette. */
-    --success: oklch(0.50 0.08 155);
-    --success-foreground: oklch(0.985 0.002 165);
+  --success: oklch(0.5 0.08 155);
+  --success-foreground: oklch(0.985 0.002 165);
 
-    --radius: 0.625rem;
+  --radius: 0.625rem;
 
-    /* Sidebar — unused today (no sidebar component). Kept so a future shadcn
+  /* Sidebar — unused today (no sidebar component). Kept so a future shadcn
        sidebar install works without re-adding tokens. */
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
 .dark {
-    --background: oklch(0.18 0.005 230);
-    --foreground: oklch(0.96 0.002 170);
-    --card: oklch(0.22 0.005 230);
-    --card-foreground: oklch(0.96 0.002 170);
-    --popover: oklch(0.22 0.005 230);
-    --popover-foreground: oklch(0.96 0.002 170);
-    --primary: oklch(0.78 0.075 205);
-    --primary-foreground: oklch(0.18 0.005 230);
-    --secondary: oklch(0.27 0.008 220);
-    --secondary-foreground: oklch(0.96 0.002 170);
-    --muted: oklch(0.27 0.008 220);
-    --muted-foreground: oklch(0.70 0.012 220);
-    --accent: oklch(0.30 0.018 205);
-    --accent-foreground: oklch(0.96 0.002 170);
-    --destructive: oklch(0.65 0.14 28);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.60 0.075 205);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --success: oklch(0.68 0.08 155);
-    --success-foreground: oklch(0.18 0.005 230);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+  --background: oklch(0.18 0.005 230);
+  --foreground: oklch(0.96 0.002 170);
+  --card: oklch(0.22 0.005 230);
+  --card-foreground: oklch(0.96 0.002 170);
+  --popover: oklch(0.22 0.005 230);
+  --popover-foreground: oklch(0.96 0.002 170);
+  --primary: oklch(0.78 0.075 205);
+  --primary-foreground: oklch(0.18 0.005 230);
+  --secondary: oklch(0.27 0.008 220);
+  --secondary-foreground: oklch(0.96 0.002 170);
+  --muted: oklch(0.27 0.008 220);
+  --muted-foreground: oklch(0.7 0.012 220);
+  --accent: oklch(0.3 0.018 205);
+  --accent-foreground: oklch(0.96 0.002 170);
+  --destructive: oklch(0.65 0.14 28);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.6 0.075 205);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --success: oklch(0.68 0.08 155);
+  --success-foreground: oklch(0.18 0.005 230);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
     /* 112.5% of the user's browser default (typically 16px → 18px), so
        text-base = 18px and rem-based sizes scale proportionally. Using %
        rather than px preserves user font-size accessibility preferences. */
     font-size: 112.5%;
-    }
-  h1, h2, h3, h4, h5, h6 {
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-sans;
-    }
+  }
   p {
     @apply font-serif text-base;
-    }
+  }
 }
