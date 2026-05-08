@@ -178,6 +178,7 @@ export type MemberSummary = {
   displayName: string;
   location: string | null;
   keywords: string[];
+  avatarUrl: string | null;
 };
 
 export const listMembers = async (): Promise<MemberSummary[]> => {
@@ -188,6 +189,7 @@ export const listMembers = async (): Promise<MemberSummary[]> => {
       displayName: profiles.displayName,
       location: profiles.location,
       keywords: profiles.keywords,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(profiles)
     .where(isNotNull(profiles.displayName))
