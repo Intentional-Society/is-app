@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-07 | James | Replace ESLint with Biome
+
+Why? `npm run lint` performance goes from 49 s → 0.9 s.
+
 ## 2026-05-07 | Ola | Readable slug-based profile URLs
 
 Profiles now have readable slug URLs (e.g. `/members/aria-chen` instead of `/members/00000000-...`). Added a nullable unique `slug` column to the profiles schema. Slugs are auto-generated from display name on profile create and update — "Aria Chen" becomes `aria-chen`. `getProfileForMember` accepts either slug or UUID so old UUID links don't break. If two members share a display name the second keeps a UUID URL until they update their name to something distinct. Directory cards link by slug when available, UUID otherwise.

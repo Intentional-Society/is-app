@@ -16,6 +16,7 @@ export function ProgramsList() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a manual refetch trigger; bumping it reruns the effect by design
   useEffect(() => {
     let cancelled = false;
     async function fetchPrograms() {

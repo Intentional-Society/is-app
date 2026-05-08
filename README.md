@@ -49,7 +49,7 @@ First run pulls Docker images and takes a few minutes. After that, startup is ne
 | `npm run dev:db:reset` | Wipe local DB and reapply migrations |
 | `npm test` | Run all tests (functional + e2e) |
 | `npm run watch` | Vitest in watch mode |
-| `npm run lint` | ESLint |
+| `npm run lint` | Biome |
 
 ## Project structure
 
