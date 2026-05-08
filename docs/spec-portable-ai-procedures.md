@@ -452,9 +452,9 @@ For v1 to be considered shipped:
 
 ### Appendix A: Changelog
 
-- **v1** (`docs/spec-portable-ai-procedures-v1.md`, reference) — initial unified spec from the two planning drafts.
-- **v2** (`docs/spec-portable-ai-procedures-v2.md`, reference) — incorporated approved design revisions, Codex Skills alignment, Phase 0 spike, and early `/ship` wait/drift ideas.
-- **v3** (`docs/spec-portable-ai-procedures-v3.md`, reference) — simplified scope after peer review; clarified `/ship`, CI, attribution, and docs-drift policies; split rollout phases; moved supporting material into appendices.
+- **v1** — initial unified spec from the two planning drafts.
+- **v2** — incorporated approved design revisions, Codex Skills alignment, Phase 0 spike, and early `/ship` wait/drift ideas.
+- **v3** — simplified scope after peer review; clarified `/ship`, CI, attribution, and docs-drift policies; split rollout phases; moved supporting material into appendices.
 - **v4 (this document)** — structure-only reorganization for readability: numbered body sections, unified appendices, appendix renumbering, updated cross-references, and a short rollout summary. No substantive design changes.
 
 ### Appendix B: Phase 0 spike — file content and run procedure
@@ -900,5 +900,4 @@ Used during spec authoring:
 - [agents.md cross-tool standard](https://agents.md/).
 - Repo — `CLAUDE.md`, `docs/doc-strategy-committing.md`, `docs/doc-strategy-branching.md`, `docs/doc-github.md`, `docs/doc-strategy-project-management.md`, `.github/workflows/ci.yml`, `.github/workflows/ci-docs-skip.yml`, `.github/workflows/e2e.yml`, `vercel.json`, `package.json`, `scripts/update-main-branch-protection.mjs`.
 - Issue thread — [#62](https://github.com/Intentional-Society/is-app/issues/62) and comments [4320013457](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4320013457), [4374728362](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4374728362).
-- Reference drafts (preserved as input artifacts, superseded by this spec) — `docs/plan-ai-checkin-procedure.md`, `docs/plan-portable-ai-procedures.md`, `docs/spec-portable-ai-procedures-v1.md`, `docs/spec-portable-ai-procedures-v2.md`.
 - Empirical analysis — recent 100 `ci.yml` and 100 `e2e.yml` runs from `Intentional-Society/is-app`, paired by SHA on 2026-05-06; underpins the 5-minute `/ship` wait-window default.
