@@ -55,6 +55,7 @@ function SentView({ email, origin }: { email: string; origin: string }) {
         <p className="text-base text-success">Link resent.</p>
       ) : (
         <button
+          type="button"
           onClick={handleResend}
           disabled={!canResend}
           className="text-base text-muted-foreground underline disabled:no-underline disabled:opacity-50"

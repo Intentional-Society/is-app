@@ -51,7 +51,7 @@ const authAs = (userId: string) => {
         error: null,
       }),
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: test mock shape
   } as any);
 };
 
