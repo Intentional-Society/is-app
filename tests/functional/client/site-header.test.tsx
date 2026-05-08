@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
 import type { User } from "@supabase/supabase-js";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { SiteHeader } from "@/components/site-header";
 

@@ -1,6 +1,6 @@
-import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { asc, eq, isNotNull, or } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "./db";
 import { profiles } from "./schema";

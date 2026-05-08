@@ -1,6 +1,6 @@
 import type { InferResponseType } from "hono/client";
 
-import { apiClient } from "@/lib/api";
+import type { apiClient } from "@/lib/api";
 
 // Named shapes for API responses, extracted from the Hono route
 // inference. Import these instead of reaching into the RPC client at

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-
-import { NextRequest } from "next/server";
 import { eq, sql } from "drizzle-orm";
+import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/server", () => ({

@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
-import { act, render, renderHook, screen } from "@testing-library/react";
 import type { User } from "@supabase/supabase-js";
+import { act, render, renderHook, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "@/components/auth-provider";
 

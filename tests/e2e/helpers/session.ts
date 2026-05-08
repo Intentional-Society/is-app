@@ -1,4 +1,4 @@
-import { type Page, expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 // Two long-lived test users seeded manually in prod Supabase. We sign
 // in through the real /signin form with a known password rather than

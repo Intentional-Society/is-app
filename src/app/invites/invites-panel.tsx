@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { apiClient } from "@/lib/api";
-
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { apiClient } from "@/lib/api";
 
 type InviteRow = {
   code: string;

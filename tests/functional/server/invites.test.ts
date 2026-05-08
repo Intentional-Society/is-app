@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import type { User } from "@supabase/supabase-js";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";

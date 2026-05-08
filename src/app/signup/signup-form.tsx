@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 
-import { apiClient } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiClient } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 
 type Step =
   | { kind: "enter-code"; error?: string }

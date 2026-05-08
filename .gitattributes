@@ -1,0 +1,6 @@
+# Force LF line endings in the working tree on all platforms. Biome's
+# formatter writes LF; without this, Windows contributors with the default
+# `core.autocrlf=true` get CRLF in the working tree and Biome reformats it
+# back to LF on every run, producing diff noise that git can't see (because
+# the index is LF either way).
+* text=auto eol=lf

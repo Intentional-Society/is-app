@@ -1,10 +1,11 @@
-import { config } from "dotenv";
-import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { profiles, programs, profilePrograms, invites } from "../src/server/schema.js";
+
+import { invites, profilePrograms, profiles, programs } from "../src/server/schema.js";
 
 // Load .env.local so this script works standalone via `npx tsx`.
 config({ path: resolve(process.cwd(), ".env.local") });
