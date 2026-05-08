@@ -3,15 +3,17 @@
 > Tracks [issue #62](https://github.com/Intentional-Society/is-app/issues/62).
 >
 > **Last verified against repo realities:** 2026-05-06.
-> Authored 2026-05-06 by Blake Pusztai with Claude Opus 4.7.
+> Authored 2026-05-07 by Blake Pusztai with Claude Opus 4.7.
 
-## Problem statement
+## 1. Overview
+
+### Problem statement
 
 Team members using AI coding assistants follow our team check-in conventions only as well as their personal "training" of that assistant — through prompting, custom memories, and tribal knowledge of which docs to read. The result is inconsistent execution of the same checkin process across the team, with each new teammate or assistant rebuilding muscle memory from zero. We are also a small team (4-5 part-time, including a couple of volunteers); losing per-person prompting/memory effort at every join or tool-switch is a real cost.
 
 James captured the underlying hypothesis in [issue #62](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4320013457): we should be able to encode reliable process-execution instructions for AIs that transfer across the team. His stated "I'm done" workflow ([issue #62](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4374728362)) — *test + commit + make PR + watch + merge + tidy* — is the canonical acceptance behavior for `/ship`.
 
-## Goals
+### Goals
 
 - Provide one canonical, repo-resident source of truth for the AI-assisted `/commit`, `/pr`, and `/ship` check-in workflows.
 - Make the workflow followable by any supported agent without private per-user prompting, memory, or teammate-specific training.
@@ -22,7 +24,7 @@ James captured the underlying hypothesis in [issue #62](https://github.com/Inten
 - Keep the framework understandable and maintainable by a small, 4-5 person part-time team without dedicated tooling ownership.
 - Make future procedure and assistant additions discoverable with minimal token waste.
 
-## Non-goals
+### Non-goals
 
 - No replacement for human PR review.
 - No custom CLI, command runner, or CI job that runs an AI agent.
@@ -36,7 +38,7 @@ James captured the underlying hypothesis in [issue #62](https://github.com/Inten
 - No web-side or GUI agent surface.
 - No guarantee of identical UX across assistants. The goal is equivalent procedure behavior, not identical trigger mechanics.
 
-## Constraints and trade-offs we accept
+### Constraints and trade-offs we accept
 
 These are the real-world constraints the design is shaped against.
 
@@ -50,7 +52,7 @@ These are the real-world constraints the design is shaped against.
 - **Claude Code does not yet read AGENTS.md natively** as of May 2026. We accept dual-maintenance of `CLAUDE.md` and `AGENTS.md` for now; collapse to a single index when Anthropic ships AGENTS.md support.
 - **Small-team context.** A 4-5 person part-time team — including volunteers — can't afford procedure-doc tooling that requires dedicated ownership. v1 prefers the lightest durable pattern.
 
-## Design principles
+### Design principles
 
 - **Procedure first, trigger second:** the durable artifact is the procedure doc; assistant-specific files are adapters.
 - **Claude-first adoption, portable architecture:** optimize the first implementation path for Claude Code without making the procedures Claude-only.
@@ -62,7 +64,9 @@ These are the real-world constraints the design is shaped against.
 - **Human confirmation where judgment matters:** commit text, PR text, AI attribution, advisory check failures, ambiguous working-tree states, and PR merges all require explicit review.
 - **Small-team durability:** choose boring markdown files and existing `git`/`gh` workflows over sophisticated automation.
 
-## Validated tool/platform assumptions
+## 2. Validated Context
+
+### Validated tool/platform assumptions
 
 > *Last verified: 2026-05-06.* Re-verify when updating assistant adapters or repo instruction files; do **not** re-verify during normal `/commit`, `/pr`, or `/ship` runs.
 
@@ -75,7 +79,7 @@ These are the real-world constraints the design is shaped against.
 - **AGENTS.md** is the cross-tool standard (Linux Foundation Agentic AI Foundation, Dec 2025). Supported by Codex and several other coding agents; Claude Code is the relevant holdout for this repo (uses `CLAUDE.md`).
 - **GitHub CLI** supports `gh pr create`, `gh pr checks --watch`, and `gh pr merge` with `--merge`, `--delete-branch`. (Auto-merge via `--auto` is supported but is not used in v1; see `/ship` requirements.)
 
-## Validated repo assumptions
+### Validated repo assumptions
 
 These describe the current repo state the procedures depend on. Kept fresh by bidirectional links rather than `Last verified` dates.
 
@@ -91,15 +95,17 @@ These describe the current repo state the procedures depend on. Kept fresh by bi
 - Project-board automation: `PR Linked → In progress`, `PR Merged → Done` (per `docs/doc-strategy-project-management.md`). Closing keywords (`Closes #N`/`Fixes #N`/`Resolves #N`) create the GitHub-linked-PR relationship the automation depends on; plain `(#N)` references are visible context but do not create that link.
 - `vercel.json` `ignoreCommand` already skips preview builds for docs-only branch diffs.
 
-## Proposed architecture
+## 3. Proposed Design
 
-### Files: new vs existing
+### Proposed architecture
+
+#### Files: new vs existing
 
 The v1 work splits cleanly into new files, edits to existing files, and existing files that stay as-is. Crucial principle: **strategy docs are policy/rationale for humans; procedure docs are imperative step-by-step for agents.** Procedure docs *reference* strategy docs; they never duplicate them.
 
 | File / folder | Status | Role |
 |---|---|---|
-| `docs/ai-procedures/index.md` | **NEW** | Discoverable map: canonical files, adapter locations, extension recipe, maintenance triggers, and policy/reference docs. See Appendix F for the creation and maintenance workflow. |
+| `docs/ai-procedures/index.md` | **NEW** | Discoverable map: canonical files, adapter locations, extension recipe, maintenance triggers, and policy/reference docs. See Appendix E for the creation and maintenance workflow. |
 | `docs/ai-procedures/{commit,pr,ship}.md` | **NEW** | Imperative step-by-step for agents — single source of truth for procedure logic |
 | `AGENTS.md` (root) | **NEW** | Cross-tool index, ≤30 lines — points at `docs/ai-procedures/index.md` |
 | `.claude/skills/{commit,pr,ship}/SKILL.md` | **NEW** | Claude Code adapter (Skills format) |
@@ -114,7 +120,7 @@ The v1 work splits cleanly into new files, edits to existing files, and existing
 | `.github/PULL_REQUEST_TEMPLATE.md` (or equivalent) | **NEW or EDIT** | Add two checklist items: (a) smoke-test prompt when `docs/ai-procedures/**` is touched; (b) anchor/rule check when any of the four high-impact policy docs (`doc-strategy-*.md`, `doc-github.md`) is touched |
 | `README.md` | **EDIT** | Add a short "Working with AI assistants" section pointing at `docs/ai-procedures/index.md` |
 
-### File layout
+#### File layout
 
 ```
 docs/ai-procedures/
@@ -141,7 +147,7 @@ CLAUDE.md                # already exists — adds pointer to AGENTS.md + index.
   skills/{commit,pr,ship}/SKILL.md             # only if .agents/skills/ isn't picked up
 ```
 
-### Why this layout
+#### Why this layout
 
 The Files table above lists every artifact and its status. The non-obvious choices in this layout are:
 
@@ -151,7 +157,7 @@ The Files table above lists every artifact and its status. The non-obvious choic
 - **`.agents/skills/` is the cross-tool location**, not Codex-specific. VS Code Agent Skills also discover this path, so it likely covers Copilot Chat without a Copilot-specific shim.
 - **`.github/skills/` and `.github/copilot-instructions.md` are conditional Phase 3 deliverables** — added only if OQ-1 verification shows that `.agents/skills/` discovery in the team's Copilot environment isn't sufficient.
 
-### Trade-offs explicitly chosen
+#### Trade-offs explicitly chosen
 
 - **Claude Code does not yet read AGENTS.md** → maintain `CLAUDE.md` and `AGENTS.md` in parallel. Forward-compat: collapse when Anthropic ships support.
 - **Skills format over slash commands for Claude** → consistency across tools beats Claude-native frontmatter affordances; we don't currently need `argument-hint`.
@@ -159,9 +165,31 @@ The Files table above lists every artifact and its status. The non-obvious choic
 - **One folder per skill (Skills format) vs one file per command** → marginally heavier file structure, paid for by single-mental-model maintenance.
 - **Adapter-shim folders proliferate slightly** → each adapter is 3-10 lines pointing at the canonical procedure; no procedure logic in shims.
 
-## Command/procedure scope
+### Documentation and source-of-truth model
 
-### Three commands
+- **`docs/ai-procedures/<name>.md`** = single source of truth for procedure logic.
+- **`docs/ai-procedures/index.md`** = discoverable map of canonical files, adapters, extension recipe, policy-doc references.
+- **`doc-strategy-committing.md` Conventions section** = single source of truth for branch / commit / PR / merge format rules. Procedure docs reference, never restate.
+- **Maintenance rule:** policy docs and procedure docs should stay linked but not duplicated. When a policy doc changes, update the related `docs/ai-procedures/*` file only if the change affects what an agent should do, ask, run, stop on, or report. Appendix E describes the creation and maintenance workflow.
+- **`AGENTS.md`** = cross-tool index, ≤30 lines. Points at `docs/ai-procedures/index.md`.
+- **`CLAUDE.md`** = Claude Code's index. Adds pointers to `AGENTS.md` and `docs/ai-procedures/index.md`. Collapses to a one-line pointer when Claude Code ships AGENTS.md support.
+- **`.github/copilot-instructions.md`** = (conditional) Copilot's index, points at AGENTS.md.
+
+#### Discoverability
+
+For humans: a short "Working with AI assistants" section in `README.md` pointing at `docs/ai-procedures/index.md`. A `CONTRIBUTING.md` is not needed in v1.
+
+For agents: AGENTS.md and CLAUDE.md both point at the index, which lists every procedure doc with a one-sentence "use when" pointer. Procedure doc filenames are predictable (`commit.md`, `pr.md`, `ship.md`).
+
+#### Drift detection
+
+The procedure docs maintain cross-reference footers to the policy docs and config they depend on; high-impact policy docs (`doc-strategy-committing.md`, `doc-strategy-branching.md`, `doc-github.md`, `doc-strategy-project-management.md`) include "Related AI procedures" back-links; the PR template flags both procedure-doc edits (with a smoke-test prompt) and high-impact policy-doc edits (with an anchor/rule check) so neither side of the dependency drifts unnoticed. A policy-doc change requires a procedure-doc update only when it changes agent behavior: what an agent should do, ask, run, stop on, or report. Heavier mechanisms (analysis scripts, scheduled monitors, CI lint of the procedure docs themselves) are deferred to v1.1+.
+
+## 4. Procedure Behavior
+
+### Command/procedure scope
+
+#### Three commands
 
 | Command | Intent | Internal behavior |
 |---|---|---|
@@ -169,9 +197,9 @@ The Files table above lists every artifact and its status. The non-obvious choic
 | `/pr` | Push current branch and ensure a PR exists in the right state | State-dispatcher; opens new PR or updates existing; reports CI status; **does not enable auto-merge**. Stops after PR is open and CI is reported. |
 | `/ship` | The full "I'm done" workflow | State-aware: from a clean branch, runs commit → push → PR → wait for required + advisory CI → confirm with human → merge → tidy. Performs the merge directly. |
 
-For end-to-end developer dialogues showing what each command looks like in practice (happy path, dirty-tree handling, schema-touch, bugfix-without-regression-test, advisory-pending-on-`/ship`, refusal cases), see **Appendix E**.
+For end-to-end developer dialogues showing what each command looks like in practice (happy path, dirty-tree handling, schema-touch, bugfix-without-regression-test, advisory-pending-on-`/ship`, refusal cases), see **Appendix D**.
 
-### Naming decision: `/ship`, not `/merge`, no aliases in v1
+#### Naming decision: `/ship`, not `/merge`, no aliases in v1
 
 `/ship` wins over `/merge` because it captures James's stated workflow (test + commit + make PR + watch + merge + tidy), is intent-based rather than primitive-based, and composes naturally with the primitives: `/commit` → `/pr` → `/ship` walks low-to-high abstraction.
 
@@ -181,7 +209,7 @@ We do not ship a `/pr --ship` flag (the state-aware `/ship` command makes the ch
 
 We do not enable `gh pr merge --auto` from `/pr` in v1. `/pr` prepares; `/ship` finishes. No GitHub-side auto-merge in v1. Auto-merge from `/pr` may return as an opt-in flag (e.g., `/pr --auto-merge`) once both procedures have proven stable in dogfooding.
 
-### State dispatch — plain English
+#### State dispatch — plain English
 
 All three commands inspect repo state and pick the right next action.
 
@@ -198,7 +226,7 @@ For **`/pr`**:
 
 For **`/ship`**: same dispatch as `/pr`, but on "PR is green" the agent confirms with the human and then merges directly (no auto-merge); after merge it tidies the local branch (`git branch -d <branch>` after confirming remote was deleted). On advisory failure or pending state, runs the **Supervised-auto handoff** with a 5-minute bounded wait + extension option.
 
-### `/commit` — required step-by-step
+#### `/commit` — required step-by-step
 
 1. **Branch check.** Refuse if HEAD is `main`.
 2. **Diff scan.** `git diff` and `git diff --staged`. Abort if both empty (no-op commit).
@@ -218,7 +246,7 @@ For **`/ship`**: same dispatch as `/pr`, but on "PR is green" the agent confirms
 13. **Commit.** Pass message via heredoc. If a commit hook or local gate fails, fix the issue and retry safely. Do **not** use `git commit --amend` or otherwise rewrite existing commits unless the human explicitly approves.
 14. **Stop.** Don't push. Output: commit SHA + suggestion to run `/pr` or `/ship` when ready.
 
-### `/pr` — required structure
+#### `/pr` — required structure
 
 `/pr` prepares or updates a PR and reports CI. It does **not** merge and does **not** enable auto-merge. When the working tree isn't in the happy state, the agent evaluates with a "do no harm" lens and continues the natural next step rather than forcing the human to retype.
 
@@ -245,7 +273,7 @@ For **`/ship`**: same dispatch as `/pr`, but on "PR is green" the agent confirms
 
 **Docs-only awareness.** Recognize that for branches whose entire diff is docs-only, the no-op `Lint & Functional Tests` status posts in seconds via `ci-docs-skip.yml`. No special-casing needed; the agent just polls and gets green fast.
 
-### `/ship` — required structure
+#### `/ship` — required structure
 
 `/ship` finishes a PR. It performs the merge directly — no `gh pr merge --auto`, no GitHub-side auto-merge in v1.
 
@@ -273,9 +301,29 @@ For **`/ship`**: same dispatch as `/pr`, but on "PR is green" the agent confirms
 
 This keeps the agent in the loop where it adds value (helping resolve), not just at the bookend.
 
-## Detailed requirements
+### Guardrails and edge cases
 
-### P0 — required for v1
+Cross-cutting safety items. Per-command details live with each command's step list.
+
+- **Refuse on `main`.** No commits, pushes, PR-open, or merge from `main`.
+- **Working-tree gate.** Before any `/pr` or `/ship` action, inspect uncommitted changes (W) and commits ahead of `main` (C); the four-quadrant outcome dictates the next step (see `/pr`'s Working-tree gate for the dispatch table).
+- **Schema change without expand-contract.** Refuse to bundle expand+contract in one PR. Procedural enforcement of an existing rule from `doc-strategy-committing.md`.
+- **Secret-bearing files: stop and ask.** `.env*` files, common secret-pattern matches, or unexpectedly large files trigger a pause; do not commit unless the human explicitly confirms it is safe.
+- **No `--no-verify`, no force-push, no force-merge, no admin bypass.** Period.
+- **No `--amend` without explicit human approval.** Preserves audit trail on hook failures and review iterations.
+- **No silent merge through advisory failures.** Advisory red, unavailable, or pending-after-bounded-wait states all hand off to the human via the Supervised-auto handoff.
+- **No GitHub-side auto-merge in v1.** `/pr` reports CI state and stops; `/ship` performs the merge directly when CI is green and the human has confirmed.
+- **Test-plan provenance.** Every line is grounded in commands the agent ran, verbatim human attestations, or one collapsed local-gate line — never invented.
+- **Resumability.** Re-running `/pr` or `/ship` inspects state and continues from there rather than duplicating PRs or commits. Idempotent on the same input.
+- **`gh` unavailability or auth gap.** If `gh` (or equivalent GitHub access) is unavailable or unauthenticated, stop with the missing capability and the manual alternative; do not pretend another tool exists, do not skip the GitHub-side step silently, do not invent statuses.
+- **Human review before `/ship` merges.** `/ship` confirms with the human before invoking `gh pr merge`, even when it opened the PR in the same run.
+- **Failure handoff.** Show the failing command, exit state, relevant URL, and the next safe options. Stay in the conversation.
+
+## 5. Requirements and Delivery
+
+### Detailed requirements
+
+#### P0 — required for v1
 
 Slim traceability index. Each entry references the canonical source-of-truth section above.
 
@@ -295,10 +343,10 @@ Slim traceability index. Each entry references the canonical source-of-truth sec
 - **P0.14 — Conventions encoded in `doc-strategy-committing.md`.** New "Conventions" section captures branch / commit / PR / merge format rules; procedure docs reference rather than restate.
 - **P0.15 — AI-attribution trailer in commits and PR bodies.** Model specificity required; ambiguity handling per `/commit` step 11.
 - **P0.16 — Issue linkage rule.** Closing keywords (`Closes`/`Fixes`/`Resolves`) only when the PR resolves the issue; plain `(#N)` for non-resolving references.
-- **P0.17 — Drift-aware documentation.** Cross-reference footers in procedure docs; a `Maintenance Triggers` section in `docs/ai-procedures/index.md`; "Related AI procedures" back-link sections in high-impact policy docs (`doc-strategy-committing.md`, `doc-strategy-branching.md`, `doc-github.md`, `doc-strategy-project-management.md`); PR-template checklist with two items: (a) when `docs/ai-procedures/**` is touched — *"smoke-tested end-to-end with at least one assistant?"*; (b) when any of the four high-impact policy docs above is touched — *"if you changed referenced anchors or added rules with procedural implications, did you check the matching procedure docs?"* Appendix F defines how the trigger list and `Depends on` footers stay aligned.
+- **P0.17 — Drift-aware documentation.** Cross-reference footers in procedure docs; a `Maintenance Triggers` section in `docs/ai-procedures/index.md`; "Related AI procedures" back-link sections in high-impact policy docs (`doc-strategy-committing.md`, `doc-strategy-branching.md`, `doc-github.md`, `doc-strategy-project-management.md`); PR-template checklist with two items: (a) when `docs/ai-procedures/**` is touched — *"smoke-tested end-to-end with at least one assistant?"*; (b) when any of the four high-impact policy docs above is touched — *"if you changed referenced anchors or added rules with procedural implications, did you check the matching procedure docs?"* Appendix E defines how the trigger list and `Depends on` footers stay aligned.
 - **P0.18 — Human-review-of-diff checkpoint before `/ship` merges.** `/ship` confirms with the human ("Ready to merge PR #<N>? [Y/n]") before invoking `gh pr merge`, even when `/ship` opened the PR in the same run.
 
-### Out of scope for v1 (deferred to v1.1+ or later)
+#### Out of scope for v1 (deferred to v1.1+ or later)
 
 > **Tracking convention**: items marked **`[tracked: #TBD]`** should have a GitHub issue filed when v1 lands; replace `TBD` with the issue number once the issue exists. Use `grep TBD` to find every placeholder across this spec at once.
 
@@ -315,45 +363,9 @@ Slim traceability index. Each entry references the canonical source-of-truth sec
 
 > **Permanent non-goal** (not deferred): generated CI step that runs an AI agent on a draft PR (`claude -p`, `codex exec`, etc.). Per the non-goals list above.
 
-## Guardrails and edge cases
+### Phased rollout
 
-Cross-cutting safety items. Per-command details live with each command's step list.
-
-- **Refuse on `main`.** No commits, pushes, PR-open, or merge from `main`.
-- **Working-tree gate.** Before any `/pr` or `/ship` action, inspect uncommitted changes (W) and commits ahead of `main` (C); the four-quadrant outcome dictates the next step (see `/pr`'s Working-tree gate for the dispatch table).
-- **Schema change without expand-contract.** Refuse to bundle expand+contract in one PR. Procedural enforcement of an existing rule from `doc-strategy-committing.md`.
-- **Secret-bearing files: stop and ask.** `.env*` files, common secret-pattern matches, or unexpectedly large files trigger a pause; do not commit unless the human explicitly confirms it is safe.
-- **No `--no-verify`, no force-push, no force-merge, no admin bypass.** Period.
-- **No `--amend` without explicit human approval.** Preserves audit trail on hook failures and review iterations.
-- **No silent merge through advisory failures.** Advisory red, unavailable, or pending-after-bounded-wait states all hand off to the human via the Supervised-auto handoff.
-- **No GitHub-side auto-merge in v1.** `/pr` reports CI state and stops; `/ship` performs the merge directly when CI is green and the human has confirmed.
-- **Test-plan provenance.** Every line is grounded in commands the agent ran, verbatim human attestations, or one collapsed local-gate line — never invented.
-- **Resumability.** Re-running `/pr` or `/ship` inspects state and continues from there rather than duplicating PRs or commits. Idempotent on the same input.
-- **`gh` unavailability or auth gap.** If `gh` (or equivalent GitHub access) is unavailable or unauthenticated, stop with the missing capability and the manual alternative; do not pretend another tool exists, do not skip the GitHub-side step silently, do not invent statuses.
-- **Human review before `/ship` merges.** `/ship` confirms with the human before invoking `gh pr merge`, even when it opened the PR in the same run.
-- **Failure handoff.** Show the failing command, exit state, relevant URL, and the next safe options. Stay in the conversation.
-
-## Documentation and source-of-truth model
-
-- **`docs/ai-procedures/<name>.md`** = single source of truth for procedure logic.
-- **`docs/ai-procedures/index.md`** = discoverable map of canonical files, adapters, extension recipe, policy-doc references.
-- **`doc-strategy-committing.md` Conventions section** = single source of truth for branch / commit / PR / merge format rules. Procedure docs reference, never restate.
-- **Maintenance rule:** policy docs and procedure docs should stay linked but not duplicated. When a policy doc changes, update the related `docs/ai-procedures/*` file only if the change affects what an agent should do, ask, run, stop on, or report. Appendix F describes the creation and maintenance workflow.
-- **`AGENTS.md`** = cross-tool index, ≤30 lines. Points at `docs/ai-procedures/index.md`.
-- **`CLAUDE.md`** = Claude Code's index. Adds pointers to `AGENTS.md` and `docs/ai-procedures/index.md`. Collapses to a one-line pointer when Claude Code ships AGENTS.md support.
-- **`.github/copilot-instructions.md`** = (conditional) Copilot's index, points at AGENTS.md.
-
-### Discoverability
-
-For humans: a short "Working with AI assistants" section in `README.md` pointing at `docs/ai-procedures/index.md`. A `CONTRIBUTING.md` is not needed in v1.
-
-For agents: AGENTS.md and CLAUDE.md both point at the index, which lists every procedure doc with a one-sentence "use when" pointer. Procedure doc filenames are predictable (`commit.md`, `pr.md`, `ship.md`).
-
-### Drift detection
-
-The procedure docs maintain cross-reference footers to the policy docs and config they depend on; high-impact policy docs (`doc-strategy-committing.md`, `doc-strategy-branching.md`, `doc-github.md`, `doc-strategy-project-management.md`) include "Related AI procedures" back-links; the PR template flags both procedure-doc edits (with a smoke-test prompt) and high-impact policy-doc edits (with an anchor/rule check) so neither side of the dependency drifts unnoticed. A policy-doc change requires a procedure-doc update only when it changes agent behavior: what an agent should do, ask, run, stop on, or report. Heavier mechanisms (analysis scripts, scheduled monitors, CI lint of the procedure docs themselves) are deferred to v1.1+.
-
-## Phased rollout
+This rollout sequences risk down before scope. Phase 0 cheaply validates the adapter architecture, Phase 1a establishes the canonical procedure docs as the cross-tool source of truth, Phases 1b–3 layer per-tool adapters (Claude first, Codex second, Copilot last and conditional on OQ-1), and Phase 4 defers the long-tail to tracked tickets.
 
 **Phase 0 — Pre-implementation spike (recommended, optional).**
 
@@ -361,7 +373,7 @@ A throwaway smoke test that de-risks the architecture before Phase 1 commits to 
 
 **Phase 1a — Canonical docs and instruction indexes (one PR).**
 - `docs/ai-procedures/index.md` + `commit.md` + `pr.md` + `ship.md` with cross-reference footers.
-- `docs/ai-procedures/walkthroughs.md` (relocated from this spec's Appendix E for ongoing maintenance; the appendix becomes a stub pointer once the file lands). **[tracked: #TBD]**
+- `docs/ai-procedures/walkthroughs.md` (relocated from this spec's Appendix D for ongoing maintenance; the appendix becomes a stub pointer once the file lands). **[tracked: #TBD]**
 - `AGENTS.md` (root, ≤30 lines).
 - `CLAUDE.md` updates: pointer to `AGENTS.md` and `docs/ai-procedures/index.md`, fix the "run `npm test` before committing" line.
 - `doc-strategy-committing.md`, `doc-strategy-branching.md`, `doc-github.md`, `doc-strategy-project-management.md` — each gets a "Related AI procedures" back-link section.
@@ -398,7 +410,7 @@ Acceptance: a Copilot Chat IDE user dogfoods one PR end-to-end. The Copilot codi
 - Cursor / Aider shims. **[tracked: #TBD]**
 - Coverage delta tooling. **[tracked: #TBD]**
 
-### Why this phasing
+#### Why this phasing
 
 - Phase 1a is the load-bearing one — it establishes the source-of-truth model independently of any assistant. Reviewable as docs only.
 - Phase 1b is small (3 files) and dogfoodable independently.
@@ -406,7 +418,7 @@ Acceptance: a Copilot Chat IDE user dogfoods one PR end-to-end. The Copilot codi
 - Phase 3 may collapse to a one-line "verified" PR if `.agents/skills/` is sufficient.
 - The CLAUDE.md `npm test` reconciliation is bundled with Phase 1a to keep the human and AI guidance consistent from day one.
 
-## Acceptance criteria
+### Acceptance criteria
 
 For v1 to be considered shipped:
 
@@ -425,7 +437,7 @@ For v1 to be considered shipped:
 9. `/ship` confirms with the human ("Ready to merge PR #<N>? [Y/n]") before merging, even when it opened the PR in the same run.
 10. Commit text, PR text, AI attribution, advisory check failures, and ambiguous working-tree states all require explicit human review before the agent proceeds.
 
-## Open questions
+## 6. Open Questions
 
 | ID | Question | Blocking | Why | Mitigation / options | Recommendation |
 |---|---|---|---|---|---|
@@ -436,15 +448,16 @@ For v1 to be considered shipped:
 | **OQ-5** | Should `/pr --ship` (chained sequence) or `/pr --auto-merge` (opt-in flag) enter v1.1+? | Non-blocking; deferred. | Chaining or auto-merge increases convenience but combines the riskiest operations. The team can learn from separate `/pr` and `/ship` use first. | (a) Defer. Add later as a thin sequence only after both procedures are stable. (b) Require a clean state and passing required checks before any chained ship behavior. | Defer to v1.1+. |
 | **OQ-6** | Should `CODEOWNERS` require a second-pair-of-eyes review on `docs/ai-procedures/**`? | Non-blocking. Process choice. | Small team; CODEOWNERS may add friction without payoff. | (a) Add CODEOWNERS for `docs/ai-procedures/**`; (b) Trust normal PR review. | Defer. Small team; trust normal PR review + the PR-template smoke-test checklist. Revisit if a regression bites. |
 
-# Appendices
+## Appendices
 
-## Appendix A: Changelog
+### Appendix A: Changelog
 
-- **v1** (`docs/spec-portable-ai-procedures-v1.md`, preserved as reference) — initial unified spec synthesizing `docs/plan-portable-ai-procedures.md` and `docs/plan-ai-checkin-procedure.md` per the original mega-prompt brief.
-- **v2** (`docs/spec-portable-ai-procedures-v2.md`, preserved as reference) — incorporated 13 approved edits over v1 (E-1 through E-13), including adoption of Codex Skills as the cross-tool adapter format after alignment with a parallel Codex-authored spec, Phase 0 spike, and the empirically-grounded 5-minute `/ship` wait window with monthly drift-monitor workflow.
-- **v3 (this document)** — peer-review revision pass. Removed synthesis/revision-history framing from the main body; deferred the analysis script + monthly drift-monitor workflow and the inverse-pointer mechanism (JSON-comment problem); added explicit human-review-of-diff checkpoint to `/ship`; split former Phase 1 into Phase 1a (canonical docs + indexes) and Phase 1b (Claude adapter); softened secret-scan and issue-linkage language; sharpened AI-attribution ambiguity handling; consolidated duplicated requirement content; moved spike file content, worked PR #90 example, and verification sources into appendices; added Appendix E (developer walkthroughs) for team review of the workflow UX, with the long-term plan to migrate it to `docs/ai-procedures/walkthroughs.md` when Phase 1a ships.
+- **v1** (`docs/spec-portable-ai-procedures-v1.md`, reference) — initial unified spec from the two planning drafts.
+- **v2** (`docs/spec-portable-ai-procedures-v2.md`, reference) — incorporated approved design revisions, Codex Skills alignment, Phase 0 spike, and early `/ship` wait/drift ideas.
+- **v3** (`docs/spec-portable-ai-procedures-v3.md`, reference) — simplified scope after peer review; clarified `/ship`, CI, attribution, and docs-drift policies; split rollout phases; moved supporting material into appendices.
+- **v4 (this document)** — structure-only reorganization for readability: numbered body sections, unified appendices, appendix renumbering, updated cross-references, and a short rollout summary. No substantive design changes.
 
-## Appendix B: Phase 0 spike — file content and run procedure
+### Appendix B: Phase 0 spike — file content and run procedure
 
 A throwaway smoke test that de-risks the architecture before Phase 1a commits to it. Cost: ~15-30 minutes, ~30 lines across 4 files. Easily reverted.
 
@@ -493,7 +506,7 @@ Acceptance: at minimum, Claude Code passes (validates the indirection pattern + 
 
 Cleanup: the spike files are not part of v1 deliverables. Delete the three files (or merge + revert the spike branch) before Phase 1a lands. Capture the verification outcome in `docs/ai-procedures/index.md` or a brief devjournal entry.
 
-## Appendix C: Worked example — PR #90
+### Appendix C: Worked example — PR #90
 
 To validate the spec against real iteration, walk [PR #90](https://github.com/Intentional-Society/is-app/pull/90) (which added `--fix` to `check-env.mjs`, closing [#73](https://github.com/Intentional-Society/is-app/issues/73), with three commits: feature, CodeQL fix, wording polish):
 
@@ -503,28 +516,13 @@ To validate the spec against real iteration, walk [PR #90](https://github.com/In
 - **Commit 3 (self-review polish).** Same iteration shape. Human runs `/review` first (existing skill) to surface wording issues; the procedure composes cleanly. Final push, then `/ship` again — agent reconfirms before merging.
 - **If either advisory had been red, unavailable, or still pending past the 5-minute wait** (CodeQL not clearing, E2E flaking on cold start, etc.), `/ship` would have run the **Supervised-auto handoff** with proceed / abort / troubleshoot / wait-another-5 options instead of merging through. Even on "proceed," the human-review-of-diff checkpoint at step 7 still fires before merge.
 
-## Appendix D: Sources / verification
-
-Used during spec authoring:
-
-- Anthropic — [Claude Code slash commands](https://code.claude.com/docs/en/slash-commands), [Claude Code overview](https://code.claude.com/docs/en/overview), [Claude Code memory docs](https://code.claude.com/docs/en/memory), [issue #6235 (AGENTS.md support)](https://github.com/anthropics/claude-code/issues/6235).
-- OpenAI — [Codex AGENTS.md guide](https://developers.openai.com/codex/guides/agents-md), [Codex Skills](https://developers.openai.com/codex/skills), [Codex CLI slash commands](https://developers.openai.com/codex/cli/slash-commands), [Codex CLI reference](https://developers.openai.com/codex/cli/reference), [openai/codex docs/skills.md](https://github.com/openai/codex/blob/main/docs/skills.md).
-- GitHub — [Copilot coding agent supports AGENTS.md (Aug 2025)](https://github.blog/changelog/2025-08-28-copilot-coding-agent-now-supports-agents-md-custom-instructions/), [Copilot prompt files](https://docs.github.com/en/copilot/tutorials/customization-library/prompt-files), [Copilot custom instructions](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot), [Copilot custom-instructions support matrix](https://docs.github.com/en/copilot/reference/custom-instructions-support).
-- Microsoft — [VS Code custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions), [VS Code Agent Skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills).
-- GitHub CLI — [`gh pr create`](https://cli.github.com/manual/gh_pr_create), [`gh pr checks`](https://cli.github.com/manual/gh_pr_checks), [`gh pr merge`](https://cli.github.com/manual/gh_pr_merge).
-- [agents.md cross-tool standard](https://agents.md/).
-- Repo — `CLAUDE.md`, `docs/doc-strategy-committing.md`, `docs/doc-strategy-branching.md`, `docs/doc-github.md`, `docs/doc-strategy-project-management.md`, `.github/workflows/ci.yml`, `.github/workflows/ci-docs-skip.yml`, `.github/workflows/e2e.yml`, `vercel.json`, `package.json`, `scripts/update-main-branch-protection.mjs`.
-- Issue thread — [#62](https://github.com/Intentional-Society/is-app/issues/62) and comments [4320013457](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4320013457), [4374728362](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4374728362).
-- Reference drafts (preserved as input artifacts, superseded by this spec) — `docs/plan-ai-checkin-procedure.md`, `docs/plan-portable-ai-procedures.md`, `docs/spec-portable-ai-procedures-v1.md`, `docs/spec-portable-ai-procedures-v2.md`.
-- Empirical analysis — recent 100 `ci.yml` and 100 `e2e.yml` runs from `Intentional-Society/is-app`, paired by SHA on 2026-05-06; underpins the 5-minute `/ship` wait-window default.
-
-## Appendix E: Developer walkthroughs
+### Appendix D: Developer walkthroughs
 
 These are illustrative dialogues — what using `/commit`, `/pr`, and `/ship` looks like from a developer's chair. They are not normative; the canonical behavior lives in the procedure step-lists above. Use these for team review of the developer experience.
 
 When Phase 1a lands, this content moves to `docs/ai-procedures/walkthroughs.md` alongside the procedure docs themselves; this appendix becomes a stub pointer. **[tracked: #TBD]** (same placeholder as Phase 1a's `walkthroughs.md` deliverable).
 
-### W-1: Happy path — `/commit` then `/ship` end-to-end
+#### D-1: Happy path — `/commit` then `/ship` end-to-end
 
 Branch `add-keyword-filter-to-members-list`, four files modified including a new test file. Working tree dirty; no commits yet.
 
@@ -576,7 +574,7 @@ Agent: Merged 9c4f8d1 → main. Tidied local branch (deleted, switched to main,
   pulled). Vercel deploy: <url>.
 ```
 
-### W-2: Dirty tree on `/pr` — W × C ambiguity
+#### D-2: Dirty tree on `/pr` — W × C ambiguity
 
 Branch already has 2 commits; dev has uncommitted edits to an unrelated logging tweak.
 
@@ -602,7 +600,7 @@ Agent: Proceeding with the 2 existing commits. Pushed. Opened PR #146; required
   Note: your stashed-or-uncommitted log changes are still in the working tree.
 ```
 
-### W-3: Schema touch on `/commit`
+#### D-3: Schema touch on `/commit`
 
 Dev modified `src/server/schema.ts` to add a `last_active_at` column on `profiles`.
 
@@ -634,7 +632,7 @@ Dev: no issue, just commit
 Agent: Committed 4b2e9a1.
 ```
 
-### W-4: Bugfix without regression test
+#### D-4: Bugfix without regression test
 
 Dev wrote a one-line fix to `src/lib/api.ts` to handle a null case.
 
@@ -661,7 +659,7 @@ Agent: The fix handles `getProfileForSelf` returning undefined when the user
   Run it locally? Should fail before your fix and pass after.
 ```
 
-### W-5: Advisory pending past 5 min on `/ship`
+#### D-5: Advisory pending past 5 min on `/ship`
 
 Dev pushed a commit to an open PR; required check is green but the Vercel preview is cold-starting.
 
@@ -694,7 +692,7 @@ Dev: Y
 Agent: Merged 5d8c2f4 → main. Tidied local branch.
 ```
 
-### W-6: Refusal cases
+#### D-6: Refusal cases
 
 Two compact examples of the agent refusing safely.
 
@@ -725,13 +723,13 @@ Agent: Stopping: gh is not authenticated (`gh auth status` reports no token).
   Re-run /pr after `gh auth login` if you want me to take it from here.
 ```
 
-## Appendix F: Creating and Maintaining AI Procedure Docs
+### Appendix E: Creating and Maintaining AI Procedure Docs
 
 The AI procedure docs are agent-facing runbooks. They translate existing repo policy into step-by-step behavior for `/commit`, `/pr`, and `/ship`.
 
 They do not replace the policy docs, and they should not duplicate long policy explanations.
 
-### M-1: Initial creation
+#### E-1: Initial creation
 
 Create each procedure doc by reading the relevant repo policy docs and converting only the agent-actionable parts into steps.
 
@@ -760,7 +758,7 @@ Do not include:
 - Speculative future-agent behavior.
 - Unrelated governance rules.
 
-### M-2: Ongoing maintenance
+#### E-2: Ongoing maintenance
 
 Policy docs remain the source of truth for rationale and repo conventions. Procedure docs are updated only when a change affects agent behavior.
 
@@ -787,7 +785,7 @@ Examples:
 | Change expand-contract safety rule | Yes | `/commit` and `/pr` schema guardrails change. |
 | Rename a policy heading linked from a procedure footer | Yes | Cross-reference links need repair. |
 
-### M-3: Maintenance triggers
+#### E-3: Maintenance triggers
 
 `docs/ai-procedures/index.md` should include a `Maintenance Triggers` section.
 
@@ -815,7 +813,7 @@ If these files change, check whether `/commit`, `/pr`, or `/ship` behavior chang
 
 This is a reminder list, not a hard enforcement system.
 
-### M-4: Keeping the trigger list current
+#### E-4: Keeping the trigger list current
 
 Each procedure doc should end with a short `Depends on` footer.
 
@@ -839,7 +837,7 @@ When editing any `docs/ai-procedures/*.md` file:
 - Prefer specific files over broad globs.
 - Do not add noisy triggers that rarely affect agent behavior.
 
-### M-5: How agents should help
+#### E-5: How agents should help
 
 Agents should provide lightweight nudges during normal work.
 
@@ -865,7 +863,7 @@ This procedure no longer depends on `<file>`. Should I check whether it can be r
 
 These are prompts, not automatic edits. The human decides.
 
-### M-6: Human review reminders
+#### E-6: Human review reminders
 
 The PR template should include one lightweight reminder:
 
@@ -875,7 +873,7 @@ The PR template should include one lightweight reminder:
 
 No CI enforcement is required in v1.
 
-### M-7: Anti-patterns
+#### E-7: Anti-patterns
 
 Avoid these maintenance patterns:
 
@@ -889,3 +887,18 @@ Avoid these maintenance patterns:
 The desired maintenance burden is one extra review question:
 
 > Did this change alter what the AI procedure should do?
+
+### Appendix F: Sources / verification
+
+Used during spec authoring:
+
+- Anthropic — [Claude Code slash commands](https://code.claude.com/docs/en/slash-commands), [Claude Code overview](https://code.claude.com/docs/en/overview), [Claude Code memory docs](https://code.claude.com/docs/en/memory), [issue #6235 (AGENTS.md support)](https://github.com/anthropics/claude-code/issues/6235).
+- OpenAI — [Codex AGENTS.md guide](https://developers.openai.com/codex/guides/agents-md), [Codex Skills](https://developers.openai.com/codex/skills), [Codex CLI slash commands](https://developers.openai.com/codex/cli/slash-commands), [Codex CLI reference](https://developers.openai.com/codex/cli/reference), [openai/codex docs/skills.md](https://github.com/openai/codex/blob/main/docs/skills.md).
+- GitHub — [Copilot coding agent supports AGENTS.md (Aug 2025)](https://github.blog/changelog/2025-08-28-copilot-coding-agent-now-supports-agents-md-custom-instructions/), [Copilot prompt files](https://docs.github.com/en/copilot/tutorials/customization-library/prompt-files), [Copilot custom instructions](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot), [Copilot custom-instructions support matrix](https://docs.github.com/en/copilot/reference/custom-instructions-support).
+- Microsoft — [VS Code custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions), [VS Code Agent Skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills).
+- GitHub CLI — [`gh pr create`](https://cli.github.com/manual/gh_pr_create), [`gh pr checks`](https://cli.github.com/manual/gh_pr_checks), [`gh pr merge`](https://cli.github.com/manual/gh_pr_merge).
+- [agents.md cross-tool standard](https://agents.md/).
+- Repo — `CLAUDE.md`, `docs/doc-strategy-committing.md`, `docs/doc-strategy-branching.md`, `docs/doc-github.md`, `docs/doc-strategy-project-management.md`, `.github/workflows/ci.yml`, `.github/workflows/ci-docs-skip.yml`, `.github/workflows/e2e.yml`, `vercel.json`, `package.json`, `scripts/update-main-branch-protection.mjs`.
+- Issue thread — [#62](https://github.com/Intentional-Society/is-app/issues/62) and comments [4320013457](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4320013457), [4374728362](https://github.com/Intentional-Society/is-app/issues/62#issuecomment-4374728362).
+- Reference drafts (preserved as input artifacts, superseded by this spec) — `docs/plan-ai-checkin-procedure.md`, `docs/plan-portable-ai-procedures.md`, `docs/spec-portable-ai-procedures-v1.md`, `docs/spec-portable-ai-procedures-v2.md`.
+- Empirical analysis — recent 100 `ci.yml` and 100 `e2e.yml` runs from `Intentional-Society/is-app`, paired by SHA on 2026-05-06; underpins the 5-minute `/ship` wait-window default.
