@@ -4,13 +4,7 @@ import { log } from "next-axiom";
 
 import { type ApiVariables, requireAuth } from "./auth-middleware";
 import { db } from "./db";
-import {
-  checkInvite,
-  createInvite,
-  getInvitesForCreator,
-  revokeInvite,
-  validateNote,
-} from "./invites";
+import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
   getProfileForMember,
   getProfileForSelf,
@@ -79,9 +73,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
     if (Object.keys(parsed).length > 0) {
       const update = {
         ...parsed,
-        ...(parsed.displayName !== undefined
-          ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null }
-          : {}),
+        ...(parsed.displayName !== undefined ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null } : {}),
       };
       await db.update(profiles).set(update).where(eq(profiles.id, user.id));
     }
@@ -109,10 +101,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
 
     const result = await createInvite({ createdBy: user.id, note: noteCheck });
     if ("error" in result) {
-      return c.json(
-        { error: "too_many_active_invites", limit: result.limit },
-        429,
-      );
+      return c.json({ error: "too_many_active_invites", limit: result.limit }, 429);
     }
     return c.json(result, 201);
   })
@@ -125,10 +114,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const user = c.get("user");
     const code = c.req.param("code");
 
-    const [row] = await db
-      .select({ isAdmin: profiles.isAdmin })
-      .from(profiles)
-      .where(eq(profiles.id, user.id));
+    const [row] = await db.select({ isAdmin: profiles.isAdmin }).from(profiles).where(eq(profiles.id, user.id));
     const isAdmin = row?.isAdmin ?? false;
 
     const result = await revokeInvite({ code, userId: user.id, isAdmin });

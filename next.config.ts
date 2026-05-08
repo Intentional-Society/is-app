@@ -6,9 +6,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 // 'unsafe-eval' is needed by React Refresh under `next dev`. Production Next 15
 // does not need it, so we keep it out of the production policy.
-const scriptSrc = isProd
-  ? "script-src 'self' 'unsafe-inline'"
-  : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+const scriptSrc = isProd ? "script-src 'self' 'unsafe-inline'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
 
 // Local Supabase (started by `npm run dev`) runs at http://127.0.0.1:54321.
 // The browser auth client and AuthProvider token refresh call it directly, so

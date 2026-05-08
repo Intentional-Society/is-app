@@ -34,9 +34,7 @@ try {
 } catch (err) {
   if (err.code !== "ENOENT") throw err;
   console.error("check-env: .env.local.example is missing from the repo.");
-  console.error(
-    "  This file is the canonical list of env keys and should be committed.",
-  );
+  console.error("  This file is the canonical list of env keys and should be committed.");
   process.exit(1);
 }
 
@@ -61,8 +59,7 @@ if (missing.length > 0) {
       const m = line.match(KEY_LINE);
       return m && missingSet.has(m[1]);
     });
-    const needsLeadingNewline =
-      localContents.length > 0 && !localContents.endsWith("\n");
+    const needsLeadingNewline = localContents.length > 0 && !localContents.endsWith("\n");
     const today = new Date().toISOString().slice(0, 10);
     const block =
       (needsLeadingNewline ? "\n" : "") +
@@ -70,24 +67,16 @@ if (missing.length > 0) {
       linesToAppend.join("\n") +
       "\n";
     appendFileSync(localPath, block);
-    process.stdout.write(
-      `check-env --fix: appended ${missing.length} key(s) to .env.local:\n`,
-    );
+    process.stdout.write(`check-env --fix: appended ${missing.length} key(s) to .env.local:\n`);
     for (const key of missing) process.stdout.write(`  + ${key}\n`);
     process.exit(0);
   }
 
-  console.error(
-    `check-env: .env.local is missing ${missing.length} key(s) declared in .env.local.example:`,
-  );
+  console.error(`check-env: .env.local is missing ${missing.length} key(s) declared in .env.local.example:`);
   for (const key of missing) console.error(`  - ${key}`);
-  console.error(
-    "  Fix: run `node scripts/check-env.mjs --fix` to append them from .env.local.example",
-  );
+  console.error("  Fix: run `node scripts/check-env.mjs --fix` to append them from .env.local.example");
   console.error("       (existing values are preserved).");
-  console.error(
-    "       Or to start fresh (wipes local customizations): delete .env.local",
-  );
+  console.error("       Or to start fresh (wipes local customizations): delete .env.local");
   console.error("       and run `npm run setup`.");
   process.exit(1);
 }

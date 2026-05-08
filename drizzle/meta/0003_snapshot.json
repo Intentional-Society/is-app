@@ -34,12 +34,8 @@
           "name": "invite_hints_invite_id_invites_id_fk",
           "tableFrom": "invite_hints",
           "tableTo": "invites",
-          "columnsFrom": [
-            "invite_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invite_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -47,12 +43,8 @@
           "name": "invite_hints_ratee_id_profiles_id_fk",
           "tableFrom": "invite_hints",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "ratee_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ratee_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -60,10 +52,7 @@
       "compositePrimaryKeys": {
         "invite_hints_invite_id_ratee_id_pk": {
           "name": "invite_hints_invite_id_ratee_id_pk",
-          "columns": [
-            "invite_id",
-            "ratee_id"
-          ]
+          "columns": ["invite_id", "ratee_id"]
         }
       },
       "uniqueConstraints": {},
@@ -144,12 +133,8 @@
           "name": "invites_created_by_profiles_id_fk",
           "tableFrom": "invites",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -157,12 +142,8 @@
           "name": "invites_redeemed_by_profiles_id_fk",
           "tableFrom": "invites",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "redeemed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["redeemed_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -172,9 +153,7 @@
         "invites_code_unique": {
           "name": "invites_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code"
-          ]
+          "columns": ["code"]
         }
       },
       "policies": {},
@@ -224,12 +203,8 @@
           "name": "profile_programs_profile_id_profiles_id_fk",
           "tableFrom": "profile_programs",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -237,12 +212,8 @@
           "name": "profile_programs_program_id_programs_id_fk",
           "tableFrom": "profile_programs",
           "tableTo": "programs",
-          "columnsFrom": [
-            "program_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["program_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -250,10 +221,7 @@
       "compositePrimaryKeys": {
         "profile_programs_profile_id_program_id_pk": {
           "name": "profile_programs_profile_id_program_id_pk",
-          "columns": [
-            "profile_id",
-            "program_id"
-          ]
+          "columns": ["profile_id", "program_id"]
         }
       },
       "uniqueConstraints": {},
@@ -367,12 +335,8 @@
           "tableFrom": "profiles",
           "tableTo": "users",
           "schemaTo": "auth",
-          "columnsFrom": [
-            "id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -380,12 +344,8 @@
           "name": "profiles_referred_by_profiles_id_fk",
           "tableFrom": "profiles",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "referred_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["referred_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -440,9 +400,7 @@
         "programs_slug_unique": {
           "name": "programs_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -505,12 +463,8 @@
           "name": "relations_rater_id_profiles_id_fk",
           "tableFrom": "relations",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "rater_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["rater_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -518,12 +472,8 @@
           "name": "relations_ratee_id_profiles_id_fk",
           "tableFrom": "relations",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "ratee_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ratee_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -531,12 +481,8 @@
           "name": "relations_hinted_by_profiles_id_fk",
           "tableFrom": "relations",
           "tableTo": "profiles",
-          "columnsFrom": [
-            "hinted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hinted_by"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -544,10 +490,7 @@
       "compositePrimaryKeys": {
         "relations_rater_id_ratee_id_pk": {
           "name": "relations_rater_id_ratee_id_pk",
-          "columns": [
-            "rater_id",
-            "ratee_id"
-          ]
+          "columns": ["rater_id", "ratee_id"]
         }
       },
       "uniqueConstraints": {},

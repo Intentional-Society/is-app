@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-07 | James | Turn on the Biome formatter
+
+Style: 120 width, 2-space, double quotes (JS + JSX), arrow parens always, trailing commas all, semis always. One-shot reformat across 69 files.
+
 ## 2026-05-07 | James | Replace ESLint with Biome
 
 Why? `npm run lint` performance goes from 49 s → 0.9 s.

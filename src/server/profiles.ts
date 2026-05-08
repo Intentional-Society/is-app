@@ -29,19 +29,15 @@ export type EditableProfileInput = Partial<{
   liveDesire: string | null;
 }>;
 
-const isNullableString = (v: unknown): v is string | null =>
-  v === null || typeof v === "string";
+const isNullableString = (v: unknown): v is string | null => v === null || typeof v === "string";
 
-const isStringArray = (v: unknown): v is string[] =>
-  Array.isArray(v) && v.every((s) => typeof s === "string");
+const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === "string");
 
 // Returns the sanitized update payload, or a string describing the
 // first validation failure. Unknown keys are treated as failures to
 // protect fields like isAdmin / referredBy from being set via the
 // editable endpoint.
-export const parseEditableProfile = (
-  body: unknown,
-): EditableProfileInput | { error: string } => {
+export const parseEditableProfile = (body: unknown): EditableProfileInput | { error: string } => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "body must be a JSON object" };
   }
@@ -81,14 +77,10 @@ export const toSlug = (displayName: string): string =>
     .replace(/^-|-$/g, "");
 
 export const upsertProfile = async (user: User) => {
-  const displayName =
-    (user.user_metadata?.displayName as string | undefined) ?? null;
+  const displayName = (user.user_metadata?.displayName as string | undefined) ?? null;
   const slug = displayName ? toSlug(displayName) : null;
 
-  await db
-    .insert(profiles)
-    .values({ id: user.id, displayName, slug })
-    .onConflictDoNothing({ target: profiles.id });
+  await db.insert(profiles).values({ id: user.id, displayName, slug }).onConflictDoNothing({ target: profiles.id });
 };
 
 export type ProfileForSelf = {
@@ -114,9 +106,7 @@ export type ProfileForSelf = {
 // every signed-in render — enough to push Vercel-preview cold-starts
 // past e2e's 10s waitForURL budget. cache() keys on the arg tuple, so
 // only co-located callers with the same userId share the result.
-export const getProfileForSelf = cache(async (
-  userId: string,
-): Promise<ProfileForSelf | null> => {
+export const getProfileForSelf = cache(async (userId: string): Promise<ProfileForSelf | null> => {
   const [row] = await db
     .select({
       id: profiles.id,
@@ -153,15 +143,12 @@ export type ProfileForMember = {
   createdAt: Date;
 };
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Accepts either a UUID or a slug so /members/aria-chen and
 // /members/<uuid> both work. UUID-shaped strings go straight to the id
 // column; anything else is treated as a slug lookup.
-export const getProfileForMember = async (
-  idOrSlug: string,
-): Promise<ProfileForMember | null> => {
+export const getProfileForMember = async (idOrSlug: string): Promise<ProfileForMember | null> => {
   const where = UUID_RE.test(idOrSlug)
     ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
     : eq(profiles.slug, idOrSlug);

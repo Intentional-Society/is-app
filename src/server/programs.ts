@@ -20,9 +20,7 @@ export type ProgramWithMembership = {
 // fine for a small number of programs. If the programs table grows
 // significantly, refactor to LEFT JOIN + GROUP BY with a conditional
 // aggregate for the current user's assigned_at.
-export const listPrograms = async (
-  userId: string,
-): Promise<ProgramWithMembership[]> => {
+export const listPrograms = async (userId: string): Promise<ProgramWithMembership[]> => {
   const rows = await db
     .select({
       id: programs.id,
@@ -53,16 +51,10 @@ export const listPrograms = async (
 // the FK from profile_programs.profile_id → profiles.id would throw
 // if a session exists but the profile upsert in /auth/callback failed.
 const ensureProfile = async (userId: string): Promise<void> => {
-  const [existing] = await db
-    .select({ id: profiles.id })
-    .from(profiles)
-    .where(eq(profiles.id, userId));
+  const [existing] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, userId));
 
   if (!existing) {
-    await db
-      .insert(profiles)
-      .values({ id: userId })
-      .onConflictDoNothing();
+    await db.insert(profiles).values({ id: userId }).onConflictDoNothing();
   }
 };
 
@@ -73,10 +65,7 @@ export const joinProgram = async (
   if (!isValidUuid(programId)) return { error: "not_found" };
 
   // Verify program exists
-  const [program] = await db
-    .select({ id: programs.id })
-    .from(programs)
-    .where(eq(programs.id, programId));
+  const [program] = await db.select({ id: programs.id }).from(programs).where(eq(programs.id, programId));
 
   if (!program) return { error: "not_found" };
 
@@ -103,12 +92,7 @@ export const leaveProgram = async (
 
   const result = await db
     .delete(profilePrograms)
-    .where(
-      and(
-        eq(profilePrograms.profileId, userId),
-        eq(profilePrograms.programId, programId),
-      ),
-    )
+    .where(and(eq(profilePrograms.profileId, userId), eq(profilePrograms.programId, programId)))
     .returning({ profileId: profilePrograms.profileId });
 
   if (result.length === 0) return { error: "not_found" };

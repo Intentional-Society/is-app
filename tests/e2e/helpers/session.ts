@@ -13,8 +13,7 @@ const EMAILS: Record<TestRole, string> = {
 };
 
 const passwordFor = (role: TestRole): string => {
-  const envVar =
-    role === "admin" ? "E2E_ADMIN_PASSWORD" : "E2E_REGULAR_PASSWORD";
+  const envVar = role === "admin" ? "E2E_ADMIN_PASSWORD" : "E2E_REGULAR_PASSWORD";
   const value = process.env[envVar];
   if (!value) {
     throw new Error(
@@ -31,10 +30,7 @@ export type TestUser = { role: TestRole; email: string };
 // production sign-in path avoids a parallel "set the cookies directly"
 // implementation that would drift from how sessions actually get
 // established.
-export const signInAs = async (
-  page: Page,
-  role: TestRole,
-): Promise<TestUser> => {
+export const signInAs = async (page: Page, role: TestRole): Promise<TestUser> => {
   const email = EMAILS[role];
   await page.goto("/signin");
   await page.getByLabel("Email").fill(email);
@@ -54,17 +50,12 @@ export const expectAuthed = async (page: Page): Promise<void> => {
 
 // After reset, bio is null and `/` redirects to `/welcome`. Tests that
 // want to land on `/` (e.g. to navigate to /invites) call this to fill the form.
-export const completeWelcome = async (
-  page: Page,
-  opts: { displayName?: string; bio?: string } = {},
-): Promise<void> => {
+export const completeWelcome = async (page: Page, opts: { displayName?: string; bio?: string } = {}): Promise<void> => {
   await page.waitForURL((url) => url.pathname === "/welcome", {
     timeout: 10_000,
   });
   await page.getByLabel("Display name").fill(opts.displayName ?? "E2E User");
-  await page
-    .getByLabel("Bio")
-    .fill(opts.bio ?? "Short bio to clear the welcome redirect.");
+  await page.getByLabel("Bio").fill(opts.bio ?? "Short bio to clear the welcome redirect.");
   await page.getByRole("button", { name: "Save" }).click();
   await page.waitForURL((url) => url.pathname === "/", { timeout: 10_000 });
 };
@@ -85,8 +76,6 @@ export const resetSeededUsers = async (baseURL: string): Promise<void> => {
     headers: { "x-ci-reset-token": token },
   });
   if (!res.ok) {
-    throw new Error(
-      `reset endpoint returned ${res.status}: ${await res.text().catch(() => "")}`,
-    );
+    throw new Error(`reset endpoint returned ${res.status}: ${await res.text().catch(() => "")}`);
   }
 };

@@ -35,11 +35,7 @@ const generateInviteCode = (): string => {
   return out;
 };
 
-const deriveStatus = (row: {
-  redeemedAt: Date | null;
-  revokedAt: Date | null;
-  expiresAt: Date;
-}): InviteStatus => {
+const deriveStatus = (row: { redeemedAt: Date | null; revokedAt: Date | null; expiresAt: Date }): InviteStatus => {
   if (row.redeemedAt) return "redeemed";
   if (row.revokedAt) return "revoked";
   if (row.expiresAt.getTime() <= Date.now()) return "expired";
@@ -55,9 +51,7 @@ export const validateNote = (note: unknown): string | { error: string } => {
   return trimmed;
 };
 
-export const countActiveInvitesForCreator = async (
-  createdBy: string,
-): Promise<number> => {
+export const countActiveInvitesForCreator = async (createdBy: string): Promise<number> => {
   const [row] = await db
     .select({ c: count() })
     .from(invites)
@@ -76,10 +70,7 @@ export type CreateInviteResult =
   | { code: string; note: string; expiresAt: Date }
   | { error: "too_many_active"; limit: number };
 
-export const createInvite = async (params: {
-  createdBy: string;
-  note: string;
-}): Promise<CreateInviteResult> => {
+export const createInvite = async (params: { createdBy: string; note: string }): Promise<CreateInviteResult> => {
   const active = await countActiveInvitesForCreator(params.createdBy);
   if (active >= MAX_ACTIVE_INVITES_PER_USER) {
     return { error: "too_many_active", limit: MAX_ACTIVE_INVITES_PER_USER };
@@ -116,9 +107,7 @@ export const createInvite = async (params: {
   throw new Error("createInvite: exhausted code-generation retries");
 };
 
-export const getInvitesForCreator = async (
-  createdBy: string,
-): Promise<InviteForCreator[]> => {
+export const getInvitesForCreator = async (createdBy: string): Promise<InviteForCreator[]> => {
   const rows = await db
     .select({
       code: invites.code,
@@ -135,9 +124,7 @@ export const getInvitesForCreator = async (
   return rows.map((r) => ({ ...r, status: deriveStatus(r) }));
 };
 
-export type RevokeInviteResult =
-  | { ok: true }
-  | { error: "not_found" | "forbidden" | "already_redeemed" };
+export type RevokeInviteResult = { ok: true } | { error: "not_found" | "forbidden" | "already_redeemed" };
 
 export const revokeInvite = async (params: {
   code: string;
@@ -160,26 +147,18 @@ export const revokeInvite = async (params: {
   if (row.redeemedAt) return { error: "already_redeemed" };
   if (row.revokedAt) return { ok: true }; // Idempotent.
 
-  await db
-    .update(invites)
-    .set({ revokedAt: sql`now()` })
-    .where(eq(invites.code, params.code));
+  await db.update(invites).set({ revokedAt: sql`now()` }).where(eq(invites.code, params.code));
   return { ok: true };
 };
 
-export type RedeemInviteResult =
-  | { ok: true; inviterId: string | null }
-  | { error: "invalid" };
+export type RedeemInviteResult = { ok: true; inviterId: string | null } | { error: "invalid" };
 
 // Atomic redemption. Returns the inviter id so the caller can stamp
 // referredBy on the new profile row. A single UPDATE...WHERE guarded
 // by the unredeemed/unrevoked/unexpired predicates plus Postgres row
 // locking means concurrent callers see exactly one success — no need
 // for an explicit transaction here.
-export const redeemInvite = async (params: {
-  code: string;
-  userId: string;
-}): Promise<RedeemInviteResult> => {
+export const redeemInvite = async (params: { code: string; userId: string }): Promise<RedeemInviteResult> => {
   const rows = await db
     .update(invites)
     .set({ redeemedBy: params.userId, redeemedAt: sql`now()` })
@@ -201,9 +180,7 @@ export type CheckInviteResult =
   | { valid: true; note: string }
   | { valid: false; reason: "not_found" | "revoked" | "expired" | "redeemed" };
 
-export const checkInvite = async (
-  code: string,
-): Promise<CheckInviteResult> => {
+export const checkInvite = async (code: string): Promise<CheckInviteResult> => {
   const [row] = await db
     .select({
       note: invites.note,
@@ -222,4 +199,3 @@ export const checkInvite = async (
   }
   return { valid: true, note: row.note };
 };
-

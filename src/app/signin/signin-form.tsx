@@ -60,11 +60,7 @@ function SentView({ email, origin }: { email: string; origin: string }) {
           disabled={!canResend}
           className="text-base text-muted-foreground underline disabled:no-underline disabled:opacity-50"
         >
-          {sending
-            ? "Resending…"
-            : secondsLeft > 0
-              ? `Resend in ${secondsLeft}s`
-              : "Resend email"}
+          {sending ? "Resending…" : secondsLeft > 0 ? `Resend in ${secondsLeft}s` : "Resend email"}
         </button>
       )}
     </div>
@@ -135,16 +131,11 @@ export function SigninForm() {
   };
 
   if (state.status === "sent") {
-    return (
-      <SentView email={state.email} origin={window.location.origin} />
-    );
+    return <SentView email={state.email} origin={window.location.origin} />;
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex w-full max-w-sm flex-col gap-3"
-    >
+    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-3">
       <Label htmlFor="email">Email</Label>
       <Input
         id="email"
@@ -165,10 +156,7 @@ export function SigninForm() {
         onChange={(event) => setPassword(event.target.value)}
         disabled={state.status === "submitting"}
       />
-      <Button
-        type="submit"
-        disabled={state.status === "submitting"}
-      >
+      <Button type="submit" disabled={state.status === "submitting"}>
         {state.status === "submitting"
           ? password.length > 0
             ? "Signing in…"

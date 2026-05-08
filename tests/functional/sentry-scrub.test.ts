@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { scrubClientEvent, scrubServerEvent } from "@/lib/sentry-scrub";
 
-const makeEvent = (request: ErrorEvent["request"]): ErrorEvent =>
-  ({ request }) as ErrorEvent;
+const makeEvent = (request: ErrorEvent["request"]): ErrorEvent => ({ request }) as ErrorEvent;
 
 describe("scrubClientEvent", () => {
   it("strips the query string from /auth/callback URLs", () => {

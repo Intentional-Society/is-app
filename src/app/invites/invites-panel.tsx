@@ -18,10 +18,7 @@ type InviteRow = {
   status: "active" | "redeemed" | "revoked" | "expired";
 };
 
-type PanelState =
-  | { kind: "idle" }
-  | { kind: "creating" }
-  | { kind: "error"; message: string };
+type PanelState = { kind: "idle" } | { kind: "creating" } | { kind: "error"; message: string };
 
 export function InvitesPanel() {
   const [rows, setRows] = useState<InviteRow[] | null>(null);
@@ -131,9 +128,7 @@ export function InvitesPanel() {
         Invite a member
       </h2>
       <form onSubmit={create} className="flex flex-col gap-2">
-        <Label htmlFor="invite-note">
-          Note (for your records and theirs — who are you inviting?)
-        </Label>
+        <Label htmlFor="invite-note">Note (for your records and theirs — who are you inviting?)</Label>
         <Textarea
           id="invite-note"
           required
@@ -143,11 +138,7 @@ export function InvitesPanel() {
           onChange={(event) => setNote(event.target.value)}
           disabled={state.kind === "creating"}
         />
-        <Button
-          type="submit"
-          disabled={state.kind === "creating"}
-          className="self-start"
-        >
+        <Button type="submit" disabled={state.kind === "creating"} className="self-start">
           {state.kind === "creating" ? "Creating…" : "Create invite"}
         </Button>
         {state.kind === "error" && (
@@ -158,9 +149,7 @@ export function InvitesPanel() {
       </form>
 
       <div>
-        <h3 className="mb-2 text-base font-semibold uppercase tracking-wide text-muted-foreground">
-          My invites
-        </h3>
+        <h3 className="mb-2 text-base font-semibold uppercase tracking-wide text-muted-foreground">My invites</h3>
         {rows === null ? (
           <p className="text-base text-muted-foreground">Loading…</p>
         ) : rows.length === 0 ? (
@@ -168,36 +157,23 @@ export function InvitesPanel() {
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((row) => (
-              <li
-                key={row.code}
-                className="flex flex-col gap-1 rounded border border-border p-3 text-base"
-              >
+              <li key={row.code} className="flex flex-col gap-1 rounded border border-border p-3 text-base">
                 <div className="flex items-center gap-3">
                   <code className="font-mono text-base">{row.code}</code>
                   <StatusBadge status={row.status} />
                   {row.status === "active" && (
                     <>
-                      <Button
-                        size="xs"
-                        className="ml-auto"
-                        onClick={() => copy(row.code)}
-                      >
+                      <Button size="xs" className="ml-auto" onClick={() => copy(row.code)}>
                         {copiedCode === row.code ? "Copied" : "Copy"}
                       </Button>
-                      <Button
-                        variant="destructive"
-                        size="xs"
-                        onClick={() => revoke(row.code)}
-                      >
+                      <Button variant="destructive" size="xs" onClick={() => revoke(row.code)}>
                         Revoke
                       </Button>
                     </>
                   )}
                 </div>
                 <p className="text-foreground">{row.note}</p>
-                <p className="text-sm text-muted-foreground">
-                  Expires {formatDate(row.expiresAt)}
-                </p>
+                <p className="text-sm text-muted-foreground">Expires {formatDate(row.expiresAt)}</p>
               </li>
             ))}
           </ul>
@@ -214,11 +190,7 @@ function StatusBadge({ status }: { status: InviteRow["status"] }) {
     revoked: "text-muted-foreground",
     expired: "text-muted-foreground",
   };
-  return (
-    <span className={`text-sm font-semibold uppercase tracking-wide ${tone[status]}`}>
-      {status}
-    </span>
-  );
+  return <span className={`text-sm font-semibold uppercase tracking-wide ${tone[status]}`}>{status}</span>;
 }
 
 function formatDate(iso: string) {
@@ -236,7 +208,5 @@ function formatDate(iso: string) {
 function confirmRevoke(): boolean {
   // Intentionally a simple browser confirm — a real modal isn't worth
   // the weight for a low-frequency destructive action in a small app.
-  return window.confirm(
-    "Revoke this invite? The link will stop working immediately.",
-  );
+  return window.confirm("Revoke this invite? The link will stop working immediately.");
 }

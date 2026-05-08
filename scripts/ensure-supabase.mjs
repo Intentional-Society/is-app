@@ -56,15 +56,9 @@ const clearDanglingSupabaseContainers = () => {
   // not regex, so earlier attempts at `supabase_.*_${PROJECT_ID}$` matched
   // nothing and recovery silently no-op'd. List all containers and match
   // names in JS instead.
-  const list = spawnSync(
-    "docker",
-    ["ps", "-a", "--format", "{{.Names}}"],
-    { shell: true, encoding: "utf8" },
-  );
+  const list = spawnSync("docker", ["ps", "-a", "--format", "{{.Names}}"], { shell: true, encoding: "utf8" });
   if (list.status !== 0) {
-    process.stderr.write(
-      `docker ps failed (exit ${list.status}):\n${list.stderr ?? ""}\n`,
-    );
+    process.stderr.write(`docker ps failed (exit ${list.status}):\n${list.stderr ?? ""}\n`);
     return false;
   }
   const pattern = new RegExp(`^supabase_.+_${PROJECT_ID}$`);
@@ -73,9 +67,7 @@ const clearDanglingSupabaseContainers = () => {
     .map((s) => s.trim())
     .filter((n) => pattern.test(n));
   if (names.length === 0) return false;
-  process.stdout.write(
-    `Removing ${names.length} dangling Supabase container(s): ${names.join(", ")}\n`,
-  );
+  process.stdout.write(`Removing ${names.length} dangling Supabase container(s): ${names.join(", ")}\n`);
   const rm = spawnSync("docker", ["rm", "-f", ...names], {
     stdio: "inherit",
     shell: true,
@@ -117,10 +109,7 @@ const main = async () => {
     return;
   }
 
-  process.stderr.write(
-    "Supabase stack failed to become ready. " +
-      "Try: npx supabase stop && npx supabase start\n",
-  );
+  process.stderr.write("Supabase stack failed to become ready. " + "Try: npx supabase stop && npx supabase start\n");
   process.exit(1);
 };
 

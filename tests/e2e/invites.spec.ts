@@ -26,13 +26,9 @@ test.describe("invites — authed member flow", () => {
   test("create an invite, see it listed, revoke it", async ({ page }) => {
     await page.getByRole("button", { name: "Manage invites" }).click();
     await page.waitForURL((u) => u.pathname === "/invites", { timeout: 10_000 });
-    await expect(
-      page.getByRole("heading", { name: "Invite a member" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Invite a member" })).toBeVisible();
 
-    await page
-      .getByLabel(/Note \(for your records/)
-      .fill("bringing a friend from the meditation group");
+    await page.getByLabel(/Note \(for your records/).fill("bringing a friend from the meditation group");
     await page.getByRole("button", { name: "Create invite" }).click();
 
     const codeLocator = page.locator("code").first();
@@ -67,14 +63,10 @@ test.describe("invites — authed member flow", () => {
       await route.continue();
     });
 
-    await page
-      .getByLabel(/Note \(for your records/)
-      .fill("this should trigger the cap message");
+    await page.getByLabel(/Note \(for your records/).fill("this should trigger the cap message");
     await page.getByRole("button", { name: "Create invite" }).click();
 
-    await expect(
-      page.getByText(/You already have 10 active invites/),
-    ).toBeVisible();
+    await expect(page.getByText(/You already have 10 active invites/)).toBeVisible();
   });
 });
 
@@ -86,10 +78,7 @@ test.describe("/signup — unauthed invite flow", () => {
     await expect(page.getByText(/doesn't match any invite/)).toBeVisible();
   });
 
-  test("valid code → note displayed → submitting email shows 'check your email'", async ({
-    browser,
-    baseURL,
-  }) => {
+  test("valid code → note displayed → submitting email shows 'check your email'", async ({ browser, baseURL }) => {
     if (!baseURL) throw new Error("invites.spec.ts: baseURL is not configured");
     await resetSeededUsers(baseURL);
 
@@ -102,9 +91,7 @@ test.describe("/signup — unauthed invite flow", () => {
       await completeWelcome(memberPage, { displayName: "Inviter" });
       await memberPage.getByRole("button", { name: "Manage invites" }).click();
       await memberPage.waitForURL((u) => u.pathname === "/invites", { timeout: 10_000 });
-      await memberPage
-        .getByLabel(/Note \(for your records/)
-        .fill("e2e signup-flow invite — come on in");
+      await memberPage.getByLabel(/Note \(for your records/).fill("e2e signup-flow invite — come on in");
       await memberPage.getByRole("button", { name: "Create invite" }).click();
       const codeLocator = memberPage.locator("code").first();
       await expect(codeLocator).toHaveText(/^[A-HJ-NP-Z2-9]{10}$/);
@@ -135,22 +122,14 @@ test.describe("/signup — unauthed invite flow", () => {
       await guestPage.getByLabel("Invite code").fill(code);
       await guestPage.getByRole("button", { name: "Check code" }).click();
 
-      await expect(
-        guestPage.getByText("e2e signup-flow invite — come on in"),
-      ).toBeVisible();
+      await expect(guestPage.getByText("e2e signup-flow invite — come on in")).toBeVisible();
 
       await guestPage.getByLabel("Display name").fill("Future Member");
       await guestPage.getByLabel("Email").fill("future-member@testfake.local");
-      await guestPage
-        .getByRole("button", { name: "Send sign-in link" })
-        .click();
+      await guestPage.getByRole("button", { name: "Send sign-in link" }).click();
 
-      await expect(
-        guestPage.getByText("future-member@testfake.local"),
-      ).toBeVisible();
-      await expect(
-        guestPage.getByText(/Check.*for a sign-in link/),
-      ).toBeVisible();
+      await expect(guestPage.getByText("future-member@testfake.local")).toBeVisible();
+      await expect(guestPage.getByText(/Check.*for a sign-in link/)).toBeVisible();
     } finally {
       await guestContext.close();
     }

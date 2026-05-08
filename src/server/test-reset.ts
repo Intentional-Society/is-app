@@ -7,10 +7,7 @@ import { invites, profiles } from "./schema";
 // docs/doc-supabase.md). E2E signs in as these via password instead of
 // admin-provisioning a fresh user per run, so CI never needs the
 // service-role key.
-export const E2E_EMAILS = [
-  "e2e-regular@testfake.local",
-  "e2e-admin@testfake.local",
-] as const;
+export const E2E_EMAILS = ["e2e-regular@testfake.local", "e2e-admin@testfake.local"] as const;
 
 // Clears out everything a welcome/invites test might leave behind on
 // the seeded users. isAdmin is preserved so the admin account keeps
@@ -21,9 +18,7 @@ export const resetE2EUsers = async (): Promise<{ reset: number }> => {
     E2E_EMAILS.map((e) => sql`${e}`),
     sql`, `,
   );
-  const rows = await db.execute(
-    sql`SELECT id FROM auth.users WHERE email IN (${emailList})`,
-  );
+  const rows = await db.execute(sql`SELECT id FROM auth.users WHERE email IN (${emailList})`);
   const ids = (rows as unknown as { id: string }[]).map((r) => r.id);
   if (ids.length === 0) return { reset: 0 };
 

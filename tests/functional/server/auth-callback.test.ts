@@ -16,8 +16,7 @@ import { invites, profiles } from "@/server/schema";
 
 const mockCreateClient = vi.mocked(createClient);
 
-const makeRequest = (path: string) =>
-  new NextRequest(new URL(path, "http://testfake.local"));
+const makeRequest = (path: string) => new NextRequest(new URL(path, "http://testfake.local"));
 
 const mockSupabase = (user: { id: string; email: string } | null) => {
   const signOut = vi.fn().mockResolvedValue({ error: null });
@@ -66,9 +65,7 @@ describe("GET /auth/callback", () => {
     const res = await GET(makeRequest("/auth/callback"));
 
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe(
-      "http://testfake.local/signin?error=missing_code",
-    );
+    expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=missing_code");
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
 
@@ -78,9 +75,7 @@ describe("GET /auth/callback", () => {
     const res = await GET(makeRequest("/auth/callback?code=bad-code"));
 
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe(
-      "http://testfake.local/signin?error=exchange_failed",
-    );
+    expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=exchange_failed");
   });
 });
 
@@ -111,24 +106,16 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
     if ("error" in r) throw new Error("seed failed");
     mockSupabase({ id: newUserId, email: "newbie@testfake.local" });
 
-    const res = await GET(
-      makeRequest(`/auth/callback?code=pkce&invite=${r.code}`),
-    );
+    const res = await GET(makeRequest(`/auth/callback?code=pkce&invite=${r.code}`));
 
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe("http://testfake.local/");
 
-    const [profile] = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, newUserId));
+    const [profile] = await db.select().from(profiles).where(eq(profiles.id, newUserId));
     expect(profile.referredBy).toBe(inviterId);
     expect(profile.displayName).toBe("New Member");
 
-    const [inviteRow] = await db
-      .select()
-      .from(invites)
-      .where(eq(invites.code, r.code));
+    const [inviteRow] = await db.select().from(invites).where(eq(invites.code, r.code));
     expect(inviteRow.redeemedBy).toBe(newUserId);
     expect(inviteRow.redeemedAt).not.toBeNull();
   });
@@ -140,31 +127,21 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
     });
     if ("error" in r) throw new Error("seed failed");
     // Pre-redeem it.
-    await db
-      .update(invites)
-      .set({ redeemedBy: inviterId, redeemedAt: sql`now()` })
-      .where(eq(invites.code, r.code));
+    await db.update(invites).set({ redeemedBy: inviterId, redeemedAt: sql`now()` }).where(eq(invites.code, r.code));
 
     const { signOut } = mockSupabase({
       id: newUserId,
       email: "newbie@testfake.local",
     });
 
-    const res = await GET(
-      makeRequest(`/auth/callback?code=pkce&invite=${r.code}`),
-    );
+    const res = await GET(makeRequest(`/auth/callback?code=pkce&invite=${r.code}`));
 
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe(
-      "http://testfake.local/signin?error=invite_invalid",
-    );
+    expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=invite_invalid");
     expect(signOut).toHaveBeenCalledOnce();
 
     // No profile created for the would-be new user.
-    const rows = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, newUserId));
+    const rows = await db.select().from(profiles).where(eq(profiles.id, newUserId));
     expect(rows).toHaveLength(0);
   });
 
@@ -174,14 +151,10 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
       email: "newbie@testfake.local",
     });
 
-    const res = await GET(
-      makeRequest("/auth/callback?code=pkce&invite=ZZZZZZZZZZ"),
-    );
+    const res = await GET(makeRequest("/auth/callback?code=pkce&invite=ZZZZZZZZZZ"));
 
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe(
-      "http://testfake.local/signin?error=invite_invalid",
-    );
+    expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=invite_invalid");
     expect(signOut).toHaveBeenCalledOnce();
   });
 });

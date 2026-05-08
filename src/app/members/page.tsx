@@ -12,9 +12,7 @@ function MemberCard({ member }: { member: MemberSummary }) {
       className="flex flex-col gap-1 rounded border border-border p-4 hover:bg-muted/50 transition-colors"
     >
       <span className="font-semibold">{member.displayName}</span>
-      {member.location && (
-        <span className="text-sm text-muted-foreground">{member.location}</span>
-      )}
+      {member.location && <span className="text-sm text-muted-foreground">{member.location}</span>}
       {member.keywords.length > 0 && (
         <span className="text-sm text-muted-foreground">
           {member.keywords.slice(0, 4).join(", ")}

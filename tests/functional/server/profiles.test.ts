@@ -5,12 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/server/db";
-import {
-  getProfileForAdmin,
-  getProfileForMember,
-  getProfileForSelf,
-  upsertProfile,
-} from "@/server/profiles";
+import { getProfileForAdmin, getProfileForMember, getProfileForSelf, upsertProfile } from "@/server/profiles";
 import { profiles } from "@/server/schema";
 
 describe("upsertProfile", () => {
@@ -28,9 +23,7 @@ describe("upsertProfile", () => {
 
   afterEach(async () => {
     await db.delete(profiles).where(eq(profiles.id, testUserId));
-    await db.execute(
-      sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`,
-    );
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`);
   });
 
   it("is idempotent across repeated calls for the same user", async () => {
@@ -45,10 +38,7 @@ describe("upsertProfile", () => {
     await upsertProfile(user);
     await upsertProfile(user);
 
-    const rows = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, testUserId));
+    const rows = await db.select().from(profiles).where(eq(profiles.id, testUserId));
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.displayName).toBe("Test User");
@@ -65,10 +55,7 @@ describe("upsertProfile", () => {
 
     await upsertProfile(user);
 
-    const rows = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, testUserId));
+    const rows = await db.select().from(profiles).where(eq(profiles.id, testUserId));
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.displayName).toBeNull();
@@ -88,9 +75,7 @@ describe("getProfileForSelf", () => {
 
   afterEach(async () => {
     await db.delete(profiles).where(eq(profiles.id, testUserId));
-    await db.execute(
-      sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`,
-    );
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`);
   });
 
   it("returns null for an unknown id", async () => {
@@ -160,7 +145,18 @@ describe("getProfileForMember", () => {
     expect(profile).not.toBeNull();
     expect(profile?.displayName).toBe("Test Member");
     expect(Object.keys(profile!).sort()).toEqual(
-      ["id", "slug", "displayName", "bio", "keywords", "location", "supplementaryInfo", "avatarUrl", "liveDesire", "createdAt"].sort(),
+      [
+        "id",
+        "slug",
+        "displayName",
+        "bio",
+        "keywords",
+        "location",
+        "supplementaryInfo",
+        "avatarUrl",
+        "liveDesire",
+        "createdAt",
+      ].sort(),
     );
   });
 

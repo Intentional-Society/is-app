@@ -53,8 +53,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
       } else {
         setStep({
           kind: "enter-code",
-          error:
-            REASON_MESSAGES[body.reason] ?? "That invite is no longer valid.",
+          error: REASON_MESSAGES[body.reason] ?? "That invite is no longer valid.",
         });
       }
     } catch {
@@ -88,8 +87,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
     } catch (err) {
       setStep({
         kind: "error",
-        message:
-          err instanceof Error ? err.message : "Unexpected error while sending.",
+        message: err instanceof Error ? err.message : "Unexpected error while sending.",
         code,
         note,
       });
@@ -99,8 +97,8 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
   if (step.kind === "sent") {
     return (
       <p className="max-w-sm text-center text-base text-foreground">
-        Check <span className="font-semibold">{step.email}</span> for a
-        sign-in link. Open it in this same browser within 15 minutes.
+        Check <span className="font-semibold">{step.email}</span> for a sign-in link. Open it in this same browser
+        within 15 minutes.
       </p>
     );
   }
@@ -108,14 +106,9 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
   if (step.kind === "code-valid" || step.kind === "submitting" || step.kind === "error") {
     const submitting = step.kind === "submitting";
     return (
-      <form
-        onSubmit={sendMagicLink}
-        className="flex w-full max-w-sm flex-col gap-3"
-      >
+      <form onSubmit={sendMagicLink} className="flex w-full max-w-sm flex-col gap-3">
         <p className="rounded border border-border bg-muted p-3 text-base text-foreground">
-          <span className="block text-sm uppercase tracking-wide text-muted-foreground">
-            Your invite note
-          </span>
+          <span className="block text-sm uppercase tracking-wide text-muted-foreground">Your invite note</span>
           {step.note}
         </p>
         <Label htmlFor="displayName">Display name</Label>

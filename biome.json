@@ -9,7 +9,19 @@
     "includes": ["**", "!.next/**", "!next-env.d.ts"]
   },
   "formatter": {
-    "enabled": false
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "arrowParentheses": "always",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
   },
   "css": {
     "parser": {

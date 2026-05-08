@@ -9,13 +9,7 @@ type AuthContextValue = { user: User | null };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({
-  initialUser,
-  children,
-}: {
-  initialUser: User | null;
-  children: React.ReactNode;
-}) {
+export function AuthProvider({ initialUser, children }: { initialUser: User | null; children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(initialUser);
 
   useEffect(() => {
@@ -28,9 +22,7 @@ export function AuthProvider({
     return () => subscription.unsubscribe();
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user }}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

@@ -5,10 +5,7 @@ import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
 import type { Program } from "@/lib/api-types";
 
-type ListState =
-  | { kind: "loading" }
-  | { kind: "loaded"; programs: Program[] }
-  | { kind: "error"; message: string };
+type ListState = { kind: "loading" } | { kind: "loaded"; programs: Program[] } | { kind: "error"; message: string };
 
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
@@ -36,7 +33,9 @@ export function ProgramsList() {
       }
     }
     void fetchPrograms();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [reloadKey]);
 
   const reload = () => setReloadKey((k) => k + 1);
@@ -50,7 +49,9 @@ export function ProgramsList() {
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setActionError(body.error === "already_joined" ? "You've already joined this program." : "Failed to join program.");
+        setActionError(
+          body.error === "already_joined" ? "You've already joined this program." : "Failed to join program.",
+        );
       }
       reload();
     } catch {
@@ -83,7 +84,11 @@ export function ProgramsList() {
   }
 
   if (state.kind === "error") {
-    return <p role="alert" className="text-sm text-red-300">{state.message}</p>;
+    return (
+      <p role="alert" className="text-sm text-red-300">
+        {state.message}
+      </p>
+    );
   }
 
   if (state.programs.length === 0) {
@@ -98,53 +103,44 @@ export function ProgramsList() {
         </p>
       )}
       <ul className="flex w-full max-w-xl flex-col gap-4">
-      {state.programs.map((program) => (
-        <li
-          key={program.id}
-          className="flex flex-col gap-2 rounded border border-gray-700 p-4"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-semibold">{program.name}</h2>
-              {program.description && (
-                <p className="font-serif text-sm text-gray-500">
-                  {program.description}
-                </p>
+        {state.programs.map((program) => (
+          <li key={program.id} className="flex flex-col gap-2 rounded border border-gray-700 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-lg font-semibold">{program.name}</h2>
+                {program.description && <p className="font-serif text-sm text-gray-500">{program.description}</p>}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">
+                {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
+              </span>
+              {program.joined ? (
+                <button
+                  type="button"
+                  disabled={pendingId === program.id}
+                  onClick={() => leave(program.id)}
+                  className="rounded border border-red-500/40 px-3 py-1 text-sm text-red-300 disabled:opacity-50"
+                >
+                  {pendingId === program.id ? "Leaving…" : "Leave"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={pendingId === program.id}
+                  onClick={() => join(program.id)}
+                  className="rounded bg-gray-100 px-3 py-1 text-sm font-medium text-gray-900 disabled:opacity-50"
+                >
+                  {pendingId === program.id ? "Joining…" : "Join"}
+                </button>
               )}
             </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">
-              {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
-            </span>
-            {program.joined ? (
-              <button
-                type="button"
-                disabled={pendingId === program.id}
-                onClick={() => leave(program.id)}
-                className="rounded border border-red-500/40 px-3 py-1 text-sm text-red-300 disabled:opacity-50"
-              >
-                {pendingId === program.id ? "Leaving…" : "Leave"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={pendingId === program.id}
-                onClick={() => join(program.id)}
-                className="rounded bg-gray-100 px-3 py-1 text-sm font-medium text-gray-900 disabled:opacity-50"
-              >
-                {pendingId === program.id ? "Joining…" : "Join"}
-              </button>
+            {program.joined && program.joinedAt && (
+              <p className="text-xs text-gray-500">Joined {formatDate(program.joinedAt)}</p>
             )}
-          </div>
-          {program.joined && program.joinedAt && (
-            <p className="text-xs text-gray-500">
-              Joined {formatDate(program.joinedAt)}
-            </p>
-          )}
-        </li>
-      ))}
-    </ul>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }

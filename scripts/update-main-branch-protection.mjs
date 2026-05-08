@@ -98,23 +98,10 @@ const existing = list.find((r) => r.name === RULESET_NAME);
 
 if (existing) {
   console.log(`Updating ruleset #${existing.id} ("${RULESET_NAME}")...`);
-  gh(
-    [
-      "api",
-      "--method",
-      "PUT",
-      `/repos/${REPO}/rulesets/${existing.id}`,
-      "--input",
-      "-",
-    ],
-    { input: body },
-  );
+  gh(["api", "--method", "PUT", `/repos/${REPO}/rulesets/${existing.id}`, "--input", "-"], { input: body });
 } else {
   console.log(`Creating new ruleset "${RULESET_NAME}"...`);
-  gh(
-    ["api", "--method", "POST", `/repos/${REPO}/rulesets`, "--input", "-"],
-    { input: body },
-  );
+  gh(["api", "--method", "POST", `/repos/${REPO}/rulesets`, "--input", "-"], { input: body });
 }
 
 console.log(`\nRuleset "${RULESET_NAME}" applied to ${REPO}.`);

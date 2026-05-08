@@ -12,8 +12,7 @@ import { platform } from "node:process";
 const DAEMON_READY_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 2_000;
 
-const pingDaemon = () =>
-  spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
+const pingDaemon = () => spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -74,8 +73,7 @@ const main = async () => {
   }
 
   process.stderr.write(
-    `Timed out waiting for Docker daemon after ${DAEMON_READY_TIMEOUT_MS / 1000}s. ` +
-      "Please check Docker Desktop.\n",
+    `Timed out waiting for Docker daemon after ${DAEMON_READY_TIMEOUT_MS / 1000}s. ` + "Please check Docker Desktop.\n",
   );
   process.exit(1);
 };
