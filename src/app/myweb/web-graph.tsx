@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { Panel, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   forceCenter,
@@ -50,8 +50,20 @@ type EdgeData = {
   relateeName: string | null;
 };
 
-const fetchSubgraph = async () => {
-  const res = await apiClient.api.relations.subgraph.$get();
+type ViewOptions = {
+  includeIncoming: boolean;
+  hops: 1 | 2;
+};
+
+const DEFAULT_VIEW: ViewOptions = { includeIncoming: false, hops: 2 };
+
+const fetchSubgraph = async (opts: ViewOptions) => {
+  const res = await apiClient.api.relations.subgraph.$get({
+    query: {
+      in: opts.includeIncoming ? "true" : "false",
+      hops: String(opts.hops),
+    },
+  });
   if (!res.ok) throw new Error(`relations/subgraph: ${res.status}`);
   return res.json();
 };
@@ -93,9 +105,13 @@ const nodeTypes = { member: MemberNode };
 
 export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget) => void }) {
   const router = useRouter();
+  const [view, setView] = useState<ViewOptions>(DEFAULT_VIEW);
+  // The view options become part of the query key so toggling refetches
+  // automatically and the rating-mutation invalidator (which uses the
+  // bare ["relations", "subgraph"] key) still hits every variant.
   const { data, isPending, isError } = useQuery({
-    queryKey: RELATION_SUBGRAPH_QUERY_KEY,
-    queryFn: fetchSubgraph,
+    queryKey: [...RELATION_SUBGRAPH_QUERY_KEY, view] as const,
+    queryFn: () => fetchSubgraph(view),
   });
 
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
@@ -231,7 +247,26 @@ export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget
             currentValue: validValue,
           });
         }}
-      />
+      >
+        <Panel position="top-right" className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={view.includeIncoming}
+              onChange={(e) => setView((v) => ({ ...v, includeIncoming: e.target.checked }))}
+            />
+            Show incoming
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={view.hops === 2}
+              onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
+            />
+            2 hops
+          </label>
+        </Panel>
+      </ReactFlow>
     </div>
   );
 }
