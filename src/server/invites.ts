@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import { db } from "./db";
+import { insertInviteHints, isRelationValue, type RelationValue, validateInviteHints } from "./relations";
 import { invites } from "./schema";
 
 // Alphabet: 23 uppercase letters (no I, O — visually confusable with 1/0)
@@ -67,10 +68,29 @@ export const countActiveInvitesForCreator = async (createdBy: string): Promise<n
 };
 
 export type CreateInviteResult =
-  | { code: string; note: string; expiresAt: Date }
-  | { error: "too_many_active"; limit: number };
+  | { code: string; note: string; expiresAt: Date; creatorValue: RelationValue | null; hintCount: number }
+  | { error: "too_many_active"; limit: number }
+  | { error: "invalid_creator_value" }
+  | { error: "invalid_hints"; reason: "not_an_array" | "non_uuid" | "self" | "duplicate" | "too_many" | "not_a_member" };
 
-export const createInvite = async (params: { createdBy: string; note: string }): Promise<CreateInviteResult> => {
+export const createInvite = async (params: {
+  createdBy: string;
+  note: string;
+  creatorValue?: RelationValue | null;
+  hints?: string[];
+}): Promise<CreateInviteResult> => {
+  const creatorValue = params.creatorValue ?? null;
+  if (creatorValue !== null && !isRelationValue(creatorValue)) {
+    return { error: "invalid_creator_value" };
+  }
+
+  // Validate hints up front so we don't burn an invite-code slot on a
+  // payload that's about to be rejected.
+  const hintCheck = await validateInviteHints({ hints: params.hints, inviterId: params.createdBy });
+  if ("error" in hintCheck) {
+    return { error: "invalid_hints", reason: hintCheck.reason };
+  }
+
   const active = await countActiveInvitesForCreator(params.createdBy);
   if (active >= MAX_ACTIVE_INVITES_PER_USER) {
     return { error: "too_many_active", limit: MAX_ACTIVE_INVITES_PER_USER };
@@ -79,24 +99,38 @@ export const createInvite = async (params: { createdBy: string; note: string }):
   // Retry loop guards against the astronomically-unlikely collision.
   // Three attempts is more than enough — collision probability at 10
   // chars over a 31-char alphabet is negligible even with millions of
-  // rows.
+  // rows. Each attempt runs in its own tx so the invite_hints insert
+  // rolls back with a code collision.
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = generateInviteCode();
     try {
-      const [row] = await db
-        .insert(invites)
-        .values({
-          code,
-          createdBy: params.createdBy,
-          note: params.note,
-          expiresAt: sql`now() + interval '${sql.raw(String(INVITE_LIFETIME_DAYS))} days'`,
-        })
-        .returning({
-          code: invites.code,
-          note: invites.note,
-          expiresAt: invites.expiresAt,
-        });
-      return row;
+      const row = await db.transaction(async (tx) => {
+        const [inserted] = await tx
+          .insert(invites)
+          .values({
+            code,
+            createdBy: params.createdBy,
+            note: params.note,
+            expiresAt: sql`now() + interval '${sql.raw(String(INVITE_LIFETIME_DAYS))} days'`,
+            creatorValue,
+          })
+          .returning({
+            id: invites.id,
+            code: invites.code,
+            note: invites.note,
+            expiresAt: invites.expiresAt,
+            creatorValue: invites.creatorValue,
+          });
+        await insertInviteHints(tx, { inviteId: inserted.id, rateeIds: hintCheck.ids });
+        return inserted;
+      });
+      return {
+        code: row.code,
+        note: row.note,
+        expiresAt: row.expiresAt,
+        creatorValue: row.creatorValue as RelationValue | null,
+        hintCount: hintCheck.ids.length,
+      };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!msg.includes("invites_code_unique") && !msg.includes("duplicate")) {

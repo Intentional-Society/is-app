@@ -14,6 +14,16 @@ import {
   upsertProfile,
 } from "./profiles";
 import { joinProgram, leaveProgram, listPrograms } from "./programs";
+import {
+  createHint,
+  deleteHint,
+  getCandidates,
+  getSubgraph,
+  isAdmin,
+  isRelationValue,
+  isUuid,
+  rateMember,
+} from "./relations";
 import { profiles } from "./schema";
 import { resetE2EUsers } from "./test-reset";
 
@@ -93,15 +103,41 @@ const api = new Hono<{ Variables: ApiVariables }>()
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return c.json({ error: "body must be a JSON object" }, 400);
     }
+    const obj = body as Record<string, unknown>;
 
-    const noteCheck = validateNote((body as Record<string, unknown>).note);
+    const noteCheck = validateNote(obj.note);
     if (typeof noteCheck !== "string") {
       return c.json({ error: noteCheck.error }, 400);
     }
 
-    const result = await createInvite({ createdBy: user.id, note: noteCheck });
+    // creatorValue and hints are optional — the form omits them for
+    // admin-issued invites and for inviters who decline the picker.
+    const rawCreatorValue = obj.creatorValue;
+    let creatorValue: 1 | 2 | 3 | 4 | null = null;
+    if (rawCreatorValue !== undefined && rawCreatorValue !== null) {
+      if (!isRelationValue(rawCreatorValue)) {
+        return c.json({ error: "creatorValue must be an integer 1..4" }, 400);
+      }
+      creatorValue = rawCreatorValue;
+    }
+
+    const result = await createInvite({
+      createdBy: user.id,
+      note: noteCheck,
+      creatorValue,
+      hints: obj.hints as string[] | undefined,
+    });
+
     if ("error" in result) {
-      return c.json({ error: "too_many_active_invites", limit: result.limit }, 429);
+      if (result.error === "too_many_active") {
+        return c.json({ error: "too_many_active_invites", limit: result.limit }, 429);
+      }
+      if (result.error === "invalid_creator_value") {
+        return c.json({ error: "creatorValue must be an integer 1..4" }, 400);
+      }
+      // invalid_hints — the reason names exactly what's wrong so the
+      // form can call out the bad chip.
+      return c.json({ error: "invalid_hints", reason: result.reason }, 400);
     }
     return c.json(result, 201);
   })
@@ -170,6 +206,100 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const user = c.get("user");
     const programId = c.req.param("id");
     const result = await leaveProgram(user.id, programId);
+    if ("error" in result) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    return c.json({ ok: true });
+  })
+  .get("/relations/candidates", async (c) => {
+    const user = c.get("user");
+    const feed = await getCandidates(user.id);
+    return c.json(feed);
+  })
+  .get("/relations/subgraph", async (c) => {
+    const user = c.get("user");
+    // Defaults match the design: outgoing only, one hop. Toggles can
+    // widen the view from the client.
+    const includeOutgoing = c.req.query("out") !== "false";
+    const includeIncoming = c.req.query("in") === "true";
+    const hops = c.req.query("hops") === "2" ? 2 : 1;
+
+    const subgraph = await getSubgraph({
+      centerId: user.id,
+      includeIncoming,
+      includeOutgoing,
+      hops,
+    });
+    return c.json(subgraph);
+  })
+  .put("/relations/:rateeId", async (c) => {
+    const user = c.get("user");
+    const rateeId = c.req.param("rateeId");
+    if (!isUuid(rateeId)) {
+      return c.json({ error: "rateeId must be a UUID" }, 400);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "body must be a JSON object" }, 400);
+    }
+    const value = (body as Record<string, unknown>).value;
+    if (!isRelationValue(value)) {
+      return c.json({ error: "value must be an integer 1..4" }, 400);
+    }
+
+    const result = await rateMember({ raterId: user.id, rateeId, value });
+    if ("error" in result) {
+      if (result.error === "self_rating") return c.json({ error: "self_rating" }, 400);
+      if (result.error === "ratee_not_found") return c.json({ error: "not_found" }, 404);
+    }
+    return c.json({ ok: true });
+  })
+  .post("/relations/hint", async (c) => {
+    const user = c.get("user");
+    if (!(await isAdmin(user.id))) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "body must be a JSON object" }, 400);
+    }
+    const { raterId, rateeId } = body as Record<string, unknown>;
+    if (!isUuid(raterId) || !isUuid(rateeId)) {
+      return c.json({ error: "raterId and rateeId must be UUIDs" }, 400);
+    }
+
+    const result = await createHint({ raterId, rateeId, hintedBy: user.id });
+    if ("error" in result) {
+      if (result.error === "self_rating") return c.json({ error: "self_rating" }, 400);
+      return c.json({ error: "not_found" }, 404);
+    }
+    return c.json(result, 201);
+  })
+  .delete("/relations/hint/:raterId/:rateeId", async (c) => {
+    const user = c.get("user");
+    if (!(await isAdmin(user.id))) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+
+    const raterId = c.req.param("raterId");
+    const rateeId = c.req.param("rateeId");
+    if (!isUuid(raterId) || !isUuid(rateeId)) {
+      return c.json({ error: "raterId and rateeId must be UUIDs" }, 400);
+    }
+
+    const result = await deleteHint({ raterId, rateeId });
     if ("error" in result) {
       return c.json({ error: "not_found" }, 404);
     }
