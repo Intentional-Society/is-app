@@ -35,6 +35,14 @@ export function SiteHeader({ displayName }: { displayName: string | null }) {
             <SheetClose
               nativeButton={false}
               render={
+                <Link href="/myweb" className="rounded px-2 py-2 hover:bg-muted">
+                  My web
+                </Link>
+              }
+            />
+            <SheetClose
+              nativeButton={false}
+              render={
                 <Link href="/invites" className="rounded px-2 py-2 hover:bg-muted">
                   Invite a friend
                 </Link>
