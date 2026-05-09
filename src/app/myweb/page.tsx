@@ -2,10 +2,14 @@ import Link from "next/link";
 
 import { requireUser } from "@/lib/api-server";
 
-import { WebBuilder } from "./web-builder";
+import { MyWeb } from "./my-web";
 
 export default async function MyWebPage() {
-  await requireUser();
+  const me = await requireUser();
+  // ProfileForSelf surfaces lastUpdatedWeb as a Date; the JSON wire
+  // arrives as an ISO string, so reconstruct here for the client.
+  const raw = me.profile?.lastUpdatedWeb ?? null;
+  const initialLastUpdatedWeb = typeof raw === "string" ? new Date(raw) : raw;
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
@@ -15,7 +19,7 @@ export default async function MyWebPage() {
           ← Back
         </Link>
       </div>
-      <WebBuilder />
+      <MyWeb initialLastUpdatedWeb={initialLastUpdatedWeb} />
     </main>
   );
 }
