@@ -48,10 +48,35 @@ function ReasonLine({ reason }: { reason: RelationCandidate["reason"] }) {
   }
 }
 
-// Pure display for now. Click-to-rate lands in a follow-up commit.
-export function SuggestionCard({ candidate }: { candidate: RelationCandidate }) {
+export function SuggestionCard({
+  candidate,
+  onClick,
+}: {
+  candidate: RelationCandidate;
+  onClick?: (candidate: RelationCandidate) => void;
+}) {
+  const interactive = onClick !== undefined;
+  const handleClick = interactive ? () => onClick(candidate) : undefined;
+
   return (
-    <article className="flex w-full items-start gap-3 rounded border border-border p-3">
+    <article
+      onClick={handleClick}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick(candidate);
+              }
+            }
+          : undefined
+      }
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      className={`flex w-full items-start gap-3 rounded border border-border p-3 ${
+        interactive ? "cursor-pointer hover:bg-muted/50 focus:bg-muted/50 focus:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" : ""
+      }`}
+    >
       <Avatar candidate={candidate} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-baseline justify-between gap-2">

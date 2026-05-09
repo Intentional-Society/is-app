@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
 import { type ApiVariables, isAdmin, isUuid, requireAuth } from "./auth-middleware";
@@ -231,34 +232,39 @@ const api = new Hono<{ Variables: ApiVariables }>()
     });
     return c.json(subgraph);
   })
-  .put("/relations/value/:relateeId", async (c) => {
-    const user = c.get("user");
-    const relateeId = c.req.param("relateeId");
-    if (!isUuid(relateeId)) {
-      return c.json({ error: "relateeId must be a UUID" }, 400);
-    }
+  // hono/validator typed body — needed so RPC clients can pass
+  // `json: { value }` against a route that also has a path param.
+  // Without it, Hono's type inference exposes only `param`, and the
+  // typed call `apiClient.api.relations.value[":relateeId"].$put({
+  // param, json })` errors on the excess `json` key.
+  .put(
+    "/relations/value/:relateeId",
+    validator("json", (body, c) => {
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "body must be a JSON object" }, 400);
+      }
+      const value = (body as Record<string, unknown>).value;
+      if (!isRelationValue(value)) {
+        return c.json({ error: "value must be an integer 1..4" }, 400);
+      }
+      return { value };
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const relateeId = c.req.param("relateeId");
+      if (!isUuid(relateeId)) {
+        return c.json({ error: "relateeId must be a UUID" }, 400);
+      }
+      const { value } = c.req.valid("json");
 
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "invalid JSON" }, 400);
-    }
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return c.json({ error: "body must be a JSON object" }, 400);
-    }
-    const value = (body as Record<string, unknown>).value;
-    if (!isRelationValue(value)) {
-      return c.json({ error: "value must be an integer 1..4" }, 400);
-    }
-
-    const result = await updateRelationValue({ relatorId: user.id, relateeId, value });
-    if ("error" in result) {
-      if (result.error === "self_relating") return c.json({ error: "self_relating" }, 400);
-      if (result.error === "relatee_not_found") return c.json({ error: "not_found" }, 404);
-    }
-    return c.json({ ok: true });
-  })
+      const result = await updateRelationValue({ relatorId: user.id, relateeId, value });
+      if ("error" in result) {
+        if (result.error === "self_relating") return c.json({ error: "self_relating" }, 400);
+        if (result.error === "relatee_not_found") return c.json({ error: "not_found" }, 404);
+      }
+      return c.json({ ok: true });
+    },
+  )
   .post("/relations/hint", async (c) => {
     const user = c.get("user");
     if (!(await isAdmin(user.id))) {
