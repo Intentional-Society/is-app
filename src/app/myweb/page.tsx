@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { requireUser } from "@/lib/api-server";
 
+import { WebBuilder } from "./web-builder";
+
 export default async function MyWebPage() {
   await requireUser();
 
@@ -13,7 +15,7 @@ export default async function MyWebPage() {
           ← Back
         </Link>
       </div>
-      <p className="text-muted-foreground">Coming soon — your personal subgraph and suggestion feed.</p>
+      <WebBuilder />
     </main>
   );
 }

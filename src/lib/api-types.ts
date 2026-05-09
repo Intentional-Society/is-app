@@ -18,3 +18,9 @@ export type Me = InferResponseType<(typeof apiClient.api.me)["$get"], 200>;
 export type ProgramsResponse = InferResponseType<(typeof apiClient.api.programs)["$get"], 200>;
 
 export type Program = ProgramsResponse["programs"][number];
+
+export type RelationCandidatesFeed = InferResponseType<(typeof apiClient.api.relations.candidates)["$get"], 200>;
+
+export type RelationCandidate = RelationCandidatesFeed["suggestions"][number];
+
+export type RelationSubgraph = InferResponseType<(typeof apiClient.api.relations.subgraph)["$get"], 200>;
