@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 import { asc, eq, isNotNull, or } from "drizzle-orm";
 import { cache } from "react";
 
+import { isUuid } from "./auth-middleware";
 import { db } from "./db";
 import { profiles } from "./schema";
 
@@ -143,13 +144,11 @@ export type ProfileForMember = {
   createdAt: Date;
 };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 // Accepts either a UUID or a slug so /members/aria-chen and
 // /members/<uuid> both work. UUID-shaped strings go straight to the id
 // column; anything else is treated as a slug lookup.
 export const getProfileForMember = async (idOrSlug: string): Promise<ProfileForMember | null> => {
-  const where = UUID_RE.test(idOrSlug)
+  const where = isUuid(idOrSlug)
     ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
     : eq(profiles.slug, idOrSlug);
 

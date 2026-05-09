@@ -21,7 +21,6 @@ import {
   getRelationSuggestions,
   isRelationValue,
   parseOptionalRelationValue,
-  type RelationValue,
   updateRelationValue,
 } from "./relations";
 import { profiles } from "./schema";
@@ -113,15 +112,14 @@ const api = new Hono<{ Variables: ApiVariables }>()
     // relationValue and hints are optional — the form omits them for
     // admin-issued invites and for inviters who decline the picker.
     const parsed = parseOptionalRelationValue(obj.relationValue);
-    if (parsed !== null && typeof parsed === "object") {
+    if (!parsed.ok) {
       return c.json({ error: parsed.error }, 400);
     }
-    const relationValue: RelationValue | null = parsed;
 
     const result = await createInvite({
       createdBy: user.id,
       note: noteCheck,
-      relationValue,
+      relationValue: parsed.value,
       hints: obj.hints as string[] | undefined,
     });
 
