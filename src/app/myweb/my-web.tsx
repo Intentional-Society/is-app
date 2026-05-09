@@ -8,6 +8,7 @@ import { apiClient } from "@/lib/api";
 
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
 import { WebBuilder } from "./web-builder";
+import { WebGraph } from "./web-graph";
 
 type Mode = "edit" | "view";
 
@@ -23,8 +24,6 @@ const useMarkDone = (onDone: () => void) => {
       return res.json();
     },
     onSuccess: () => {
-      // Other members' feeds may now surface me as recently active,
-      // and my own subgraph view stays fresh.
       queryClient.invalidateQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: RELATION_SUBGRAPH_QUERY_KEY });
       onDone();
@@ -35,13 +34,14 @@ const useMarkDone = (onDone: () => void) => {
 export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date | null }) {
   // First-ever visit lands in Edit so new members aren't staring at a
   // blank graph; returning members open in View since their last action
-  // was the explicit "I'm done" click. Either way, the Edit/Done button
-  // toggles freely afterward.
+  // was the explicit "I'm done" click. The toggle is freely flipable.
   const [mode, setMode] = useState<Mode>(initialLastUpdatedWeb ? "view" : "edit");
   const markDone = useMarkDone(() => setMode("view"));
 
   return (
-    <>
+    <div className="flex w-full max-w-5xl flex-col items-center gap-6">
+      <WebGraph />
+
       {mode === "edit" ? (
         <div className="flex w-full max-w-3xl flex-col gap-4">
           <WebBuilder />
@@ -60,15 +60,10 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
           )}
         </div>
       ) : (
-        <div className="flex w-full max-w-3xl flex-col gap-4">
-          <p className="text-base text-muted-foreground">
-            Your web is your view of the network — your ratings shape who shows up next time.
-          </p>
-          <Button className="self-start" onClick={() => setMode("edit")}>
-            Edit
-          </Button>
-        </div>
+        <Button className="self-start" onClick={() => setMode("edit")}>
+          Edit
+        </Button>
       )}
-    </>
+    </div>
   );
 }
