@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Gudea, Ovo } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
+import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
 import { loadMe } from "@/lib/api-server";
 import { createClient } from "@/lib/supabase/server";
@@ -42,8 +43,10 @@ export default async function RootLayout({
     <html lang="en" className={cn("font-sans", gudea.variable, ovo.variable)}>
       <body className="antialiased">
         <AuthProvider initialUser={user}>
-          <SiteHeader displayName={me?.profile?.displayName ?? null} />
-          {children}
+          <QueryProvider>
+            <SiteHeader displayName={me?.profile?.displayName ?? null} />
+            {children}
+          </QueryProvider>
         </AuthProvider>
       </body>
     </html>
