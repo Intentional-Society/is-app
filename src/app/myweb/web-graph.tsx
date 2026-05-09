@@ -12,12 +12,14 @@ import {
   forceSimulation,
   type Simulation,
 } from "d3-force";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 
 import { RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
+import type { RatingTarget } from "./rating-dialog";
 
 type SubgraphNode = RelationSubgraph["nodes"][number];
 
@@ -39,6 +41,13 @@ type SimNode = {
 type SimEdge = {
   source: string | SimNode;
   target: string | SimNode;
+};
+
+type EdgeData = {
+  isOutgoing: boolean;
+  value: number;
+  relateeId: string;
+  relateeName: string | null;
 };
 
 const fetchSubgraph = async () => {
@@ -82,14 +91,15 @@ function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
 
 const nodeTypes = { member: MemberNode };
 
-export function WebGraph() {
+export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget) => void }) {
+  const router = useRouter();
   const { data, isPending, isError } = useQuery({
     queryKey: RELATION_SUBGRAPH_QUERY_KEY,
     queryFn: fetchSubgraph,
   });
 
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [edges, setEdges] = useState<Edge<EdgeData>[]>([]);
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
 
   // Build (or rebuild) the d3-force simulation whenever the subgraph
@@ -98,6 +108,7 @@ export function WebGraph() {
   useEffect(() => {
     if (!data) return;
     const centerId = data.centerId;
+    const nodeById = new Map(data.nodes.map((n) => [n.id, n]));
 
     const simNodes: SimNode[] = data.nodes.map((n) => {
       const isCenter = n.id === centerId;
@@ -114,9 +125,6 @@ export function WebGraph() {
       target: e.relateeId,
     }));
 
-    // Initial node placement uses the seed positions above; the tick
-    // handler then keeps ReactFlow's position state in sync with the
-    // running simulation.
     setNodes(
       data.nodes.map((n) => {
         const sn = simNodes.find((s) => s.id === n.id);
@@ -125,19 +133,30 @@ export function WebGraph() {
           type: "member",
           position: { x: sn?.x ?? 0, y: sn?.y ?? 0 },
           data: { ...n, isCenter: n.id === centerId },
-          // Drag is allowed but the simulation will pull undragged
-          // nodes back; user can grab a node to nudge the layout.
           draggable: true,
         };
       }),
     );
     setEdges(
-      data.edges.map((e) => ({
-        id: `${e.relatorId}->${e.relateeId}`,
-        source: e.relatorId,
-        target: e.relateeId,
-        style: { strokeWidth: edgeStrokeWidth(e.value) },
-      })),
+      data.edges.map((e) => {
+        const isOutgoing = e.relatorId === centerId;
+        const relatee = nodeById.get(e.relateeId);
+        return {
+          id: `${e.relatorId}->${e.relateeId}`,
+          source: e.relatorId,
+          target: e.relateeId,
+          style: {
+            strokeWidth: edgeStrokeWidth(e.value),
+            cursor: isOutgoing ? "pointer" : "default",
+          },
+          data: {
+            isOutgoing,
+            value: e.value,
+            relateeId: e.relateeId,
+            relateeName: relatee?.displayName ?? null,
+          },
+        };
+      }),
     );
 
     const sim = forceSimulation(simNodes)
@@ -163,9 +182,6 @@ export function WebGraph() {
     };
   }, [data]);
 
-  // ReactFlow needs a fixed-height parent. Tailwind's h-[500px] keeps
-  // the canvas tall enough to read at desktop widths without dominating
-  // mobile.
   const empty = useMemo(() => !data || data.nodes.length === 0, [data]);
 
   if (isPending) {
@@ -175,8 +191,6 @@ export function WebGraph() {
     return <p role="alert" className="text-base text-destructive">Couldn&apos;t load your web.</p>;
   }
   if (empty) {
-    // Smallest case — center hasn't rated anyone yet. Show a soft
-    // pointer toward Edit mode rather than an empty canvas.
     return (
       <p className="text-base text-muted-foreground">
         No connections yet — start rating members in Edit mode and they&apos;ll appear here.
@@ -194,6 +208,29 @@ export function WebGraph() {
         nodesConnectable={false}
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
+        onNodeClick={(_event, node) => {
+          // Center node has no profile destination distinct from "you
+          // are here" — clicking yourself is a no-op.
+          if (node.data.isCenter) return;
+          const slug = node.data.slug ?? node.data.id;
+          router.push(`/members/${slug}`);
+        }}
+        onEdgeClick={(_event, edge) => {
+          // Re-rate is only available on edges I authored. Incoming-only
+          // edges (someone else rated me, I haven't reciprocated) route
+          // through the suggestion feed instead.
+          const data = edge.data as EdgeData | undefined;
+          if (!data?.isOutgoing) return;
+          const validValue =
+            data.value === 1 || data.value === 2 || data.value === 3 || data.value === 4
+              ? data.value
+              : null;
+          onOpenRating({
+            id: data.relateeId,
+            displayName: data.relateeName,
+            currentValue: validValue,
+          });
+        }}
       />
     </div>
   );

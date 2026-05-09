@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
+import { RatingDialog, type RatingTarget } from "./rating-dialog";
 import { WebBuilder } from "./web-builder";
 import { WebGraph } from "./web-graph";
 
@@ -36,15 +37,18 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   // blank graph; returning members open in View since their last action
   // was the explicit "I'm done" click. The toggle is freely flipable.
   const [mode, setMode] = useState<Mode>(initialLastUpdatedWeb ? "view" : "edit");
+  // Lifted to MyWeb so both the suggestion feed (WebBuilder) and the
+  // graph (WebGraph) can request a rating dialog from a single source.
+  const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
   const markDone = useMarkDone(() => setMode("view"));
 
   return (
     <div className="flex w-full max-w-5xl flex-col items-center gap-6">
-      <WebGraph />
+      <WebGraph onOpenRating={setRatingTarget} />
 
       {mode === "edit" ? (
         <div className="flex w-full max-w-3xl flex-col gap-4">
-          <WebBuilder />
+          <WebBuilder onOpenRating={setRatingTarget} />
           <Button
             variant="secondary"
             className="self-start"
@@ -64,6 +68,8 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
           Edit
         </Button>
       )}
+
+      <RatingDialog target={ratingTarget} onClose={() => setRatingTarget(null)} />
     </div>
   );
 }
