@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { log } from "next-axiom";
 
-import { type ApiVariables, requireAuth } from "./auth-middleware";
+import { type ApiVariables, isAdmin, isUuid, requireAuth } from "./auth-middleware";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -14,6 +14,15 @@ import {
   upsertProfile,
 } from "./profiles";
 import { joinProgram, leaveProgram, listPrograms } from "./programs";
+import {
+  createRelationHint,
+  deleteRelationHint,
+  getPersonalWeb,
+  getRelationSuggestions,
+  isRelationValue,
+  parseOptionalRelationValue,
+  updateRelationValue,
+} from "./relations";
 import { profiles } from "./schema";
 import { resetE2EUsers } from "./test-reset";
 
@@ -93,15 +102,37 @@ const api = new Hono<{ Variables: ApiVariables }>()
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return c.json({ error: "body must be a JSON object" }, 400);
     }
+    const obj = body as Record<string, unknown>;
 
-    const noteCheck = validateNote((body as Record<string, unknown>).note);
+    const noteCheck = validateNote(obj.note);
     if (typeof noteCheck !== "string") {
       return c.json({ error: noteCheck.error }, 400);
     }
 
-    const result = await createInvite({ createdBy: user.id, note: noteCheck });
+    // relationValue and hints are optional — the form omits them for
+    // admin-issued invites and for inviters who decline the picker.
+    const parsed = parseOptionalRelationValue(obj.relationValue);
+    if (!parsed.ok) {
+      return c.json({ error: parsed.error }, 400);
+    }
+
+    const result = await createInvite({
+      createdBy: user.id,
+      note: noteCheck,
+      relationValue: parsed.value,
+      hints: obj.hints as string[] | undefined,
+    });
+
     if ("error" in result) {
-      return c.json({ error: "too_many_active_invites", limit: result.limit }, 429);
+      if (result.error === "too_many_active") {
+        return c.json({ error: "too_many_active_invites", limit: result.limit }, 429);
+      }
+      if (result.error === "invalid_relation_value") {
+        return c.json({ error: "relationValue must be an integer 1..4" }, 400);
+      }
+      // invalid_hints — the reason names exactly what's wrong so the
+      // form can call out the bad chip.
+      return c.json({ error: "invalid_hints", reason: result.reason }, 400);
     }
     return c.json(result, 201);
   })
@@ -113,11 +144,9 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .post("/invites/:code/revoke", async (c) => {
     const user = c.get("user");
     const code = c.req.param("code");
+    const adminFlag = await isAdmin(user.id);
 
-    const [row] = await db.select({ isAdmin: profiles.isAdmin }).from(profiles).where(eq(profiles.id, user.id));
-    const isAdmin = row?.isAdmin ?? false;
-
-    const result = await revokeInvite({ code, userId: user.id, isAdmin });
+    const result = await revokeInvite({ code, userId: user.id, isAdmin: adminFlag });
     if ("error" in result) {
       if (result.error === "not_found") {
         return c.json({ error: "not_found" }, 404);
@@ -170,6 +199,100 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const user = c.get("user");
     const programId = c.req.param("id");
     const result = await leaveProgram(user.id, programId);
+    if ("error" in result) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    return c.json({ ok: true });
+  })
+  .get("/relations/candidates", async (c) => {
+    const user = c.get("user");
+    const feed = await getRelationSuggestions(user.id);
+    return c.json(feed);
+  })
+  .get("/relations/subgraph", async (c) => {
+    const user = c.get("user");
+    // Defaults match the design: outgoing only, two hops. Toggles can
+    // narrow or widen the view from the client.
+    const includeOutgoing = c.req.query("out") !== "false";
+    const includeIncoming = c.req.query("in") === "true";
+    const hops = c.req.query("hops") === "1" ? 1 : 2;
+
+    const subgraph = await getPersonalWeb({
+      centerId: user.id,
+      includeIncoming,
+      includeOutgoing,
+      hops,
+    });
+    return c.json(subgraph);
+  })
+  .put("/relations/value/:relateeId", async (c) => {
+    const user = c.get("user");
+    const relateeId = c.req.param("relateeId");
+    if (!isUuid(relateeId)) {
+      return c.json({ error: "relateeId must be a UUID" }, 400);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "body must be a JSON object" }, 400);
+    }
+    const value = (body as Record<string, unknown>).value;
+    if (!isRelationValue(value)) {
+      return c.json({ error: "value must be an integer 1..4" }, 400);
+    }
+
+    const result = await updateRelationValue({ relatorId: user.id, relateeId, value });
+    if ("error" in result) {
+      if (result.error === "self_relating") return c.json({ error: "self_relating" }, 400);
+      if (result.error === "relatee_not_found") return c.json({ error: "not_found" }, 404);
+    }
+    return c.json({ ok: true });
+  })
+  .post("/relations/hint", async (c) => {
+    const user = c.get("user");
+    if (!(await isAdmin(user.id))) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "body must be a JSON object" }, 400);
+    }
+    const { relatorId, relateeId } = body as Record<string, unknown>;
+    if (!isUuid(relatorId) || !isUuid(relateeId)) {
+      return c.json({ error: "relatorId and relateeId must be UUIDs" }, 400);
+    }
+
+    const result = await createRelationHint({ relatorId, relateeId, hintedBy: user.id });
+    if ("error" in result) {
+      if (result.error === "self_relating") return c.json({ error: "self_relating" }, 400);
+      return c.json({ error: "not_found" }, 404);
+    }
+    return c.json(result, 201);
+  })
+  .delete("/relations/hint/:relatorId/:relateeId", async (c) => {
+    const user = c.get("user");
+    if (!(await isAdmin(user.id))) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+
+    const relatorId = c.req.param("relatorId");
+    const relateeId = c.req.param("relateeId");
+    if (!isUuid(relatorId) || !isUuid(relateeId)) {
+      return c.json({ error: "relatorId and relateeId must be UUIDs" }, 400);
+    }
+
+    const result = await deleteRelationHint({ relatorId, relateeId });
     if ("error" in result) {
       return c.json({ error: "not_found" }, 404);
     }

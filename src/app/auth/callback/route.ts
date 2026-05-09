@@ -4,6 +4,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
 import { upsertProfile } from "@/server/profiles";
+import { materializeInviteRelations } from "@/server/relations";
 import { invites, profiles } from "@/server/schema";
 
 export async function GET(request: NextRequest) {
@@ -64,14 +65,32 @@ export async function GET(request: NextRequest) {
             gt(invites.expiresAt, sql`now()`),
           ),
         )
-        .returning({ inviterId: invites.createdBy });
+        .returning({
+          inviteId: invites.id,
+          inviterId: invites.createdBy,
+          relationValue: invites.relationValue,
+        });
 
       if (rows.length === 0) {
         // Force rollback — no partial state survives.
         throw new InviteInvalid();
       }
 
-      await tx.update(profiles).set({ referredBy: rows[0].inviterId }).where(eq(profiles.id, userId));
+      const { inviteId, inviterId, relationValue } = rows[0];
+
+      await tx.update(profiles).set({ referredBy: inviterId }).where(eq(profiles.id, userId));
+
+      // Materialize the inviter→redeemer rating (from relation_value)
+      // and the redeemer→relatee hints (from invite_hints) into
+      // relations rows. Same tx as the redemption itself so a failure
+      // here rolls back the consumed invite — the new member never
+      // ends up with a half-populated web.
+      await materializeInviteRelations(tx, {
+        inviteId,
+        inviterId,
+        redeemerId: userId,
+        relationValue,
+      });
 
       return true;
     });

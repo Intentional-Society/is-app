@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-08 | James | Relations API: PR 2 of the Relations ship
+
+Hono routes for the candidate feed, personal subgraph, member-rate, and admin hint create/delete; `POST /api/invites` extended with `creatorValue` + `hints`; auth callback now materializes both into `relations` rows in the same transaction as redemption. Soft-hide enforced server-side so the rater's value never reaches the client. No UI yet — that's PR 3.
+
 ## 2026-05-07 | James | Replace ESLint with Biome
 
 Why? `npm run lint` performance goes from 49 s → 0.9 s. Also we now have an automatic formatter tool (see biome.json).
