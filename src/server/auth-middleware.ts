@@ -1,8 +1,29 @@
 import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
 import type { MiddlewareHandler } from "hono";
 
+import { db } from "./db";
+import { profiles } from "./schema";
+
 export type ApiVariables = { user: User };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// UUID predicate, used at API boundaries that take an id from a path
+// or body. Lives in the auth/middleware layer because it's part of
+// the request-shape validators that gate every route, not anything
+// domain-specific.
+export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID_RE.test(v);
+
+// Resolves the admin flag for a given user id with one DB roundtrip.
+// Routes that need an admin gate call this; the alternative would be
+// to attach the flag to the auth-middleware context alongside `user`,
+// which is a fair next step once enough routes care.
+export const isAdmin = async (userId: string): Promise<boolean> => {
+  const [row] = await db.select({ isAdmin: profiles.isAdmin }).from(profiles).where(eq(profiles.id, userId));
+  return row?.isAdmin ?? false;
+};
 
 // Routes that bypass auth. Keep this tight — the regression guard in
 // auth-middleware.test.ts asserts nothing else is public.

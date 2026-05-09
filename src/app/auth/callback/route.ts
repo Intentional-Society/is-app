@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         .returning({
           inviteId: invites.id,
           inviterId: invites.createdBy,
-          creatorValue: invites.creatorValue,
+          relationValue: invites.relationValue,
         });
 
       if (rows.length === 0) {
@@ -76,11 +76,12 @@ export async function GET(request: NextRequest) {
         throw new InviteInvalid();
       }
 
-      const { inviteId, inviterId, creatorValue } = rows[0];
+      const { inviteId, inviterId, relationValue } = rows[0];
 
       await tx.update(profiles).set({ referredBy: inviterId }).where(eq(profiles.id, userId));
 
-      // Materialize any creator_value rating + invite_hints rows into
+      // Materialize the inviter→redeemer rating (from relation_value)
+      // and the redeemer→relatee hints (from invite_hints) into
       // relations rows. Same tx as the redemption itself so a failure
       // here rolls back the consumed invite — the new member never
       // ends up with a half-populated web.
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
         inviteId,
         inviterId,
         redeemerId: userId,
-        creatorValue,
+        relationValue,
       });
 
       return true;

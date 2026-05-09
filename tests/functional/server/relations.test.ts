@@ -12,7 +12,7 @@ import { createServerClient } from "@supabase/ssr";
 import app from "@/server/api";
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
-import { getCandidates, getSubgraph, materializeInviteRelations, rateMember } from "@/server/relations";
+import { getPersonalWeb, getRelationSuggestions, materializeInviteRelations, updateRelationValue } from "@/server/relations";
 import { inviteHints, invites, profiles, relations } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
@@ -51,46 +51,46 @@ const insertUserAndProfile = async (id: string, opts: { displayName?: string; is
 };
 
 const deleteUserAndProfile = async (id: string) => {
-  await db.delete(relations).where(eq(relations.raterId, id));
-  await db.delete(relations).where(eq(relations.rateeId, id));
+  await db.delete(relations).where(eq(relations.relatorId, id));
+  await db.delete(relations).where(eq(relations.relateeId, id));
   await db.delete(invites).where(eq(invites.createdBy, id));
   await db.delete(profiles).where(eq(profiles.id, id));
   await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
 };
 
-describe("rateMember", () => {
-  let raterId: string;
-  let rateeId: string;
+describe("updateRelationValue", () => {
+  let relatorId: string;
+  let relateeId: string;
 
   beforeEach(async () => {
-    raterId = randomUUID();
-    rateeId = randomUUID();
-    await insertUserAndProfile(raterId);
-    await insertUserAndProfile(rateeId);
+    relatorId = randomUUID();
+    relateeId = randomUUID();
+    await insertUserAndProfile(relatorId);
+    await insertUserAndProfile(relateeId);
   });
 
   afterEach(async () => {
-    await deleteUserAndProfile(raterId);
-    await deleteUserAndProfile(rateeId);
+    await deleteUserAndProfile(relatorId);
+    await deleteUserAndProfile(relateeId);
   });
 
   it("creates a confirmed rating row", async () => {
-    const r = await rateMember({ raterId, rateeId, value: 3 });
+    const r = await updateRelationValue({ relatorId, relateeId, value: 3 });
     expect(r).toEqual({ ok: true });
 
-    const [row] = await db.select().from(relations).where(eq(relations.raterId, raterId));
+    const [row] = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
     expect(row.value).toBe(3);
     expect(row.isHint).toBe(false);
   });
 
   it("re-rating updates value and bumps updatedAt without changing the primary key", async () => {
-    await rateMember({ raterId, rateeId, value: 2 });
-    const [first] = await db.select().from(relations).where(eq(relations.raterId, raterId));
+    await updateRelationValue({ relatorId, relateeId, value: 2 });
+    const [first] = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
 
     await new Promise((r) => setTimeout(r, 10));
-    await rateMember({ raterId, rateeId, value: 4 });
+    await updateRelationValue({ relatorId, relateeId, value: 4 });
 
-    const rows = await db.select().from(relations).where(eq(relations.raterId, raterId));
+    const rows = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
     expect(rows).toHaveLength(1);
     expect(rows[0].value).toBe(4);
     expect(rows[0].updatedAt.getTime()).toBeGreaterThan(first.updatedAt.getTime());
@@ -101,17 +101,17 @@ describe("rateMember", () => {
     await insertUserAndProfile(hinterId);
     try {
       await db.insert(relations).values({
-        raterId,
-        rateeId,
+        relatorId,
+        relateeId,
         value: null,
         isHint: true,
         hintedBy: hinterId,
       });
 
-      const r = await rateMember({ raterId, rateeId, value: 2 });
+      const r = await updateRelationValue({ relatorId, relateeId, value: 2 });
       expect(r).toEqual({ ok: true });
 
-      const [row] = await db.select().from(relations).where(eq(relations.raterId, raterId));
+      const [row] = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
       expect(row.value).toBe(2);
       expect(row.isHint).toBe(false);
       expect(row.hintedBy).toBe(hinterId);
@@ -121,17 +121,17 @@ describe("rateMember", () => {
   });
 
   it("rejects self-rating before hitting the DB constraint", async () => {
-    const r = await rateMember({ raterId, rateeId: raterId, value: 3 });
-    expect(r).toEqual({ error: "self_rating" });
+    const r = await updateRelationValue({ relatorId, relateeId: relatorId, value: 3 });
+    expect(r).toEqual({ error: "self_relating" });
   });
 
   it("rejects rating a non-existent ratee", async () => {
-    const r = await rateMember({ raterId, rateeId: randomUUID(), value: 3 });
-    expect(r).toEqual({ error: "ratee_not_found" });
+    const r = await updateRelationValue({ relatorId, relateeId: randomUUID(), value: 3 });
+    expect(r).toEqual({ error: "relatee_not_found" });
   });
 });
 
-describe("getCandidates", () => {
+describe("getRelationSuggestions", () => {
   let me: string;
 
   beforeEach(async () => {
@@ -144,7 +144,7 @@ describe("getCandidates", () => {
   });
 
   it("returns an empty feed for a fresh user with no signals", async () => {
-    const feed = await getCandidates(me);
+    const feed = await getRelationSuggestions(me);
     expect(feed.suggestions).toEqual([]);
     expect(feed.otherMembers).toEqual([]);
   });
@@ -153,8 +153,8 @@ describe("getCandidates", () => {
     const them = randomUUID();
     await insertUserAndProfile(them, { displayName: "Them" });
     try {
-      await rateMember({ raterId: them, rateeId: me, value: 4 });
-      const feed = await getCandidates(me);
+      await updateRelationValue({ relatorId: them, relateeId: me, value: 4 });
+      const feed = await getRelationSuggestions(me);
       expect(feed.suggestions).toHaveLength(1);
       expect(feed.suggestions[0].id).toBe(them);
       expect(feed.suggestions[0].reason).toEqual({ type: "ratedYou" });
@@ -169,9 +169,9 @@ describe("getCandidates", () => {
     const them = randomUUID();
     await insertUserAndProfile(them, { displayName: "Them" });
     try {
-      await rateMember({ raterId: them, rateeId: me, value: 3 });
-      await rateMember({ raterId: me, rateeId: them, value: 2 });
-      const feed = await getCandidates(me);
+      await updateRelationValue({ relatorId: them, relateeId: me, value: 3 });
+      await updateRelationValue({ relatorId: me, relateeId: them, value: 2 });
+      const feed = await getRelationSuggestions(me);
       expect(feed.suggestions).toEqual([]);
     } finally {
       await deleteUserAndProfile(them);
@@ -185,13 +185,13 @@ describe("getCandidates", () => {
     await insertUserAndProfile(hinter, { displayName: "Hinter" });
     try {
       await db.insert(relations).values({
-        raterId: me,
-        rateeId: target,
+        relatorId: me,
+        relateeId: target,
         value: null,
         isHint: true,
         hintedBy: hinter,
       });
-      const feed = await getCandidates(me);
+      const feed = await getRelationSuggestions(me);
       expect(feed.suggestions).toHaveLength(1);
       expect(feed.suggestions[0].id).toBe(target);
       expect(feed.suggestions[0].reason).toEqual({
@@ -213,10 +213,10 @@ describe("getCandidates", () => {
     await insertUserAndProfile(acquaintance, { displayName: "Acquaintance" });
     try {
       await db.update(profiles).set({ referredBy: inviter }).where(eq(profiles.id, me));
-      await rateMember({ raterId: inviter, rateeId: friend, value: 4 });
-      await rateMember({ raterId: inviter, rateeId: acquaintance, value: 2 });
+      await updateRelationValue({ relatorId: inviter, relateeId: friend, value: 4 });
+      await updateRelationValue({ relatorId: inviter, relateeId: acquaintance, value: 2 });
 
-      const feed = await getCandidates(me);
+      const feed = await getRelationSuggestions(me);
       // Suggestions empty (acquaintance value < 3 doesn't qualify).
       const ids = feed.otherMembers.map((c) => c.id);
       expect(ids).toContain(friend);
@@ -252,7 +252,7 @@ describe("getCandidates", () => {
         .set({ lastUpdatedWeb: sql`now() - interval '7 days'` })
         .where(eq(profiles.id, stale));
 
-      const feed = await getCandidates(me);
+      const feed = await getRelationSuggestions(me);
       const ids = feed.otherMembers.map((c) => c.id);
       expect(ids).toContain(recent);
       expect(ids).not.toContain(stale);
@@ -268,7 +268,7 @@ describe("getCandidates", () => {
     await insertUserAndProfile(them, { displayName: "Them" });
     try {
       // They rated me (source 1).
-      await rateMember({ raterId: them, rateeId: me, value: 4 });
+      await updateRelationValue({ relatorId: them, relateeId: me, value: 4 });
       // And they're recently active (source 4).
       await db
         .update(profiles)
@@ -279,7 +279,7 @@ describe("getCandidates", () => {
         .set({ lastUpdatedWeb: sql`now() - interval '1 day'` })
         .where(eq(profiles.id, me));
 
-      const feed = await getCandidates(me);
+      const feed = await getRelationSuggestions(me);
       const allCards = [...feed.suggestions, ...feed.otherMembers];
       const occurrences = allCards.filter((c) => c.id === them).length;
       expect(occurrences).toBe(1);
@@ -296,12 +296,12 @@ describe("getCandidates", () => {
       .update(profiles)
       .set({ lastUpdatedWeb: sql`now()` })
       .where(eq(profiles.id, me));
-    const feed = await getCandidates(me);
+    const feed = await getRelationSuggestions(me);
     expect([...feed.suggestions, ...feed.otherMembers].map((c) => c.id)).not.toContain(me);
   });
 });
 
-describe("getSubgraph", () => {
+describe("getPersonalWeb", () => {
   let center: string;
   let a: string;
   let b: string;
@@ -322,46 +322,46 @@ describe("getSubgraph", () => {
   });
 
   it("hops=1, outgoing only, no edges → just the center node", async () => {
-    const sub = await getSubgraph({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
+    const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
     expect(sub.nodes.map((n) => n.id)).toEqual([center]);
     expect(sub.edges).toEqual([]);
   });
 
   it("hops=1, outgoing only — returns my ratings", async () => {
-    await rateMember({ raterId: center, rateeId: a, value: 3 });
-    await rateMember({ raterId: center, rateeId: b, value: 2 });
-    const sub = await getSubgraph({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
+    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
+    const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
     expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a, b]));
     expect(sub.edges).toHaveLength(2);
-    expect(sub.edges.every((e) => e.raterId === center)).toBe(true);
+    expect(sub.edges.every((e) => e.relatorId === center)).toBe(true);
   });
 
   it("hops=1, incoming only — returns ratings of me", async () => {
-    await rateMember({ raterId: a, rateeId: center, value: 3 });
-    const sub = await getSubgraph({ centerId: center, includeIncoming: true, includeOutgoing: false, hops: 1 });
+    await updateRelationValue({ relatorId: a, relateeId: center, value: 3 });
+    const sub = await getPersonalWeb({ centerId: center, includeIncoming: true, includeOutgoing: false, hops: 1 });
     expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a]));
     expect(sub.edges).toHaveLength(1);
-    expect(sub.edges[0]).toMatchObject({ raterId: a, rateeId: center, value: 3 });
+    expect(sub.edges[0]).toMatchObject({ relatorId: a, relateeId: center, value: 3 });
   });
 
   it("paired counter-edges render asymmetry as two rows", async () => {
-    await rateMember({ raterId: center, rateeId: a, value: 3 });
-    await rateMember({ raterId: a, rateeId: center, value: 1 });
-    const sub = await getSubgraph({ centerId: center, includeIncoming: true, includeOutgoing: true, hops: 1 });
+    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+    await updateRelationValue({ relatorId: a, relateeId: center, value: 1 });
+    const sub = await getPersonalWeb({ centerId: center, includeIncoming: true, includeOutgoing: true, hops: 1 });
     expect(sub.edges).toHaveLength(2);
-    const values = sub.edges.map((e) => `${e.raterId === center ? "out" : "in"}:${e.value}`).sort();
+    const values = sub.edges.map((e) => `${e.relatorId === center ? "out" : "in"}:${e.value}`).sort();
     expect(values).toEqual(["in:1", "out:3"]);
   });
 
   it("filters out hint rows entirely", async () => {
     await db.insert(relations).values({
-      raterId: center,
-      rateeId: a,
+      relatorId: center,
+      relateeId: a,
       value: null,
       isHint: true,
       hintedBy: b,
     });
-    const sub = await getSubgraph({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
+    const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
     expect(sub.edges).toEqual([]);
     expect(sub.nodes.map((n) => n.id)).toEqual([center]);
   });
@@ -370,19 +370,19 @@ describe("getSubgraph", () => {
     const c = randomUUID();
     await insertUserAndProfile(c, { displayName: "C" });
     try {
-      await rateMember({ raterId: center, rateeId: a, value: 3 });
-      await rateMember({ raterId: a, rateeId: c, value: 4 });
-      const sub = await getSubgraph({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 2 });
+      await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+      await updateRelationValue({ relatorId: a, relateeId: c, value: 4 });
+      const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 2 });
       const nodeIds = new Set(sub.nodes.map((n) => n.id));
       expect(nodeIds.has(c)).toBe(true);
-      expect(sub.edges.some((e) => e.raterId === a && e.rateeId === c)).toBe(true);
+      expect(sub.edges.some((e) => e.relatorId === a && e.relateeId === c)).toBe(true);
     } finally {
       await deleteUserAndProfile(c);
     }
   });
 
   it("renders gracefully at N=1 (just self, no edges)", async () => {
-    const sub = await getSubgraph({ centerId: center, includeIncoming: true, includeOutgoing: true, hops: 2 });
+    const sub = await getPersonalWeb({ centerId: center, includeIncoming: true, includeOutgoing: true, hops: 2 });
     expect(sub.nodes).toHaveLength(1);
     expect(sub.edges).toEqual([]);
   });
@@ -421,13 +421,13 @@ describe("materializeInviteRelations", () => {
       inviteId: row.id,
       inviterId: inviter,
       redeemerId: redeemer,
-      creatorValue: 3,
+      relationValue: 3,
     });
 
     const [rel] = await db
       .select()
       .from(relations)
-      .where(and(eq(relations.raterId, inviter), eq(relations.rateeId, redeemer)));
+      .where(and(eq(relations.relatorId, inviter), eq(relations.relateeId, redeemer)));
     expect(rel.value).toBe(3);
     expect(rel.isHint).toBe(false);
   });
@@ -447,16 +447,16 @@ describe("materializeInviteRelations", () => {
       inviteId: row.id,
       inviterId: inviter,
       redeemerId: redeemer,
-      creatorValue: null,
+      relationValue: null,
     });
 
-    const rels = await db.select().from(relations).where(eq(relations.raterId, redeemer));
+    const rels = await db.select().from(relations).where(eq(relations.relatorId, redeemer));
     expect(rels).toHaveLength(2);
     for (const rel of rels) {
       expect(rel.isHint).toBe(true);
       expect(rel.value).toBeNull();
       expect(rel.hintedBy).toBe(inviter);
-      expect([h1, h2]).toContain(rel.rateeId);
+      expect([h1, h2]).toContain(rel.relateeId);
     }
   });
 
@@ -469,13 +469,13 @@ describe("materializeInviteRelations", () => {
       inviteId: row.id,
       inviterId: inviter,
       redeemerId: redeemer,
-      creatorValue: null,
+      relationValue: null,
     });
 
     const rels = await db
       .select()
       .from(relations)
-      .where(eq(relations.raterId, redeemer));
+      .where(eq(relations.relatorId, redeemer));
     expect(rels).toEqual([]);
   });
 
@@ -484,18 +484,18 @@ describe("materializeInviteRelations", () => {
     if ("error" in r) throw new Error("seed failed");
     const [row] = await db.select({ id: invites.id }).from(invites).where(eq(invites.code, r.code));
     // Bypass the API validator to construct the pathological row.
-    await db.insert(inviteHints).values({ inviteId: row.id, rateeId: redeemer });
+    await db.insert(inviteHints).values({ inviteId: row.id, relateeId: redeemer });
 
     await expect(
       materializeInviteRelations(db, {
         inviteId: row.id,
         inviterId: inviter,
         redeemerId: redeemer,
-        creatorValue: null,
+        relationValue: null,
       }),
     ).resolves.toBeUndefined();
 
-    const rels = await db.select().from(relations).where(eq(relations.raterId, redeemer));
+    const rels = await db.select().from(relations).where(eq(relations.relatorId, redeemer));
     expect(rels).toEqual([]);
   });
 
@@ -514,18 +514,18 @@ describe("materializeInviteRelations", () => {
           inviteId: row.id,
           inviterId: inviter,
           redeemerId: redeemer,
-          creatorValue: 3,
+          relationValue: 3,
         });
         // Sanity: the rows are visible inside the open tx.
-        const inside = await tx.select().from(relations).where(eq(relations.rateeId, redeemer));
+        const inside = await tx.select().from(relations).where(eq(relations.relateeId, redeemer));
         expect(inside.length).toBeGreaterThan(0);
         throw new Error("simulated failure after materialization");
       }),
     ).rejects.toThrow("simulated failure");
 
     // After rollback, none of the materialized rows are visible.
-    const after = await db.select().from(relations).where(eq(relations.rateeId, redeemer));
-    const fromRedeemer = await db.select().from(relations).where(eq(relations.raterId, redeemer));
+    const after = await db.select().from(relations).where(eq(relations.relateeId, redeemer));
+    const fromRedeemer = await db.select().from(relations).where(eq(relations.relatorId, redeemer));
     expect(after).toEqual([]);
     expect(fromRedeemer).toEqual([]);
   });
@@ -539,15 +539,15 @@ describe("materializeInviteRelations", () => {
       inviteId: row.id,
       inviterId: null,
       redeemerId: redeemer,
-      creatorValue: 3,
+      relationValue: 3,
     });
 
-    const rels = await db.select().from(relations).where(eq(relations.rateeId, redeemer));
+    const rels = await db.select().from(relations).where(eq(relations.relateeId, redeemer));
     expect(rels).toEqual([]);
   });
 });
 
-describe("PUT /api/relations/:rateeId", () => {
+describe("PUT /api/relations/value/:relateeId", () => {
   let me: string;
   let other: string;
 
@@ -565,8 +565,8 @@ describe("PUT /api/relations/:rateeId", () => {
     await deleteUserAndProfile(other);
   });
 
-  const put = (rateeId: string, body: unknown) =>
-    app.request(`/api/relations/${rateeId}`, {
+  const put = (relateeId: string, body: unknown) =>
+    app.request(`/api/relations/value/${relateeId}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -576,7 +576,7 @@ describe("PUT /api/relations/:rateeId", () => {
     const res = await put(other, { value: 3 });
     expect(res.status).toBe(200);
 
-    const [row] = await db.select().from(relations).where(eq(relations.raterId, me));
+    const [row] = await db.select().from(relations).where(eq(relations.relatorId, me));
     expect(row.value).toBe(3);
   });
 
@@ -589,7 +589,7 @@ describe("PUT /api/relations/:rateeId", () => {
   it("rejects self-rating", async () => {
     const res = await put(me, { value: 3 });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe("self_rating");
+    expect((await res.json()).error).toBe("self_relating");
   });
 
   it("404s on non-existent ratee", async () => {
@@ -622,7 +622,7 @@ describe("GET /api/relations/candidates", () => {
   });
 
   it("returns the soft-hidden ratedYou attribution", async () => {
-    await rateMember({ raterId: them, rateeId: me, value: 4 });
+    await updateRelationValue({ relatorId: them, relateeId: me, value: 4 });
     const res = await app.request("/api/relations/candidates");
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -651,18 +651,18 @@ describe("GET /api/relations/subgraph", () => {
   });
 
   it("default returns my outgoing first-hop subgraph", async () => {
-    await rateMember({ raterId: me, rateeId: other, value: 2 });
+    await updateRelationValue({ relatorId: me, relateeId: other, value: 2 });
     const res = await app.request("/api/relations/subgraph");
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.centerId).toBe(me);
     expect(body.edges).toHaveLength(1);
-    expect(body.edges[0]).toMatchObject({ raterId: me, rateeId: other, value: 2 });
+    expect(body.edges[0]).toMatchObject({ relatorId: me, relateeId: other, value: 2 });
   });
 
   it("query params widen the view", async () => {
-    await rateMember({ raterId: me, rateeId: other, value: 2 });
-    await rateMember({ raterId: other, rateeId: me, value: 4 });
+    await updateRelationValue({ relatorId: me, relateeId: other, value: 2 });
+    await updateRelationValue({ relatorId: other, relateeId: me, value: 4 });
     const res = await app.request("/api/relations/subgraph?in=true&hops=1");
     const body = await res.json();
     expect(body.edges).toHaveLength(2);
@@ -673,17 +673,17 @@ describe("POST /api/relations/hint (admin-only)", () => {
   let admin: string;
   let nonAdmin: string;
   let target: string;
-  let rater: string;
+  let relator: string;
 
   beforeEach(async () => {
     admin = randomUUID();
     nonAdmin = randomUUID();
     target = randomUUID();
-    rater = randomUUID();
+    relator = randomUUID();
     await insertUserAndProfile(admin, { isAdmin: true });
     await insertUserAndProfile(nonAdmin);
     await insertUserAndProfile(target);
-    await insertUserAndProfile(rater);
+    await insertUserAndProfile(relator);
   });
 
   afterEach(async () => {
@@ -691,7 +691,7 @@ describe("POST /api/relations/hint (admin-only)", () => {
     await deleteUserAndProfile(admin);
     await deleteUserAndProfile(nonAdmin);
     await deleteUserAndProfile(target);
-    await deleteUserAndProfile(rater);
+    await deleteUserAndProfile(relator);
   });
 
   const post = (body: unknown) =>
@@ -703,9 +703,9 @@ describe("POST /api/relations/hint (admin-only)", () => {
 
   it("creates a hint when admin", async () => {
     authAs(admin);
-    const res = await post({ raterId: rater, rateeId: target });
+    const res = await post({ relatorId: relator, relateeId: target });
     expect(res.status).toBe(201);
-    const [row] = await db.select().from(relations).where(eq(relations.raterId, rater));
+    const [row] = await db.select().from(relations).where(eq(relations.relatorId, relator));
     expect(row.isHint).toBe(true);
     expect(row.value).toBeNull();
     expect(row.hintedBy).toBe(admin);
@@ -713,37 +713,37 @@ describe("POST /api/relations/hint (admin-only)", () => {
 
   it("403s when non-admin", async () => {
     authAs(nonAdmin);
-    const res = await post({ raterId: rater, rateeId: target });
+    const res = await post({ relatorId: relator, relateeId: target });
     expect(res.status).toBe(403);
   });
 
   it("400 on self-rating", async () => {
     authAs(admin);
-    const res = await post({ raterId: rater, rateeId: rater });
+    const res = await post({ relatorId: relator, relateeId: relator });
     expect(res.status).toBe(400);
   });
 
-  it("404 when rater or ratee profile missing", async () => {
+  it("404 when relator or relatee profile missing", async () => {
     authAs(admin);
-    const res = await post({ raterId: randomUUID(), rateeId: target });
+    const res = await post({ relatorId: randomUUID(), relateeId: target });
     expect(res.status).toBe(404);
   });
 });
 
-describe("DELETE /api/relations/hint/:raterId/:rateeId (admin-only)", () => {
+describe("DELETE /api/relations/hint/:relatorId/:relateeId (admin-only)", () => {
   let admin: string;
   let nonAdmin: string;
-  let rater: string;
+  let relator: string;
   let target: string;
 
   beforeEach(async () => {
     admin = randomUUID();
     nonAdmin = randomUUID();
-    rater = randomUUID();
+    relator = randomUUID();
     target = randomUUID();
     await insertUserAndProfile(admin, { isAdmin: true });
     await insertUserAndProfile(nonAdmin);
-    await insertUserAndProfile(rater);
+    await insertUserAndProfile(relator);
     await insertUserAndProfile(target);
   });
 
@@ -751,44 +751,44 @@ describe("DELETE /api/relations/hint/:raterId/:rateeId (admin-only)", () => {
     mockCreateServerClient.mockReset();
     await deleteUserAndProfile(admin);
     await deleteUserAndProfile(nonAdmin);
-    await deleteUserAndProfile(rater);
+    await deleteUserAndProfile(relator);
     await deleteUserAndProfile(target);
   });
 
   it("deletes a hint when admin", async () => {
     await db.insert(relations).values({
-      raterId: rater,
-      rateeId: target,
+      relatorId: relator,
+      relateeId: target,
       value: null,
       isHint: true,
       hintedBy: admin,
     });
     authAs(admin);
-    const res = await app.request(`/api/relations/hint/${rater}/${target}`, { method: "DELETE" });
+    const res = await app.request(`/api/relations/hint/${relator}/${target}`, { method: "DELETE" });
     expect(res.status).toBe(200);
-    const rows = await db.select().from(relations).where(eq(relations.raterId, rater));
+    const rows = await db.select().from(relations).where(eq(relations.relatorId, relator));
     expect(rows).toEqual([]);
   });
 
   it("refuses to delete a confirmed rating (404)", async () => {
-    await rateMember({ raterId: rater, rateeId: target, value: 3 });
+    await updateRelationValue({ relatorId: relator, relateeId: target, value: 3 });
     authAs(admin);
-    const res = await app.request(`/api/relations/hint/${rater}/${target}`, { method: "DELETE" });
+    const res = await app.request(`/api/relations/hint/${relator}/${target}`, { method: "DELETE" });
     expect(res.status).toBe(404);
-    const rows = await db.select().from(relations).where(eq(relations.raterId, rater));
+    const rows = await db.select().from(relations).where(eq(relations.relatorId, relator));
     expect(rows).toHaveLength(1);
   });
 
   it("403s when non-admin", async () => {
     await db.insert(relations).values({
-      raterId: rater,
-      rateeId: target,
+      relatorId: relator,
+      relateeId: target,
       value: null,
       isHint: true,
       hintedBy: admin,
     });
     authAs(nonAdmin);
-    const res = await app.request(`/api/relations/hint/${rater}/${target}`, { method: "DELETE" });
+    const res = await app.request(`/api/relations/hint/${relator}/${target}`, { method: "DELETE" });
     expect(res.status).toBe(403);
   });
 });

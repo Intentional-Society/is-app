@@ -90,22 +90,26 @@ export const invites = pgTable(
     }),
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
-    creatorValue: integer("creator_value"),
+    // SQL column stays "creator_value" until a rename migration lands;
+    // the TS-side name follows the post-review vocabulary.
+    relationValue: integer("creator_value"),
   },
   (table) => [
     check("invites_redemption_pair", sql`(${table.redeemedBy} IS NULL) = (${table.redeemedAt} IS NULL)`),
     check("invites_expires_after_created", sql`${table.expiresAt} > ${table.createdAt}`),
-    check("invites_creator_value_range", sql`${table.creatorValue} IS NULL OR (${table.creatorValue} BETWEEN 1 AND 4)`),
+    check("invites_creator_value_range", sql`${table.relationValue} IS NULL OR (${table.relationValue} BETWEEN 1 AND 4)`),
   ],
 ).enableRLS();
 
 export const relations = pgTable(
   "relations",
   {
-    raterId: uuid("rater_id")
+    // SQL columns stay rater_id / ratee_id until a rename migration
+    // lands; TS-side names follow the post-review vocabulary.
+    relatorId: uuid("rater_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    rateeId: uuid("ratee_id")
+    relateeId: uuid("ratee_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
     value: integer("value"),
@@ -120,8 +124,8 @@ export const relations = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    primaryKey({ columns: [table.raterId, table.rateeId] }),
-    check("relations_no_self", sql`${table.raterId} != ${table.rateeId}`),
+    primaryKey({ columns: [table.relatorId, table.relateeId] }),
+    check("relations_no_self", sql`${table.relatorId} != ${table.relateeId}`),
     check("relations_value_range", sql`${table.value} IS NULL OR (${table.value} BETWEEN 1 AND 4)`),
     check(
       "relations_hint_state",
@@ -137,10 +141,10 @@ export const inviteHints = pgTable(
     inviteId: uuid("invite_id")
       .notNull()
       .references(() => invites.id, { onDelete: "cascade" }),
-    rateeId: uuid("ratee_id")
+    relateeId: uuid("ratee_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.inviteId, table.rateeId] })],
+  (table) => [primaryKey({ columns: [table.inviteId, table.relateeId] })],
 ).enableRLS();

@@ -68,20 +68,20 @@ export const countActiveInvitesForCreator = async (createdBy: string): Promise<n
 };
 
 export type CreateInviteResult =
-  | { code: string; note: string; expiresAt: Date; creatorValue: RelationValue | null; hintCount: number }
+  | { code: string; note: string; expiresAt: Date; relationValue: RelationValue | null; hintCount: number }
   | { error: "too_many_active"; limit: number }
-  | { error: "invalid_creator_value" }
+  | { error: "invalid_relation_value" }
   | { error: "invalid_hints"; reason: "not_an_array" | "non_uuid" | "self" | "duplicate" | "too_many" | "not_a_member" };
 
 export const createInvite = async (params: {
   createdBy: string;
   note: string;
-  creatorValue?: RelationValue | null;
+  relationValue?: RelationValue | null;
   hints?: string[];
 }): Promise<CreateInviteResult> => {
-  const creatorValue = params.creatorValue ?? null;
-  if (creatorValue !== null && !isRelationValue(creatorValue)) {
-    return { error: "invalid_creator_value" };
+  const relationValue = params.relationValue ?? null;
+  if (relationValue !== null && !isRelationValue(relationValue)) {
+    return { error: "invalid_relation_value" };
   }
 
   // Validate hints up front so we don't burn an invite-code slot on a
@@ -112,23 +112,23 @@ export const createInvite = async (params: {
             createdBy: params.createdBy,
             note: params.note,
             expiresAt: sql`now() + interval '${sql.raw(String(INVITE_LIFETIME_DAYS))} days'`,
-            creatorValue,
+            relationValue,
           })
           .returning({
             id: invites.id,
             code: invites.code,
             note: invites.note,
             expiresAt: invites.expiresAt,
-            creatorValue: invites.creatorValue,
+            relationValue: invites.relationValue,
           });
-        await insertInviteHints(tx, { inviteId: inserted.id, rateeIds: hintCheck.ids });
+        await insertInviteHints(tx, { inviteId: inserted.id, relateeIds: hintCheck.ids });
         return inserted;
       });
       return {
         code: row.code,
         note: row.note,
         expiresAt: row.expiresAt,
-        creatorValue: row.creatorValue as RelationValue | null,
+        relationValue: row.relationValue as RelationValue | null,
         hintCount: hintCheck.ids.length,
       };
     } catch (err) {

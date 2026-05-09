@@ -53,8 +53,8 @@ const insertUserAndProfile = async (id: string, isAdmin = false) => {
 };
 
 const deleteUserAndProfile = async (id: string) => {
-  await db.delete(relations).where(eq(relations.raterId, id));
-  await db.delete(relations).where(eq(relations.rateeId, id));
+  await db.delete(relations).where(eq(relations.relatorId, id));
+  await db.delete(relations).where(eq(relations.relateeId, id));
   await db.delete(invites).where(eq(invites.createdBy, id));
   await db.delete(profiles).where(eq(profiles.id, id));
   await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
@@ -323,17 +323,17 @@ describe("POST /api/invites", () => {
     expect(res.status).toBe(400);
   });
 
-  it("accepts creatorValue and persists it", async () => {
-    const res = await post({ note: "with creator value picker", creatorValue: 3 });
+  it("accepts relationValue and persists it", async () => {
+    const res = await post({ note: "with relation value picker", relationValue: 3 });
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.creatorValue).toBe(3);
-    const [row] = await db.select({ creatorValue: invites.creatorValue }).from(invites).where(eq(invites.code, body.code));
-    expect(row.creatorValue).toBe(3);
+    expect(body.relationValue).toBe(3);
+    const [row] = await db.select({ relationValue: invites.relationValue }).from(invites).where(eq(invites.code, body.code));
+    expect(row.relationValue).toBe(3);
   });
 
-  it("rejects creatorValue outside 1..4", async () => {
-    const res = await post({ note: "creator value out of range", creatorValue: 5 });
+  it("rejects relationValue outside 1..4", async () => {
+    const res = await post({ note: "relation value out of range", relationValue: 5 });
     expect(res.status).toBe(400);
   });
 
@@ -349,7 +349,7 @@ describe("POST /api/invites", () => {
       expect(body.hintCount).toBe(2);
       const [invRow] = await db.select({ id: invites.id }).from(invites).where(eq(invites.code, body.code));
       const hintRows = await db.select().from(inviteHints).where(eq(inviteHints.inviteId, invRow.id));
-      expect(hintRows.map((r) => r.rateeId).sort()).toEqual([h1, h2].sort());
+      expect(hintRows.map((r) => r.relateeId).sort()).toEqual([h1, h2].sort());
     } finally {
       await deleteUserAndProfile(h1);
       await deleteUserAndProfile(h2);

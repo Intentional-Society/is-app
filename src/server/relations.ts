@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
+import { isUuid } from "./auth-middleware";
 import { db } from "./db";
 import { inviteHints, invites, profiles, relations } from "./schema";
 
@@ -13,13 +14,21 @@ export type RelationValue = 1 | 2 | 3 | 4;
 export const isRelationValue = (v: unknown): v is RelationValue =>
   typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 4;
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID_RE.test(v);
+// Body-shape parser shared between POST /api/invites (where the
+// inviter declares their relation to the invitee) and any other route
+// that accepts an optional 1..4 value. Mirrors validateNote's shape:
+// happy value or `{error}` envelope.
+export const parseOptionalRelationValue = (raw: unknown): RelationValue | null | { error: string } => {
+  if (raw === undefined || raw === null) return null;
+  if (!isRelationValue(raw)) return { error: "relationValue must be an integer 1..4" };
+  return raw;
+};
 
-// Card payload returned in the candidate feed. The fields here are what
-// the rating-decision UI needs without navigating away — the design's
-// "enough profile information to make a rating decision" requirement.
-export type CandidateCard = {
+// One suggestion in the relation-suggestion feed. The fields here are
+// what the rating-decision UI needs without navigating away — the
+// design's "enough profile information to make a rating decision"
+// requirement.
+export type RelationSuggestion = {
   id: string;
   slug: string | null;
   displayName: string | null;
@@ -27,21 +36,21 @@ export type CandidateCard = {
   bio: string | null;
   keywords: string[];
   location: string | null;
-  reason: CandidateReason;
+  reason: RelationSuggestionReason;
 };
 
 // Soft-hide is enforced here: the "ratedYou" reason carries no value
 // field, even though the source row has one. The client cannot leak
 // what it never sees.
-export type CandidateReason =
+export type RelationSuggestionReason =
   | { type: "ratedYou" }
   | { type: "hint"; hintedBy: { id: string; displayName: string | null; slug: string | null } | null }
   | { type: "viaInviter"; inviter: { id: string; displayName: string | null; slug: string | null } }
   | { type: "recentlyActive" };
 
-export type CandidateFeed = {
-  suggestions: CandidateCard[];
-  otherMembers: CandidateCard[];
+export type RelationSuggestionFeed = {
+  suggestions: RelationSuggestion[];
+  otherMembers: RelationSuggestion[];
 };
 
 const cardColumns = {
@@ -64,41 +73,40 @@ type CardColumns = {
   location: string | null;
 };
 
-const toCard = (row: CardColumns, reason: CandidateReason): CandidateCard => ({ ...row, reason });
+const toCard = (row: CardColumns, reason: RelationSuggestionReason): RelationSuggestion => ({ ...row, reason });
 
 // Candidate feed sources are enumerated in design-relations.md
 // "Candidate feed sources." Each person appears at most once, in the
 // highest-priority source where they qualify; downstream sources skip
 // IDs already collected. At MVP scale the four-query approach is fine —
 // none of these touch more than ~hundreds of rows.
-export const getCandidates = async (userId: string): Promise<CandidateFeed> => {
+export const getRelationSuggestions = async (userId: string): Promise<RelationSuggestionFeed> => {
   const seen = new Set<string>([userId]);
 
   // Source 1 — people who rated me (with a value), where I have no row
   // back to them at all (no rating, no hint).
-  const ratedMeAlias = relations;
   const ratedMe = await db
     .select(cardColumns)
-    .from(ratedMeAlias)
-    .innerJoin(profiles, eq(profiles.id, ratedMeAlias.raterId))
+    .from(relations)
+    .innerJoin(profiles, eq(profiles.id, relations.relatorId))
     .where(
       and(
-        eq(ratedMeAlias.rateeId, userId),
-        isNotNull(ratedMeAlias.value),
-        sql`NOT EXISTS (SELECT 1 FROM relations rev WHERE rev.rater_id = ${userId} AND rev.ratee_id = ${ratedMeAlias.raterId})`,
+        eq(relations.relateeId, userId),
+        isNotNull(relations.value),
+        sql`NOT EXISTS (SELECT 1 FROM relations rev WHERE rev.rater_id = ${userId} AND rev.ratee_id = ${relations.relatorId})`,
       ),
     )
-    .orderBy(desc(ratedMeAlias.updatedAt));
+    .orderBy(desc(relations.updatedAt));
 
-  const suggestions: CandidateCard[] = [];
+  const suggestions: RelationSuggestion[] = [];
   for (const row of ratedMe) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
     suggestions.push(toCard(row, { type: "ratedYou" }));
   }
 
-  // Source 2 — pending hints for me (rater=me, isHint=true, value=null).
-  // Two queries: hint rows (with ratee profile), then a batch lookup
+  // Source 2 — pending hints for me (relator=me, isHint=true, value=null).
+  // Two queries: hint rows (with relatee profile), then a batch lookup
   // for hinter profiles. Aliasing profiles twice in one Drizzle query
   // is more code than this at our scale.
   const hintRows = await db
@@ -108,8 +116,8 @@ export const getCandidates = async (userId: string): Promise<CandidateFeed> => {
       updatedAt: relations.updatedAt,
     })
     .from(relations)
-    .innerJoin(profiles, eq(profiles.id, relations.rateeId))
-    .where(and(eq(relations.raterId, userId), eq(relations.isHint, true)))
+    .innerJoin(profiles, eq(profiles.id, relations.relateeId))
+    .where(and(eq(relations.relatorId, userId), eq(relations.isHint, true)))
     .orderBy(desc(relations.updatedAt));
 
   const hintIds = hintRows.map((r) => r.hintedBy).filter((x): x is string => !!x);
@@ -138,7 +146,7 @@ export const getCandidates = async (userId: string): Promise<CandidateFeed> => {
     suggestions.push(toCard(card, { type: "hint", hintedBy }));
   }
 
-  const otherMembers: CandidateCard[] = [];
+  const otherMembers: RelationSuggestion[] = [];
 
   // Source 3 — my inviter's higher-rated connections. Only fires when
   // I have a referredBy and that inviter has confirmed ratings ≥ 3.
@@ -161,14 +169,14 @@ export const getCandidates = async (userId: string): Promise<CandidateFeed> => {
       const inviterConnections = await db
         .select(cardColumns)
         .from(relations)
-        .innerJoin(profiles, eq(profiles.id, relations.rateeId))
+        .innerJoin(profiles, eq(profiles.id, relations.relateeId))
         .where(
           and(
-            eq(relations.raterId, inviterId),
+            eq(relations.relatorId, inviterId),
             isNotNull(relations.value),
             sql`${relations.value} >= 3`,
-            ne(relations.rateeId, userId),
-            sql`NOT EXISTS (SELECT 1 FROM relations rev WHERE rev.rater_id = ${userId} AND rev.ratee_id = ${relations.rateeId})`,
+            ne(relations.relateeId, userId),
+            sql`NOT EXISTS (SELECT 1 FROM relations rev WHERE rev.rater_id = ${userId} AND rev.ratee_id = ${relations.relateeId})`,
           ),
         )
         .orderBy(desc(relations.value), desc(relations.updatedAt));
@@ -209,10 +217,11 @@ export const getCandidates = async (userId: string): Promise<CandidateFeed> => {
   return { suggestions, otherMembers };
 };
 
-// Subgraph payload for the WebGraph component. centerId is whoever the
-// graph is rendered around — in the MVP that's always the requesting
-// user, but the component is parameterized for the future profile-page
-// embed (see design-relations.md "Embedded subgraph displays").
+// PersonalWeb payload for the WebGraph component. centerId is whoever
+// the graph is rendered around — in the MVP that's always the
+// requesting user, but the component is parameterized for the future
+// profile-page embed (see design-relations.md "Embedded subgraph
+// displays").
 export type SubgraphNode = {
   id: string;
   slug: string | null;
@@ -221,8 +230,8 @@ export type SubgraphNode = {
 };
 
 export type SubgraphEdge = {
-  raterId: string;
-  rateeId: string;
+  relatorId: string;
+  relateeId: string;
   value: number;
 };
 
@@ -240,8 +249,8 @@ const nodeColumns = {
 };
 
 // One-hop or two-hop personal subgraph. Hints (value IS NULL) are never
-// rendered; they live in the candidate feed.
-export const getSubgraph = async (params: {
+// rendered; they live in the relation-suggestion feed.
+export const getPersonalWeb = async (params: {
   centerId: string;
   includeIncoming: boolean;
   includeOutgoing: boolean;
@@ -252,17 +261,17 @@ export const getSubgraph = async (params: {
   // First hop — direct relations involving centerId.
   const firstHopWhere = (() => {
     if (includeIncoming && includeOutgoing) {
-      return or(eq(relations.raterId, centerId), eq(relations.rateeId, centerId));
+      return or(eq(relations.relatorId, centerId), eq(relations.relateeId, centerId));
     }
-    if (includeOutgoing) return eq(relations.raterId, centerId);
-    if (includeIncoming) return eq(relations.rateeId, centerId);
+    if (includeOutgoing) return eq(relations.relatorId, centerId);
+    if (includeIncoming) return eq(relations.relateeId, centerId);
     return sql`false`;
   })();
 
   const firstHop = await db
     .select({
-      raterId: relations.raterId,
-      rateeId: relations.rateeId,
+      relatorId: relations.relatorId,
+      relateeId: relations.relateeId,
       value: relations.value,
     })
     .from(relations)
@@ -270,13 +279,13 @@ export const getSubgraph = async (params: {
 
   const nodeIds = new Set<string>([centerId]);
   for (const e of firstHop) {
-    nodeIds.add(e.raterId);
-    nodeIds.add(e.rateeId);
+    nodeIds.add(e.relatorId);
+    nodeIds.add(e.relateeId);
   }
 
   const edges: SubgraphEdge[] = firstHop.map((e) => ({
-    raterId: e.raterId,
-    rateeId: e.rateeId,
+    relatorId: e.relatorId,
+    relateeId: e.relateeId,
     // Drizzle's value column is nullable in the type; we filtered on
     // IS NOT NULL above, so the runtime value is guaranteed numeric.
     value: e.value as number,
@@ -290,24 +299,24 @@ export const getSubgraph = async (params: {
     if (firstHopIds.length > 0) {
       const secondHop = await db
         .select({
-          raterId: relations.raterId,
-          rateeId: relations.rateeId,
+          relatorId: relations.relatorId,
+          relateeId: relations.relateeId,
           value: relations.value,
         })
         .from(relations)
         .where(
           and(
             isNotNull(relations.value),
-            inArray(relations.raterId, firstHopIds),
-            ne(relations.rateeId, centerId),
+            inArray(relations.relatorId, firstHopIds),
+            ne(relations.relateeId, centerId),
           ),
         );
       for (const e of secondHop) {
-        if (edges.some((existing) => existing.raterId === e.raterId && existing.rateeId === e.rateeId)) {
+        if (edges.some((existing) => existing.relatorId === e.relatorId && existing.relateeId === e.relateeId)) {
           continue;
         }
-        nodeIds.add(e.rateeId);
-        edges.push({ raterId: e.raterId, rateeId: e.rateeId, value: e.value as number });
+        nodeIds.add(e.relateeId);
+        edges.push({ relatorId: e.relatorId, relateeId: e.relateeId, value: e.value as number });
       }
     }
   }
@@ -320,33 +329,33 @@ export const getSubgraph = async (params: {
   return { centerId, nodes: nodeRows, edges };
 };
 
-// rateMember: create or update the (rater, ratee) row with a confirmed
-// value. If a pending hint exists, this transition flips isHint to
-// false while preserving hintedBy. The check constraint
+// updateRelationValue: create or update the (relator, relatee) row with
+// a confirmed value. If a pending hint exists, this transition flips
+// isHint to false while preserving hintedBy. The check constraint
 // relations_hint_state means we have to set both columns in the same
 // statement.
-export type RateMemberResult = { ok: true } | { error: "self_rating" | "ratee_not_found" };
+export type UpdateRelationValueResult = { ok: true } | { error: "self_relating" | "relatee_not_found" };
 
-export const rateMember = async (params: {
-  raterId: string;
-  rateeId: string;
+export const updateRelationValue = async (params: {
+  relatorId: string;
+  relateeId: string;
   value: RelationValue;
-}): Promise<RateMemberResult> => {
-  if (params.raterId === params.rateeId) return { error: "self_rating" };
+}): Promise<UpdateRelationValueResult> => {
+  if (params.relatorId === params.relateeId) return { error: "self_relating" };
 
-  const [exists] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, params.rateeId));
-  if (!exists) return { error: "ratee_not_found" };
+  const [exists] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, params.relateeId));
+  if (!exists) return { error: "relatee_not_found" };
 
   await db
     .insert(relations)
     .values({
-      raterId: params.raterId,
-      rateeId: params.rateeId,
+      relatorId: params.relatorId,
+      relateeId: params.relateeId,
       value: params.value,
       isHint: false,
     })
     .onConflictDoUpdate({
-      target: [relations.raterId, relations.rateeId],
+      target: [relations.relatorId, relations.relateeId],
       set: {
         value: params.value,
         isHint: false,
@@ -357,63 +366,64 @@ export const rateMember = async (params: {
   return { ok: true };
 };
 
-// createHint: admin-only path. Inserts a pending hint row (value NULL,
-// isHint true, hintedBy set). Ignored silently if a row already exists
-// — admins shouldn't get a hard error from re-clicking a hint button,
-// and the rater's existing state is more authoritative than a re-hint.
-export type CreateHintResult =
+// createRelationHint: admin-only path. Inserts a pending hint row
+// (value NULL, isHint true, hintedBy set). Ignored silently if a row
+// already exists — admins shouldn't get a hard error from re-clicking
+// a hint button, and the relator's existing state is more
+// authoritative than a re-hint.
+export type CreateRelationHintResult =
   | { ok: true; created: boolean }
-  | { error: "self_rating" | "rater_not_found" | "ratee_not_found" };
+  | { error: "self_relating" | "relator_not_found" | "relatee_not_found" };
 
-export const createHint = async (params: {
-  raterId: string;
-  rateeId: string;
+export const createRelationHint = async (params: {
+  relatorId: string;
+  relateeId: string;
   hintedBy: string;
-}): Promise<CreateHintResult> => {
-  if (params.raterId === params.rateeId) return { error: "self_rating" };
+}): Promise<CreateRelationHintResult> => {
+  if (params.relatorId === params.relateeId) return { error: "self_relating" };
 
   const found = await db
     .select({ id: profiles.id })
     .from(profiles)
-    .where(inArray(profiles.id, [params.raterId, params.rateeId]));
+    .where(inArray(profiles.id, [params.relatorId, params.relateeId]));
   const ids = new Set(found.map((r) => r.id));
-  if (!ids.has(params.raterId)) return { error: "rater_not_found" };
-  if (!ids.has(params.rateeId)) return { error: "ratee_not_found" };
+  if (!ids.has(params.relatorId)) return { error: "relator_not_found" };
+  if (!ids.has(params.relateeId)) return { error: "relatee_not_found" };
 
   const result = await db
     .insert(relations)
     .values({
-      raterId: params.raterId,
-      rateeId: params.rateeId,
+      relatorId: params.relatorId,
+      relateeId: params.relateeId,
       value: null,
       isHint: true,
       hintedBy: params.hintedBy,
     })
-    .onConflictDoNothing({ target: [relations.raterId, relations.rateeId] })
-    .returning({ raterId: relations.raterId });
+    .onConflictDoNothing({ target: [relations.relatorId, relations.relateeId] })
+    .returning({ relatorId: relations.relatorId });
 
   return { ok: true, created: result.length > 0 };
 };
 
-// deleteHint: admin-only withdraw. Only deletes when the row is in the
-// pending-hint state — refuses to clobber a confirmed rating, even if
-// the admin asked for it.
-export type DeleteHintResult = { ok: true } | { error: "not_found" };
+// deleteRelationHint: admin-only withdraw. Only deletes when the row
+// is in the pending-hint state — refuses to clobber a confirmed
+// rating, even if the admin asked for it.
+export type DeleteRelationHintResult = { ok: true } | { error: "not_found" };
 
-export const deleteHint = async (params: {
-  raterId: string;
-  rateeId: string;
-}): Promise<DeleteHintResult> => {
+export const deleteRelationHint = async (params: {
+  relatorId: string;
+  relateeId: string;
+}): Promise<DeleteRelationHintResult> => {
   const result = await db
     .delete(relations)
     .where(
       and(
-        eq(relations.raterId, params.raterId),
-        eq(relations.rateeId, params.rateeId),
+        eq(relations.relatorId, params.relatorId),
+        eq(relations.relateeId, params.relateeId),
         eq(relations.isHint, true),
       ),
     )
-    .returning({ raterId: relations.raterId });
+    .returning({ relatorId: relations.relatorId });
 
   if (result.length === 0) return { error: "not_found" };
   return { ok: true };
@@ -470,25 +480,25 @@ export const materializeInviteRelations = async (
     inviteId: string;
     inviterId: string | null;
     redeemerId: string;
-    creatorValue: number | null;
+    relationValue: number | null;
   },
 ): Promise<void> => {
-  // creator_value → confirmed inviter→redeemer rating.
-  if (params.inviterId && params.creatorValue !== null) {
+  // relation_value → confirmed inviter→redeemer rating.
+  if (params.inviterId && params.relationValue !== null) {
     await tx
       .insert(relations)
       .values({
-        raterId: params.inviterId,
-        rateeId: params.redeemerId,
-        value: params.creatorValue,
+        relatorId: params.inviterId,
+        relateeId: params.redeemerId,
+        value: params.relationValue,
         isHint: false,
       })
-      .onConflictDoNothing({ target: [relations.raterId, relations.rateeId] });
+      .onConflictDoNothing({ target: [relations.relatorId, relations.relateeId] });
   }
 
-  // invite_hints → pending redeemer→ratee hints, hintedBy=inviter.
+  // invite_hints → pending redeemer→relatee hints, hintedBy=inviter.
   const hints = await tx
-    .select({ rateeId: inviteHints.rateeId })
+    .select({ relateeId: inviteHints.relateeId })
     .from(inviteHints)
     .where(eq(inviteHints.inviteId, params.inviteId));
 
@@ -499,10 +509,10 @@ export const materializeInviteRelations = async (
   // flows, but the auth callback shouldn't fail because of upstream
   // data weirdness.
   const rows = hints
-    .filter((h) => h.rateeId !== params.redeemerId)
+    .filter((h) => h.relateeId !== params.redeemerId)
     .map((h) => ({
-      raterId: params.redeemerId,
-      rateeId: h.rateeId,
+      relatorId: params.redeemerId,
+      relateeId: h.relateeId,
       value: null,
       isHint: true,
       hintedBy: params.inviterId,
@@ -513,7 +523,7 @@ export const materializeInviteRelations = async (
   await tx
     .insert(relations)
     .values(rows)
-    .onConflictDoNothing({ target: [relations.raterId, relations.rateeId] });
+    .onConflictDoNothing({ target: [relations.relatorId, relations.relateeId] });
 };
 
 // Helper for invite creation — writes invite_hints rows in the same
@@ -521,21 +531,8 @@ export const materializeInviteRelations = async (
 // hint list via validateInviteHints.
 export const insertInviteHints = async (
   tx: Tx | typeof db,
-  params: { inviteId: string; rateeIds: string[] },
+  params: { inviteId: string; relateeIds: string[] },
 ): Promise<void> => {
-  if (params.rateeIds.length === 0) return;
-  await tx.insert(inviteHints).values(params.rateeIds.map((rateeId) => ({ inviteId: params.inviteId, rateeId })));
+  if (params.relateeIds.length === 0) return;
+  await tx.insert(inviteHints).values(params.relateeIds.map((relateeId) => ({ inviteId: params.inviteId, relateeId })));
 };
-
-// Convenience wrapper for the API: fetches and parses the admin flag,
-// returns 403 sentinel if the caller isn't an admin. Non-admins still
-// get to call hint endpoints to discover them — admin-gated routes
-// return 403 (not 404) because admin-ness isn't a secret.
-export const isAdmin = async (userId: string): Promise<boolean> => {
-  const [row] = await db.select({ isAdmin: profiles.isAdmin }).from(profiles).where(eq(profiles.id, userId));
-  return row?.isAdmin ?? false;
-};
-
-// Re-export check used by API for self-rating short-circuit before
-// the DB constraint triggers.
-export const sameId = (a: string, b: string): boolean => a === b;

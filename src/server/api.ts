@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { log } from "next-axiom";
 
-import { type ApiVariables, requireAuth } from "./auth-middleware";
+import { type ApiVariables, isAdmin, isUuid, requireAuth } from "./auth-middleware";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -15,14 +15,14 @@ import {
 } from "./profiles";
 import { joinProgram, leaveProgram, listPrograms } from "./programs";
 import {
-  createHint,
-  deleteHint,
-  getCandidates,
-  getSubgraph,
-  isAdmin,
+  createRelationHint,
+  deleteRelationHint,
+  getPersonalWeb,
+  getRelationSuggestions,
   isRelationValue,
-  isUuid,
-  rateMember,
+  parseOptionalRelationValue,
+  type RelationValue,
+  updateRelationValue,
 } from "./relations";
 import { profiles } from "./schema";
 import { resetE2EUsers } from "./test-reset";
@@ -110,21 +110,18 @@ const api = new Hono<{ Variables: ApiVariables }>()
       return c.json({ error: noteCheck.error }, 400);
     }
 
-    // creatorValue and hints are optional — the form omits them for
+    // relationValue and hints are optional — the form omits them for
     // admin-issued invites and for inviters who decline the picker.
-    const rawCreatorValue = obj.creatorValue;
-    let creatorValue: 1 | 2 | 3 | 4 | null = null;
-    if (rawCreatorValue !== undefined && rawCreatorValue !== null) {
-      if (!isRelationValue(rawCreatorValue)) {
-        return c.json({ error: "creatorValue must be an integer 1..4" }, 400);
-      }
-      creatorValue = rawCreatorValue;
+    const parsed = parseOptionalRelationValue(obj.relationValue);
+    if (parsed !== null && typeof parsed === "object") {
+      return c.json({ error: parsed.error }, 400);
     }
+    const relationValue: RelationValue | null = parsed;
 
     const result = await createInvite({
       createdBy: user.id,
       note: noteCheck,
-      creatorValue,
+      relationValue,
       hints: obj.hints as string[] | undefined,
     });
 
@@ -132,8 +129,8 @@ const api = new Hono<{ Variables: ApiVariables }>()
       if (result.error === "too_many_active") {
         return c.json({ error: "too_many_active_invites", limit: result.limit }, 429);
       }
-      if (result.error === "invalid_creator_value") {
-        return c.json({ error: "creatorValue must be an integer 1..4" }, 400);
+      if (result.error === "invalid_relation_value") {
+        return c.json({ error: "relationValue must be an integer 1..4" }, 400);
       }
       // invalid_hints — the reason names exactly what's wrong so the
       // form can call out the bad chip.
@@ -149,11 +146,9 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .post("/invites/:code/revoke", async (c) => {
     const user = c.get("user");
     const code = c.req.param("code");
+    const adminFlag = await isAdmin(user.id);
 
-    const [row] = await db.select({ isAdmin: profiles.isAdmin }).from(profiles).where(eq(profiles.id, user.id));
-    const isAdmin = row?.isAdmin ?? false;
-
-    const result = await revokeInvite({ code, userId: user.id, isAdmin });
+    const result = await revokeInvite({ code, userId: user.id, isAdmin: adminFlag });
     if ("error" in result) {
       if (result.error === "not_found") {
         return c.json({ error: "not_found" }, 404);
@@ -213,18 +208,18 @@ const api = new Hono<{ Variables: ApiVariables }>()
   })
   .get("/relations/candidates", async (c) => {
     const user = c.get("user");
-    const feed = await getCandidates(user.id);
+    const feed = await getRelationSuggestions(user.id);
     return c.json(feed);
   })
   .get("/relations/subgraph", async (c) => {
     const user = c.get("user");
-    // Defaults match the design: outgoing only, one hop. Toggles can
-    // widen the view from the client.
+    // Defaults match the design: outgoing only, two hops. Toggles can
+    // narrow or widen the view from the client.
     const includeOutgoing = c.req.query("out") !== "false";
     const includeIncoming = c.req.query("in") === "true";
-    const hops = c.req.query("hops") === "2" ? 2 : 1;
+    const hops = c.req.query("hops") === "1" ? 1 : 2;
 
-    const subgraph = await getSubgraph({
+    const subgraph = await getPersonalWeb({
       centerId: user.id,
       includeIncoming,
       includeOutgoing,
@@ -232,11 +227,11 @@ const api = new Hono<{ Variables: ApiVariables }>()
     });
     return c.json(subgraph);
   })
-  .put("/relations/:rateeId", async (c) => {
+  .put("/relations/value/:relateeId", async (c) => {
     const user = c.get("user");
-    const rateeId = c.req.param("rateeId");
-    if (!isUuid(rateeId)) {
-      return c.json({ error: "rateeId must be a UUID" }, 400);
+    const relateeId = c.req.param("relateeId");
+    if (!isUuid(relateeId)) {
+      return c.json({ error: "relateeId must be a UUID" }, 400);
     }
 
     let body: unknown;
@@ -253,10 +248,10 @@ const api = new Hono<{ Variables: ApiVariables }>()
       return c.json({ error: "value must be an integer 1..4" }, 400);
     }
 
-    const result = await rateMember({ raterId: user.id, rateeId, value });
+    const result = await updateRelationValue({ relatorId: user.id, relateeId, value });
     if ("error" in result) {
-      if (result.error === "self_rating") return c.json({ error: "self_rating" }, 400);
-      if (result.error === "ratee_not_found") return c.json({ error: "not_found" }, 404);
+      if (result.error === "self_relating") return c.json({ error: "self_relating" }, 400);
+      if (result.error === "relatee_not_found") return c.json({ error: "not_found" }, 404);
     }
     return c.json({ ok: true });
   })
@@ -275,31 +270,31 @@ const api = new Hono<{ Variables: ApiVariables }>()
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return c.json({ error: "body must be a JSON object" }, 400);
     }
-    const { raterId, rateeId } = body as Record<string, unknown>;
-    if (!isUuid(raterId) || !isUuid(rateeId)) {
-      return c.json({ error: "raterId and rateeId must be UUIDs" }, 400);
+    const { relatorId, relateeId } = body as Record<string, unknown>;
+    if (!isUuid(relatorId) || !isUuid(relateeId)) {
+      return c.json({ error: "relatorId and relateeId must be UUIDs" }, 400);
     }
 
-    const result = await createHint({ raterId, rateeId, hintedBy: user.id });
+    const result = await createRelationHint({ relatorId, relateeId, hintedBy: user.id });
     if ("error" in result) {
-      if (result.error === "self_rating") return c.json({ error: "self_rating" }, 400);
+      if (result.error === "self_relating") return c.json({ error: "self_relating" }, 400);
       return c.json({ error: "not_found" }, 404);
     }
     return c.json(result, 201);
   })
-  .delete("/relations/hint/:raterId/:rateeId", async (c) => {
+  .delete("/relations/hint/:relatorId/:relateeId", async (c) => {
     const user = c.get("user");
     if (!(await isAdmin(user.id))) {
       return c.json({ error: "forbidden" }, 403);
     }
 
-    const raterId = c.req.param("raterId");
-    const rateeId = c.req.param("rateeId");
-    if (!isUuid(raterId) || !isUuid(rateeId)) {
-      return c.json({ error: "raterId and rateeId must be UUIDs" }, 400);
+    const relatorId = c.req.param("relatorId");
+    const relateeId = c.req.param("relateeId");
+    if (!isUuid(relatorId) || !isUuid(relateeId)) {
+      return c.json({ error: "relatorId and relateeId must be UUIDs" }, 400);
     }
 
-    const result = await deleteHint({ raterId, rateeId });
+    const result = await deleteRelationHint({ relatorId, relateeId });
     if ("error" in result) {
       return c.json({ error: "not_found" }, 404);
     }
