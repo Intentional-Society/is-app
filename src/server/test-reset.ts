@@ -38,6 +38,7 @@ export const resetE2EUsers = async (): Promise<{ reset: number }> => {
         avatarUrl: null,
         emergencyContact: null,
         liveDesire: null,
+        lastUpdatedWeb: null,
       })
       .where(inArray(profiles.id, ids));
   });

@@ -9,6 +9,7 @@ import {
   getProfileForMember,
   getProfileForSelf,
   listMembers,
+  markWebUpdated,
   parseEditableProfile,
   toSlug,
   upsertProfile,
@@ -89,6 +90,11 @@ const api = new Hono<{ Variables: ApiVariables }>()
 
     const profile = await getProfileForSelf(user.id);
     return c.json({ id: user.id, email: user.email, profile });
+  })
+  .put("/me/last-updated-web", async (c) => {
+    const user = c.get("user");
+    await markWebUpdated(user.id);
+    return c.json({ ok: true });
   })
   .post("/invites", async (c) => {
     const user = c.get("user");

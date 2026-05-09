@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import { asc, eq, isNotNull, or } from "drizzle-orm";
+import { asc, eq, isNotNull, or, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { isUuid } from "./auth-middleware";
@@ -97,6 +97,7 @@ export type ProfileForSelf = {
   emergencyContact: string | null;
   liveDesire: string | null;
   isAdmin: boolean;
+  lastUpdatedWeb: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -122,6 +123,7 @@ export const getProfileForSelf = cache(async (userId: string): Promise<ProfileFo
       emergencyContact: profiles.emergencyContact,
       liveDesire: profiles.liveDesire,
       isAdmin: profiles.isAdmin,
+      lastUpdatedWeb: profiles.lastUpdatedWeb,
       createdAt: profiles.createdAt,
       updatedAt: profiles.updatedAt,
     })
@@ -130,6 +132,14 @@ export const getProfileForSelf = cache(async (userId: string): Promise<ProfileFo
 
   return row ?? null;
 });
+
+// Bumps lastUpdatedWeb to now() on the user's profile. The Done button
+// at the bottom of /myweb is the only caller — clicking it captures
+// "I'm done updating my relations for now" and surfaces the user in
+// other members' "recently active" suggestion source.
+export const markWebUpdated = async (userId: string): Promise<void> => {
+  await db.update(profiles).set({ lastUpdatedWeb: sql`now()` }).where(eq(profiles.id, userId));
+};
 
 export type ProfileForMember = {
   id: string;
