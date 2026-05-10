@@ -1,36 +1,10 @@
-import Link from "next/link";
 import type { UrlObject } from "node:url";
+import Link from "next/link";
 
+import { Avatar } from "@/components/avatar";
+import { KeywordChips } from "@/components/keyword-chips";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberSummary } from "@/lib/api-types";
-
-function MemberAvatar({ member }: { member: MemberSummary }) {
-  const initials = member.displayName
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  if (member.avatarUrl) {
-    return (
-      <div className="aspect-square w-full overflow-hidden rounded-t-sm">
-        {/* biome-ignore lint/performance/noImgElement: avatarUrl is user-supplied and can come from any host */}
-        <img
-          src={member.avatarUrl}
-          alt={member.displayName}
-          className="h-full w-full object-cover"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex aspect-square w-full items-center justify-center rounded-t-sm bg-muted text-2xl font-semibold text-muted-foreground">
-      {initials}
-    </div>
-  );
-}
 
 function MemberCard({ member }: { member: MemberSummary }) {
   const href: UrlObject = { pathname: `/members/${member.slug ?? member.id}` };
@@ -39,27 +13,15 @@ function MemberCard({ member }: { member: MemberSummary }) {
       href={href}
       className="flex h-full flex-col rounded border border-border hover:bg-muted/50 transition-colors overflow-hidden"
     >
-      <MemberAvatar member={member} />
+      <Avatar
+        name={member.displayName}
+        url={member.avatarUrl}
+        className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-t-sm bg-muted text-2xl font-semibold text-muted-foreground"
+      />
       <div className="flex flex-col gap-1 p-4">
         <span className="font-semibold">{member.displayName}</span>
-        {member.location && (
-          <span className="text-sm text-muted-foreground">{member.location}</span>
-        )}
-        {member.keywords.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {member.keywords.slice(0, 4).map((kw) => (
-              <span
-                key={kw}
-                className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-              >
-                {kw}
-              </span>
-            ))}
-            {member.keywords.length > 4 && (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">…</span>
-            )}
-          </div>
-        )}
+        {member.location && <span className="text-sm text-muted-foreground">{member.location}</span>}
+        <KeywordChips keywords={member.keywords} />
       </div>
     </Link>
   );

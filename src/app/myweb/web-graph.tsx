@@ -2,19 +2,13 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { Panel, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  forceCenter,
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  type Simulation,
-} from "d3-force";
+import { type Edge, type Node, type NodeProps, Panel, ReactFlow } from "@xyflow/react";
+import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 
@@ -72,30 +66,16 @@ const fetchSubgraph = async (opts: ViewOptions) => {
 // distinct from a 1-rated acquaintance without dominating the canvas.
 const edgeStrokeWidth = (value: number) => 1.5 + value * 1.25;
 
-const initials = (name: string | null) =>
-  (name ?? "?")
-    .split(" ")
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?";
-
 function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <div
+      <Avatar
+        name={data.displayName}
+        url={data.avatarUrl}
         className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 ${
           data.isCenter ? "border-primary" : "border-border"
         } bg-muted text-base font-semibold text-muted-foreground`}
-      >
-        {data.avatarUrl ? (
-          // biome-ignore lint/performance/noImgElement: avatarUrl can come from any host
-          <img src={data.avatarUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span>{initials(data.displayName)}</span>
-        )}
-      </div>
+      />
       <div className="max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
     </div>
   );
@@ -177,7 +157,12 @@ export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget
 
     const sim = forceSimulation(simNodes)
       .force("charge", forceManyBody().strength(-500))
-      .force("link", forceLink<SimNode, SimEdge>(simEdges).id((d) => d.id).distance(140))
+      .force(
+        "link",
+        forceLink<SimNode, SimEdge>(simEdges)
+          .id((d) => d.id)
+          .distance(140),
+      )
       .force("center", forceCenter(0, 0))
       .force("collide", forceCollide(40))
       .on("tick", () => {
@@ -204,7 +189,11 @@ export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget
     return <p className="text-base text-muted-foreground">Loading your web…</p>;
   }
   if (isError) {
-    return <p role="alert" className="text-base text-destructive">Couldn&apos;t load your web.</p>;
+    return (
+      <p role="alert" className="text-base text-destructive">
+        Couldn&apos;t load your web.
+      </p>
+    );
   }
   if (empty) {
     return (
@@ -238,9 +227,7 @@ export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget
           const data = edge.data as EdgeData | undefined;
           if (!data?.isOutgoing) return;
           const validValue =
-            data.value === 1 || data.value === 2 || data.value === 3 || data.value === 4
-              ? data.value
-              : null;
+            data.value === 1 || data.value === 2 || data.value === 3 || data.value === 4 ? data.value : null;
           onOpenRating({
             id: data.relateeId,
             displayName: data.relateeName,
@@ -248,7 +235,10 @@ export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget
           });
         }}
       >
-        <Panel position="top-right" className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm">
+        <Panel
+          position="top-right"
+          className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+        >
           <label className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
