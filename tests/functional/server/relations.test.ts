@@ -12,7 +12,12 @@ import { createServerClient } from "@supabase/ssr";
 import app from "@/server/api";
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
-import { getPersonalWeb, getRelationSuggestions, materializeInviteRelations, updateRelationValue } from "@/server/relations";
+import {
+  getPersonalWeb,
+  getRelationSuggestions,
+  materializeInviteRelations,
+  updateRelationValue,
+} from "@/server/relations";
 import { inviteHints, invites, profiles, relations } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
@@ -150,9 +155,7 @@ describe("getRelationSuggestions", () => {
   // tests to DB-cleanliness instead of the source logic under test.
   it("a fresh user gets no person-targeted signals (sources 1–3) of their own", async () => {
     const feed = await getRelationSuggestions(me);
-    const personSignals = feed.suggestions.filter((c) =>
-      ["ratedYou", "hint", "viaInviter"].includes(c.reason.type),
-    );
+    const personSignals = feed.suggestions.filter((c) => ["addedYou", "hint", "viaInviter"].includes(c.reason.type));
     expect(personSignals).toEqual([]);
   });
 
@@ -163,7 +166,7 @@ describe("getRelationSuggestions", () => {
       await updateRelationValue({ relatorId: them, relateeId: me, value: 4 });
       const feed = await getRelationSuggestions(me);
       const card = feed.suggestions.find((c) => c.id === them);
-      expect(card?.reason).toEqual({ type: "ratedYou" });
+      expect(card?.reason).toEqual({ type: "addedYou" });
       // No value field anywhere on the card.
       expect(JSON.stringify(card)).not.toContain('"value"');
     } finally {
@@ -246,18 +249,9 @@ describe("getRelationSuggestions", () => {
     await insertUserAndProfile(recent, { displayName: "Recent" });
     await insertUserAndProfile(stale, { displayName: "Stale" });
     try {
-      await db
-        .update(profiles)
-        .set({ lastUpdatedWeb: sql`now() - interval '1 day'` })
-        .where(eq(profiles.id, me));
-      await db
-        .update(profiles)
-        .set({ lastUpdatedWeb: sql`now()` })
-        .where(eq(profiles.id, recent));
-      await db
-        .update(profiles)
-        .set({ lastUpdatedWeb: sql`now() - interval '7 days'` })
-        .where(eq(profiles.id, stale));
+      await db.update(profiles).set({ lastUpdatedWeb: sql`now() - interval '1 day'` }).where(eq(profiles.id, me));
+      await db.update(profiles).set({ lastUpdatedWeb: sql`now()` }).where(eq(profiles.id, recent));
+      await db.update(profiles).set({ lastUpdatedWeb: sql`now() - interval '7 days'` }).where(eq(profiles.id, stale));
 
       const feed = await getRelationSuggestions(me);
       const recentCard = feed.suggestions.find((c) => c.id === recent);
@@ -294,14 +288,8 @@ describe("getRelationSuggestions", () => {
       // They rated me (source 1).
       await updateRelationValue({ relatorId: them, relateeId: me, value: 4 });
       // And they're recently active (source 4).
-      await db
-        .update(profiles)
-        .set({ lastUpdatedWeb: sql`now()` })
-        .where(eq(profiles.id, them));
-      await db
-        .update(profiles)
-        .set({ lastUpdatedWeb: sql`now() - interval '1 day'` })
-        .where(eq(profiles.id, me));
+      await db.update(profiles).set({ lastUpdatedWeb: sql`now()` }).where(eq(profiles.id, them));
+      await db.update(profiles).set({ lastUpdatedWeb: sql`now() - interval '1 day'` }).where(eq(profiles.id, me));
 
       const feed = await getRelationSuggestions(me);
       const allCards = [...feed.suggestions, ...feed.otherMembers];
@@ -309,17 +297,14 @@ describe("getRelationSuggestions", () => {
       expect(occurrences).toBe(1);
       // Source 1 wins.
       expect(feed.suggestions[0].id).toBe(them);
-      expect(feed.suggestions[0].reason).toEqual({ type: "ratedYou" });
+      expect(feed.suggestions[0].reason).toEqual({ type: "addedYou" });
     } finally {
       await deleteUserAndProfile(them);
     }
   });
 
   it("excludes self under all sources", async () => {
-    await db
-      .update(profiles)
-      .set({ lastUpdatedWeb: sql`now()` })
-      .where(eq(profiles.id, me));
+    await db.update(profiles).set({ lastUpdatedWeb: sql`now()` }).where(eq(profiles.id, me));
     const feed = await getRelationSuggestions(me);
     expect([...feed.suggestions, ...feed.otherMembers].map((c) => c.id)).not.toContain(me);
   });
@@ -496,10 +481,7 @@ describe("materializeInviteRelations", () => {
       relationValue: null,
     });
 
-    const rels = await db
-      .select()
-      .from(relations)
-      .where(eq(relations.relatorId, redeemer));
+    const rels = await db.select().from(relations).where(eq(relations.relatorId, redeemer));
     expect(rels).toEqual([]);
   });
 
@@ -645,13 +627,13 @@ describe("GET /api/relations/candidates", () => {
     await deleteUserAndProfile(them);
   });
 
-  it("returns the soft-hidden ratedYou attribution", async () => {
+  it("returns the soft-hidden addedYou attribution", async () => {
     await updateRelationValue({ relatorId: them, relateeId: me, value: 4 });
     const res = await app.request("/api/relations/candidates");
     expect(res.status).toBe(200);
     const body = await res.json();
     const card = body.suggestions.find((c: { id: string }) => c.id === them);
-    expect(card?.reason).toEqual({ type: "ratedYou" });
+    expect(card?.reason).toEqual({ type: "addedYou" });
     // No value field anywhere on the soft-hidden card.
     expect(JSON.stringify(card)).not.toContain('"value"');
   });

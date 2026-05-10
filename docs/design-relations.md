@@ -193,7 +193,7 @@ Surfaced in approximate priority order. At MVP scale (50–100 members), simpler
 4. **Recently active members.** Profiles whose `last_updated_web > my last_updated_web`, minus people I've already rated.
 5. **Everybody else.** The rest of the directory — profiles minus me, minus anyone I've already rated or hinted at, minus anyone surfaced by sources 1–4. Ordered `last_updated_web DESC NULLS LAST, displayName ASC` so engaged-but-not-recent members lead and dormant members tail in.
 
-Sources 1–4 carry an explicit "reason" surfaced in the UI (`ratedYou` / `hintedBy <name>` / `via <inviter>` / `recently active`) — a sub-line that grounds the suggestion in something legible. Source 5 has no derived signal and renders without a reason chip.
+Sources 1–4 carry an explicit "reason" surfaced in the UI (`addedYou` / `hintedBy <name>` / `via <inviter>` / `recently active`) — a sub-line that grounds the suggestion in something legible. Source 5 has no derived signal and renders without a reason chip.
 
 The asymmetry-visibility ethos: when someone shows up because they rated me, I don't see their rating before responding. This is a soft UI hiding, not a hard constraint, and I see their rating on the completed two-way relation.
 

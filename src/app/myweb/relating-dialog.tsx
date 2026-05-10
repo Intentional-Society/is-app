@@ -21,7 +21,7 @@ const VALUE_LABELS: Record<1 | 2 | 3 | 4, { headline: string; detail: string }> 
 
 const VALUES = [1, 2, 3, 4] as const;
 
-export type RatingTarget = {
+export type RelatingTarget = {
   id: string;
   displayName: string | null;
   hintAttribution?: string | null;
@@ -29,11 +29,11 @@ export type RatingTarget = {
 };
 
 type Props = {
-  target: RatingTarget | null;
+  target: RelatingTarget | null;
   onClose: () => void;
 };
 
-export function RatingDialog({ target, onClose }: Props) {
+export function RelatingDialog({ target, onClose }: Props) {
   const queryClient = useQueryClient();
   const [pendingValue, setPendingValue] = useState<1 | 2 | 3 | 4 | null>(null);
 
@@ -76,7 +76,7 @@ export function RatingDialog({ target, onClose }: Props) {
     },
   });
 
-  const rate = (value: 1 | 2 | 3 | 4) => {
+  const relate = (value: 1 | 2 | 3 | 4) => {
     if (!target || mutation.isPending) return;
     setPendingValue(value);
     mutation.mutate(
@@ -94,7 +94,7 @@ export function RatingDialog({ target, onClose }: Props) {
   };
 
   // 1–4 keyboard shortcut while the dialog is open. Re-attached on
-  // every render — cheap, and avoids stale closures on `rate` /
+  // every render — cheap, and avoids stale closures on `relate` /
   // `target`. Skips when a text field would have caught the keystroke.
   useEffect(() => {
     if (!target) return;
@@ -105,7 +105,7 @@ export function RatingDialog({ target, onClose }: Props) {
       const n = Number.parseInt(e.key, 10);
       if (n >= 1 && n <= 4) {
         e.preventDefault();
-        rate(n as 1 | 2 | 3 | 4);
+        relate(n as 1 | 2 | 3 | 4);
       }
     };
     window.addEventListener("keydown", handler);
@@ -127,14 +127,13 @@ export function RatingDialog({ target, onClose }: Props) {
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/20 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <Dialog.Popup
           className="fixed top-1/2 left-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded border border-border bg-popover p-5 text-popover-foreground shadow-lg data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150"
-          aria-describedby={target?.hintAttribution ? "rating-attribution" : undefined}
+          aria-describedby={target?.hintAttribution ? "relating-attribution" : undefined}
         >
           <Dialog.Title className="font-heading text-base font-medium">
-            {target?.currentValue ? "Update your relation with" : "Rate your relation with"}{" "}
-            {target?.displayName ?? "this member"}
+            Describe your relationship with {target?.displayName ?? "this member"}
           </Dialog.Title>
           {target?.hintAttribution && (
-            <p id="rating-attribution" className="mt-1 text-sm text-muted-foreground">
+            <p id="relating-attribution" className="mt-1 text-sm text-muted-foreground">
               {target.hintAttribution}
             </p>
           )}
@@ -150,7 +149,7 @@ export function RatingDialog({ target, onClose }: Props) {
                   variant={isCurrent ? "secondary" : "primary"}
                   className="h-auto justify-start gap-3 px-3 py-2 text-left"
                   disabled={mutation.isPending}
-                  onClick={() => rate(value)}
+                  onClick={() => relate(value)}
                 >
                   <span className="text-lg font-bold tabular-nums">{value}</span>
                   <span className="flex flex-col">

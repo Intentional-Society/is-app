@@ -13,7 +13,7 @@ import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 
 import { RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
-import type { RatingTarget } from "./rating-dialog";
+import type { RelatingTarget } from "./relating-dialog";
 
 type SubgraphNode = RelationSubgraph["nodes"][number];
 
@@ -83,7 +83,7 @@ function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
 
 const nodeTypes = { member: MemberNode };
 
-export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget) => void }) {
+export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const router = useRouter();
   const [view, setView] = useState<ViewOptions>(DEFAULT_VIEW);
   // The view options become part of the query key so toggling refetches
@@ -228,7 +228,7 @@ export function WebGraph({ onOpenRating }: { onOpenRating: (target: RatingTarget
           if (!data?.isOutgoing) return;
           const validValue =
             data.value === 1 || data.value === 2 || data.value === 3 || data.value === 4 ? data.value : null;
-          onOpenRating({
+          onOpenRelating({
             id: data.relateeId,
             displayName: data.relateeName,
             currentValue: validValue,

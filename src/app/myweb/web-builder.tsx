@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api";
 import type { RelationCandidate, RelationCandidatesFeed } from "@/lib/api-types";
 
 import { RELATION_CANDIDATES_QUERY_KEY } from "./query-keys";
-import type { RatingTarget } from "./rating-dialog";
+import type { RelatingTarget } from "./relating-dialog";
 import { SuggestionCard } from "./suggestion-card";
 
 const fetchCandidates = async (): Promise<RelationCandidatesFeed> => {
@@ -15,9 +15,9 @@ const fetchCandidates = async (): Promise<RelationCandidatesFeed> => {
   return res.json();
 };
 
-const targetFromCandidate = (candidate: RelationCandidate): RatingTarget => {
+const targetFromCandidate = (candidate: RelationCandidate): RelatingTarget => {
   // Hint cards reveal the hinter's name in the dialog so the member
-  // sees who suggested them. ratedYou cards intentionally omit the
+  // sees who suggested them. addedYou cards intentionally omit the
   // value (soft-hide) — the API never sends it, so there's nothing
   // to omit here either.
   const hintAttribution =
@@ -31,7 +31,7 @@ const targetFromCandidate = (candidate: RelationCandidate): RatingTarget => {
   };
 };
 
-export function WebBuilder({ onOpenRating }: { onOpenRating: (target: RatingTarget) => void }) {
+export function WebBuilder({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const { data, isPending, isError } = useQuery({
     queryKey: RELATION_CANDIDATES_QUERY_KEY,
     queryFn: fetchCandidates,
@@ -41,11 +41,15 @@ export function WebBuilder({ onOpenRating }: { onOpenRating: (target: RatingTarg
     return <p className="text-base text-muted-foreground">Loading suggestions…</p>;
   }
   if (isError) {
-    return <p role="alert" className="text-base text-destructive">Couldn&apos;t load suggestions.</p>;
+    return (
+      <p role="alert" className="text-base text-destructive">
+        Couldn&apos;t load suggestions.
+      </p>
+    );
   }
 
   const { suggestions, otherMembers } = data;
-  const openRating = (candidate: RelationCandidate) => onOpenRating(targetFromCandidate(candidate));
+  const openRelating = (candidate: RelationCandidate) => onOpenRelating(targetFromCandidate(candidate));
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-8">
@@ -54,10 +58,10 @@ export function WebBuilder({ onOpenRating }: { onOpenRating: (target: RatingTarg
           <h2 id="suggestions-heading" className="text-lg font-semibold">
             Suggestions
           </h2>
-          <ul className="flex flex-col gap-2">
+          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
             {suggestions.map((candidate) => (
               <li key={candidate.id}>
-                <SuggestionCard candidate={candidate} onClick={openRating} />
+                <SuggestionCard candidate={candidate} onClick={openRelating} />
               </li>
             ))}
           </ul>
@@ -69,10 +73,10 @@ export function WebBuilder({ onOpenRating }: { onOpenRating: (target: RatingTarg
           Other members
         </h2>
         {otherMembers.length > 0 ? (
-          <ul className="flex flex-col gap-2">
+          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
             {otherMembers.map((candidate) => (
               <li key={candidate.id}>
-                <SuggestionCard candidate={candidate} onClick={openRating} />
+                <SuggestionCard candidate={candidate} onClick={openRelating} />
               </li>
             ))}
           </ul>

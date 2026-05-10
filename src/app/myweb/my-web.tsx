@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
-import { RatingDialog, type RatingTarget } from "./rating-dialog";
+import { RelatingDialog, type RelatingTarget } from "./relating-dialog";
 import { WebBuilder } from "./web-builder";
 import { WebGraph } from "./web-graph";
 
@@ -39,12 +39,12 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   const [mode, setMode] = useState<Mode>(initialLastUpdatedWeb ? "view" : "edit");
   // Lifted to MyWeb so both the suggestion feed (WebBuilder) and the
   // graph (WebGraph) can request a rating dialog from a single source.
-  const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
+  const [relatingTarget, setRelatingTarget] = useState<RelatingTarget | null>(null);
   const markDone = useMarkDone(() => setMode("view"));
 
   return (
     <div className="flex w-full max-w-5xl flex-col items-center gap-6">
-      <WebGraph onOpenRating={setRatingTarget} />
+      <WebGraph onOpenRelating={setRelatingTarget} />
 
       {/* Toggle floats in the right gutter under the graph so it doesn't
        * claim its own row — WebBuilder sits flush below the graph. Edit
@@ -53,11 +53,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
       <div className="relative w-full">
         <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
           {mode === "edit" ? (
-            <Button
-              variant="secondary"
-              disabled={markDone.isPending}
-              onClick={() => markDone.mutate()}
-            >
+            <Button variant="secondary" disabled={markDone.isPending} onClick={() => markDone.mutate()}>
               {markDone.isPending ? "Saving…" : "Done"}
             </Button>
           ) : (
@@ -72,12 +68,12 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
 
         {mode === "edit" && (
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            <WebBuilder onOpenRating={setRatingTarget} />
+            <WebBuilder onOpenRelating={setRelatingTarget} />
           </div>
         )}
       </div>
 
-      <RatingDialog target={ratingTarget} onClose={() => setRatingTarget(null)} />
+      <RelatingDialog target={relatingTarget} onClose={() => setRelatingTarget(null)} />
     </div>
   );
 }

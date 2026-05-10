@@ -1,4 +1,16 @@
-import { and, asc, desc, eq, inArray, type InferSelectModel, isNotNull, ne, or, type SQLWrapper, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  type InferSelectModel,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  type SQLWrapper,
+  sql,
+} from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 import { isUuid } from "./auth-middleware";
@@ -23,11 +35,11 @@ export const parseOptionalRelationValue = (raw: unknown): ParsedRelationValue =>
   return { ok: true, value: raw };
 };
 
-// Soft-hide is enforced here: the "ratedYou" reason carries no value
+// Soft-hide is enforced here: the "addedYou" reason carries no value
 // field, even though the source row has one. The client cannot leak
 // what it never sees.
 export type RelationSuggestionReason =
-  | { type: "ratedYou" }
+  | { type: "addedYou" }
   | { type: "hint"; hintedBy: { id: string; displayName: string | null; slug: string | null } | null }
   | { type: "viaInviter"; inviter: { id: string; displayName: string | null; slug: string | null } }
   | { type: "recentlyActive" }
@@ -61,7 +73,10 @@ type SuggestionCardColumns = Pick<
   "id" | "slug" | "displayName" | "avatarUrl" | "bio" | "keywords" | "location"
 >;
 
-const toCard = (row: SuggestionCardColumns, reason: RelationSuggestionReason): RelationSuggestion => ({ ...row, reason });
+const toCard = (row: SuggestionCardColumns, reason: RelationSuggestionReason): RelationSuggestion => ({
+  ...row,
+  reason,
+});
 
 // SQL fragment for "the current user has no row in relations pointing
 // at this relatee" — used to exclude already-acted-on people from the
@@ -108,7 +123,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
     )
     .orderBy(desc(relations.updatedAt));
 
-  collectInto(suggestions, seen, ratedMe, (row) => toCard(row, { type: "ratedYou" }));
+  collectInto(suggestions, seen, ratedMe, (row) => toCard(row, { type: "addedYou" }));
 
   // Source 2 — pending hints for me. Two queries instead of one
   // self-joined query: aliasing `profiles` twice in Drizzle for the
@@ -131,7 +146,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
   const hinterById = new Map(hinters.map((h) => [h.id, h]));
 
   collectInto(suggestions, seen, hintRows, ({ hintedBy, ...card }) => {
-    const hinter = hintedBy ? hinterById.get(hintedBy) ?? null : null;
+    const hinter = hintedBy ? (hinterById.get(hintedBy) ?? null) : null;
     return toCard(card, { type: "hint", hintedBy: hinter });
   });
 
@@ -181,9 +196,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
         isNotNull(profiles.lastUpdatedWeb),
         ne(profiles.id, userId),
         noRelationFromUserTo(userId, profiles.id),
-        myLastUpdated
-          ? sql`${profiles.lastUpdatedWeb} > ${myLastUpdated.toISOString()}`
-          : sql`true`,
+        myLastUpdated ? sql`${profiles.lastUpdatedWeb} > ${myLastUpdated.toISOString()}` : sql`true`,
       ),
     )
     .orderBy(desc(profiles.lastUpdatedWeb));
@@ -291,11 +304,7 @@ export const getPersonalWeb = async (params: {
         })
         .from(relations)
         .where(
-          and(
-            isNotNull(relations.value),
-            inArray(relations.relatorId, firstHopIds),
-            ne(relations.relateeId, centerId),
-          ),
+          and(isNotNull(relations.value), inArray(relations.relatorId, firstHopIds), ne(relations.relateeId, centerId)),
         );
       const seen = new Set(edges.map(edgeKey));
       for (const e of secondHop) {
@@ -310,7 +319,11 @@ export const getPersonalWeb = async (params: {
 
   const nodeRows =
     nodeIds.size > 0
-      ? await db.select(nodeColumns).from(profiles).where(inArray(profiles.id, [...nodeIds])).orderBy(asc(profiles.displayName))
+      ? await db
+          .select(nodeColumns)
+          .from(profiles)
+          .where(inArray(profiles.id, [...nodeIds]))
+          .orderBy(asc(profiles.displayName))
       : [];
 
   return { centerId, nodes: nodeRows, edges };

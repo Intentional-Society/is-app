@@ -138,7 +138,9 @@ describe("relations table constraints", () => {
     const rows = await db.select().from(relations);
     const pairs = rows
       .filter(
-        (r) => (r.relatorId === relatorId && r.relateeId === relateeId) || (r.relatorId === relateeId && r.relateeId === relatorId),
+        (r) =>
+          (r.relatorId === relatorId && r.relateeId === relateeId) ||
+          (r.relatorId === relateeId && r.relateeId === relatorId),
       )
       .map((r) => ({ relatorId: r.relatorId, relateeId: r.relateeId, value: r.value }));
     expect(pairs).toHaveLength(2);
@@ -163,7 +165,10 @@ describe("invites.creator_value range", () => {
       note: "creator value null is fine",
     });
     if ("error" in r) throw new Error("seed failed");
-    const [row] = await db.select({ relationValue: invites.relationValue }).from(invites).where(eq(invites.code, r.code));
+    const [row] = await db
+      .select({ relationValue: invites.relationValue })
+      .from(invites)
+      .where(eq(invites.code, r.code));
     expect(row.relationValue).toBeNull();
   });
 
