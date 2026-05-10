@@ -7,25 +7,26 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
+import type { RelationValue } from "@/lib/relation-value";
 
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
 
 // Vocabulary lives in design-relations.md; mirrored here so the dialog
 // reads the same to a member as the design intends. Keep in sync.
-const VALUE_LABELS: Record<1 | 2 | 3 | 4, { headline: string; detail: string }> = {
+const VALUE_LABELS: Record<RelationValue, { headline: string; detail: string }> = {
   1: { headline: "Met in a group", detail: "We've met in group settings and know of each other." },
   2: { headline: "Talked 1-on-1", detail: "We've spent some time talking 1-on-1 enjoyably." },
   3: { headline: "Friend", detail: "Friend." },
   4: { headline: "Deep trust", detail: "Deep trust and knowing." },
 };
 
-const VALUES = [1, 2, 3, 4] as const;
+const VALUES: readonly RelationValue[] = [1, 2, 3, 4];
 
 export type RelatingTarget = {
   id: string;
   displayName: string | null;
   hintAttribution?: string | null;
-  currentValue?: 1 | 2 | 3 | 4 | null;
+  currentValue?: RelationValue | null;
 };
 
 type Props = {
@@ -35,10 +36,10 @@ type Props = {
 
 export function RelatingDialog({ target, onClose }: Props) {
   const queryClient = useQueryClient();
-  const [pendingValue, setPendingValue] = useState<1 | 2 | 3 | 4 | null>(null);
+  const [pendingValue, setPendingValue] = useState<RelationValue | null>(null);
 
   const mutation = useMutation({
-    mutationFn: async ({ relateeId, value }: { relateeId: string; value: 1 | 2 | 3 | 4 }) => {
+    mutationFn: async ({ relateeId, value }: { relateeId: string; value: RelationValue }) => {
       const res = await apiClient.api.relations.value[":relateeId"].$put({
         param: { relateeId },
         json: { value },
@@ -76,7 +77,7 @@ export function RelatingDialog({ target, onClose }: Props) {
     },
   });
 
-  const relate = (value: 1 | 2 | 3 | 4) => {
+  const relate = (value: RelationValue) => {
     if (!target || mutation.isPending) return;
     setPendingValue(value);
     mutation.mutate(
@@ -105,7 +106,7 @@ export function RelatingDialog({ target, onClose }: Props) {
       const n = Number.parseInt(e.key, 10);
       if (n >= 1 && n <= 4) {
         e.preventDefault();
-        relate(n as 1 | 2 | 3 | 4);
+        relate(n as RelationValue);
       }
     };
     window.addEventListener("keydown", handler);

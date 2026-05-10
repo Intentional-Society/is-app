@@ -3,6 +3,8 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
+import { isRelationValue } from "@/lib/relation-value";
+
 import { type ApiVariables, isAdmin, isUuid, requireAuth } from "./auth-middleware";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
@@ -21,7 +23,6 @@ import {
   deleteRelationHint,
   getPersonalWeb,
   getRelationSuggestions,
-  isRelationValue,
   parseOptionalRelationValue,
   updateRelationValue,
 } from "./relations";
@@ -232,11 +233,8 @@ const api = new Hono<{ Variables: ApiVariables }>()
     });
     return c.json(subgraph);
   })
-  // hono/validator typed body — needed so RPC clients can pass
-  // `json: { value }` against a route that also has a path param.
-  // Without it, Hono's type inference exposes only `param`, and the
-  // typed call `apiClient.api.relations.value[":relateeId"].$put({
-  // param, json })` errors on the excess `json` key.
+  // hono/validator typed body — without it, Hono's RPC inference on a
+  // route with a path param rejects the `json` key on the typed call.
   .put(
     "/relations/value/:relateeId",
     validator("json", (body, c) => {

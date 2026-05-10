@@ -1,7 +1,9 @@
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
+import { isRelationValue, type RelationValue } from "@/lib/relation-value";
+
 import { db } from "./db";
-import { insertInviteHints, isRelationValue, type RelationValue, validateInviteHints } from "./relations";
+import { insertInviteHints, validateInviteHints } from "./relations";
 import { invites } from "./schema";
 
 // Alphabet: 23 uppercase letters (no I, O — visually confusable with 1/0)

@@ -28,7 +28,7 @@ const reasonText = (reason: RelationCandidate["reason"]): string | null => {
 // right-angle at the top-right corner; circle sits near the centroid.
 function ReasonIndicator({ text }: { text: string }) {
   return (
-    <Tooltip.Root delay={150}>
+    <Tooltip.Root>
       <Tooltip.Trigger
         render={
           <span className="absolute top-0 right-0 inline-block h-7 w-7">

@@ -46,10 +46,9 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
     <div className="flex w-full max-w-5xl flex-col items-center gap-6">
       <WebGraph onOpenRelating={setRelatingTarget} />
 
-      {/* Toggle floats in the right gutter under the graph so it doesn't
-       * claim its own row — WebBuilder sits flush below the graph. Edit
-       * and Done are the same affordance with a different label, so they
-       * stay in the same coordinates across modes. */}
+      {/* Toggle floats in the right gutter so it doesn't claim its own
+       * row. Edit and Done sit at the same coordinates across modes —
+       * same affordance, different label. */}
       <div className="relative w-full">
         <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
           {mode === "edit" ? (

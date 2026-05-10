@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
+import { isRelationValue } from "@/lib/relation-value";
 
 import { DEFAULT_SUBGRAPH_VIEW, RELATION_SUBGRAPH_QUERY_KEY, type SubgraphViewOptions } from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
@@ -112,7 +113,6 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
   });
 
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
-  const [edges, setEdges] = useState<Edge<EdgeData>[]>([]);
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
   // Captured via ReactFlow's onInit so we can refit the viewport every
   // time node positions change — fitView only auto-fires on first
@@ -120,13 +120,39 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
   // scale the initial random positions happened to produce.
   const flowRef = useRef<ReactFlowInstance<Node<MemberNodeData>, Edge<EdgeData>> | null>(null);
 
+  // Edges never change after the subgraph loads — derive instead of
+  // duplicating into React state.
+  const edges = useMemo<Edge<EdgeData>[]>(() => {
+    if (!data) return [];
+    const centerId = data.centerId;
+    const nodeById = new Map(data.nodes.map((n) => [n.id, n]));
+    return data.edges.map((e) => {
+      const isOutgoing = e.relatorId === centerId;
+      const relatee = nodeById.get(e.relateeId);
+      return {
+        id: `${e.relatorId}->${e.relateeId}`,
+        source: e.relatorId,
+        target: e.relateeId,
+        style: {
+          strokeWidth: edgeStrokeWidth(e.value),
+          cursor: isOutgoing ? "pointer" : "default",
+        },
+        data: {
+          isOutgoing,
+          value: e.value,
+          relateeId: e.relateeId,
+          relateeName: relatee?.displayName ?? null,
+        },
+      };
+    });
+  }, [data]);
+
   // Build (or rebuild) the d3-force simulation whenever the subgraph
   // changes. The viewing member is pinned at the origin so the layout
   // always orients around them.
   useEffect(() => {
     if (!data) return;
     const centerId = data.centerId;
-    const nodeById = new Map(data.nodes.map((n) => [n.id, n]));
 
     const simNodes: SimNode[] = data.nodes.map((n) => {
       const isCenter = n.id === centerId;
@@ -138,6 +164,9 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         fy: isCenter ? 0 : null,
       };
     });
+    // Lookup map kept around for paintFromSim — avoids an O(n²) .find
+    // scan on every tick.
+    const simNodeById = new Map(simNodes.map((n) => [n.id, n]));
     const simEdges: SimEdge[] = data.edges.map((e) => ({
       source: e.relatorId,
       target: e.relateeId,
@@ -145,34 +174,13 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
 
     setNodes(
       data.nodes.map((n) => {
-        const sn = simNodes.find((s) => s.id === n.id);
+        const sn = simNodeById.get(n.id);
         return {
           id: n.id,
           type: "member",
           position: { x: sn?.x ?? 0, y: sn?.y ?? 0 },
           data: { ...n, isCenter: n.id === centerId },
           draggable: true,
-        };
-      }),
-    );
-    setEdges(
-      data.edges.map((e) => {
-        const isOutgoing = e.relatorId === centerId;
-        const relatee = nodeById.get(e.relateeId);
-        return {
-          id: `${e.relatorId}->${e.relateeId}`,
-          source: e.relatorId,
-          target: e.relateeId,
-          style: {
-            strokeWidth: edgeStrokeWidth(e.value),
-            cursor: isOutgoing ? "pointer" : "default",
-          },
-          data: {
-            isOutgoing,
-            value: e.value,
-            relateeId: e.relateeId,
-            relateeName: relatee?.displayName ?? null,
-          },
         };
       }),
     );
@@ -183,7 +191,10 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     // Without this throttle a dev build can render-storm so hard the
     // browser never paints between frames and the simulation looks blank.
     const FRAME_MS = 50;
+    // fitView is not free; throttle to ~4×/sec instead of every paint.
+    const FIT_MS = 250;
     let lastUpdate = 0;
+    let lastFit = 0;
     // No forceCenter — the viewing member is already pinned at the
     // origin via fx/fy, so forceCenter would only pull the other nodes
     // toward the pinned center, fighting the link-distance equilibrium
@@ -201,39 +212,58 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         const now = performance.now();
         if (now - lastUpdate < FRAME_MS) return;
         lastUpdate = now;
-        paintFromSim(simNodes);
+        paintFromSim();
       })
-      .on("end", () => paintFromSim(simNodes));
+      .on("end", () => paintFromSim());
 
     // Paints React node positions from the live simNodes, normalized so
     // the layout's longer axis spans TARGET sim units and is centered
     // on the origin. Combined with a manual fitView refit, this makes
-    // the rendered graph fill the viewport regardless of node count —
-    // a 2-node graph fills the canvas at the same proportion as a
-    // 30-node graph does, just at a larger per-node scale.
-    function paintFromSim(simNodes: SimNode[]) {
+    // the rendered graph fill the viewport regardless of node count.
+    function paintFromSim() {
+      if (simNodes.length === 0) return;
       const TARGET = 600;
-      const xs = simNodes.map((n) => n.x);
-      const ys = simNodes.map((n) => n.y);
-      const w = Math.max(...xs) - Math.min(...xs);
-      const h = Math.max(...ys) - Math.min(...ys);
-      const longer = Math.max(w, h);
+      let minX = simNodes[0].x;
+      let maxX = minX;
+      let minY = simNodes[0].y;
+      let maxY = minY;
+      for (let i = 1; i < simNodes.length; i++) {
+        const sn = simNodes[i];
+        if (sn.x < minX) minX = sn.x;
+        else if (sn.x > maxX) maxX = sn.x;
+        if (sn.y < minY) minY = sn.y;
+        else if (sn.y > maxY) maxY = sn.y;
+      }
+      const longer = Math.max(maxX - minX, maxY - minY);
       const scale = longer > 1 ? TARGET / longer : 1;
-      const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
-      const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
-      setNodes((prev) =>
-        prev.map((node) => {
-          const sn = simNodes.find((s) => s.id === node.id);
+      const cx = (maxX + minX) / 2;
+      const cy = (maxY + minY) / 2;
+
+      setNodes((prev) => {
+        let changed = false;
+        const next = prev.map((node) => {
+          const sn = simNodeById.get(node.id);
           if (!sn) return node;
-          return { ...node, position: { x: (sn.x - cx) * scale, y: (sn.y - cy) * scale } };
-        }),
-      );
-      // Refit on the next frame so the new positions have been
-      // committed to ReactFlow's internal node store before fitting.
-      // duration: 0 = instant (no zoom animation between every tick).
-      requestAnimationFrame(() => {
-        flowRef.current?.fitView({ padding: 0.15, duration: 0 });
+          const x = (sn.x - cx) * scale;
+          const y = (sn.y - cy) * scale;
+          // Sub-pixel changes don't move anything visually; returning
+          // the same array (prev) lets React skip the re-render entirely.
+          if (Math.abs(x - node.position.x) < 0.5 && Math.abs(y - node.position.y) < 0.5) {
+            return node;
+          }
+          changed = true;
+          return { ...node, position: { x, y } };
+        });
+        return changed ? next : prev;
       });
+
+      const now = performance.now();
+      if (now - lastFit >= FIT_MS) {
+        lastFit = now;
+        requestAnimationFrame(() => {
+          flowRef.current?.fitView({ padding: 0.15, duration: 0 });
+        });
+      }
     }
 
     simRef.current?.stop();
@@ -244,7 +274,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     };
   }, [data]);
 
-  const empty = useMemo(() => !data || data.nodes.length === 0, [data]);
+  const empty = !data || data.nodes.length === 0;
 
   if (isPending) {
     return <p className="text-base text-muted-foreground">Loading your web…</p>;
@@ -291,12 +321,10 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           // through the suggestion feed instead.
           const data = edge.data as EdgeData | undefined;
           if (!data?.isOutgoing) return;
-          const validValue =
-            data.value === 1 || data.value === 2 || data.value === 3 || data.value === 4 ? data.value : null;
           onOpenRelating({
             id: data.relateeId,
             displayName: data.relateeName,
-            currentValue: validValue,
+            currentValue: isRelationValue(data.value) ? data.value : null,
           });
         }}
       >
