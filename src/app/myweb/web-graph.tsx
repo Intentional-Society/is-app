@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   type Edge,
   Handle,
@@ -106,6 +106,9 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     // it on mount. Mutations still invalidate via the rating-dialog
     // onSettled handler, so this only suppresses redundant fetches.
     staleTime: 60_000,
+    // Without this, toggling a view checkbox the first time collapses
+    // the graph to the loading placeholder while the new key fetches.
+    placeholderData: keepPreviousData,
   });
 
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
