@@ -37,6 +37,7 @@ const searchValue = (m: MemberSummary): string =>
 export function MemberTypeahead({
   label,
   triggerLabel = "Add a member…",
+  selectedLabel,
   selectedIds,
   excludeIds,
   onSelect,
@@ -44,6 +45,11 @@ export function MemberTypeahead({
 }: {
   label: string;
   triggerLabel?: string;
+  // When set, the trigger shows this in foreground tone instead of the
+  // muted `triggerLabel`. Use for single-pick flows (admin hints) where
+  // the button doubles as the current-selection display. Leave undefined
+  // for multi-pick flows (invite hints) where chips track the picks.
+  selectedLabel?: string | null;
   selectedIds: string[];
   excludeIds?: string[];
   onSelect: (member: MemberSummary) => void;
@@ -74,7 +80,11 @@ export function MemberTypeahead({
               disabled={disabled}
               className="w-full justify-between"
             >
-              <span className="text-muted-foreground">{triggerLabel}</span>
+              {selectedLabel ? (
+                <span>{selectedLabel}</span>
+              ) : (
+                <span className="text-muted-foreground">{triggerLabel}</span>
+              )}
               <ChevronDown className="h-4 w-4 opacity-50" />
             </Button>
           }

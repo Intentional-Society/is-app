@@ -11,7 +11,7 @@ import { createServerClient } from "@supabase/ssr";
 
 import app from "@/server/api";
 import { db } from "@/server/db";
-import { profiles } from "@/server/schema";
+import { profiles, relations } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 
@@ -84,5 +84,72 @@ describe("GET /api/admin/appsettings", () => {
     authAs(null);
     const res = await app.request("/api/admin/appsettings");
     expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/admin/hints", () => {
+  let admin: string;
+  let nonAdmin: string;
+  let other: string;
+
+  beforeEach(async () => {
+    admin = randomUUID();
+    nonAdmin = randomUUID();
+    other = randomUUID();
+    await insertUserAndProfile(admin, { isAdmin: true });
+    await insertUserAndProfile(nonAdmin);
+    await insertUserAndProfile(other);
+    await db.update(profiles).set({ displayName: "Alex Admin" }).where(eq(profiles.id, admin));
+    await db.update(profiles).set({ displayName: "Nora NonAdmin" }).where(eq(profiles.id, nonAdmin));
+    await db.update(profiles).set({ displayName: "Otto Other" }).where(eq(profiles.id, other));
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await db
+      .delete(relations)
+      .where(sql`${relations.relatorId} IN (${nonAdmin}::uuid, ${admin}::uuid, ${other}::uuid)`);
+    await deleteUserAndProfile(admin);
+    await deleteUserAndProfile(nonAdmin);
+    await deleteUserAndProfile(other);
+  });
+
+  it("returns pending hints with relator, relatee, and hintedBy enriched", async () => {
+    await db.insert(relations).values({
+      relatorId: nonAdmin,
+      relateeId: other,
+      value: null,
+      isHint: true,
+      hintedBy: admin,
+    });
+
+    authAs(admin);
+    const res = await app.request("/api/admin/hints");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { hints: Array<{ relator: { id: string }; relatee: { id: string }; hintedBy: { id: string } | null }> };
+    expect(body.hints).toHaveLength(1);
+    expect(body.hints[0].relator.id).toBe(nonAdmin);
+    expect(body.hints[0].relatee.id).toBe(other);
+    expect(body.hints[0].hintedBy?.id).toBe(admin);
+  });
+
+  it("does not return confirmed (non-hint) rows", async () => {
+    await db.insert(relations).values({
+      relatorId: nonAdmin,
+      relateeId: other,
+      value: 3,
+      isHint: false,
+    });
+
+    authAs(admin);
+    const res = await app.request("/api/admin/hints");
+    const body = (await res.json()) as { hints: unknown[] };
+    expect(body.hints).toEqual([]);
+  });
+
+  it("returns 404 for non-admins", async () => {
+    authAs(nonAdmin);
+    const res = await app.request("/api/admin/hints");
+    expect(res.status).toBe(404);
   });
 });

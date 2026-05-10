@@ -24,6 +24,7 @@ import {
   deleteRelationHint,
   getPersonalWeb,
   getRelationSuggestions,
+  listPendingHints,
   parseOptionalRelationValue,
   updateRelationValue,
 } from "./relations";
@@ -40,6 +41,10 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/appsettings", async (c) => {
     const appSettings = await getAppSettings();
     return c.json({ appSettings });
+  })
+  .get("/hints", async (c) => {
+    const hints = await listPendingHints();
+    return c.json({ hints });
   });
 
 const api = new Hono<{ Variables: ApiVariables }>()
