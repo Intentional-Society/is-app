@@ -46,28 +46,36 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
     <div className="flex w-full max-w-5xl flex-col items-center gap-6">
       <WebGraph onOpenRating={setRatingTarget} />
 
-      {mode === "edit" ? (
-        <div className="flex w-full max-w-3xl flex-col gap-4">
-          <WebBuilder onOpenRating={setRatingTarget} />
-          <Button
-            variant="secondary"
-            className="self-start"
-            disabled={markDone.isPending}
-            onClick={() => markDone.mutate()}
-          >
-            {markDone.isPending ? "Saving…" : "Done"}
-          </Button>
+      {/* Toggle floats in the right gutter under the graph so it doesn't
+       * claim its own row — WebBuilder sits flush below the graph. Edit
+       * and Done are the same affordance with a different label, so they
+       * stay in the same coordinates across modes. */}
+      <div className="relative w-full">
+        <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
+          {mode === "edit" ? (
+            <Button
+              variant="secondary"
+              disabled={markDone.isPending}
+              onClick={() => markDone.mutate()}
+            >
+              {markDone.isPending ? "Saving…" : "Done"}
+            </Button>
+          ) : (
+            <Button onClick={() => setMode("edit")}>Edit</Button>
+          )}
           {markDone.isError && (
             <p role="alert" className="text-sm text-destructive">
               Couldn&apos;t save your update — your ratings are still saved.
             </p>
           )}
         </div>
-      ) : (
-        <Button className="self-start" onClick={() => setMode("edit")}>
-          Edit
-        </Button>
-      )}
+
+        {mode === "edit" && (
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+            <WebBuilder onOpenRating={setRatingTarget} />
+          </div>
+        )}
+      </div>
 
       <RatingDialog target={ratingTarget} onClose={() => setRatingTarget(null)} />
     </div>

@@ -143,10 +143,17 @@ describe("getRelationSuggestions", () => {
     await deleteUserAndProfile(me);
   });
 
-  it("returns an empty feed for a fresh user with no signals", async () => {
+  // Assertions in this block scope to the test's own UUIDs rather than
+  // array lengths — the dev DB may carry seeded profiles (e2e admin,
+  // Welcome Tester) from local e2e runs, and those legitimately surface
+  // through sources 4 and 5. Length-based asserts would couple the
+  // tests to DB-cleanliness instead of the source logic under test.
+  it("a fresh user gets no person-targeted signals (sources 1–3) of their own", async () => {
     const feed = await getRelationSuggestions(me);
-    expect(feed.suggestions).toEqual([]);
-    expect(feed.otherMembers).toEqual([]);
+    const personSignals = feed.suggestions.filter((c) =>
+      ["ratedYou", "hint", "viaInviter"].includes(c.reason.type),
+    );
+    expect(personSignals).toEqual([]);
   });
 
   it("source 1 — surfaces people who rated me, without their value (soft-hide)", async () => {
@@ -155,11 +162,10 @@ describe("getRelationSuggestions", () => {
     try {
       await updateRelationValue({ relatorId: them, relateeId: me, value: 4 });
       const feed = await getRelationSuggestions(me);
-      expect(feed.suggestions).toHaveLength(1);
-      expect(feed.suggestions[0].id).toBe(them);
-      expect(feed.suggestions[0].reason).toEqual({ type: "ratedYou" });
+      const card = feed.suggestions.find((c) => c.id === them);
+      expect(card?.reason).toEqual({ type: "ratedYou" });
       // No value field anywhere on the card.
-      expect(JSON.stringify(feed.suggestions[0])).not.toContain('"value"');
+      expect(JSON.stringify(card)).not.toContain('"value"');
     } finally {
       await deleteUserAndProfile(them);
     }
@@ -172,7 +178,8 @@ describe("getRelationSuggestions", () => {
       await updateRelationValue({ relatorId: them, relateeId: me, value: 3 });
       await updateRelationValue({ relatorId: me, relateeId: them, value: 2 });
       const feed = await getRelationSuggestions(me);
-      expect(feed.suggestions).toEqual([]);
+      const allCards = [...feed.suggestions, ...feed.otherMembers];
+      expect(allCards.find((c) => c.id === them)).toBeUndefined();
     } finally {
       await deleteUserAndProfile(them);
     }
@@ -192,9 +199,8 @@ describe("getRelationSuggestions", () => {
         hintedBy: hinter,
       });
       const feed = await getRelationSuggestions(me);
-      expect(feed.suggestions).toHaveLength(1);
-      expect(feed.suggestions[0].id).toBe(target);
-      expect(feed.suggestions[0].reason).toEqual({
+      const card = feed.suggestions.find((c) => c.id === target);
+      expect(card?.reason).toEqual({
         type: "hint",
         hintedBy: { id: hinter, displayName: "Hinter", slug: null },
       });
@@ -217,15 +223,16 @@ describe("getRelationSuggestions", () => {
       await updateRelationValue({ relatorId: inviter, relateeId: acquaintance, value: 2 });
 
       const feed = await getRelationSuggestions(me);
-      // Suggestions empty (acquaintance value < 3 doesn't qualify).
-      const ids = feed.otherMembers.map((c) => c.id);
-      expect(ids).toContain(friend);
-      expect(ids).not.toContain(acquaintance);
-      const friendCard = feed.otherMembers.find((c) => c.id === friend);
+      const friendCard = feed.suggestions.find((c) => c.id === friend);
       expect(friendCard?.reason).toEqual({
         type: "viaInviter",
         inviter: { id: inviter, displayName: "Inviter", slug: null },
       });
+      // Acquaintance (value < 3) doesn't qualify for source 3, so they
+      // fall through to source 5 ("everybody else") and land in
+      // otherMembers with the catch-all `member` reason.
+      const acquaintanceCard = feed.otherMembers.find((c) => c.id === acquaintance);
+      expect(acquaintanceCard?.reason).toEqual({ type: "member" });
     } finally {
       await deleteUserAndProfile(friend);
       await deleteUserAndProfile(acquaintance);
@@ -253,13 +260,30 @@ describe("getRelationSuggestions", () => {
         .where(eq(profiles.id, stale));
 
       const feed = await getRelationSuggestions(me);
-      const ids = feed.otherMembers.map((c) => c.id);
-      expect(ids).toContain(recent);
-      expect(ids).not.toContain(stale);
-      expect(feed.otherMembers.find((c) => c.id === recent)?.reason).toEqual({ type: "recentlyActive" });
+      const recentCard = feed.suggestions.find((c) => c.id === recent);
+      expect(recentCard?.reason).toEqual({ type: "recentlyActive" });
+      // Stale (older than mine) falls through to source 5 and lands in
+      // otherMembers as a plain `member` card.
+      const staleCard = feed.otherMembers.find((c) => c.id === stale);
+      expect(staleCard?.reason).toEqual({ type: "member" });
     } finally {
       await deleteUserAndProfile(recent);
       await deleteUserAndProfile(stale);
+    }
+  });
+
+  it("source 5 — everybody else lands in otherMembers as a `member` card", async () => {
+    const dormant = randomUUID();
+    await insertUserAndProfile(dormant, { displayName: "Dormant" });
+    try {
+      // No relation, no hint, no inviter, no last_updated_web bump —
+      // they only qualify under source 5.
+      const feed = await getRelationSuggestions(me);
+      expect(feed.suggestions.find((c) => c.id === dormant)).toBeUndefined();
+      const card = feed.otherMembers.find((c) => c.id === dormant);
+      expect(card?.reason).toEqual({ type: "member" });
+    } finally {
+      await deleteUserAndProfile(dormant);
     }
   });
 
@@ -626,9 +650,10 @@ describe("GET /api/relations/candidates", () => {
     const res = await app.request("/api/relations/candidates");
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.suggestions).toHaveLength(1);
-    expect(body.suggestions[0].reason).toEqual({ type: "ratedYou" });
-    expect(JSON.stringify(body)).not.toContain('"value"');
+    const card = body.suggestions.find((c: { id: string }) => c.id === them);
+    expect(card?.reason).toEqual({ type: "ratedYou" });
+    // No value field anywhere on the soft-hidden card.
+    expect(JSON.stringify(card)).not.toContain('"value"');
   });
 });
 

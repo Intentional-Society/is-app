@@ -30,7 +30,8 @@ export type RelationSuggestionReason =
   | { type: "ratedYou" }
   | { type: "hint"; hintedBy: { id: string; displayName: string | null; slug: string | null } | null }
   | { type: "viaInviter"; inviter: { id: string; displayName: string | null; slug: string | null } }
-  | { type: "recentlyActive" };
+  | { type: "recentlyActive" }
+  | { type: "member" };
 
 // Card payload for the rating-decision UI. Fields are chosen so a
 // member can decide without navigating away from the suggestion feed.
@@ -81,10 +82,12 @@ const collectInto = <T extends { id: string }>(
   }
 };
 
-// Sources 1–4 are enumerated in design-relations.md "Suggestion feed
+// Sources 1–5 are enumerated in design-relations.md "Suggestion feed
 // sources." Each person appears at most once, in the highest-priority
 // source where they qualify; downstream sources skip already-collected
-// IDs via `seen`.
+// IDs via `seen`. Sources 1–4 land in `suggestions` (signal-bearing);
+// source 5 lands in `otherMembers` (catch-all of the rest of the
+// directory) so the feed never goes empty while a member remains.
 export const getRelationSuggestions = async (userId: string): Promise<RelationSuggestionFeed> => {
   const seen = new Set<string>([userId]);
   const suggestions: RelationSuggestion[] = [];
@@ -163,7 +166,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
         )
         .orderBy(desc(relations.value), desc(relations.updatedAt));
 
-      collectInto(otherMembers, seen, inviterConnections, (row) => toCard(row, { type: "viaInviter", inviter }));
+      collectInto(suggestions, seen, inviterConnections, (row) => toCard(row, { type: "viaInviter", inviter }));
     }
   }
 
@@ -185,7 +188,19 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
     )
     .orderBy(desc(profiles.lastUpdatedWeb));
 
-  collectInto(otherMembers, seen, recentlyActive, (row) => toCard(row, { type: "recentlyActive" }));
+  collectInto(suggestions, seen, recentlyActive, (row) => toCard(row, { type: "recentlyActive" }));
+
+  // Source 5 — everybody else. The catch-all that keeps the feed from
+  // going empty while there's still anyone in the directory left to
+  // relate to. NULLS LAST so a member who's clicked Done at least once
+  // outranks a never-engaged one.
+  const everyoneElse = await db
+    .select(cardColumns)
+    .from(profiles)
+    .where(and(ne(profiles.id, userId), noRelationFromUserTo(userId, profiles.id)))
+    .orderBy(sql`${profiles.lastUpdatedWeb} DESC NULLS LAST`, asc(profiles.displayName));
+
+  collectInto(otherMembers, seen, everyoneElse, (row) => toCard(row, { type: "member" }));
 
   return { suggestions, otherMembers };
 };

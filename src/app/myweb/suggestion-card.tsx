@@ -45,6 +45,10 @@ function ReasonLine({ reason }: { reason: RelationCandidate["reason"] }) {
       );
     case "recentlyActive":
       return <span className="text-sm text-muted-foreground">recently active</span>;
+    case "member":
+      // Source 5 ("everybody else") is the catch-all — no derived signal,
+      // so the card stands on its own without a reason chip.
+      return null;
   }
 }
 
