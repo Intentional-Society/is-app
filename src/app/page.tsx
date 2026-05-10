@@ -47,6 +47,7 @@ function LoggedInHome() {
         <h1 className="text-4xl font-bold">Intentional Society</h1>
         <p className="font-serif italic text-2xl text-muted-foreground">The IS Web App</p>
       </div>
+      <Button render={<Link href="/myweb" />}>My web</Button>
       <Button render={<Link href="/profile" />}>My profile</Button>
       <Button render={<Link href="/members" />}>Member directory</Button>
       <Button render={<Link href="/invites" />}>Manage invites</Button>

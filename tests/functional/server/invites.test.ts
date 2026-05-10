@@ -328,7 +328,10 @@ describe("POST /api/invites", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.relationValue).toBe(3);
-    const [row] = await db.select({ relationValue: invites.relationValue }).from(invites).where(eq(invites.code, body.code));
+    const [row] = await db
+      .select({ relationValue: invites.relationValue })
+      .from(invites)
+      .where(eq(invites.code, body.code));
     expect(row.relationValue).toBe(3);
   });
 

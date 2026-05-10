@@ -4,9 +4,9 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
-## 2026-05-08 | James | Relations API: PR 2 of the Relations ship
+## 2026-05-09 | James | Relations PRs 2 & 3 of the Relations ship
 
-Hono routes for the candidate feed, personal subgraph, member-rate, and admin hint create/delete; `POST /api/invites` extended with `creatorValue` + `hints`; auth callback now materializes both into `relations` rows in the same transaction as redemption. Soft-hide enforced server-side so the rater's value never reaches the client. No UI yet — that's PR 3.
+`/myweb` is live: WebGraph (`@xyflow/react` + `d3-force`) over a Hono RPC backend, with a WebBuilder list of people (with four types of suggestions sorted to the front) and a dialog to set relationship strength.
 
 ## 2026-05-07 | James | Replace ESLint with Biome
 

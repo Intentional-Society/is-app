@@ -97,7 +97,10 @@ export const invites = pgTable(
   (table) => [
     check("invites_redemption_pair", sql`(${table.redeemedBy} IS NULL) = (${table.redeemedAt} IS NULL)`),
     check("invites_expires_after_created", sql`${table.expiresAt} > ${table.createdAt}`),
-    check("invites_creator_value_range", sql`${table.relationValue} IS NULL OR (${table.relationValue} BETWEEN 1 AND 4)`),
+    check(
+      "invites_creator_value_range",
+      sql`${table.relationValue} IS NULL OR (${table.relationValue} BETWEEN 1 AND 4)`,
+    ),
   ],
 ).enableRLS();
 

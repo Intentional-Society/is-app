@@ -1,7 +1,9 @@
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
+import { isRelationValue, type RelationValue } from "@/lib/relation-value";
+
 import { db } from "./db";
-import { insertInviteHints, isRelationValue, type RelationValue, validateInviteHints } from "./relations";
+import { insertInviteHints, validateInviteHints } from "./relations";
 import { invites } from "./schema";
 
 // Alphabet: 23 uppercase letters (no I, O — visually confusable with 1/0)
@@ -71,7 +73,10 @@ export type CreateInviteResult =
   | { code: string; note: string; expiresAt: Date; relationValue: RelationValue | null; hintCount: number }
   | { error: "too_many_active"; limit: number }
   | { error: "invalid_relation_value" }
-  | { error: "invalid_hints"; reason: "not_an_array" | "non_uuid" | "self" | "duplicate" | "too_many" | "not_a_member" };
+  | {
+      error: "invalid_hints";
+      reason: "not_an_array" | "non_uuid" | "self" | "duplicate" | "too_many" | "not_a_member";
+    };
 
 export const createInvite = async (params: {
   createdBy: string;

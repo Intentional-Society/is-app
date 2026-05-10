@@ -191,15 +191,13 @@ Surfaced in approximate priority order. At MVP scale (50–100 members), simpler
 2. **Pending hints for me.** `relations.relatorId = me, isHint = true`. Includes both invite-time hints and post-signup superconnector hints. The `hintedBy` value provides the "James suggests…" attribution.
 3. **My inviter's higher-rated connections.** Rows where `relator = my profiles.referredBy` and `value >= 3`, minus people I've already rated.
 4. **Recently active members.** Profiles whose `last_updated_web > my last_updated_web`, minus people I've already rated.
+5. **Everybody else.** The rest of the directory — profiles minus me, minus anyone I've already rated or hinted at, minus anyone surfaced by sources 1–4. Ordered `last_updated_web DESC NULLS LAST, displayName ASC` so engaged-but-not-recent members lead and dormant members tail in.
 
-Each suggestion carries a "reason" surfaced in the UI (`ratedYou` / `hintedBy <name>` / `via <inviter>` / `recently active`) — a hover or sub-line that grounds the suggestion in something legible.
+Sources 1–4 carry an explicit "reason" surfaced in the UI (`addedYou` / `hintedBy <name>` / `via <inviter>` / `recently active`) — a sub-line that grounds the suggestion in something legible. Source 5 has no derived signal and renders without a reason chip.
 
 The asymmetry-visibility ethos: when someone shows up because they rated me, I don't see their rating before responding. This is a soft UI hiding, not a hard constraint, and I see their rating on the completed two-way relation.
 
-The feed is rendered in two sections:
-
-- **Suggestions.** Currently houses person-targeted signals (sources 1–2 — people who've rated me, pending hints). The label is broad enough to encompass both "from people" suggestions and "from the app" suggestions, so derived signals could be folded in later if it reads better. Auto-hides when empty, giving the user a small "caught up" moment once the queue is cleared.
-- **Other members.** Derived signals — sources 3–4 (inviter's high-rated connections, recently active members). Visible whenever there is anything to show in edit mode.
+The feed renders as a single section titled **"Add people to your relational web"** — sources 1–4 (each marked with the corner indicator that opens the reason on hover) come first, followed by source 5. The indicator is enough to distinguish signal-bearing cards from directory cards without a section break.
 
 ### Rating a suggestion
 

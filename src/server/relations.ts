@@ -1,17 +1,23 @@
-import { and, asc, desc, eq, inArray, type InferSelectModel, isNotNull, ne, or, type SQLWrapper, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  type InferSelectModel,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  type SQLWrapper,
+  sql,
+} from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
+
+import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import { isUuid } from "./auth-middleware";
 import { db } from "./db";
 import { inviteHints, invites, profiles, relations } from "./schema";
-
-// 1..4 vocabulary lives in design-relations.md. The DB enforces the
-// range via check constraints; this validator runs at the API edge so
-// callers get a 400 instead of a constraint violation.
-export type RelationValue = 1 | 2 | 3 | 4;
-
-export const isRelationValue = (v: unknown): v is RelationValue =>
-  typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 4;
 
 // Validates the optional `relationValue` body field shared by POST
 // /api/invites and any future route that accepts an optional 1..4.
@@ -23,14 +29,15 @@ export const parseOptionalRelationValue = (raw: unknown): ParsedRelationValue =>
   return { ok: true, value: raw };
 };
 
-// Soft-hide is enforced here: the "ratedYou" reason carries no value
+// Soft-hide is enforced here: the "addedYou" reason carries no value
 // field, even though the source row has one. The client cannot leak
 // what it never sees.
 export type RelationSuggestionReason =
-  | { type: "ratedYou" }
+  | { type: "addedYou" }
   | { type: "hint"; hintedBy: { id: string; displayName: string | null; slug: string | null } | null }
   | { type: "viaInviter"; inviter: { id: string; displayName: string | null; slug: string | null } }
-  | { type: "recentlyActive" };
+  | { type: "recentlyActive" }
+  | { type: "member" };
 
 // Card payload for the rating-decision UI. Fields are chosen so a
 // member can decide without navigating away from the suggestion feed.
@@ -60,7 +67,10 @@ type SuggestionCardColumns = Pick<
   "id" | "slug" | "displayName" | "avatarUrl" | "bio" | "keywords" | "location"
 >;
 
-const toCard = (row: SuggestionCardColumns, reason: RelationSuggestionReason): RelationSuggestion => ({ ...row, reason });
+const toCard = (row: SuggestionCardColumns, reason: RelationSuggestionReason): RelationSuggestion => ({
+  ...row,
+  reason,
+});
 
 // SQL fragment for "the current user has no row in relations pointing
 // at this relatee" — used to exclude already-acted-on people from the
@@ -81,111 +91,132 @@ const collectInto = <T extends { id: string }>(
   }
 };
 
-// Sources 1–4 are enumerated in design-relations.md "Suggestion feed
+// Sources 1–5 are enumerated in design-relations.md "Suggestion feed
 // sources." Each person appears at most once, in the highest-priority
 // source where they qualify; downstream sources skip already-collected
-// IDs via `seen`.
+// IDs via `seen`. Sources 1–4 land in `suggestions` (signal-bearing);
+// source 5 lands in `otherMembers` (catch-all of the rest of the
+// directory) so the feed never goes empty while a member remains.
 export const getRelationSuggestions = async (userId: string): Promise<RelationSuggestionFeed> => {
   const seen = new Set<string>([userId]);
   const suggestions: RelationSuggestion[] = [];
   const otherMembers: RelationSuggestion[] = [];
 
-  // Source 1 — people who rated me (with a value) and whom I haven't
-  // touched back, with a rating or a hint.
-  const ratedMe = await db
-    .select(cardColumns)
-    .from(relations)
-    .innerJoin(profiles, eq(profiles.id, relations.relatorId))
-    .where(
-      and(
-        eq(relations.relateeId, userId),
-        isNotNull(relations.value),
-        noRelationFromUserTo(userId, relations.relatorId),
-      ),
-    )
-    .orderBy(desc(relations.updatedAt));
+  // First wave: every query that doesn't depend on another fires in
+  // parallel. Source 1 (addedMe), Source 2 hint rows, the `me` lookup
+  // (needed by sources 3 and 4), and Source 5 (everyoneElse) are all
+  // independent.
+  const [addedMe, hintRows, [me], everyoneElse] = await Promise.all([
+    // Source 1 — people who rated me (with a value) and whom I haven't
+    // touched back.
+    db
+      .select(cardColumns)
+      .from(relations)
+      .innerJoin(profiles, eq(profiles.id, relations.relatorId))
+      .where(
+        and(
+          eq(relations.relateeId, userId),
+          isNotNull(relations.value),
+          noRelationFromUserTo(userId, relations.relatorId),
+        ),
+      )
+      .orderBy(desc(relations.updatedAt)),
+    // Source 2 — pending hints for me. Two queries instead of one
+    // self-joined query: aliasing `profiles` twice in Drizzle for the
+    // hinter side is more code than this.
+    db
+      .select({ ...cardColumns, hintedBy: relations.hintedBy })
+      .from(relations)
+      .innerJoin(profiles, eq(profiles.id, relations.relateeId))
+      .where(and(eq(relations.relatorId, userId), eq(relations.isHint, true)))
+      .orderBy(desc(relations.updatedAt)),
+    db
+      .select({ referredBy: profiles.referredBy, lastUpdatedWeb: profiles.lastUpdatedWeb })
+      .from(profiles)
+      .where(eq(profiles.id, userId)),
+    // Source 5 — everybody else. The catch-all that keeps the feed from
+    // going empty while there's still anyone in the directory left to
+    // relate to. NULLS LAST so a member who's clicked Done at least once
+    // outranks a never-engaged one.
+    db
+      .select(cardColumns)
+      .from(profiles)
+      .where(and(ne(profiles.id, userId), noRelationFromUserTo(userId, profiles.id)))
+      .orderBy(sql`${profiles.lastUpdatedWeb} DESC NULLS LAST`, asc(profiles.displayName)),
+  ]);
 
-  collectInto(suggestions, seen, ratedMe, (row) => toCard(row, { type: "ratedYou" }));
-
-  // Source 2 — pending hints for me. Two queries instead of one
-  // self-joined query: aliasing `profiles` twice in Drizzle for the
-  // hinter side is more code than this.
-  const hintRows = await db
-    .select({ ...cardColumns, hintedBy: relations.hintedBy })
-    .from(relations)
-    .innerJoin(profiles, eq(profiles.id, relations.relateeId))
-    .where(and(eq(relations.relatorId, userId), eq(relations.isHint, true)))
-    .orderBy(desc(relations.updatedAt));
-
+  // Second wave: hinter lookup depends on hintRows; sources 3 and 4
+  // depend on `me`. Still independent of each other, so parallel again.
   const hintIds = hintRows.map((r) => r.hintedBy).filter((x): x is string => !!x);
-  const hinters =
+  const myLastUpdated = me?.lastUpdatedWeb ?? null;
+  const inviterId = me?.referredBy ?? null;
+
+  const [hinters, inviter, inviterConnections, recentlyActive] = await Promise.all([
     hintIds.length > 0
-      ? await db
+      ? db
           .select({ id: profiles.id, displayName: profiles.displayName, slug: profiles.slug })
           .from(profiles)
           .where(inArray(profiles.id, hintIds))
-      : [];
-  const hinterById = new Map(hinters.map((h) => [h.id, h]));
+      : Promise.resolve([] as { id: string; displayName: string | null; slug: string | null }[]),
+    // Source 3 prep — inviter profile (skipped when there's no inviter).
+    inviterId
+      ? db
+          .select({ id: profiles.id, displayName: profiles.displayName, slug: profiles.slug })
+          .from(profiles)
+          .where(eq(profiles.id, inviterId))
+          .then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
+    // Source 3 — my inviter's higher-rated connections. Fired in
+    // parallel with the inviter lookup; if the inviter row is missing
+    // (FK guarantees it isn't, but defensively) we just discard these.
+    inviterId
+      ? db
+          .select(cardColumns)
+          .from(relations)
+          .innerJoin(profiles, eq(profiles.id, relations.relateeId))
+          .where(
+            and(
+              eq(relations.relatorId, inviterId),
+              isNotNull(relations.value),
+              sql`${relations.value} >= 3`,
+              ne(relations.relateeId, userId),
+              noRelationFromUserTo(userId, relations.relateeId),
+            ),
+          )
+          .orderBy(desc(relations.value), desc(relations.updatedAt))
+      : Promise.resolve([] as SuggestionCardColumns[]),
+    // Source 4 — members whose last_updated_web is more recent than
+    // mine (or any value, if mine is null).
+    db
+      .select(cardColumns)
+      .from(profiles)
+      .where(
+        and(
+          isNotNull(profiles.lastUpdatedWeb),
+          ne(profiles.id, userId),
+          noRelationFromUserTo(userId, profiles.id),
+          myLastUpdated ? sql`${profiles.lastUpdatedWeb} > ${myLastUpdated.toISOString()}` : sql`true`,
+        ),
+      )
+      .orderBy(desc(profiles.lastUpdatedWeb)),
+  ]);
 
+  // Assemble in priority order so the dedupe via `seen` keeps the
+  // highest-priority reason for any given person.
+  collectInto(suggestions, seen, addedMe, (row) => toCard(row, { type: "addedYou" }));
+
+  const hinterById = new Map(hinters.map((h) => [h.id, h]));
   collectInto(suggestions, seen, hintRows, ({ hintedBy, ...card }) => {
-    const hinter = hintedBy ? hinterById.get(hintedBy) ?? null : null;
+    const hinter = hintedBy ? (hinterById.get(hintedBy) ?? null) : null;
     return toCard(card, { type: "hint", hintedBy: hinter });
   });
 
-  // `me` is needed by sources 3 (referredBy) and 4 (lastUpdatedWeb).
-  const [me] = await db
-    .select({ referredBy: profiles.referredBy, lastUpdatedWeb: profiles.lastUpdatedWeb })
-    .from(profiles)
-    .where(eq(profiles.id, userId));
-
-  // Source 3 — my inviter's higher-rated connections. Only fires when
-  // I have a referredBy and that inviter has confirmed ratings ≥ 3.
-  if (me?.referredBy) {
-    const inviterId = me.referredBy;
-    const [inviter] = await db
-      .select({ id: profiles.id, displayName: profiles.displayName, slug: profiles.slug })
-      .from(profiles)
-      .where(eq(profiles.id, inviterId));
-
-    if (inviter) {
-      const inviterConnections = await db
-        .select(cardColumns)
-        .from(relations)
-        .innerJoin(profiles, eq(profiles.id, relations.relateeId))
-        .where(
-          and(
-            eq(relations.relatorId, inviterId),
-            isNotNull(relations.value),
-            sql`${relations.value} >= 3`,
-            ne(relations.relateeId, userId),
-            noRelationFromUserTo(userId, relations.relateeId),
-          ),
-        )
-        .orderBy(desc(relations.value), desc(relations.updatedAt));
-
-      collectInto(otherMembers, seen, inviterConnections, (row) => toCard(row, { type: "viaInviter", inviter }));
-    }
+  if (inviter) {
+    collectInto(suggestions, seen, inviterConnections, (row) => toCard(row, { type: "viaInviter", inviter }));
   }
 
-  // Source 4 — members whose last_updated_web is more recent than
-  // mine (or any value, if mine is null).
-  const myLastUpdated = me?.lastUpdatedWeb ?? null;
-  const recentlyActive = await db
-    .select(cardColumns)
-    .from(profiles)
-    .where(
-      and(
-        isNotNull(profiles.lastUpdatedWeb),
-        ne(profiles.id, userId),
-        noRelationFromUserTo(userId, profiles.id),
-        myLastUpdated
-          ? sql`${profiles.lastUpdatedWeb} > ${myLastUpdated.toISOString()}`
-          : sql`true`,
-      ),
-    )
-    .orderBy(desc(profiles.lastUpdatedWeb));
-
-  collectInto(otherMembers, seen, recentlyActive, (row) => toCard(row, { type: "recentlyActive" }));
+  collectInto(suggestions, seen, recentlyActive, (row) => toCard(row, { type: "recentlyActive" }));
+  collectInto(otherMembers, seen, everyoneElse, (row) => toCard(row, { type: "member" }));
 
   return { suggestions, otherMembers };
 };
@@ -276,11 +307,7 @@ export const getPersonalWeb = async (params: {
         })
         .from(relations)
         .where(
-          and(
-            isNotNull(relations.value),
-            inArray(relations.relatorId, firstHopIds),
-            ne(relations.relateeId, centerId),
-          ),
+          and(isNotNull(relations.value), inArray(relations.relatorId, firstHopIds), ne(relations.relateeId, centerId)),
         );
       const seen = new Set(edges.map(edgeKey));
       for (const e of secondHop) {
@@ -295,7 +322,11 @@ export const getPersonalWeb = async (params: {
 
   const nodeRows =
     nodeIds.size > 0
-      ? await db.select(nodeColumns).from(profiles).where(inArray(profiles.id, [...nodeIds])).orderBy(asc(profiles.displayName))
+      ? await db
+          .select(nodeColumns)
+          .from(profiles)
+          .where(inArray(profiles.id, [...nodeIds]))
+          .orderBy(asc(profiles.displayName))
       : [];
 
   return { centerId, nodes: nodeRows, edges };
