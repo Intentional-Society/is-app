@@ -4,13 +4,9 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
-## 2026-05-08 | James | Relations UI: PR 3 of the Relations ship
+## 2026-05-09 | James | Relations PRs 2 & 3 of the Relations ship
 
-`/myweb` lights up with the WebGraph (`@xyflow/react` + live `d3-force` simulation, viewing member pinned at the origin) and the WebBuilder (suggestion feed + rating dialog with 1–4 button column and numeric shortcuts, optimistic mutation via TanStack Query). Edit/Done toggle bumps `lastUpdatedWeb` through a new `PUT /api/me/last-updated-web`. Graph supports clicking a node → profile and clicking an outgoing edge → re-rate; toggles for incoming edges and 2-hop are overlaid on the canvas. Welcome tour and richer e2e land with PR 4.
-
-## 2026-05-08 | James | Relations API: PR 2 of the Relations ship
-
-Hono routes for the candidate feed, personal subgraph, member-rate, and admin hint create/delete; `POST /api/invites` extended with `creatorValue` + `hints`; auth callback now materializes both into `relations` rows in the same transaction as redemption. Soft-hide enforced server-side so the rater's value never reaches the client. No UI yet — that's PR 3.
+`/myweb` is live: WebGraph (`@xyflow/react` + `d3-force`) over a Hono RPC backend, with a clickable suggestion feed and optimistic rating mutations. Soft-hide stays server-side — the rater's value never reaches the client. Welcome tour + richer signup-tour e2e land in PR 4.
 
 ## 2026-05-07 | James | Replace ESLint with Biome
 
