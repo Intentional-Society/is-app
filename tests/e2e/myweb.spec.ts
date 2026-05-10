@@ -24,8 +24,8 @@ test("/myweb loads, Done flips into View, Edit flips back", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
 
   // Edit mode is the first-visit default (lastUpdatedWeb IS NULL): the
-  // builder, "Other members" heading, and Done button are all present.
-  await expect(page.getByRole("heading", { name: "Other members" })).toBeVisible();
+  // builder, "Add people to your relational web" heading, and Done button are all present.
+  await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
   const doneButton = page.getByRole("button", { name: "Done" });
   await expect(doneButton).toBeVisible();
 
@@ -33,9 +33,9 @@ test("/myweb loads, Done flips into View, Edit flips back", async ({ page }) => 
   // After PUT /api/me/last-updated-web returns, mode flips to View and
   // the builder vanishes; only the Edit button remains under the graph.
   await expect(page.getByRole("button", { name: "Edit" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Other members" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeHidden();
 
   await page.getByRole("button", { name: "Edit" }).click();
   await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Other members" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
 });

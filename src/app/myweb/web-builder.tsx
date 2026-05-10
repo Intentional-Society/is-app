@@ -49,45 +49,30 @@ export function WebBuilder({ onOpenRelating }: { onOpenRelating: (target: Relati
   }
 
   const { suggestions, otherMembers } = data;
+  // Signal-bearing cards (sources 1–4) come first; the pink corner
+  // indicator on those cards is enough to differentiate them from the
+  // catch-all directory cards (source 5) without a section break.
+  const allCandidates = [...suggestions, ...otherMembers];
   const openRelating = (candidate: RelationCandidate) => onOpenRelating(targetFromCandidate(candidate));
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-8">
-      {suggestions.length > 0 && (
-        <section aria-labelledby="suggestions-heading" className="flex flex-col gap-3">
-          <h2 id="suggestions-heading" className="text-lg font-semibold">
-            Suggestions
-          </h2>
-          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-            {suggestions.map((candidate) => (
-              <li key={candidate.id}>
-                <SuggestionCard candidate={candidate} onClick={openRelating} />
-              </li>
-            ))}
-          </ul>
-        </section>
+    <section aria-labelledby="add-people-heading" className="flex w-full max-w-3xl flex-col gap-3">
+      <h2 id="add-people-heading" className="text-lg font-semibold">
+        Add people to your relational web
+      </h2>
+      {allCandidates.length > 0 ? (
+        <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+          {allCandidates.map((candidate) => (
+            <li key={candidate.id}>
+              <SuggestionCard candidate={candidate} onClick={openRelating} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-base text-muted-foreground">
+          You&apos;ve connected with everyone — no one left to add right now.
+        </p>
       )}
-
-      <section aria-labelledby="other-members-heading" className="flex flex-col gap-3">
-        <h2 id="other-members-heading" className="text-lg font-semibold">
-          Other members
-        </h2>
-        {otherMembers.length > 0 ? (
-          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-            {otherMembers.map((candidate) => (
-              <li key={candidate.id}>
-                <SuggestionCard candidate={candidate} onClick={openRelating} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-base text-muted-foreground">
-            {suggestions.length === 0
-              ? "You're caught up — nothing new to suggest right now."
-              : "No more members to surface."}
-          </p>
-        )}
-      </section>
-    </div>
+    </section>
   );
 }

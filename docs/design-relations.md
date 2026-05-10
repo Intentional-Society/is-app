@@ -197,10 +197,7 @@ Sources 1–4 carry an explicit "reason" surfaced in the UI (`addedYou` / `hinte
 
 The asymmetry-visibility ethos: when someone shows up because they rated me, I don't see their rating before responding. This is a soft UI hiding, not a hard constraint, and I see their rating on the completed two-way relation.
 
-The feed is rendered in two sections:
-
-- **Suggestions.** All four signal-bearing sources (1–4). Auto-hides when empty, giving the user a small "caught up" moment once the algorithmic queue is cleared.
-- **Other members.** Source 5 — the rest of the directory, so the feed never goes empty while there's still anyone left to relate to. Visible whenever there is anything to show in edit mode.
+The feed renders as a single section titled **"Add people to your relational web"** — sources 1–4 (each marked with the corner indicator that opens the reason on hover) come first, followed by source 5. The indicator is enough to distinguish signal-bearing cards from directory cards without a section break.
 
 ### Rating a suggestion
 
