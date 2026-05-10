@@ -3,8 +3,17 @@
 import "@xyflow/react/dist/style.css";
 
 import { useQuery } from "@tanstack/react-query";
-import { type Edge, type Node, type NodeProps, Panel, ReactFlow } from "@xyflow/react";
-import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
+import {
+  type Edge,
+  Handle,
+  type Node,
+  type NodeProps,
+  Panel,
+  Position,
+  ReactFlow,
+  type ReactFlowInstance,
+} from "@xyflow/react";
+import { forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -59,9 +68,16 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
 // distinct from a 1-rated acquaintance without dominating the canvas.
 const edgeStrokeWidth = (value: number) => 1.5 + value * 1.25;
 
+// Handles are required for ReactFlow to anchor edges; rendering both at
+// the same vertically-centered position with opacity 0 makes edges read
+// as center-to-center lines without showing connector dots.
+const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
+
 function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
   return (
     <div className="flex flex-col items-center gap-1">
+      <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
+      <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
       <Avatar
         name={data.displayName}
         url={data.avatarUrl}
@@ -95,6 +111,11 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
   const [edges, setEdges] = useState<Edge<EdgeData>[]>([]);
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
+  // Captured via ReactFlow's onInit so we can refit the viewport every
+  // time node positions change — fitView only auto-fires on first
+  // mount, so a settling simulation would otherwise overflow whatever
+  // scale the initial random positions happened to produce.
+  const flowRef = useRef<ReactFlowInstance<Node<MemberNodeData>, Edge<EdgeData>> | null>(null);
 
   // Build (or rebuild) the d3-force simulation whenever the subgraph
   // changes. The viewing member is pinned at the origin so the layout
@@ -160,39 +181,57 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     // browser never paints between frames and the simulation looks blank.
     const FRAME_MS = 50;
     let lastUpdate = 0;
+    // No forceCenter — the viewing member is already pinned at the
+    // origin via fx/fy, so forceCenter would only pull the other nodes
+    // toward the pinned center, fighting the link-distance equilibrium
+    // and causing them to bunch on top of the center.
     const sim = forceSimulation(simNodes)
-      .force("charge", forceManyBody().strength(-500))
+      .force("charge", forceManyBody().strength(-800))
       .force(
         "link",
         forceLink<SimNode, SimEdge>(simEdges)
           .id((d) => d.id)
-          .distance(140),
+          .distance(180),
       )
-      .force("center", forceCenter(0, 0))
-      .force("collide", forceCollide(40))
+      .force("collide", forceCollide(60))
       .on("tick", () => {
         const now = performance.now();
         if (now - lastUpdate < FRAME_MS) return;
         lastUpdate = now;
-        setNodes((prev) =>
-          prev.map((node) => {
-            const sn = simNodes.find((s) => s.id === node.id);
-            if (!sn) return node;
-            return { ...node, position: { x: sn.x, y: sn.y } };
-          }),
-        );
+        paintFromSim(simNodes);
       })
-      .on("end", () => {
-        // Final paint with the settled positions in case the last frame
-        // landed inside the throttle window.
-        setNodes((prev) =>
-          prev.map((node) => {
-            const sn = simNodes.find((s) => s.id === node.id);
-            if (!sn) return node;
-            return { ...node, position: { x: sn.x, y: sn.y } };
-          }),
-        );
+      .on("end", () => paintFromSim(simNodes));
+
+    // Paints React node positions from the live simNodes, normalized so
+    // the layout's longer axis spans TARGET sim units and is centered
+    // on the origin. Combined with a manual fitView refit, this makes
+    // the rendered graph fill the viewport regardless of node count —
+    // a 2-node graph fills the canvas at the same proportion as a
+    // 30-node graph does, just at a larger per-node scale.
+    function paintFromSim(simNodes: SimNode[]) {
+      const TARGET = 600;
+      const xs = simNodes.map((n) => n.x);
+      const ys = simNodes.map((n) => n.y);
+      const w = Math.max(...xs) - Math.min(...xs);
+      const h = Math.max(...ys) - Math.min(...ys);
+      const longer = Math.max(w, h);
+      const scale = longer > 1 ? TARGET / longer : 1;
+      const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+      const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+      setNodes((prev) =>
+        prev.map((node) => {
+          const sn = simNodes.find((s) => s.id === node.id);
+          if (!sn) return node;
+          return { ...node, position: { x: (sn.x - cx) * scale, y: (sn.y - cy) * scale } };
+        }),
+      );
+      // Refit on the next frame so the new positions have been
+      // committed to ReactFlow's internal node store before fitting.
+      // duration: 0 = instant (no zoom animation between every tick).
+      requestAnimationFrame(() => {
+        flowRef.current?.fitView({ padding: 0.15, duration: 0 });
       });
+    }
 
     simRef.current?.stop();
     simRef.current = sim;
@@ -229,6 +268,10 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
+        fitViewOptions={{ padding: 0.15 }}
+        onInit={(instance) => {
+          flowRef.current = instance;
+        }}
         nodesConnectable={false}
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
