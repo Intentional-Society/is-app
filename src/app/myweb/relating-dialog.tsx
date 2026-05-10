@@ -7,20 +7,9 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
-import type { RelationValue } from "@/lib/relation-value";
+import { RELATION_VALUE_LABELS, RELATION_VALUES, type RelationValue } from "@/lib/relation-value";
 
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
-
-// Vocabulary lives in design-relations.md; mirrored here so the dialog
-// reads the same to a member as the design intends. Keep in sync.
-const VALUE_LABELS: Record<RelationValue, { headline: string; detail: string }> = {
-  1: { headline: "Met in a group", detail: "We've met in group settings and know of each other." },
-  2: { headline: "Talked 1-on-1", detail: "We've spent some time talking 1-on-1 enjoyably." },
-  3: { headline: "Friend", detail: "Friend." },
-  4: { headline: "Deep trust", detail: "Deep trust and knowing." },
-};
-
-const VALUES: readonly RelationValue[] = [1, 2, 3, 4];
 
 export type RelatingTarget = {
   id: string;
@@ -140,8 +129,8 @@ export function RelatingDialog({ target, onClose }: Props) {
           )}
 
           <div className="mt-4 flex flex-col gap-2">
-            {VALUES.map((value) => {
-              const { headline, detail } = VALUE_LABELS[value];
+            {RELATION_VALUES.map((value) => {
+              const { headline, detail } = RELATION_VALUE_LABELS[value];
               const isCurrent = target?.currentValue === value;
               const isPending = pendingValue === value;
               return (

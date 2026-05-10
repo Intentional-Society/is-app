@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { MemberChip, MemberTypeahead } from "@/components/member-typeahead";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
+import type { Me, MemberSummary } from "@/lib/api-types";
+import { RELATION_VALUE_LABELS, RELATION_VALUES, type RelationValue } from "@/lib/relation-value";
 
 type InviteRow = {
   code: string;
@@ -19,9 +22,15 @@ type InviteRow = {
 
 type PanelState = { kind: "idle" } | { kind: "creating" } | { kind: "error"; message: string };
 
-export function InvitesPanel() {
+const HINT_LIMIT = 10;
+
+type HintMember = Pick<MemberSummary, "id" | "displayName">;
+
+export function InvitesPanel({ me }: { me: Me }) {
   const [rows, setRows] = useState<InviteRow[] | null>(null);
   const [note, setNote] = useState("");
+  const [relationValue, setRelationValue] = useState<RelationValue | null>(null);
+  const [hints, setHints] = useState<HintMember[]>([]);
   const [state, setState] = useState<PanelState>({ kind: "idle" });
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -43,8 +52,6 @@ export function InvitesPanel() {
   }, []);
 
   useEffect(() => {
-    // reload() is async; setState calls run after await, not in the effect body.
-    // Long-term: move to TanStack Query (already a dependency).
     void reload();
   }, [reload]);
 
@@ -61,7 +68,11 @@ export function InvitesPanel() {
     setState({ kind: "creating" });
     try {
       const res = await apiClient.api.invites.$post({
-        json: { note: trimmed },
+        json: {
+          note: trimmed,
+          relationValue,
+          hints: hints.map((h) => h.id),
+        },
       });
       if (res.status === 429) {
         setState({
@@ -78,6 +89,8 @@ export function InvitesPanel() {
         return;
       }
       setNote("");
+      setRelationValue(null);
+      setHints([]);
       setState({ kind: "idle" });
       await reload();
     } catch {
@@ -118,6 +131,19 @@ export function InvitesPanel() {
     }
   };
 
+  const addHint = (m: MemberSummary) => {
+    if (hints.length >= HINT_LIMIT) return;
+    if (hints.some((h) => h.id === m.id)) return;
+    setHints((prev) => [...prev, { id: m.id, displayName: m.displayName }]);
+  };
+
+  const removeHint = (id: string) => {
+    setHints((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  const submitting = state.kind === "creating";
+  const excludeFromHints = [me.id, ...hints.map((h) => h.id)];
+
   return (
     <section
       aria-labelledby="invites-heading"
@@ -126,19 +152,45 @@ export function InvitesPanel() {
       <h2 id="invites-heading" className="text-lg font-semibold">
         Invite a member
       </h2>
-      <form onSubmit={create} className="flex flex-col gap-2">
-        <Label htmlFor="invite-note">Note (for your records and theirs — who are you inviting?)</Label>
-        <Textarea
-          id="invite-note"
-          required
-          minLength={10}
-          rows={2}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          disabled={state.kind === "creating"}
-        />
-        <Button type="submit" disabled={state.kind === "creating"} className="self-start">
-          {state.kind === "creating" ? "Creating…" : "Create invite"}
+      <form onSubmit={create} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="invite-note">Note (for your records and theirs — who are you inviting?)</Label>
+          <Textarea
+            id="invite-note"
+            required
+            minLength={10}
+            rows={2}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            disabled={submitting}
+          />
+        </div>
+
+        <RelationValuePicker value={relationValue} onChange={setRelationValue} disabled={submitting} />
+
+        <div className="flex flex-col gap-2">
+          <MemberTypeahead
+            label="Hints (optional) — people you think they'll want to know"
+            triggerLabel="Add a hint…"
+            selectedIds={hints.map((h) => h.id)}
+            excludeIds={excludeFromHints}
+            onSelect={addHint}
+            disabled={submitting || hints.length >= HINT_LIMIT}
+          />
+          {hints.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {hints.map((h) => (
+                <MemberChip key={h.id} member={h} onRemove={removeHint} disabled={submitting} />
+              ))}
+            </div>
+          )}
+          {hints.length >= HINT_LIMIT && (
+            <p className="text-sm text-muted-foreground">Up to {HINT_LIMIT} hints per invite.</p>
+          )}
+        </div>
+
+        <Button type="submit" disabled={submitting} className="self-start">
+          {submitting ? "Creating…" : "Create invite"}
         </Button>
         {state.kind === "error" && (
           <p role="alert" className="text-base text-destructive">
@@ -179,6 +231,49 @@ export function InvitesPanel() {
         )}
       </div>
     </section>
+  );
+}
+
+function RelationValuePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: RelationValue | null;
+  onChange: (next: RelationValue | null) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2" disabled={disabled}>
+      <legend className="text-base font-medium">Your relationship to them (optional)</legend>
+      <div className="flex flex-col gap-2">
+        {RELATION_VALUES.map((v) => {
+          const { headline, detail } = RELATION_VALUE_LABELS[v];
+          const selected = value === v;
+          return (
+            <Button
+              key={v}
+              type="button"
+              variant={selected ? "secondary" : "primary"}
+              className="h-auto justify-start gap-3 px-3 py-2 text-left"
+              onClick={() => onChange(selected ? null : v)}
+              aria-pressed={selected}
+            >
+              <span className="text-lg font-bold tabular-nums">{v}</span>
+              <span className="flex flex-col">
+                <span className="font-semibold">{headline}</span>
+                <span className="text-sm text-muted-foreground">{detail}</span>
+              </span>
+            </Button>
+          );
+        })}
+      </div>
+      {value === 1 && (
+        <p className="text-sm text-muted-foreground">
+          Inviting people you've only met in group settings tends to lead to weak fit. Is this the right time?
+        </p>
+      )}
+    </fieldset>
   );
 }
 

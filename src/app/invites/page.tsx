@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/api-server";
 import { InvitesPanel } from "./invites-panel";
 
 export default async function InvitesPage() {
-  await requireUser();
+  const me = await requireUser();
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
@@ -13,7 +13,7 @@ export default async function InvitesPage() {
       <Link href="/" className="text-base text-muted-foreground underline hover:text-foreground">
         ← Back to home
       </Link>
-      <InvitesPanel />
+      <InvitesPanel me={me} />
     </main>
   );
 }
