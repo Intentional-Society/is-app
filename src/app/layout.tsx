@@ -44,7 +44,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <AuthProvider initialUser={user}>
           <QueryProvider>
-            <SiteHeader displayName={me?.profile?.displayName ?? null} />
+            <SiteHeader displayName={me?.profile?.displayName ?? null} isAdmin={me?.profile?.isAdmin ?? false} />
             {children}
           </QueryProvider>
         </AuthProvider>

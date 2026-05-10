@@ -25,6 +25,18 @@ export const isAdmin = async (userId: string): Promise<boolean> => {
   return row?.isAdmin ?? false;
 };
 
+// Admin-only gate for the /api/admin/* sub-router. Runs after
+// requireAuth, so c.get("user") is always populated. Returns 404
+// rather than 403 so the surface isn't advertised to non-admins —
+// matches the /admin page's notFound() behavior.
+export const requireAdmin: MiddlewareHandler<{ Variables: ApiVariables }> = async (c, next) => {
+  const user = c.get("user");
+  if (!(await isAdmin(user.id))) {
+    return c.json({ error: "not_found" }, 404);
+  }
+  return next();
+};
+
 // Routes that bypass auth. Keep this tight — the regression guard in
 // auth-middleware.test.ts asserts nothing else is public.
 // Strings are matched exactly; RegExps are tested against c.req.path.

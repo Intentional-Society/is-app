@@ -5,7 +5,8 @@ import { log } from "next-axiom";
 
 import { isRelationValue } from "@/lib/relation-value";
 
-import { type ApiVariables, isAdmin, isUuid, requireAuth } from "./auth-middleware";
+import { getAppSettings } from "./app-settings";
+import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -28,6 +29,18 @@ import {
 } from "./relations";
 import { profiles } from "./schema";
 import { resetE2EUsers } from "./test-reset";
+
+// Admin-only sub-router. requireAdmin runs after the main api's
+// requireAuth (mounted via .route() below), so handlers here can
+// assume both an authenticated user and isAdmin === true. New admin
+// endpoints (e.g. api/admin/programs, api/admin/web) live here.
+// "appsettings" leaves room for "usersettings" elsewhere later.
+const adminRoutes = new Hono<{ Variables: ApiVariables }>()
+  .use("*", requireAdmin)
+  .get("/appsettings", async (c) => {
+    const appSettings = await getAppSettings();
+    return c.json({ appSettings });
+  });
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -265,8 +278,10 @@ const api = new Hono<{ Variables: ApiVariables }>()
   )
   .post("/relations/hint", async (c) => {
     const user = c.get("user");
+    // Generic 404 — same rationale as /api/admin/*: don't advertise
+    // the admin surface to non-admins.
     if (!(await isAdmin(user.id))) {
-      return c.json({ error: "forbidden" }, 403);
+      return c.json({ error: "not_found" }, 404);
     }
 
     let body: unknown;
@@ -293,7 +308,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .delete("/relations/hint/:relatorId/:relateeId", async (c) => {
     const user = c.get("user");
     if (!(await isAdmin(user.id))) {
-      return c.json({ error: "forbidden" }, 403);
+      return c.json({ error: "not_found" }, 404);
     }
 
     const relatorId = c.req.param("relatorId");
@@ -317,7 +332,8 @@ const api = new Hono<{ Variables: ApiVariables }>()
         serverTime: result[0].server_time,
       },
     });
-  });
+  })
+  .route("/admin", adminRoutes);
 
 // CI-only reset for the two seeded e2e users. Token header is the only
 // gate — preview and prod share the same Supabase, so a VERCEL_ENV gate

@@ -718,10 +718,10 @@ describe("POST /api/relations/hint (admin-only)", () => {
     expect(row.hintedBy).toBe(admin);
   });
 
-  it("403s when non-admin", async () => {
+  it("404s when non-admin", async () => {
     authAs(nonAdmin);
     const res = await post({ relatorId: relator, relateeId: target });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
   it("400 on self-rating", async () => {
@@ -786,7 +786,7 @@ describe("DELETE /api/relations/hint/:relatorId/:relateeId (admin-only)", () => 
     expect(rows).toHaveLength(1);
   });
 
-  it("403s when non-admin", async () => {
+  it("404s when non-admin", async () => {
     await db.insert(relations).values({
       relatorId: relator,
       relateeId: target,
@@ -796,6 +796,6 @@ describe("DELETE /api/relations/hint/:relatorId/:relateeId (admin-only)", () => 
     });
     authAs(nonAdmin);
     const res = await app.request(`/api/relations/hint/${relator}/${target}`, { method: "DELETE" });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 });
