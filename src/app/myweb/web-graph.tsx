@@ -12,7 +12,7 @@ import { Avatar } from "@/components/avatar";
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 
-import { RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
+import { DEFAULT_SUBGRAPH_VIEW, RELATION_SUBGRAPH_QUERY_KEY, type SubgraphViewOptions } from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
 
 type SubgraphNode = RelationSubgraph["nodes"][number];
@@ -44,14 +44,7 @@ type EdgeData = {
   relateeName: string | null;
 };
 
-type ViewOptions = {
-  includeIncoming: boolean;
-  hops: 1 | 2;
-};
-
-const DEFAULT_VIEW: ViewOptions = { includeIncoming: false, hops: 2 };
-
-const fetchSubgraph = async (opts: ViewOptions) => {
+const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   const res = await apiClient.api.relations.subgraph.$get({
     query: {
       in: opts.includeIncoming ? "true" : "false",
@@ -85,13 +78,18 @@ const nodeTypes = { member: MemberNode };
 
 export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const router = useRouter();
-  const [view, setView] = useState<ViewOptions>(DEFAULT_VIEW);
+  const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
   // The view options become part of the query key so toggling refetches
   // automatically and the rating-mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
   const { data, isPending, isError } = useQuery({
     queryKey: [...RELATION_SUBGRAPH_QUERY_KEY, view] as const,
     queryFn: () => fetchSubgraph(view),
+    // The default view is prefetched server-side and dehydrated into
+    // this cache; staleTime keeps the client from immediately refetching
+    // it on mount. Mutations still invalidate via the rating-dialog
+    // onSettled handler, so this only suppresses redundant fetches.
+    staleTime: 60_000,
   });
 
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
@@ -155,6 +153,13 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
       }),
     );
 
+    // d3 ticks at ~60fps internally. We push to React state at most once
+    // per FRAME_MS so ReactFlow only re-renders ~20 times/sec — physics
+    // stays accurate, render budget is 3× cheaper, motion stays visible.
+    // Without this throttle a dev build can render-storm so hard the
+    // browser never paints between frames and the simulation looks blank.
+    const FRAME_MS = 50;
+    let lastUpdate = 0;
     const sim = forceSimulation(simNodes)
       .force("charge", forceManyBody().strength(-500))
       .force(
@@ -166,6 +171,20 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
       .force("center", forceCenter(0, 0))
       .force("collide", forceCollide(40))
       .on("tick", () => {
+        const now = performance.now();
+        if (now - lastUpdate < FRAME_MS) return;
+        lastUpdate = now;
+        setNodes((prev) =>
+          prev.map((node) => {
+            const sn = simNodes.find((s) => s.id === node.id);
+            if (!sn) return node;
+            return { ...node, position: { x: sn.x, y: sn.y } };
+          }),
+        );
+      })
+      .on("end", () => {
+        // Final paint with the settled positions in case the last frame
+        // landed inside the throttle window.
         setNodes((prev) =>
           prev.map((node) => {
             const sn = simNodes.find((s) => s.id === node.id);
