@@ -22,7 +22,7 @@ describe("SiteHeader", () => {
   it("renders nothing when there is no user", () => {
     const { container } = render(
       <AuthProvider initialUser={null}>
-        <SiteHeader displayName={null} />
+        <SiteHeader displayName={null} isAdmin={false} />
       </AuthProvider>,
     );
     expect(container).toBeEmptyDOMElement();
@@ -31,7 +31,7 @@ describe("SiteHeader", () => {
   it("renders the menu trigger when a user is present", () => {
     render(
       <AuthProvider initialUser={user}>
-        <SiteHeader displayName={null} />
+        <SiteHeader displayName={null} isAdmin={false} />
       </AuthProvider>,
     );
     expect(screen.getByRole("button", { name: /open menu/i })).toBeVisible();
@@ -41,11 +41,32 @@ describe("SiteHeader", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     render(
       <AuthProvider initialUser={user}>
-        <SiteHeader displayName={null} />
+        <SiteHeader displayName={null} isAdmin={false} />
       </AuthProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
     expect(await screen.findByText("Home")).toBeVisible();
     expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("hides the Admin link when isAdmin is false", async () => {
+    render(
+      <AuthProvider initialUser={user}>
+        <SiteHeader displayName={null} isAdmin={false} />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
+    await screen.findByText("Home");
+    expect(screen.queryByText("Admin")).toBeNull();
+  });
+
+  it("shows the Admin link when isAdmin is true", async () => {
+    render(
+      <AuthProvider initialUser={user}>
+        <SiteHeader displayName={null} isAdmin={true} />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
+    expect(await screen.findByText("Admin")).toBeVisible();
   });
 });

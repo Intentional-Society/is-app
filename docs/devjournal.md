@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-10 | James | Admin page scaffold + `/api/admin/*` sub-router
+
+`/admin` is a hub for admin-only stuff; non-admins get `notFound()`. Admin endpoints live behind a `requireAdmin` middleware in a `/api/admin/*` sub-router that 404s for non-admins. Future real settings will likely come from an `app_settings` table read by `getAppSettings()`.
+
 ## 2026-05-09 | James | Relations PRs 2 & 3 of the Relations ship
 
 `/myweb` is live: WebGraph (`@xyflow/react` + `d3-force`) over a Hono RPC backend, with a WebBuilder list of people (with four types of suggestions sorted to the front) and a dialog to set relationship strength.

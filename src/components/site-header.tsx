@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-export function SiteHeader({ displayName }: { displayName: string | null }) {
+export function SiteHeader({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
   const { user } = useAuth();
 
   if (!user) return null;
@@ -56,6 +56,16 @@ export function SiteHeader({ displayName }: { displayName: string | null }) {
                 </Link>
               }
             />
+            {isAdmin ? (
+              <SheetClose
+                nativeButton={false}
+                render={
+                  <Link href="/admin" className="rounded px-2 py-2 hover:bg-muted">
+                    Admin
+                  </Link>
+                }
+              />
+            ) : null}
             <form action="/signout" method="post">
               <SheetClose
                 render={
