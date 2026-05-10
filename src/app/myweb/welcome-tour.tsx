@@ -50,6 +50,9 @@ export function WelcomeTour({ run, onClose }: { run: boolean; onClose: () => voi
         // showing the pulse beacon first — better for a guided welcome.
         skipBeacon: true,
         showProgress: true,
+        // Default buttons drop 'skip'; we want a one-click out for users
+        // who'd rather poke around themselves.
+        buttons: ["back", "skip", "primary"],
         // Project teal, matches the rest of the palette closely enough.
         primaryColor: "#4a7c7a",
         zIndex: 10000,
