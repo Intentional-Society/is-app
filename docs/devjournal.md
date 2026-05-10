@@ -6,7 +6,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-05-09 | James | Relations PRs 2 & 3 of the Relations ship
 
-`/myweb` is live: WebGraph (`@xyflow/react` + `d3-force`) over a Hono RPC backend, with a clickable suggestion feed and optimistic rating mutations. Soft-hide stays server-side — the rater's value never reaches the client. Welcome tour + richer signup-tour e2e land in PR 4.
+`/myweb` is live: WebGraph (`@xyflow/react` + `d3-force`) over a Hono RPC backend, with a WebBuilder list of people (with four types of suggestions sorted to the front) and a dialog to set relationship strength.
 
 ## 2026-05-07 | James | Replace ESLint with Biome
 
