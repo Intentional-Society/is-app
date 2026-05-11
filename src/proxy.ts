@@ -1,9 +1,10 @@
 import type { NextRequest } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
+import { timed } from "@/lib/timing";
 
 export async function proxy(request: NextRequest) {
-  return await updateSession(request);
+  return timed(request, "proxy-total", () => updateSession(request));
 }
 
 export const config = {
