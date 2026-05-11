@@ -4,9 +4,9 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
-## 2026-05-11 | James | Proxy is the only `auth.getUser` per request
+## 2026-05-11 | James | Perf/simplification improvements on auth/user/profile checks
 
-Signed-in `/` did three serial `supabase.auth.getUser` round-trips (proxy, layout, `/api/me` `requireAuth`) against the same JWT. The proxy now validates once and forwards the User on `x-supabase-user`; layout/signin/signup and `requireAuth` read from the header. Forged inbound headers are stripped pre-validation. `requireAuth` falls back to Supabase when the header is absent, so tests dispatching through `app.request()` are unaffected.
+Proxy passes `auth.getUser` through headers - signed-in `/` did three serial `supabase.auth.getUser` round-trips previously. The proxy now validates once and forwards the User on `x-supabase-user`. loadMe is cached (per-request), GetProfileForSelf is no longer cached.
 
 ## 2026-05-10 | James | Relations PR 4 — invite form, admin hints, welcome tour
 
