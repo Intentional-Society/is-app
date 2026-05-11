@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { requireUser, serverApiClient } from "@/lib/api-server";
 
+import { AdminHints } from "./admin-hints";
+
 export default async function AdminPage() {
   const me = await requireUser();
   // Generic 404 for non-admins so the page doesn't advertise itself.
@@ -39,7 +41,7 @@ export default async function AdminPage() {
 
       <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">Web</h2>
-        <p className="text-sm text-muted-foreground">Coming soon.</p>
+        <AdminHints />
       </section>
     </main>
   );

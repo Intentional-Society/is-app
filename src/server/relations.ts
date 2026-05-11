@@ -415,6 +415,73 @@ export const createRelationHint = async (params: {
   return { ok: true, created: result.length > 0 };
 };
 
+export type HintProfile = {
+  id: string;
+  displayName: string | null;
+  slug: string | null;
+  avatarUrl: string | null;
+};
+
+export type PendingHint = {
+  relator: HintProfile;
+  relatee: HintProfile;
+  hintedBy: HintProfile | null;
+  createdAt: Date;
+};
+
+// All pending hints across the whole network, newest first. Read by
+// the admin /admin Web section; the self-join across profiles is done
+// in JS (two queries) for the same reason getRelationSuggestions does
+// — Drizzle profile aliasing is more code than the joined volume here
+// is worth.
+export const listPendingHints = async (): Promise<PendingHint[]> => {
+  const rows = await db
+    .select({
+      relatorId: relations.relatorId,
+      relateeId: relations.relateeId,
+      hintedBy: relations.hintedBy,
+      createdAt: relations.createdAt,
+    })
+    .from(relations)
+    .where(eq(relations.isHint, true))
+    .orderBy(desc(relations.createdAt));
+
+  if (rows.length === 0) return [];
+
+  const ids = new Set<string>();
+  for (const r of rows) {
+    ids.add(r.relatorId);
+    ids.add(r.relateeId);
+    if (r.hintedBy) ids.add(r.hintedBy);
+  }
+  const profileRows = await db
+    .select({
+      id: profiles.id,
+      displayName: profiles.displayName,
+      slug: profiles.slug,
+      avatarUrl: profiles.avatarUrl,
+    })
+    .from(profiles)
+    .where(inArray(profiles.id, [...ids]));
+  const byId = new Map<string, HintProfile>(profileRows.map((p) => [p.id, p]));
+
+  // Skip rows whose relator or relatee profile vanished mid-query;
+  // hintedBy stays optional since the FK is set null on delete.
+  const out: PendingHint[] = [];
+  for (const r of rows) {
+    const relator = byId.get(r.relatorId);
+    const relatee = byId.get(r.relateeId);
+    if (!relator || !relatee) continue;
+    out.push({
+      relator,
+      relatee,
+      hintedBy: r.hintedBy ? (byId.get(r.hintedBy) ?? null) : null,
+      createdAt: r.createdAt,
+    });
+  }
+  return out;
+};
+
 export type DeleteRelationHintResult = { ok: true } | { error: "not_found" };
 
 // Refuses to delete a confirmed rating — the isHint = true predicate

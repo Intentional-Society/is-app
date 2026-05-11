@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
+import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 // Smoke coverage of /myweb's wiring: page loads, the WebBuilder
 // suggestion feed renders, the Done button toggles into View mode and
@@ -10,32 +10,55 @@ import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
 
 test.describe.configure({ mode: "serial" });
 
-test.beforeEach(async ({ baseURL }) => {
-  if (!baseURL) throw new Error("myweb.spec.ts: baseURL is not configured");
-  await resetSeededUsers(baseURL);
+test.describe("/myweb — tour pre-dismissed", () => {
+  test.beforeEach(async ({ page, baseURL }) => {
+    if (!baseURL) throw new Error("myweb.spec.ts: baseURL is not configured");
+    await resetSeededUsers(baseURL);
+    // The welcome tour fires whenever lastUpdatedWeb is null; tests in
+    // this block exercise the page wiring, not the tour, so pre-dismiss
+    // via the same sessionStorage key MyWeb checks on mount.
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem("isweb-welcome-tour-dismissed", "1");
+    });
+  });
+
+  test("/myweb loads, Done flips into View, Edit flips back", async ({ page }) => {
+    await signInAs(page, "regular");
+    await completeWelcome(page);
+
+    await page.getByRole("button", { name: "My web" }).click();
+    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
+    await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
+    const doneButton = page.getByRole("button", { name: "Done" });
+    await expect(doneButton).toBeVisible();
+
+    await doneButton.click();
+    await expect(page.getByRole("button", { name: "Edit" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeHidden();
+
+    await page.getByRole("button", { name: "Edit" }).click();
+    await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
+  });
 });
 
-test("/myweb loads, Done flips into View, Edit flips back", async ({ page }) => {
-  await signInAs(page, "regular");
-  await completeWelcome(page);
+test.describe("/myweb — first-time welcome tour", () => {
+  test.beforeEach(async ({ baseURL }) => {
+    if (!baseURL) throw new Error("myweb.spec.ts: baseURL is not configured");
+    await resetSeededUsers(baseURL);
+    // No addInitScript: this block wants the tour to fire on mount.
+  });
 
-  await page.getByRole("button", { name: "My web" }).click();
-  await page.waitForURL((u) => u.pathname === "/myweb", { timeout: 10_000 });
-  await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
+  test("tour appears for a first-time visitor and can be skipped", async ({ page }) => {
+    await signInAs(page, "regular");
+    await completeWelcome(page);
+    await page.getByRole("button", { name: "My web" }).click();
+    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 
-  // Edit mode is the first-visit default (lastUpdatedWeb IS NULL): the
-  // builder, "Add people to your relational web" heading, and Done button are all present.
-  await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
-  const doneButton = page.getByRole("button", { name: "Done" });
-  await expect(doneButton).toBeVisible();
-
-  await doneButton.click();
-  // After PUT /api/me/last-updated-web returns, mode flips to View and
-  // the builder vanishes; only the Edit button remains under the graph.
-  await expect(page.getByRole("button", { name: "Edit" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeHidden();
-
-  await page.getByRole("button", { name: "Edit" }).click();
-  await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
+    await expect(page.getByText("Welcome to your relational web")).toBeVisible({ timeout: 5_000 });
+    await page.getByRole("button", { name: /^Skip$/ }).click();
+    await expect(page.getByText("Welcome to your relational web")).toBeHidden();
+  });
 });

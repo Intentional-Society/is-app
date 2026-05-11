@@ -56,7 +56,11 @@ export function WebBuilder({ onOpenRelating }: { onOpenRelating: (target: Relati
   const openRelating = (candidate: RelationCandidate) => onOpenRelating(targetFromCandidate(candidate));
 
   return (
-    <section aria-labelledby="add-people-heading" className="flex w-full max-w-3xl flex-col gap-3">
+    <section
+      aria-labelledby="add-people-heading"
+      data-tour="add-people"
+      className="flex w-full max-w-3xl flex-col gap-3"
+    >
       <h2 id="add-people-heading" className="text-lg font-semibold">
         Add people to your relational web
       </h2>

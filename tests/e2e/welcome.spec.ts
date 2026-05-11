@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { resetSeededUsers, signInAs } from "./helpers/session";
+import { resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 // Phase 2 backfill: verify that a fresh user lands on /welcome, can
 // save the form, and is then allowed through to / where the "Manage
@@ -20,7 +20,7 @@ test.beforeEach(async ({ baseURL }) => {
 // expect to land on / rather than bouncing through /welcome.
 test("welcome form surfaces a validation failure instead of getting stuck", async ({ page }) => {
   await signInAs(page, "regular");
-  await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 10_000 });
+  await page.waitForURL((u) => u.pathname === "/welcome", { timeout: TIMEOUT_MS });
 
   await page.route("**/api/me", async (route) => {
     if (route.request().method() === "PUT") {
@@ -45,7 +45,7 @@ test("welcome form surfaces a validation failure instead of getting stuck", asyn
 
 test("fresh user lands on /welcome and can complete their profile", async ({ page }) => {
   await signInAs(page, "regular");
-  await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 10_000 });
+  await page.waitForURL((u) => u.pathname === "/welcome", { timeout: TIMEOUT_MS });
 
   await page.getByLabel("Display name").fill("Welcome Tester");
   await page.getByLabel("Bio").fill("Loves writing, hikes, long coffees.");
@@ -54,6 +54,6 @@ test("fresh user lands on /welcome and can complete their profile", async ({ pag
 
   await page.getByRole("button", { name: "Save" }).click();
 
-  await page.waitForURL((u) => u.pathname === "/", { timeout: 10_000 });
+  await page.waitForURL((u) => u.pathname === "/", { timeout: TIMEOUT_MS });
   await expect(page.getByRole("button", { name: "Manage invites" })).toBeVisible();
 });

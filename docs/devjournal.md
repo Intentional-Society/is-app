@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-10 | James | Relations PR 4 — invite form, admin hints, welcome tour
+
+Closes the initial Relations plan. The invite flow now has a strength setting and suggestion chips backed by a new shadcn-Command-based `MemberTypeahead`. The admin page's Web section allows additional suggestions. A react-joyride tour fires on first `/myweb` visit.
+
 ## 2026-05-10 | James | Admin page scaffold + `/api/admin/*` sub-router
 
 `/admin` is a hub for admin-only stuff; non-admins get `notFound()`. Admin endpoints live behind a `requireAdmin` middleware in a `/api/admin/*` sub-router that 404s for non-admins. Future real settings will likely come from an `app_settings` table read by `getAppSettings()`.

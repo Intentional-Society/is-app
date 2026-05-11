@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
@@ -10,8 +10,11 @@ import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./qu
 import { RelatingDialog, type RelatingTarget } from "./relating-dialog";
 import { WebBuilder } from "./web-builder";
 import { WebGraph } from "./web-graph";
+import { WelcomeTour } from "./welcome-tour";
 
 type Mode = "edit" | "view";
+
+const TOUR_DISMISSED_KEY = "isweb-welcome-tour-dismissed";
 
 // Done captures intent ("I'm done updating for now") and surfaces the
 // member in others' "recently active" suggestion source. Real-time
@@ -40,7 +43,23 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   // Lifted to MyWeb so both the suggestion feed (WebBuilder) and the
   // graph (WebGraph) can request a rating dialog from a single source.
   const [relatingTarget, setRelatingTarget] = useState<RelatingTarget | null>(null);
+  // Tour dismissed for the rest of this tab session (sessionStorage),
+  // for this navigation (markDone success), or for this state (parent
+  // setTourDismissed). The sessionStorage check makes e2e tests trivial
+  // to set up: addInitScript with the flag and the tour stays off.
+  const [tourDismissed, setTourDismissed] = useState(false);
+  useEffect(() => {
+    if (window.sessionStorage.getItem(TOUR_DISMISSED_KEY) === "1") {
+      setTourDismissed(true);
+    }
+  }, []);
   const markDone = useMarkDone(() => setMode("view"));
+  const tourRun = initialLastUpdatedWeb === null && !tourDismissed && !markDone.isSuccess;
+
+  const dismissTour = () => {
+    setTourDismissed(true);
+    window.sessionStorage.setItem(TOUR_DISMISSED_KEY, "1");
+  };
 
   return (
     <div className="flex w-full max-w-5xl flex-col items-center gap-6">
@@ -52,7 +71,12 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
       <div className="relative w-full">
         <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
           {mode === "edit" ? (
-            <Button variant="secondary" disabled={markDone.isPending} onClick={() => markDone.mutate()}>
+            <Button
+              variant="secondary"
+              data-tour="done-button"
+              disabled={markDone.isPending}
+              onClick={() => markDone.mutate()}
+            >
               {markDone.isPending ? "Saving…" : "Done"}
             </Button>
           ) : (
@@ -73,6 +97,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
       </div>
 
       <RelatingDialog target={relatingTarget} onClose={() => setRelatingTarget(null)} />
+      <WelcomeTour run={tourRun} onClose={dismissTour} />
     </div>
   );
 }
