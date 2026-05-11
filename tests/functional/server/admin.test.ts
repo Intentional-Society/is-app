@@ -127,10 +127,12 @@ describe("GET /api/admin/hints", () => {
     const res = await app.request("/api/admin/hints");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { hints: Array<{ relator: { id: string }; relatee: { id: string }; hintedBy: { id: string } | null }> };
-    expect(body.hints).toHaveLength(1);
-    expect(body.hints[0].relator.id).toBe(nonAdmin);
-    expect(body.hints[0].relatee.id).toBe(other);
-    expect(body.hints[0].hintedBy?.id).toBe(admin);
+    // The endpoint lists every pending hint in the DB, so other rows
+    // (from parallel test files or stale local-dev state) may appear.
+    // Filter to this test's seeded UUIDs before asserting.
+    const own = body.hints.filter((h) => h.relator.id === nonAdmin && h.relatee.id === other);
+    expect(own).toHaveLength(1);
+    expect(own[0].hintedBy?.id).toBe(admin);
   });
 
   it("does not return confirmed (non-hint) rows", async () => {
@@ -143,8 +145,10 @@ describe("GET /api/admin/hints", () => {
 
     authAs(admin);
     const res = await app.request("/api/admin/hints");
-    const body = (await res.json()) as { hints: unknown[] };
-    expect(body.hints).toEqual([]);
+    const body = (await res.json()) as { hints: Array<{ relator: { id: string }; relatee: { id: string } }> };
+    // Same global-scope caveat: just assert the row this test inserted
+    // is not surfaced, rather than asserting the whole list is empty.
+    expect(body.hints.find((h) => h.relator.id === nonAdmin && h.relatee.id === other)).toBeUndefined();
   });
 
   it("returns 404 for non-admins", async () => {
