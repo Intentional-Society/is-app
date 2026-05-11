@@ -1,6 +1,5 @@
 import type { User } from "@supabase/supabase-js";
 import { asc, eq, isNotNull, or, sql } from "drizzle-orm";
-import { cache } from "react";
 
 import { isUuid } from "./auth-middleware";
 import { db } from "./db";
@@ -102,13 +101,7 @@ export type ProfileForSelf = {
   updatedAt: Date;
 };
 
-// Per-request memoization: the root layout fetches the profile to show
-// displayName in the header, and `/` fetches it again for the bio-null
-// /welcome redirect gate. Without cache(), that's two DB roundtrips on
-// every signed-in render — enough to push Vercel-preview cold-starts
-// past e2e's 10s waitForURL budget. cache() keys on the arg tuple, so
-// only co-located callers with the same userId share the result.
-export const getProfileForSelf = cache(async (userId: string): Promise<ProfileForSelf | null> => {
+export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf | null> => {
   const [row] = await db
     .select({
       id: profiles.id,
@@ -131,7 +124,7 @@ export const getProfileForSelf = cache(async (userId: string): Promise<ProfileFo
     .where(eq(profiles.id, userId));
 
   return row ?? null;
-});
+};
 
 // Bumps lastUpdatedWeb to now() on the user's profile. The Done button
 // at the bottom of /myweb is the only caller — clicking it captures
