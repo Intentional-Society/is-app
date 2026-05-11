@@ -19,7 +19,7 @@ Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-pr
 - **Force-push blocked** and **deletion blocked**.
 - **Zero required approvals globally** — keeps solo work on app code unblocked.
 - **Code-owner review required** on paths listed in `.github/CODEOWNERS` (currently `.github/workflows/` and `.github/CODEOWNERS` itself). A CI-secret-touching workflow change can't land without a second codeowner's approval.
-- **Repository Admin can bypass** for emergencies (CI wedged, urgent revert).
+- **Repository Admin can bypass per-PR** by ticking the bypass checkbox in the merge box (`bypass_mode: "pull_request"`). Not silent — admin merges that don't tick it still enforce every rule, including codeowner review. Previously was `"always"`, which silently skipped every rule for admins and defeated the codeowner gate; tightened after PR #159 merged without triggering review.
 
 ## CI workflows
 

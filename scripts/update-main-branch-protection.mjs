@@ -21,13 +21,16 @@ const ruleset = {
   name: RULESET_NAME,
   target: "branch",
   enforcement: "active",
-  // Admins can override in emergencies (CI wedged, urgent revert, etc).
-  // Worth tightening if the team grows.
+  // Admins can bypass per-PR via the merge-box checkbox — required for
+  // emergencies (CI wedged, urgent revert) but no longer a free pass on
+  // every merge. "always" would silently skip every rule for admins,
+  // including the codeowner-review gate on workflow PRs, which defeats
+  // the point of having CODEOWNERS.
   bypass_actors: [
     {
       actor_id: 5, // built-in "Repository Admin" role
       actor_type: "RepositoryRole",
-      bypass_mode: "always",
+      bypass_mode: "pull_request",
     },
   ],
   conditions: {
