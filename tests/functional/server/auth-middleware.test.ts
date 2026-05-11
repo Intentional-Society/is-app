@@ -7,6 +7,7 @@ vi.mock("@supabase/ssr", () => ({
 
 import { createServerClient } from "@supabase/ssr";
 
+import { encodeUser, SUPABASE_USER_HEADER } from "@/lib/supabase/server-user";
 import app from "@/server/api";
 import { PUBLIC_PATHS } from "@/server/auth-middleware";
 
@@ -83,5 +84,27 @@ describe("API auth middleware", () => {
 
     expect(res.status).not.toBe(401);
     expect(mockCreateServerClient).not.toHaveBeenCalled();
+  });
+
+  // The proxy (src/lib/supabase/middleware.ts) does the one canonical
+  // getUser() round-trip per request and forwards the validated User
+  // here. requireAuth must trust that header and skip its own
+  // Supabase call — that's the whole point of option (a).
+  it("trusts SUPABASE_USER_HEADER and skips the Supabase round-trip", async () => {
+    const res = await app.request("/api/hello", {
+      headers: { [SUPABASE_USER_HEADER]: encodeUser(fakeUser) },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockCreateServerClient).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Supabase when the header is missing (test path)", async () => {
+    mockGetUser(fakeUser);
+
+    const res = await app.request("/api/hello");
+
+    expect(res.status).toBe(200);
+    expect(mockCreateServerClient).toHaveBeenCalled();
   });
 });

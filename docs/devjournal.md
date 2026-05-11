@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-11 | James | Proxy is the only `auth.getUser` per request
+
+Signed-in `/` did three serial `supabase.auth.getUser` round-trips (proxy, layout, `/api/me` `requireAuth`) against the same JWT. The proxy now validates once and forwards the User on `x-supabase-user`; layout/signin/signup and `requireAuth` read from the header. Forged inbound headers are stripped pre-validation. `requireAuth` falls back to Supabase when the header is absent, so tests dispatching through `app.request()` are unaffected.
+
 ## 2026-05-10 | James | Relations PR 4 — invite form, admin hints, welcome tour
 
 Closes the initial Relations plan. The invite flow now has a strength setting and suggestion chips backed by a new shadcn-Command-based `MemberTypeahead`. The admin page's Web section allows additional suggestions. A react-joyride tour fires on first `/myweb` visit.

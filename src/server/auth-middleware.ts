@@ -3,6 +3,8 @@ import type { User } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import type { MiddlewareHandler } from "hono";
 
+import { decodeUser, SUPABASE_USER_HEADER } from "@/lib/supabase/server-user";
+
 import { db } from "./db";
 import { profiles } from "./schema";
 
@@ -66,24 +68,33 @@ export const requireAuth: MiddlewareHandler<{ Variables: ApiVariables }> = async
     return next();
   }
 
-  const cookies = parseCookieHeader(c.req.raw.headers.get("cookie"));
+  // Fast path: the root proxy authed once on the inbound request and
+  // attached the User in SUPABASE_USER_HEADER. Trust it — the proxy
+  // strips any forged inbound value before writing the validated one.
+  let user = decodeUser(c.req.header(SUPABASE_USER_HEADER));
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-    {
-      cookies: {
-        getAll: () => cookies,
-        // Root proxy (src/proxy.ts) is responsible for
-        // token refresh; this layer only reads.
-        setAll: () => {},
+  if (!user) {
+    // Fallback for callers that bypass the proxy: functional tests
+    // dispatching through app.request(), and the rare proxy-excluded
+    // path that still routes through requireAuth.
+    const cookies = parseCookieHeader(c.req.raw.headers.get("cookie"));
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+      {
+        cookies: {
+          getAll: () => cookies,
+          setAll: () => {},
+        },
       },
-    },
-  );
+    );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user: fetched },
+    } = await supabase.auth.getUser();
+    user = fetched;
+  }
 
   if (!user) {
     return c.json({ error: "unauthenticated" }, 401);
