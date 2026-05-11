@@ -30,6 +30,12 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "on-first-retry",
+    // Per-request timing for the redirect chain — see src/lib/timing.ts.
+    // The middleware short-circuits unless this header is present, so the
+    // cost on test traffic is a single header.get + boolean check; the
+    // upside is continuous per-step timing data in Vercel function logs
+    // for every CI run, queryable via `vercel logs ... --query "timing"`.
+    extraHTTPHeaders: { "x-debug-timing": "1" },
   },
   // The setup project calls POST /api/_test/reset once at the top of the
   // run. Specs that need guaranteed-clean state (welcome, invites) also
