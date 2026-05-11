@@ -1,0 +1,6 @@
+# Workflow changes touch CI secrets (E2E_ADMIN_PASSWORD, CI_RESET_TOKEN);
+# the gate exists so a tampered workflow can't land without an explicit
+# review from someone authorized to handle those secrets. See item 6 in
+# docs/plan-security-hardening.md.
+.github/workflows/  @james-baker @benjifriedman
+.github/CODEOWNERS  @james-baker @benjifriedman
