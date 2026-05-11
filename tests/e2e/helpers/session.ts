@@ -7,6 +7,11 @@ import { expect, type Page } from "@playwright/test";
 // Playwright setup project (see tests/e2e/reset.setup.ts).
 export type TestRole = "regular" | "admin";
 
+// Shared wait budget for page.waitForURL across the suite. Bumped from
+// 10s after Vercel preview cold-starts made 10s flaky; revisit once we
+// chase down the underlying first-request slowness.
+export const TIMEOUT_MS = 20_000;
+
 const EMAILS: Record<TestRole, string> = {
   regular: "e2e-regular@testfake.local",
   admin: "e2e-admin@testfake.local",
@@ -37,7 +42,7 @@ export const signInAs = async (page: Page, role: TestRole): Promise<TestUser> =>
   await page.getByLabel("Password (optional)").fill(passwordFor(role));
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/signin"), {
-    timeout: 10_000,
+    timeout: TIMEOUT_MS,
   });
   return { role, email };
 };
@@ -52,12 +57,12 @@ export const expectAuthed = async (page: Page): Promise<void> => {
 // want to land on `/` (e.g. to navigate to /invites) call this to fill the form.
 export const completeWelcome = async (page: Page, opts: { displayName?: string; bio?: string } = {}): Promise<void> => {
   await page.waitForURL((url) => url.pathname === "/welcome", {
-    timeout: 10_000,
+    timeout: TIMEOUT_MS,
   });
   await page.getByLabel("Display name").fill(opts.displayName ?? "E2E User");
   await page.getByLabel("Bio").fill(opts.bio ?? "Short bio to clear the welcome redirect.");
   await page.getByRole("button", { name: "Save" }).click();
-  await page.waitForURL((url) => url.pathname === "/", { timeout: 10_000 });
+  await page.waitForURL((url) => url.pathname === "/", { timeout: TIMEOUT_MS });
 };
 
 // Hits the CI-only /api/_test/reset endpoint to wipe profile fields and

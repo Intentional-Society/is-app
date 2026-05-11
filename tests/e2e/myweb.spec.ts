@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
+import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 // Smoke coverage of /myweb's wiring: page loads, the WebBuilder
 // suggestion feed renders, the Done button toggles into View mode and
@@ -27,7 +27,7 @@ test.describe("/myweb — tour pre-dismissed", () => {
     await completeWelcome(page);
 
     await page.getByRole("button", { name: "My web" }).click();
-    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: 10_000 });
+    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
     await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
@@ -55,7 +55,7 @@ test.describe("/myweb — first-time welcome tour", () => {
     await signInAs(page, "regular");
     await completeWelcome(page);
     await page.getByRole("button", { name: "My web" }).click();
-    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: 10_000 });
+    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 
     await expect(page.getByText("Welcome to your relational web")).toBeVisible({ timeout: 5_000 });
     await page.getByRole("button", { name: /^Skip$/ }).click();

@@ -29,13 +29,18 @@ const STEPS: Step[] = [
   },
 ];
 
-// Renders Joyride only while `run` is true. The parent (MyWeb) flips it
-// off when the user clicks Done — the markDone mutation succeeds and
-// the tour vanishes. Joyride finishing on its own (last-step Next or
-// the skip/close action) also closes the tour for this session.
+// Only user-driven tour endings should set the session-dismissed flag.
+// Filter on data.action — not data.status — because status="skipped"
+// also fires on passive teardowns (HMR, parent re-render, navigating
+// away mid-tour), which would otherwise poison sessionStorage and hide
+// the tour from that tab forever. Pairing tour:end with action verbs
+// (skip / close / next-on-last-step) leaves passive teardowns alone.
 export function WelcomeTour({ run, onClose }: { run: boolean; onClose: () => void }) {
   const handleEvent = (data: EventData) => {
-    if (data.status === "finished" || data.status === "skipped") {
+    if (
+      data.type === "tour:end" &&
+      (data.action === "skip" || data.action === "close" || data.action === "next")
+    ) {
       onClose();
     }
   };
