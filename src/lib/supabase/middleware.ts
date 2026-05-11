@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { timed } from "@/lib/timing";
+
 export const createClient = (request: NextRequest) => {
   let supabaseResponse = NextResponse.next({
     request: { headers: request.headers },
@@ -32,6 +34,6 @@ export const createClient = (request: NextRequest) => {
 
 export const updateSession = async (request: NextRequest) => {
   const { supabase, response } = createClient(request);
-  await supabase.auth.getUser();
+  await timed(request, "supabase-auth-getUser", () => supabase.auth.getUser());
   return response;
 };
