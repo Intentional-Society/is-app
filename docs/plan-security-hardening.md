@@ -22,46 +22,19 @@ A review of the repo, code, CI, and deployment. What we already have that's good
 - **`/api/_test/reset` is token-gated** — `CI_RESET_TOKEN` shared-secret header is the sole gate; the destructive scope is fixed to the two seeded e2e users (`src/server/test-reset.ts`). Previously also gated on `VERCEL_ENV !== "production"`, but preview and prod share the same Supabase, so the environment gate was theatre against a token that already mutates prod data on preview runs.
 - **`hono` bumped past GHSA-458j-xx4x-4375** — `npm audit` is clean.
 - **Dependabot + CodeQL + secret-scanning push protection** are all configured (`.github/dependabot.yml`, `.github/workflows/codeql.yml`).
-
----
-
-## Worth doing soon
-
-### 5. `SECURITY.md` + private vulnerability reporting
-
-In flight as PR #85 (sent back for changes — the disclosure-policy parts are right; secret-rotation runbook and admin-account threat notes need to move out of the public file into `docs/`). Once the disclosure-policy file lands, enable Settings → Code security → "Private vulnerability reporting" so the `security/advisories/new` link the file points at actually works.
-
-### 6. `E2E_ADMIN_PASSWORD` controls a real `is_admin=true` prod account
-
-Lives in a GH Actions secret. An attacker can study every workflow we ever write looking for an `echo`/`printenv` mistake or a malicious dep that exfils env. Two mitigations, pick one:
-
-- Drop `e2e-admin` until we actually have admin tests; flip the flag in the seed step instead of keeping a long-lived admin account, **or**
-- Restrict the e2e workflow with `permissions: read-all` and require a CODEOWNERS-gated approval on workflow file changes.
-
-### 9. Length-limit profile fields
-
-`parseEditableProfile` accepts arbitrary-length strings. Vercel caps body at ~4.5MB so total payload is bounded, but a member can spam ~4MB strings. Add `MAX_BIO=10000`, `MAX_DISPLAY_NAME=100`, etc.
-
-### 11. Document the `sb_secret_…` in git history
-
-Any `sb_secret_…` token in this repo is the deterministic local Supabase CLI default — not a real secret. Add a README note and a `# pragma: allowlist secret`-style annotation where it appears, so GitGuardian / TruffleHog don't open issues against the public repo.
+- **`SECURITY.md` + private vulnerability reporting** landed in PR #85.
+- **CODEOWNERS gate on `.github/workflows/`** (`.github/CODEOWNERS`, enforced by the main-branch ruleset's `require_code_owner_review: true`) — workflow changes need an approving review from one of the listed codeowners before they can merge. Narrows the "land a tampered workflow that echoes `E2E_ADMIN_PASSWORD` / `CI_RESET_TOKEN`" path.
 
 ---
 
 ## Worth knowing, not blocking
 
+- **`E2E_ADMIN_PASSWORD` controls a real `is_admin=true` prod account.** Blast radius from a leak is bounded — admin can revoke any invite and create/delete relation hints (`src/server/api.ts`), nothing more. Can't elevate other accounts (`parseEditableProfile` allowlist), can't read PII beyond `/members`, can't drop tables. External fork PRs can't pull the secret. Realistic vectors are: malicious npm dep exfilling env from any CI step (applies to every CI secret, not just admin), or a maintainer-account compromise. CODEOWNERS on `.github/workflows/` handles the "tampered workflow" path; the rest is accepted risk for an invite-only audience.
+- **Main is protected by ruleset `15374115` ("main branch protection"), not classic protection** — `gh api .../branches/main/protection` returns 404; rulesets live at `/repos/.../rulesets`. Managed in code at `scripts/update-main-branch-protection.mjs`, applied via `npm run update_main_branch_protection`.
+- **`/api/_test/reset` is registered in prod.** Intentional. Token-gated, destructive scope hard-coded to the two seeded test users (`E2E_EMAILS` in `src/server/test-reset.ts`). Preview and prod share the same Supabase, so an env-gate here would be theatre against a token that already mutates prod data on preview runs.
+- **`parseEditableProfile` accepts arbitrary-length strings.** Vercel caps body at ~4.5MB so total payload is bounded; a member can still spam ~4MB strings. Quality-of-service, not security. Add `MAX_BIO=10000`, `MAX_DISPLAY_NAME=100`, etc. when convenient.
+- **`sb_secret_…` in git history.** Deterministic local Supabase CLI default — not a real secret. README note + `# pragma: allowlist secret`-style annotation will keep GitGuardian / TruffleHog from filing false positives if/when the repo goes public.
 - **`/api/invites/:code/check` is unauthenticated and unrate-limited.** 32¹⁰ keyspace makes brute-forcing infeasible, but high-QPS hammering can drive DB CPU. Vercel WAF / Cloudflare in front handles this cheaply if it ever shows up.
 - **`displayName` flows through user-controlled `user_metadata`.** React escapes by default; just be careful that future emails or admin tooling escape it too.
 - **Supabase project ref is in docs.** Already shipped to the browser via `NEXT_PUBLIC_SUPABASE_URL`, so no new exposure — just know the dashboard URL pattern is public.
 - **OTP enumeration oracle** at the GoTrue layer is acknowledged in code; acceptable for an invite-only app, revisit if abuse shows up.
-
----
-
-## Suggested landing order
-
-1. **Item 5** (`SECURITY.md` revisions + enable PVR) — needed before first outside contact; the advisory link is currently dead.
-2. **Item 6** (`E2E_ADMIN_PASSWORD`) — pick a mitigation; an attacker reading workflows is a realistic threat now that the repo is public.
-3. **Item 11** (document `sb_secret_…`) — cheap, prevents false-positive scanner noise.
-4. **Item 9** (length limits) — quality-of-service, lower urgency than the others.
-
-Items from "worth knowing, not blocking" can ship whenever the underlying surface changes.

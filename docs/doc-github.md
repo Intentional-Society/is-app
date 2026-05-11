@@ -17,7 +17,8 @@ Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-pr
 - **PR required** for every change — even solo pushes, so the `pull_request` workflow trigger gates every merge into main.
 - **Required status check:** "Lint & Functional Tests" (E2E is not required — it runs post-deploy against the Vercel preview and can flake on cold start; check manually before merging).
 - **Force-push blocked** and **deletion blocked**.
-- **Zero required approvals** (solo dev).
+- **Zero required approvals globally** — keeps solo work on app code unblocked.
+- **Code-owner review required** on paths listed in `.github/CODEOWNERS` (currently `.github/workflows/` and `.github/CODEOWNERS` itself). A CI-secret-touching workflow change can't land without a second codeowner's approval.
 - **Repository Admin can bypass** for emergencies (CI wedged, urgent revert).
 
 ## CI workflows

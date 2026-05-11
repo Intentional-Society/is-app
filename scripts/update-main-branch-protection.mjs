@@ -42,15 +42,19 @@ const ruleset = {
     // Block branch deletion and force-pushes on main.
     { type: "deletion" },
     { type: "non_fast_forward" },
-    // Require a PR for every change. Zero approvals (solo dev) — the
-    // point is to force CI to gate every merge into main, since direct
-    // pushes bypass the pull_request workflow trigger entirely.
+    // Require a PR for every change. Zero approvals globally — the
+    // baseline point is to force CI to gate every merge into main,
+    // since direct pushes bypass the pull_request workflow trigger
+    // entirely. require_code_owner_review adds a targeted gate on
+    // CODEOWNERS-claimed paths only (currently .github/workflows/ and
+    // .github/CODEOWNERS), so workflow changes need a codeowner's
+    // approval but everything else stays count=0.
     {
       type: "pull_request",
       parameters: {
         required_approving_review_count: 0,
         dismiss_stale_reviews_on_push: false,
-        require_code_owner_review: false,
+        require_code_owner_review: true,
         require_last_push_approval: false,
         required_review_thread_resolution: false,
       },
