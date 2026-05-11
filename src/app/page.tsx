@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -60,6 +61,15 @@ export default async function Home() {
   const me = await loadMe();
   if (!me) {
     return <LoggedOutHome />;
+  }
+
+  // Diagnostic for #149: log whether the redirect-to-/welcome gate
+  // sees a profile and what bio is. Gated on x-debug-timing to keep
+  // production logs uncluttered. Remove once #149 is resolved.
+  if ((await headers()).get("x-debug-timing") === "1") {
+    console.log(
+      `[debug-149] home me.profile=${me.profile ? "present" : "null"} bio=${JSON.stringify(me.profile?.bio)}`,
+    );
   }
 
   // Incomplete-profile heuristic: bio null means the member has not
