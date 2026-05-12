@@ -1,6 +1,6 @@
 # Email — Configuration Reference
 
-Covers transactional email (auth confirmations, password resets, invite-flow magic links) and how it relates to the existing newsletter stack. **Status: pending — provider not yet provisioned.** Picked up 2026-05-02; resuming next session.
+Covers transactional email (auth confirmations, password resets, invite-flow magic links) and how it relates to the existing newsletter stack. **Status: live since 2026-05-11 — Resend via SMTP into Supabase Auth. Email templates pending customization.**
 
 ---
 
@@ -15,45 +15,82 @@ Supabase auth emails are sent via Supabase's built-in SMTP. Supabase explicitly 
 
 ---
 
-## Leading direction: Postmark
+## Provider: Resend
 
-Deliverability is the top priority for this decision. Postmark is the leading candidate over Resend on architectural grounds, not just marketing claims:
+Transactional email runs through Resend as a standalone account (not the Vercel Marketplace integration — separation of vendors over auto-provisioning convenience).
 
-- **Message Streams** — Postmark forces transactional and broadcast email onto separate IP pools with independent reputation scores. Gmail officially recommends this exact separation. Resend doesn't separate them, so a marketing-side complaint spike could drag down auth deliverability.
-- **Strict shared-pool policy** — Postmark refuses promotional senders entirely and actively boots senders that hurt reputation, keeping the shared IP pool clean.
-- **Track record** — Postmark since 2009; Resend since 2023. Resend routes through Amazon SES under the hood, so "Resend vs. Postmark" is really "SES with a developer wrapper vs. vertically integrated transactional infrastructure."
-- **Measured numbers** — third-party tests put Postmark at ~98.7% inbox placement and ~26ms median response; Resend ~79ms median, no comparable inbox-placement number published.
+- **Sending domain:** `mail.intentionalsociety.org` — separate from the apex used by Buttondown. DKIM-signed and SPF-authenticated at this subdomain.
+- **Visible From:** `devteam@mail.intentionalsociety.org`. Matches the sending domain, so DKIM signs with `d=mail.intentionalsociety.org` and DMARC alignment is strict (not just relaxed).
+- **Replies:** routed via Zoho subdomain stripping. `mail.intentionalsociety.org` has Zoho MX records, and subdomain stripping is enabled on the apex Zoho domain — so any `<anything>@mail.intentionalsociety.org` is delivered to `<anything>@intentionalsociety.org`. The existing `devteam@` alias at the apex then forwards to the operator's inbox. End result: replies to a magic-link email land cleanly without needing a mailbox on the subdomain.
 
-**Cost:** free dev tier (100 emails/mo, never expires) covers pre-launch. Basic plan **$15/mo** for 10k emails once outgrown — already allocated in `docs/budget.md`.
+### Why Resend over Postmark
 
----
+The earlier draft of this doc had Postmark as the leading candidate on architectural grounds (Message Streams separating transactional and broadcast IP pools). That argument is real for high-volume senders but doesn't outweigh:
 
-## Alternatives considered
+- **Cost.** Resend's free tier is 3,000/month and 100/day, vs Postmark's 100/month total. Pre-launch and at our member scale we sit comfortably inside Resend's free tier for months.
+- **DX feedback.** Operators running production apps on Resend report no deliverability issues and a smoother developer surface (React Email templates, modern SDK).
+- **Ecosystem fit.** Vercel-adjacent, common in our stack's neighbourhood.
 
-- **Resend** — better DX (React Email, Vercel-ecosystem feel), bigger free tier (3k/mo, 100/day). Lower pick because deliverability is the priority and Resend's underlying infrastructure is SES with no transactional/broadcast separation.
-- **Amazon SES** — cheapest by far ($0.10/1k after free tier). Lower pick because of operational overhead (DNS/IAM fiddling, no dashboard worth speaking of) when the difference at our volume is single-digit dollars.
+Resend's underlying infrastructure is SES, which is sometimes raised as a deliverability concern relative to Postmark's vertically-integrated transactional pool. At our launch volume (probably under 100 transactional/month) we are well below the threshold where IP-pool architecture is the dominant deliverability signal — content quality, list hygiene, and complaint rate carry more weight. If we ever outgrow this with observable deliverability issues, Postmark remains a portable second choice — relaxed DMARC alignment doesn't care which provider signs the mail, as long as the records are updated.
+
+### Why a subdomain
+
+Two reasons converge:
+
+1. **Resend requires the From-header domain to be a verified domain in the account.** We verified `mail.intentionalsociety.org`. Sending from `@intentionalsociety.org` would have required verifying the apex too — feasible, but then either Resend signs apex DKIM (sharing the apex DKIM-reputation surface with Buttondown) or we leave the apex verification idle. Neither pays for itself.
+2. **Reputation isolation from Buttondown.** The apex is Buttondown's sender for the newsletter, with 5+ years of strong reputation (250+ editions, ~60% open rates). Sending Resend's transactional traffic on a subdomain means each provider has its own DKIM selector and signing domain; a complaint spike on one doesn't drag the other down.
+
+At our volume (<100 transactional/month) the reputation-isolation argument is modest in absolute terms. Operational hygiene is the bigger win, and it's the pattern Resend's own docs recommend.
+
+The cost of going subdomain rather than apex is a slightly less polished visible From (`@mail.intentionalsociety.org` instead of `@intentionalsociety.org`). Zoho's subdomain stripping makes replies still work cleanly through the existing apex alias, so the only real-world "cost" is the subdomain visible in the From address itself.
 
 ---
 
 ## Newsletters and the boundary
 
-Buttondown handles newsletters and program announcements; we tag users via API to send program-related emails. That stays.
+Buttondown handles newsletters and program announcements, sending from `@intentionalsociety.org` (apex). We tag users via API to receive program-related emails. That stays.
 
 The split going forward:
 
-- **Announcement-shaped** (cohort kicks off, monthly digest) → Buttondown. Triggered by *us* deciding to tell a group something.
-- **Event-shaped** (you've been added to program X, your application was approved, password reset) → Postmark. Triggered by *one user doing one thing*.
+- **Announcement-shaped** (cohort kicks off, monthly digest) → Buttondown, from apex. Triggered by *us* deciding to tell a group something.
+- **Event-shaped** (magic link, password reset, invite accepted) → Resend, from `mail.intentionalsociety.org`. Triggered by *one user doing one thing*.
 
 Buttondown is not a candidate for the Supabase auth slot — it's a newsletter platform, not a transactional SMTP backend.
 
 ---
 
-## Open items for next session
+## DMARC
 
-- [ ] Confirm Postmark as the choice (or revisit if priorities shift)
-- [ ] Provision Postmark account, verify `intentionalsociety.org` sender domain (SPF, DKIM, DMARC, Return-Path)
-- [ ] Configure Supabase Auth → SMTP with Postmark credentials
-- [ ] Bump Supabase Auth rate limit from default 30/hour for custom SMTP up to a sensible launch level
-- [ ] Decide on a "From" address (e.g. `noreply@intentionalsociety.org` vs. a human-looking address)
-- [ ] Update Supabase email templates so the body matches our voice and the footer/sender is on-brand
-- [ ] Add a `docs/devjournal.md` entry once provisioned
+`_dmarc.intentionalsociety.org` is already configured at the apex:
+
+```
+v=DMARC1; p=none; pct=100; rua=mailto:re+u9zmncpm6mf@dmarc.postmarkapp.com; sp=none; aspf=r
+```
+
+`p=none` is report-only. Postmark's free DMARC monitoring service receives weekly XML reports; once Resend is verified, its sends will start showing up there alongside Buttondown's. Apex DMARC covers all subdomains by default, so `mail.intentionalsociety.org` is included automatically.
+
+Ratcheting to `p=quarantine` is a future move after a few weeks of clean reports across both providers.
+
+---
+
+## Supabase Auth → Custom SMTP
+
+Once the Resend domain is verified, configure Supabase Auth → SMTP Settings (production project) with the credentials Resend provides:
+
+- **Host:** `smtp.resend.com`
+- **Port:** `587` (STARTTLS)
+- **Username:** `resend`
+- **Password:** Resend API key (from Resend dashboard → API Keys)
+- **Sender email:** `devteam@mail.intentionalsociety.org`
+- **Sender name:** `Intentional Society Web App` — chosen to differentiate from Buttondown's "Intentional Society" newsletter sender, so recipients can triage app-triggered mail at a glance
+
+Also raise the Supabase Auth rate limit (Auth → Rate Limits → "emails sent per hour") from the default 30/hour. We use **50/hour** — chosen to sit comfortably below Resend's free-tier 100/day cap so that a misconfiguration or runaway loop hits Supabase's per-hour cap long before exhausting Resend's daily allotment, leaving headroom to fix the issue and send legitimate mail afterward. The custom SMTP path no longer hits the 2/hour built-in cap once Custom SMTP is enabled, but Supabase still applies its own per-project rate limit.
+
+Local dev does **not** route through Resend. The local Supabase stack continues to use Inbucket (`http://localhost:54324`) for outbound mail capture — `supabase/config.toml` is unchanged.
+
+---
+
+## Alternatives considered
+
+- **Postmark** — discussed above. Stronger on deliverability architecture and longer track record; loses on cost (100/mo free vs Resend's 3k) and DX fit.
+- **Amazon SES** — cheapest by far ($0.10/1k after free tier). Lower pick because of operational overhead (DNS/IAM fiddling, no dashboard worth speaking of) when the difference at our volume is single-digit dollars per year.

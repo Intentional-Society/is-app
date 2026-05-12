@@ -13,7 +13,7 @@ Bare minimum $20/mo (Vercel only), but we could be up to $70 shortly.
 | **Sentry** | $0 | — | Developer | 5k errors, 50 session replays, 5M performance spans per month; 1 seat | Team **$26/mo** (annual billing) — unlimited seats, more events, third-party integrations |
 | **Axiom** | $0 | — | Personal | 500 GB/mo ingest, 30-day retention, 10 GB-hrs query compute, 25 GB storage, 2 datasets, 1 user | Axiom Cloud **from $25/mo** — 1 TB ingest, 100 GB-hrs query, configurable retention, usage-based beyond included |
 | **GitHub** | $0 | — | Free org | Unlimited public-repo Actions; 2,000 Actions minutes/mo on private repos | Team **$4/user/mo** — 3,000 Actions minutes/mo on private repos plus more collaboration features |
-| **Transactional email** | $0 today | $15 | _not yet provisioned_ | Pre-launch decision; leading candidate is Postmark (free tier: 100 emails/mo, never expires) | Postmark Basic **$15/mo** for 10k emails when dev tier is outgrown. Resend and SES are the alternatives — see prior discussion / future devjournal entry. |
+| **Transactional email** | $0 today | $20 | Resend Free | 3,000 emails/mo + 100/day cap, single sending domain, 1-day log retention | Resend Pro **$20/mo** — 50k emails/mo, no daily cap, multiple domains, 3-day log retention. Postmark and SES remain alternatives if deliverability ever forces a switch — see `docs/doc-email.md`. |
 
 ## Budgeted elsewhere
 
