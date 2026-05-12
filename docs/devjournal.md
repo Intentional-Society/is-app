@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-11 | James | Transactional email: Resend wired into Supabase Auth SMTP
+
+Supabase Auth sends through Resend SMTP from `devteam@mail.intentionalsociety.org`, which can also receive email via existing Zoho mailbox. Rate limits: 50/hour at Supabase Auth (we set it), 100/day at Resend (free tier cap).
+
 ## 2026-05-11 | James | Perf/simplification improvements on auth/user/profile checks
 
 Proxy passes `auth.getUser` through headers - signed-in `/` did three serial `supabase.auth.getUser` round-trips previously. The proxy now validates once and forwards the User on `x-supabase-user`. loadMe is cached (per-request), GetProfileForSelf is no longer cached.
