@@ -139,6 +139,12 @@ Three rules:
 2. **Verify in the browser, not just in tests.** CSP violations appear in the DevTools console; functional and e2e tests almost never catch them because Playwright runs against a permissive headless Chromium. Open the deployed site, look for `Refused to ...` errors, fix them.
 3. **Loosening is a one-way ratchet.** Anything added here is harder to remove than to add — every addition needs a one-line justification in the comment next to it, like the existing `connect-src` comment.
 
+# Supply-chain quarantine
+
+`.npmrc` sets `min-release-age=5`, so `npm install` ignores any package version published in the last five days. The window is long enough to catch the usual post-publish takedown cycle (Shai-Hulud, debug/chalk, etc.) and short enough to not block routine upgrades. Override with `--min-release-age=0` on the command line for a genuine emergency install.
+
+Requires npm ≥11 — older npm warns and ignores the setting, so this is silent if the Vercel build image ever rolls back. The gate engages on dependency resolution (adding or bumping a dep); `npm ci` against a frozen lockfile installs whatever's pinned regardless.
+
 # Secret rotation
 
 If a secret is suspected compromised, rotate it immediately using the steps below.
