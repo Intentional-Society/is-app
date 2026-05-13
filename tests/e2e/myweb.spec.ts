@@ -26,7 +26,7 @@ test.describe("/myweb — tour pre-dismissed", () => {
     await signInAs(page, "regular");
     await completeWelcome(page);
 
-    await page.getByRole("button", { name: "My web" }).click();
+    await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
     await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
 
@@ -54,7 +54,7 @@ test.describe("/myweb — first-time welcome tour", () => {
   test("tour appears for a first-time visitor and can be skipped", async ({ page }) => {
     await signInAs(page, "regular");
     await completeWelcome(page);
-    await page.getByRole("button", { name: "My web" }).click();
+    await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 
     await expect(page.getByText("Welcome to your relational web")).toBeVisible({ timeout: 5_000 });
