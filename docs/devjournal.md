@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-13 | Benji | Homepage card redesign
+
+Replaced the stacked button list on the logged-in home page with a responsive 2-column card grid. Each card has a title and short description, uses the existing `card`/`border`/`accent` design tokens, and shows a teal border + accent background on hover. Added a personalized greeting ("Welcome, [name]") and a serif italic subheading for warmth. Logged-out page unchanged.
+
 ## 2026-05-11 | James | Transactional email: Resend wired into Supabase Auth SMTP
 
 Supabase Auth sends through Resend SMTP from `devteam@mail.intentionalsociety.org`, which can also receive email via existing Zoho mailbox. Rate limits: 50/hour at Supabase Auth (we set it), 100/day at Resend (free tier cap).
