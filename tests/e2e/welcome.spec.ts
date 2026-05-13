@@ -55,5 +55,5 @@ test("fresh user lands on /welcome and can complete their profile", async ({ pag
   await page.getByRole("button", { name: "Save" }).click();
 
   await page.waitForURL((u) => u.pathname === "/", { timeout: TIMEOUT_MS });
-  await expect(page.getByRole("button", { name: "Manage invites" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Invite a friend" })).toBeVisible();
 });
