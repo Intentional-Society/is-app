@@ -42,7 +42,7 @@ function LoggedOutHome() {
 }
 
 type NavCardProps = {
-  href: string;
+  href: React.ComponentProps<typeof Link>["href"];
   title: string;
   description: string;
 };
