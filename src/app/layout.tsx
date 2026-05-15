@@ -40,7 +40,10 @@ export default async function RootLayout({
     <html lang="en" className={cn("font-sans", gudea.variable, ovo.variable)}>
       <body className="antialiased">
         <AuthProvider initialUser={user}>
-          <SiteHeader displayName={me?.profile?.displayName ?? null} />
+          <SiteHeader
+            displayName={me?.profile?.displayName ?? null}
+            isAdmin={me?.profile?.isAdmin ?? false}
+          />
           {children}
         </AuthProvider>
       </body>

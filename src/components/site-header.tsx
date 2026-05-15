@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, Shield } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-export function SiteHeader({ displayName }: { displayName: string | null }) {
+export function SiteHeader({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
   const { user } = useAuth();
 
   if (!user) return null;
@@ -72,6 +72,23 @@ export function SiteHeader({ displayName }: { displayName: string | null }) {
                 </Link>
               }
             />
+            {isAdmin && (
+              <>
+                <div className="my-1 border-t border-border" />
+                <SheetClose
+                  nativeButton={false}
+                  render={
+                    <Link
+                      href="/admin"
+                      className="flex items-center gap-2 rounded px-2 py-2 font-medium text-primary hover:bg-muted"
+                    >
+                      <Shield className="h-4 w-4" />
+                      Admin
+                    </Link>
+                  }
+                />
+              </>
+            )}
             <form action="/signout" method="post">
               <SheetClose
                 render={

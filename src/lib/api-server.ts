@@ -52,3 +52,13 @@ export const requireUser = async (): Promise<Me> => {
   if (!me) redirect("/signin");
   return me;
 };
+
+// Page-level admin gate. Use at the top of any Server Component that
+// requires admin access; redirects to /signin if unauthenticated or /
+// if authenticated but not admin.
+export const requireAdmin = async (): Promise<Me> => {
+  const me = await loadMe();
+  if (!me) redirect("/signin");
+  if (!me.profile?.isAdmin) redirect("/");
+  return me;
+};

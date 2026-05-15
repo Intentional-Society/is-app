@@ -62,6 +62,10 @@ export const programs = pgTable("programs", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: uuid("created_by").references((): AnyPgColumn => profiles.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

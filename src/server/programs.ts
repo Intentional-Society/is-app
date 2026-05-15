@@ -23,6 +23,7 @@ export type ProgramWithMembership = {
 export const listPrograms = async (
   userId: string,
 ): Promise<ProgramWithMembership[]> => {
+  // Only show active programs to members; admin view shows all via listAdminPrograms
   const rows = await db
     .select({
       id: programs.id,
@@ -40,6 +41,7 @@ export const listPrograms = async (
       )`,
     })
     .from(programs)
+    .where(eq(programs.isActive, true))
     .orderBy(programs.name);
 
   return rows.map((r) => ({

@@ -1,6 +1,6 @@
 import type { InferResponseType } from "hono/client";
 
-import { apiClient } from "@/lib/api";
+import type { apiClient } from "@/lib/api";
 
 // Named shapes for API responses, extracted from the Hono route
 // inference. Import these instead of reaching into the RPC client at
@@ -30,3 +30,25 @@ export type ProgramsResponse = InferResponseType<
 >;
 
 export type Program = ProgramsResponse["programs"][number];
+
+export type AdminProgramsResponse = InferResponseType<
+  (typeof apiClient.api.admin.programs)["$get"],
+  200
+>;
+
+export type AdminProgram = AdminProgramsResponse["programs"][number];
+
+export type AdminProgramMembersResponse = InferResponseType<
+  (typeof apiClient.api.admin.programs)[":id"]["members"]["$get"],
+  200
+>;
+
+export type AdminProgramMember =
+  AdminProgramMembersResponse["members"][number];
+
+export type AdminMembersResponse = InferResponseType<
+  (typeof apiClient.api.admin.members)["$get"],
+  200
+>;
+
+export type AdminMember = AdminMembersResponse["members"][number];
