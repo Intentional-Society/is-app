@@ -83,4 +83,17 @@ export const resetSeededUsers = async (baseURL: string): Promise<void> => {
   if (!res.ok) {
     throw new Error(`reset endpoint returned ${res.status}: ${await res.text().catch(() => "")}`);
   }
+
+  // #149 probe: the endpoint reads each profile back via getProfileForSelf
+  // after its reset transaction commits. If bio is already non-null on
+  // that read, the reset didn't take and a `/`→`/welcome` test would
+  // flake on a stale gate — fail loud here instead of 20s later.
+  const body = (await res.json()) as { reset: number; profiles: { id: string; bio: string | null }[] };
+  const stale = body.profiles.filter((p) => p.bio !== null);
+  if (stale.length > 0) {
+    throw new Error(
+      `reset endpoint reports bio still set after reset for ${stale.length} user(s): ` +
+        `${stale.map((p) => p.id).join(", ")} — see #149`,
+    );
+  }
 };
