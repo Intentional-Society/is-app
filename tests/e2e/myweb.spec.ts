@@ -24,7 +24,8 @@ test.describe("/myweb — tour pre-dismissed", () => {
 
   test("/myweb loads, Done flips into View, Edit flips back", async ({ page }) => {
     await signInAs(page, "regular");
-    await completeWelcome(page);
+    // Distinct bio per completeWelcome caller — see the #149 probe.
+    await completeWelcome(page, { bio: "e2e bio · myweb.spec · tour-pre-dismissed" });
 
     await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
@@ -53,7 +54,8 @@ test.describe("/myweb — first-time welcome tour", () => {
 
   test("tour appears for a first-time visitor and can be skipped", async ({ page }) => {
     await signInAs(page, "regular");
-    await completeWelcome(page);
+    // Distinct bio per completeWelcome caller — see the #149 probe.
+    await completeWelcome(page, { bio: "e2e bio · myweb.spec · first-time-tour" });
     await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 

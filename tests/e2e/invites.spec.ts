@@ -20,7 +20,12 @@ test.describe("invites — authed member flow", () => {
     if (!baseURL) throw new Error("invites.spec.ts: baseURL is not configured");
     await resetSeededUsers(baseURL);
     await signInAs(page, "regular");
-    await completeWelcome(page, { displayName: "Member Under Test" });
+    // Distinct bio per completeWelcome caller: if a reset leaves this
+    // value behind, the #149 probe names this exact call site.
+    await completeWelcome(page, {
+      displayName: "Member Under Test",
+      bio: "e2e bio · invites.spec · authed-flow beforeEach",
+    });
   });
 
   test("create an invite, see it listed, revoke it", async ({ page }) => {
@@ -88,7 +93,10 @@ test.describe("/signup — unauthed invite flow", () => {
     let code: string;
     try {
       await signInAs(memberPage, "regular");
-      await completeWelcome(memberPage, { displayName: "Inviter" });
+      await completeWelcome(memberPage, {
+        displayName: "Inviter",
+        bio: "e2e bio · invites.spec · signup-flow inviter",
+      });
       await memberPage.getByRole("link", { name: "Invite a friend" }).click();
       await memberPage.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
       await memberPage.getByLabel(/Note \(for your records/).fill("e2e signup-flow invite — come on in");
