@@ -118,6 +118,14 @@ file_size_limit = "50MiB"
 # allowed_mime_types = ["image/png", "image/jpeg"]
 # objects_path = "./images"
 
+# Profile-picture avatars (issue #131). Private — objects are served
+# via signed URLs. `supabase start` / `db reset` provisions this on a
+# fresh stack; an already-running stack needs a restart to pick it up.
+[storage.buckets.avatars]
+public = false
+file_size_limit = "2MiB"
+allowed_mime_types = ["image/webp"]
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true
