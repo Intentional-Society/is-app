@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-15 | James | Node 24 LTS upgrade
+
+`.nvmrc`, the three CI workflows, and `@types/node` move to Node 24 — catching CI and local dev up to production, which Vercel already runs on 24. `engines.node` now pins the version in source so the two can't drift again.
+
 ## 2026-05-13 | Benji | Homepage card redesign
 
 Replaced the stacked button list on the logged-in home page with a responsive 2-column card grid. Each card has a title and short description, uses the existing `card`/`border`/`accent` design tokens, and shows a teal border + accent background on hover. Added a personalized greeting ("Welcome, [name]") and a serif italic subheading for warmth. Logged-out page unchanged.
