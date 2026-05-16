@@ -9,6 +9,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Mirror the `.npmrc` min-release-age quarantine: Dependabot has no
+    # visibility into npm client config, so without this it would propose
+    # versions younger than the quarantine window.
+    cooldown:
+      default-days: 3
     groups:
       # Batch patch/minor bumps together so Dependabot doesn't open one
       # PR per transitively-related package. Majors still land as their
