@@ -30,6 +30,7 @@ export default async function ProfilePage() {
       <Avatar
         name={profile.displayName}
         url={profile.avatarUrl}
+        sizes="128px"
         className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
       />
 

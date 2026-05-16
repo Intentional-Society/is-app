@@ -16,6 +16,7 @@ function MemberCard({ member }: { member: MemberSummary }) {
       <Avatar
         name={member.displayName}
         url={member.avatarUrl}
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 256px"
         className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-t-sm bg-muted text-2xl font-semibold text-muted-foreground"
       />
       <div className="flex flex-col gap-1 p-4">
