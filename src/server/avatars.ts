@@ -1,6 +1,14 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
+import { eq } from "drizzle-orm";
+import sharp from "sharp";
+
 import { supabaseAdmin } from "@/lib/supabase/admin";
+
+import { db } from "./db";
+import { profiles } from "./schema";
 
 // Supabase Storage bucket holding avatar objects. Private — objects
 // are reachable only via a signed URL (see
@@ -69,4 +77,63 @@ export const attachAvatarUrls = async <T extends { avatarPath: string | null }>(
     ...rest,
     avatarUrl: avatarPath ? (signed.get(avatarPath) ?? null) : null,
   }));
+};
+
+// Maximum accepted upload size. The browser shrinks the image well
+// below this; the cap is defence-in-depth against a client that does
+// not (see docs/design-profile-pictures.md decision 3).
+export const MAX_AVATAR_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+const AVATAR_DIMENSION = 1024;
+
+// Re-encodes arbitrary uploaded image bytes into the canonical avatar
+// artifact: a 1024² WebP, cover-cropped square, EXIF orientation
+// applied, all metadata stripped. Rejects (throws) bytes that do not
+// decode as an image — the caller maps that to a 400. limitInputPixels
+// caps the decoded surface as a decompression-bomb guard.
+export const encodeAvatar = (input: Buffer): Promise<Buffer> =>
+  sharp(input, { limitInputPixels: 100_000_000 })
+    .rotate()
+    .resize(AVATAR_DIMENSION, AVATAR_DIMENSION, { fit: "cover" })
+    .webp({ quality: 82 })
+    .toBuffer();
+
+// Stores an encoded avatar for a user: uploads the object, points the
+// profile row at it, then removes the previous object. The ordering is
+// deliberate — the object exists before the row references it, and the
+// old object is dropped last — so a mid-failure only ever orphans a
+// file, never leaves a row pointing at a missing object. Returns the
+// new signed URL. Assumes the profile row already exists.
+export const replaceAvatar = async (userId: string, webp: Buffer): Promise<string> => {
+  const path = `${userId}/${randomUUID()}.webp`;
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, webp, { contentType: "image/webp", upsert: false });
+  if (uploadError) throw uploadError;
+
+  const [existing] = await db
+    .select({ avatarPath: profiles.avatarPath })
+    .from(profiles)
+    .where(eq(profiles.id, userId));
+  // Single autocommit statement — safe on the transaction pooler.
+  await db.update(profiles).set({ avatarPath: path }).where(eq(profiles.id, userId));
+
+  if (existing?.avatarPath && existing.avatarPath !== path) {
+    await supabaseAdmin.storage.from(AVATAR_BUCKET).remove([existing.avatarPath]);
+  }
+
+  return (await resolveAvatarUrls([path])).get(path) ?? "";
+};
+
+// Clears a user's avatar: nulls the column, then removes the object.
+export const clearAvatar = async (userId: string): Promise<void> => {
+  const [existing] = await db
+    .select({ avatarPath: profiles.avatarPath })
+    .from(profiles)
+    .where(eq(profiles.id, userId));
+  if (!existing?.avatarPath) return;
+
+  await db.update(profiles).set({ avatarPath: null }).where(eq(profiles.id, userId));
+  await supabaseAdmin.storage.from(AVATAR_BUCKET).remove([existing.avatarPath]);
 };

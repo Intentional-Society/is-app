@@ -7,6 +7,7 @@ import { isRelationValue } from "@/lib/relation-value";
 
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
+import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -114,6 +115,43 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .put("/me/last-updated-web", async (c) => {
     const user = c.get("user");
     await markWebUpdated(user.id);
+    return c.json({ ok: true });
+  })
+  .post("/me/avatar", async (c) => {
+    const user = c.get("user");
+
+    const form = await c.req.parseBody().catch(() => null);
+    if (!form) {
+      return c.json({ error: "invalid form body" }, 400);
+    }
+    const file = form.file;
+    if (!(file instanceof File)) {
+      return c.json({ error: "missing file field" }, 400);
+    }
+    if (file.size > MAX_AVATAR_UPLOAD_BYTES) {
+      return c.json({ error: "file too large" }, 400);
+    }
+    if (!file.type.startsWith("image/")) {
+      return c.json({ error: "file must be an image" }, 400);
+    }
+
+    let webp: Buffer;
+    try {
+      webp = await encodeAvatar(Buffer.from(await file.arrayBuffer()));
+    } catch {
+      // sharp throws on bytes that do not decode as an image.
+      return c.json({ error: "could not decode image" }, 400);
+    }
+
+    // Ensure a profile row exists before pointing it at the object —
+    // the same self-heal guarantee GET/PUT /me carry.
+    await upsertProfile(user);
+    const avatarUrl = await replaceAvatar(user.id, webp);
+    return c.json({ avatarUrl });
+  })
+  .delete("/me/avatar", async (c) => {
+    const user = c.get("user");
+    await clearAvatar(user.id);
     return c.json({ ok: true });
   })
   .post("/invites", async (c) => {
