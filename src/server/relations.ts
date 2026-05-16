@@ -594,11 +594,3 @@ export const materializeInviteRelations = async (
     .values(rows)
     .onConflictDoNothing({ target: [relations.relatorId, relations.relateeId] });
 };
-
-export const insertInviteHints = async (
-  tx: Tx | typeof db,
-  params: { inviteId: string; relateeIds: string[] },
-): Promise<void> => {
-  if (params.relateeIds.length === 0) return;
-  await tx.insert(inviteHints).values(params.relateeIds.map((relateeId) => ({ inviteId: params.inviteId, relateeId })));
-};

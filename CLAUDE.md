@@ -44,6 +44,8 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 
 **Local:** `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`. Drizzle is the sole migration tool — do not use `supabase/migrations/`.
 
+**Transactions:** a multi-statement `db.transaction(...)` over the transaction pooler can be silently mishandled — read `docs/strategy-db-transactions.md` before adding one.
+
 ## Workflow
 
 - Trunk-based development: feature branches PR into `main`, which auto-deploys to production
@@ -62,6 +64,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 
 - `docs/strategy-branching.md` — branching strategy and rationale
 - `docs/strategy-committing.md` — commit conventions and expand-contract pattern
+- `docs/strategy-db-transactions.md` — writing transactions that survive the Supabase connection pooler
 - `docs/strategy-project-management.md` — GitHub Projects board conventions
 - `docs/strategy-security.md` — security headers and rationale for each directive
 - `docs/strategy-ui.md` — theme tokens, the `/colors` dev page, Button variants, buttons vs anchors
