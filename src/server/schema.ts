@@ -40,7 +40,10 @@ export const profiles = pgTable("profiles", {
     onDelete: "set null",
   }),
   referredByLegacy: text("referred_by_legacy"),
-  avatarUrl: text("avatar_url"),
+  // SQL column stays "avatar_url" until a rename migration lands; the
+  // TS name follows the post-#131 meaning — a Supabase Storage object
+  // path, not a URL. See docs/design-profile-pictures.md.
+  avatarPath: text("avatar_url"),
   emergencyContact: text("emergency_contact"),
   liveDesire: text("live_desire"),
   isAdmin: boolean("is_admin").notNull().default(false),

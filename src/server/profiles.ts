@@ -2,16 +2,19 @@ import type { User } from "@supabase/supabase-js";
 import { asc, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
+import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
 import { profiles } from "./schema";
 
+// avatarUrl is intentionally absent: the avatar is set through the
+// dedicated upload endpoint (POST /api/me/avatar), not as free-text
+// here. The column it maps to is `avatarPath`, a Storage object path.
 export const EDITABLE_PROFILE_FIELDS = [
   "displayName",
   "bio",
   "keywords",
   "location",
   "supplementaryInfo",
-  "avatarUrl",
   "emergencyContact",
   "liveDesire",
 ] as const;
@@ -24,7 +27,6 @@ export type EditableProfileInput = Partial<{
   keywords: string[];
   location: string | null;
   supplementaryInfo: string | null;
-  avatarUrl: string | null;
   emergencyContact: string | null;
   liveDesire: string | null;
 }>;
@@ -112,7 +114,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       supplementaryInfo: profiles.supplementaryInfo,
       referredBy: profiles.referredBy,
       referredByLegacy: profiles.referredByLegacy,
-      avatarUrl: profiles.avatarUrl,
+      avatarPath: profiles.avatarPath,
       emergencyContact: profiles.emergencyContact,
       liveDesire: profiles.liveDesire,
       isAdmin: profiles.isAdmin,
@@ -123,7 +125,9 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
     .from(profiles)
     .where(eq(profiles.id, userId));
 
-  return row ?? null;
+  if (!row) return null;
+  const [profile] = await attachAvatarUrls([row]);
+  return profile;
 };
 
 // Bumps lastUpdatedWeb to now() on the user's profile. The Done button
@@ -164,14 +168,16 @@ export const getProfileForMember = async (idOrSlug: string): Promise<ProfileForM
       keywords: profiles.keywords,
       location: profiles.location,
       supplementaryInfo: profiles.supplementaryInfo,
-      avatarUrl: profiles.avatarUrl,
+      avatarPath: profiles.avatarPath,
       liveDesire: profiles.liveDesire,
       createdAt: profiles.createdAt,
     })
     .from(profiles)
     .where(where);
 
-  return row ?? null;
+  if (!row) return null;
+  const [profile] = await attachAvatarUrls([row]);
+  return profile;
 };
 
 export type MemberSummary = {
@@ -184,18 +190,19 @@ export type MemberSummary = {
 };
 
 export const listMembers = async (): Promise<MemberSummary[]> => {
-  return db
+  const rows = await db
     .select({
       id: profiles.id,
       slug: profiles.slug,
       displayName: profiles.displayName,
       location: profiles.location,
       keywords: profiles.keywords,
-      avatarUrl: profiles.avatarUrl,
+      avatarPath: profiles.avatarPath,
     })
     .from(profiles)
     .where(isNotNull(profiles.displayName))
-    .orderBy(asc(profiles.displayName)) as Promise<MemberSummary[]>;
+    .orderBy(asc(profiles.displayName));
+  return (await attachAvatarUrls(rows)) as MemberSummary[];
 };
 
 // Placeholder. Same rationale as getProfileForMember — admin tooling

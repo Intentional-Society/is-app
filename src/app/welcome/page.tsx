@@ -20,7 +20,6 @@ export default async function WelcomePage() {
           keywords: profile?.keywords ?? [],
           location: profile?.location ?? "",
           supplementaryInfo: profile?.supplementaryInfo ?? "",
-          avatarUrl: profile?.avatarUrl ?? "",
           emergencyContact: profile?.emergencyContact ?? "",
           liveDesire: profile?.liveDesire ?? "",
         }}
