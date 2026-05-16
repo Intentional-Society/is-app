@@ -141,9 +141,11 @@ Three rules:
 
 # Supply-chain quarantine
 
-`.npmrc` sets `min-release-age=5`, so `npm install` ignores any package version published in the last five days. The window is long enough to catch the usual post-publish takedown cycle (Shai-Hulud, debug/chalk, etc.) and short enough to not block routine upgrades. Override with `--min-release-age=0` on the command line for a genuine emergency install.
+`.npmrc` sets `min-release-age=3`, so `npm install` ignores any package version published in the last three days. The window is long enough to catch the usual post-publish takedown cycle (Shai-Hulud, debug/chalk, etc.) and short enough to not block routine upgrades. Override with `--min-release-age=0` on the command line for a genuine emergency install.
 
 Requires npm ≥11 — older npm warns and ignores the setting, so this is silent if the Vercel build image ever rolls back. The gate engages on dependency resolution (adding or bumping a dep); `npm ci` against a frozen lockfile installs whatever's pinned regardless.
+
+Dependabot has no visibility into `.npmrc`, so `.github/dependabot.yml` carries a matching `cooldown.default-days: 3` for the npm ecosystem. Keep the two values in sync — otherwise Dependabot opens PRs bumping to versions the `.npmrc` quarantine would still reject.
 
 # Secret rotation
 
