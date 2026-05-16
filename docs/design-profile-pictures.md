@@ -167,6 +167,13 @@ for the members grid and graph nodes. If the many-tiny-avatars `/myweb`
 graph later proves heavy, exporting a second small size at upload time
 is a minor follow-up.
 
+**Stored square, displayed round.** The crop is square (`aspect={1}`);
+`react-easy-crop`'s `cropShape: "round"` only draws a circular overlay
+so the user previews the circle while positioning. The stored 1024²
+WebP keeps its corners — circular display is CSS (`rounded-full` on the
+`Avatar` box, as today), so a square or rounded-rect rendering stays
+free from the same master.
+
 Re-encoding (either stage) **strips all EXIF metadata**, including GPS
 coordinates the camera embedded — a free privacy win.
 
