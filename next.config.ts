@@ -66,7 +66,13 @@ if (!isProd) {
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
-  images: { remotePatterns },
+  images: {
+    remotePatterns,
+    // The local Supabase Storage container lives on 127.0.0.1, which
+    // Next 16's optimizer blocks as an SSRF guard. Allow it in dev
+    // only — production avatars come from the public *.supabase.co host.
+    dangerouslyAllowLocalIP: !isProd,
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
