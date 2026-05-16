@@ -10,7 +10,7 @@ import { invites, profiles } from "./schema";
 export const E2E_EMAILS = ["e2e-regular@testfake.local", "e2e-admin@testfake.local"] as const;
 
 // One physical `profiles` row as it stands immediately after the reset
-// transaction commits. ctid/xmin pin the exact tuple and the txid that
+// writes. ctid/xmin pin the exact tuple and the txid that
 // last wrote it; inRecovery/serverAddr/searchPath/backendPid describe
 // the connection the read-back ran on. All of this exists to diagnose
 // #149 — a read seeing a stale bio just after the reset commits — by
@@ -32,7 +32,7 @@ export type ResetProbeRow = {
 // its flag across runs. auth.users is not touched — the password and
 // row stay put so the next run can sign in again.
 //
-// After committing, it reads every seeded profile back (see #149): the
+// After the writes, it reads every seeded profile back (see #149): the
 // UPDATE's RETURNING reports which rows were touched, and a per-id
 // SELECT of the physical tuple plus connection state lets the caller
 // tell a genuine stale read apart from a duplicate tuple, a replica,
@@ -59,29 +59,31 @@ export const resetE2EUsers = async (): Promise<{
   if (users.length === 0) return { reset: 0, updatedIds: [], profiles: [] };
   const ids = users.map((u) => u.id);
 
-  let updatedIds: string[] = [];
-  await db.transaction(async (tx) => {
-    await tx.delete(invites).where(inArray(invites.createdBy, ids));
-    const updated = await tx
-      .update(profiles)
-      .set({
-        displayName: null,
-        slug: null,
-        bio: null,
-        keywords: sql`'{}'::text[]`,
-        location: null,
-        supplementaryInfo: null,
-        referredBy: null,
-        referredByLegacy: null,
-        avatarUrl: null,
-        emergencyContact: null,
-        liveDesire: null,
-        lastUpdatedWeb: null,
-      })
-      .where(inArray(profiles.id, ids))
-      .returning({ id: profiles.id });
-    updatedIds = updated.map((r) => r.id);
-  });
+  // Two separate autocommit statements rather than db.transaction:
+  // delete-then-wipe needn't be atomic for a test reset, and a
+  // multi-statement BEGIN/COMMIT over the Supabase transaction pooler
+  // can have its writes silently dropped while still reporting success
+  // (cf. supabase/supabase#43753) — the leading suspect for #149.
+  await db.delete(invites).where(inArray(invites.createdBy, ids));
+  const updated = await db
+    .update(profiles)
+    .set({
+      displayName: null,
+      slug: null,
+      bio: null,
+      keywords: sql`'{}'::text[]`,
+      location: null,
+      supplementaryInfo: null,
+      referredBy: null,
+      referredByLegacy: null,
+      avatarUrl: null,
+      emergencyContact: null,
+      liveDesire: null,
+      lastUpdatedWeb: null,
+    })
+    .where(inArray(profiles.id, ids))
+    .returning({ id: profiles.id });
+  const updatedIds = updated.map((r) => r.id);
 
   // Read each id back on a fresh pooled connection, post-commit. No
   // LIMIT, so a duplicate-tuple bug surfaces as rows.length > 1; ctid
