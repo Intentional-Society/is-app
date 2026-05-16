@@ -2,6 +2,9 @@
   "name": "is-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "update_main_branch_protection": "node scripts/update-main-branch-protection.mjs",
@@ -55,7 +58,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/d3-force": "^3.0.10",
-    "@types/node": "^22",
+    "@types/node": "^24",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

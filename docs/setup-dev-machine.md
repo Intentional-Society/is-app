@@ -4,27 +4,27 @@ System prerequisites for working on is-app. These are one-time installs.
 
 ---
 
-## Node.js 22+ (via nvm)
+## Node.js 24 (via nvm)
 
-We recommend using `nvm` to manage Node.js versions.
+We recommend using `nvm` to manage Node.js versions. The repo pins Node 24 (the current LTS) via `.nvmrc` and `engines.node` in `package.json`.
 
 **Mac:**
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-nvm install 22
+nvm install 24
 ```
+The repo includes an `.nvmrc` file, so running `nvm use` inside the project directory switches to the correct version.
 
 **Windows:**
 
 Install [nvm-windows](https://github.com/coreybutler/nvm-windows/releases) (download and run the latest `nvm-setup.exe`), then:
 ```bash
-nvm install 22
-nvm use 22
+nvm install 24
+nvm use 24
 ```
+nvm-windows does not read `.nvmrc`, so name the version explicitly with `nvm use 24`.
 
-After install: `node --version` should show v22.x or later.
-
-The repo includes an `.nvmrc` file, so running `nvm use` inside the project directory will automatically switch to the correct version.
+After install: `node --version` should show v24.x.
 
 ## Docker Desktop
 
