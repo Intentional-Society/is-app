@@ -86,13 +86,15 @@ export const resetSeededUsers = async (baseURL: string): Promise<void> => {
 
   // #149 probe: the endpoint reads every seeded profile back after its
   // reset transaction commits, with physical-tuple (ctid/xmin) and
-  // connection (replica/search_path) diagnostics. A clean reset is
-  // exactly one row per id with bio null. Anything else throws here —
-  // failing loud in beforeEach instead of 20s later at a /welcome
-  // timeout — and dumps the full diagnostic so CI shows the surviving
-  // bio string (its value names the test that wrote it, since each
-  // completeWelcome caller passes a distinct bio), the tuple identity,
-  // and whether the read ran on a replica.
+  // connection (replica/search_path) diagnostics. A reset is clean when
+  // every existing profile row has bio null. Two things fail loud here
+  // — in beforeEach, instead of 20s later at a /welcome timeout: a row
+  // whose bio survived the reset (the #149 symptom), or duplicate
+  // tuples for one id. A seeded user with no profile row at all (0 rows
+  // — e.g. e2e-admin, which no test signs in as) is fine, not flagged.
+  // The dump shows the surviving bio string (its value names the test
+  // that wrote it, since each completeWelcome caller passes a distinct
+  // bio), the tuple identity, and whether the read ran on a replica.
   type ResetProbeRow = {
     ctid: string;
     xmin: string;
@@ -106,11 +108,13 @@ export const resetSeededUsers = async (baseURL: string): Promise<void> => {
   const body = (await res.json()) as {
     reset: number;
     updatedIds: string[];
-    profiles: { id: string; rows: ResetProbeRow[] }[];
+    profiles: { id: string; email: string; rows: ResetProbeRow[] }[];
   };
-  const anomalies = body.profiles.filter((p) => p.rows.length !== 1 || p.rows[0]?.bio !== null);
+  const anomalies = body.profiles.filter((p) => p.rows.length > 1 || p.rows.some((r) => r.bio !== null));
   if (anomalies.length > 0) {
-    const detail = anomalies.map((p) => `  ${p.id}: ${p.rows.length} row(s) → ${JSON.stringify(p.rows)}`).join("\n");
+    const detail = anomalies
+      .map((p) => `  ${p.email} (${p.id}): ${p.rows.length} row(s) → ${JSON.stringify(p.rows)}`)
+      .join("\n");
     throw new Error(
       `reset endpoint: seeded profile not clean after reset — see #149\n` +
         `updatedIds=${JSON.stringify(body.updatedIds)}\n${detail}`,

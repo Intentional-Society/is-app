@@ -42,17 +42,22 @@ export const resetE2EUsers = async (): Promise<{
   // ids the UPDATE's RETURNING reported — one entry per row touched, so
   // a duplicated id surfaces here as a repeat.
   updatedIds: string[];
-  // Post-commit read-back per seeded id. `rows` holds every physical
-  // profile row for that id; length > 1 means duplicate tuples.
-  profiles: { id: string; rows: ResetProbeRow[] }[];
+  // Post-commit read-back per seeded user. `rows` holds every physical
+  // profile row for that id: length 0 means no profile row at all (fine
+  // — e.g. e2e-admin, which no test signs in as), length > 1 means
+  // duplicate tuples.
+  profiles: { id: string; email: string; rows: ResetProbeRow[] }[];
 }> => {
   const emailList = sql.join(
     E2E_EMAILS.map((e) => sql`${e}`),
     sql`, `,
   );
-  const rows = await db.execute(sql`SELECT id FROM auth.users WHERE email IN (${emailList})`);
-  const ids = (rows as unknown as { id: string }[]).map((r) => r.id);
-  if (ids.length === 0) return { reset: 0, updatedIds: [], profiles: [] };
+  const users = (await db.execute(sql`SELECT id, email FROM auth.users WHERE email IN (${emailList})`)) as unknown as {
+    id: string;
+    email: string;
+  }[];
+  if (users.length === 0) return { reset: 0, updatedIds: [], profiles: [] };
+  const ids = users.map((u) => u.id);
 
   let updatedIds: string[] = [];
   await db.transaction(async (tx) => {
@@ -84,7 +89,7 @@ export const resetE2EUsers = async (): Promise<{
   // current_setting('search_path') / inet_server_addr characterise the
   // connection this read happened to land on.
   const profilesAfter = await Promise.all(
-    ids.map(async (id) => {
+    users.map(async ({ id, email }) => {
       const probe = (await db.execute(sql`
         SELECT
           ctid::text AS ctid,
@@ -98,9 +103,9 @@ export const resetE2EUsers = async (): Promise<{
         FROM profiles
         WHERE id = ${id}::uuid
       `)) as unknown as ResetProbeRow[];
-      return { id, rows: [...probe] };
+      return { id, email, rows: [...probe] };
     }),
   );
 
-  return { reset: ids.length, updatedIds, profiles: profilesAfter };
+  return { reset: users.length, updatedIds, profiles: profilesAfter };
 };
