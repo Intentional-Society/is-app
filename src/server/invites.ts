@@ -3,7 +3,7 @@ import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import { db } from "./db";
-import { insertInviteHints, validateInviteHints } from "./relations";
+import { validateInviteHints } from "./relations";
 import { invites } from "./schema";
 
 // Alphabet: 23 uppercase letters (no I, O — visually confusable with 1/0)
@@ -104,35 +104,51 @@ export const createInvite = async (params: {
   // Retry loop guards against the astronomically-unlikely collision.
   // Three attempts is more than enough — collision probability at 10
   // chars over a 31-char alphabet is negligible even with millions of
-  // rows. Each attempt runs in its own tx so the invite_hints insert
-  // rolls back with a code collision.
+  // rows. A code collision fails the whole statement, so no orphan
+  // invite_hints rows survive.
+  //
+  // The invite and its hint rows are written in a single statement (a
+  // writable CTE), not a db.transaction: a multi-statement transaction
+  // over the Supabase transaction pooler can be silently discarded.
+  // See docs/strategy-db-transactions.md.
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = generateInviteCode();
     try {
-      const row = await db.transaction(async (tx) => {
-        const [inserted] = await tx
-          .insert(invites)
-          .values({
-            code,
-            createdBy: params.createdBy,
-            note: params.note,
-            expiresAt: sql`now() + interval '${sql.raw(String(INVITE_LIFETIME_DAYS))} days'`,
-            relationValue,
-          })
-          .returning({
-            id: invites.id,
-            code: invites.code,
-            note: invites.note,
-            expiresAt: invites.expiresAt,
-            relationValue: invites.relationValue,
-          });
-        await insertInviteHints(tx, { inviteId: inserted.id, relateeIds: hintCheck.ids });
-        return inserted;
-      });
+      const [row] = (await db.execute(sql`
+        WITH new_invite AS (
+          INSERT INTO invites (code, created_by, note, expires_at, creator_value)
+          VALUES (
+            ${code},
+            ${params.createdBy},
+            ${params.note},
+            now() + interval '${sql.raw(String(INVITE_LIFETIME_DAYS))} days',
+            ${relationValue}
+          )
+          RETURNING id, code, note, expires_at, creator_value
+        ),
+        inserted_hints AS (
+          INSERT INTO invite_hints (invite_id, ratee_id)
+          SELECT new_invite.id, h.ratee_id
+          FROM new_invite, unnest(ARRAY[${sql.join(
+            hintCheck.ids.map((id) => sql`${id}`),
+            sql`, `,
+          )}]::uuid[]) AS h(ratee_id)
+          RETURNING 1
+        )
+        SELECT code, note, expires_at AS "expiresAt", creator_value AS "relationValue"
+        FROM new_invite
+      `)) as unknown as {
+        code: string;
+        note: string;
+        expiresAt: string;
+        relationValue: number | null;
+      }[];
       return {
         code: row.code,
         note: row.note,
-        expiresAt: row.expiresAt,
+        // Raw db.execute returns the timestamptz as a string; the typed
+        // query builder would have mapped it to Date, raw SQL does not.
+        expiresAt: new Date(row.expiresAt),
         relationValue: row.relationValue as RelationValue | null,
         hintCount: hintCheck.ids.length,
       };
