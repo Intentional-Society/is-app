@@ -146,7 +146,7 @@ other; neither should be removed without the other.
 Two stages, each doing a distinct job:
 
 - **Browser** — after crop-confirm, draw the crop to a `<canvas>` and
-  export **WebP** (`canvas.toBlob`, quality ~0.82) at the master size.
+  export **WebP** (`canvas.toBlob`, quality ~0.88) at the master size.
   The crop step already produced this canvas, so the resize is nearly
   free. This keeps the upload to ~100–200 KB, which is what makes the
   Hono-through upload (decision 2) fit Vercel's request-body limit.

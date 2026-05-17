@@ -40,7 +40,12 @@ const boundSource = async (file: File): Promise<string> => {
   getContext(canvas).drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+  // The bounded image is both what the cropper displays and what
+  // cropToWebp extracts the final crop from, so its quality is a real
+  // link in the chain — but it only needs to sit above the final
+  // encode (0.88) to not be the limiting generation; higher just grows
+  // the blob. The object URL is revoked when the modal closes.
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.92));
   if (!blob) throw new Error("could not process image");
   return URL.createObjectURL(blob);
 };
@@ -72,7 +77,7 @@ const cropToWebp = async (src: string, area: Area): Promise<Blob> => {
     OUTPUT_DIMENSION,
     OUTPUT_DIMENSION,
   );
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.88));
   if (!blob) throw new Error("could not encode image");
   return blob;
 };

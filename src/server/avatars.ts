@@ -93,7 +93,7 @@ export const encodeAvatar = (input: Buffer): Promise<Buffer> =>
   sharp(input, { limitInputPixels: 100_000_000 })
     .rotate()
     .resize(AVATAR_DIMENSION, AVATAR_DIMENSION, { fit: "cover" })
-    .webp({ quality: 82 })
+    .webp({ quality: 88 })
     .toBuffer();
 
 // Stores an encoded avatar for a user: uploads the object, points the
