@@ -8,6 +8,7 @@ import { isRelationValue } from "@/lib/relation-value";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -152,6 +153,35 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .delete("/me/avatar", async (c) => {
     const user = c.get("user");
     await clearAvatar(user.id);
+    return c.json({ ok: true });
+  })
+  .delete("/me", async (c) => {
+    const user = c.get("user");
+
+    // Guard: admins must revoke their own admin flag first so we never
+    // orphan admin-only state or accidentally remove the last admin.
+    const profile = await getProfileForSelf(user.id);
+    if (profile?.isAdmin) {
+      return c.json({ error: "admins_cannot_self_delete" }, 403);
+    }
+
+    // Clear avatar from Storage before deleting the profile row.
+    await clearAvatar(user.id).catch(() => {});
+
+    // Delete the profile row. FK cascades remove profile_programs,
+    // relations, and invite_hints. Invites created by this member
+    // have createdBy set to null (set null FK).
+    await db.delete(profiles).where(eq(profiles.id, user.id));
+
+    // Delete the auth.users row — must come after profile since
+    // profiles.id references auth.users.id.
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+    if (error) {
+      // Profile is already gone; log and return an error so the client
+      // knows the auth row wasn't cleaned up.
+      return c.json({ error: "auth_delete_failed", message: error.message }, 500);
+    }
+
     return c.json({ ok: true });
   })
   .post("/invites", async (c) => {
