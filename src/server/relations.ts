@@ -16,6 +16,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import { isUuid } from "./auth-middleware";
+import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
 import { inviteHints, invites, profiles, relations } from "./schema";
 
@@ -41,7 +42,7 @@ export type RelationSuggestionReason =
 
 // Card payload for the rating-decision UI. Fields are chosen so a
 // member can decide without navigating away from the suggestion feed.
-export type RelationSuggestion = SuggestionCardColumns & { reason: RelationSuggestionReason };
+export type RelationSuggestion = Omit<SuggestionCardRow, "avatarPath"> & { avatarUrl: string | null };
 
 export type RelationSuggestionFeed = {
   suggestions: RelationSuggestion[];
@@ -56,7 +57,7 @@ const cardColumns = {
   id: profiles.id,
   slug: profiles.slug,
   displayName: profiles.displayName,
-  avatarUrl: profiles.avatarUrl,
+  avatarPath: profiles.avatarPath,
   bio: profiles.bio,
   keywords: profiles.keywords,
   location: profiles.location,
@@ -64,10 +65,15 @@ const cardColumns = {
 
 type SuggestionCardColumns = Pick<
   InferSelectModel<typeof profiles>,
-  "id" | "slug" | "displayName" | "avatarUrl" | "bio" | "keywords" | "location"
+  "id" | "slug" | "displayName" | "avatarPath" | "bio" | "keywords" | "location"
 >;
 
-const toCard = (row: SuggestionCardColumns, reason: RelationSuggestionReason): RelationSuggestion => ({
+// A card as assembled internally — still carrying the stored
+// avatarPath. getRelationSuggestions resolves these to signed
+// avatarUrls (yielding RelationSuggestion) just before returning.
+type SuggestionCardRow = SuggestionCardColumns & { reason: RelationSuggestionReason };
+
+const toCard = (row: SuggestionCardColumns, reason: RelationSuggestionReason): SuggestionCardRow => ({
   ...row,
   reason,
 });
@@ -79,10 +85,10 @@ const noRelationFromUserTo = (userId: string, relateeRef: SQLWrapper) =>
   sql`NOT EXISTS (SELECT 1 FROM relations rev WHERE rev.rater_id = ${userId} AND rev.ratee_id = ${relateeRef})`;
 
 const collectInto = <T extends { id: string }>(
-  target: RelationSuggestion[],
+  target: SuggestionCardRow[],
   seen: Set<string>,
   rows: T[],
-  build: (row: T) => RelationSuggestion,
+  build: (row: T) => SuggestionCardRow,
 ): void => {
   for (const row of rows) {
     if (seen.has(row.id)) continue;
@@ -99,8 +105,8 @@ const collectInto = <T extends { id: string }>(
 // directory) so the feed never goes empty while a member remains.
 export const getRelationSuggestions = async (userId: string): Promise<RelationSuggestionFeed> => {
   const seen = new Set<string>([userId]);
-  const suggestions: RelationSuggestion[] = [];
-  const otherMembers: RelationSuggestion[] = [];
+  const suggestions: SuggestionCardRow[] = [];
+  const otherMembers: SuggestionCardRow[] = [];
 
   // First wave: every query that doesn't depend on another fires in
   // parallel. Source 1 (addedMe), Source 2 hint rows, the `me` lookup
@@ -218,7 +224,12 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
   collectInto(suggestions, seen, recentlyActive, (row) => toCard(row, { type: "recentlyActive" }));
   collectInto(otherMembers, seen, everyoneElse, (row) => toCard(row, { type: "member" }));
 
-  return { suggestions, otherMembers };
+  // Resolve stored avatar paths to signed URLs in one batch per array
+  // — the chokepoint that keeps raw paths off the wire.
+  return {
+    suggestions: await attachAvatarUrls(suggestions),
+    otherMembers: await attachAvatarUrls(otherMembers),
+  };
 };
 
 export type SubgraphNode = {
@@ -244,7 +255,7 @@ const nodeColumns = {
   id: profiles.id,
   slug: profiles.slug,
   displayName: profiles.displayName,
-  avatarUrl: profiles.avatarUrl,
+  avatarPath: profiles.avatarPath,
 };
 
 const edgeKey = (e: { relatorId: string; relateeId: string }): string => `${e.relatorId}:${e.relateeId}`;
@@ -329,7 +340,7 @@ export const getPersonalWeb = async (params: {
           .orderBy(asc(profiles.displayName))
       : [];
 
-  return { centerId, nodes: nodeRows, edges };
+  return { centerId, nodes: await attachAvatarUrls(nodeRows), edges };
 };
 
 // Postgres error code 23503 = foreign_key_violation. In
@@ -459,11 +470,11 @@ export const listPendingHints = async (): Promise<PendingHint[]> => {
       id: profiles.id,
       displayName: profiles.displayName,
       slug: profiles.slug,
-      avatarUrl: profiles.avatarUrl,
+      avatarPath: profiles.avatarPath,
     })
     .from(profiles)
     .where(inArray(profiles.id, [...ids]));
-  const byId = new Map<string, HintProfile>(profileRows.map((p) => [p.id, p]));
+  const byId = new Map<string, HintProfile>((await attachAvatarUrls(profileRows)).map((p) => [p.id, p]));
 
   // Skip rows whose relator or relatee profile vanished mid-query;
   // hintedBy stays optional since the FK is set null on delete.

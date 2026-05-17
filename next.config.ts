@@ -48,8 +48,31 @@ const securityHeaders = [
   },
 ];
 
+// Avatar objects are served from Supabase Storage (signed URLs) and
+// rendered through next/image, so the optimizer must be allowed to
+// fetch from the Supabase host. Local dev points at the Supabase
+// container on 127.0.0.1:54321 — mirror the isProd CSP branching.
+const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
+  { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/**" },
+];
+if (!isProd) {
+  remotePatterns.push({
+    protocol: "http",
+    hostname: "127.0.0.1",
+    port: "54321",
+    pathname: "/storage/v1/object/**",
+  });
+}
+
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  images: {
+    remotePatterns,
+    // The local Supabase Storage container lives on 127.0.0.1, which
+    // Next 16's optimizer blocks as an SSRF guard. Allow it in dev
+    // only — production avatars come from the public *.supabase.co host.
+    dangerouslyAllowLocalIP: !isProd,
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

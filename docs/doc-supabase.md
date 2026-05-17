@@ -78,7 +78,7 @@ The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRed
 ### API keys
 
 - **Publishable default key:** exposed to the browser as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
-- **Service role key:** not currently used by the app; keep secret if ever needed
+- **Secret key:** used server-side by `src/lib/supabase/admin.ts` for avatar Storage operations (upload, signing, delete) and by the e2e session helper; exposed as `SUPABASE_SECRET_KEY`. Never sent to the browser.
 
 Both are set as Vercel environment variables (see `docs/doc-vercel.md`), not committed to the repo.
 
@@ -89,6 +89,17 @@ The hosted project's auto-generated **Data API** is disabled at the dashboard to
 **Why it stays off.** Authorization logic lives in the Hono middleware (`src/server/auth-middleware.ts`), so PostgREST and pg_graphql add attack surface without adding capability. RLS denies `anon` and `authenticated` on every table as a backstop (see `docs/architecture-appstack.md`), so flipping the toggle on would not directly expose data — but it would put every table one RLS-policy bug away from a leak, and create a parallel access path that bypasses the request logging, validation, and shape-checking in the Hono layer.
 
 Keeping the Data API off leaves a single door to the database: the Hono API at `src/server/api.ts`, which connects via the `postgres` superuser in `DATABASE_URL` (a server-only env var).
+
+### Storage — `avatars` bucket
+
+Profile pictures (issue #131) live in a Storage bucket named **`avatars`**. Create it once in the dashboard (Storage → New bucket) to match the local declaration in `supabase/config.toml`:
+
+- **Name:** `avatars`
+- **Public:** off — objects are served via short-lived signed URLs
+- **File size limit:** 1 MB (the field takes decimal MB/KB/B units, not MiB)
+- **Allowed MIME types:** `image/webp`
+
+The server reaches Storage with the **secret key** (`src/lib/supabase/admin.ts`), which bypasses Storage RLS — so no bucket policies are needed, the same posture as the `postgres` superuser for the database.
 
 ---
 

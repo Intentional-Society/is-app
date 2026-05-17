@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
 
+import { AvatarUploader } from "../avatar-uploader";
 import { ProfileForm } from "../profile-form";
 
 export default async function EditProfilePage() {
@@ -18,6 +19,8 @@ export default async function EditProfilePage() {
         </Link>
       </div>
 
+      <AvatarUploader name={profile.displayName} initialUrl={profile.avatarUrl} />
+
       <ProfileForm
         initial={{
           displayName: profile.displayName ?? "",
@@ -25,7 +28,6 @@ export default async function EditProfilePage() {
           keywords: profile.keywords ?? [],
           location: profile.location ?? "",
           supplementaryInfo: profile.supplementaryInfo ?? "",
-          avatarUrl: profile.avatarUrl ?? "",
           emergencyContact: profile.emergencyContact ?? "",
           liveDesire: profile.liveDesire ?? "",
         }}

@@ -76,7 +76,7 @@ export const resetE2EUsers = async (): Promise<{
       supplementaryInfo: null,
       referredBy: null,
       referredByLegacy: null,
-      avatarUrl: null,
+      avatarPath: null,
       emergencyContact: null,
       liveDesire: null,
       lastUpdatedWeb: null,

@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
 
+import { AvatarUploader } from "../profile/avatar-uploader";
 import { WelcomeForm } from "./welcome-form";
 
 export default async function WelcomePage() {
@@ -13,6 +14,7 @@ export default async function WelcomePage() {
       <p className="max-w-md text-center text-base text-muted-foreground">
         Tell us a little about yourself. You can edit this later.
       </p>
+      <AvatarUploader name={profile?.displayName ?? null} initialUrl={profile?.avatarUrl ?? null} />
       <WelcomeForm
         initial={{
           displayName: profile?.displayName ?? "",
@@ -20,7 +22,6 @@ export default async function WelcomePage() {
           keywords: profile?.keywords ?? [],
           location: profile?.location ?? "",
           supplementaryInfo: profile?.supplementaryInfo ?? "",
-          avatarUrl: profile?.avatarUrl ?? "",
           emergencyContact: profile?.emergencyContact ?? "",
           liveDesire: profile?.liveDesire ?? "",
         }}

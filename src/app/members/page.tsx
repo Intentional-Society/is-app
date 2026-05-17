@@ -11,12 +11,13 @@ function MemberCard({ member }: { member: MemberSummary }) {
   return (
     <Link
       href={href}
-      className="flex h-full flex-col rounded border border-border hover:bg-muted/50 transition-colors overflow-hidden"
+      className="flex h-full flex-col rounded-sm border border-border hover:bg-muted/50 transition-colors overflow-hidden"
     >
       <Avatar
         name={member.displayName}
         url={member.avatarUrl}
-        className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-t-sm bg-muted text-2xl font-semibold text-muted-foreground"
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 256px"
+        className="flex aspect-square w-full items-center justify-center overflow-hidden bg-muted text-2xl font-semibold text-muted-foreground"
       />
       <div className="flex flex-col gap-1 p-4">
         <span className="font-semibold">{member.displayName}</span>

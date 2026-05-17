@@ -16,7 +16,6 @@ type Initial = {
   keywords: string[];
   location: string;
   supplementaryInfo: string;
-  avatarUrl: string;
   emergencyContact: string;
   liveDesire: string;
 };
@@ -30,7 +29,6 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
   const [keywordsText, setKeywordsText] = useState(initial.keywords.join(", "));
   const [location, setLocation] = useState(initial.location);
   const [supplementaryInfo, setSupplementaryInfo] = useState(initial.supplementaryInfo);
-  const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl);
   const [emergencyContact, setEmergencyContact] = useState(initial.emergencyContact);
   const [liveDesire, setLiveDesire] = useState(initial.liveDesire);
   const [password, setPassword] = useState("");
@@ -53,7 +51,6 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
           keywords,
           location: location.trim() || null,
           supplementaryInfo: supplementaryInfo.trim() || null,
-          avatarUrl: avatarUrl.trim() || null,
           emergencyContact: emergencyContact.trim() || null,
           liveDesire: liveDesire.trim() || null,
         },
@@ -144,15 +141,6 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         onChange={(e) => setSupplementaryInfo(e.target.value)}
         disabled={disabled}
         rows={3}
-      />
-
-      <Label htmlFor="avatarUrl">Avatar URL</Label>
-      <Input
-        id="avatarUrl"
-        type="url"
-        value={avatarUrl}
-        onChange={(e) => setAvatarUrl(e.target.value)}
-        disabled={disabled}
       />
 
       <Label htmlFor="emergencyContact">Emergency contact</Label>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Avatar } from "@/components/avatar";
 import { serverApiClient } from "@/lib/api-server";
 import type { MemberProfile } from "@/lib/api-types";
 
@@ -47,6 +48,14 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
           ← Directory
         </Link>
       </div>
+
+      <Avatar
+        name={profile.displayName}
+        url={profile.avatarUrl}
+        sizes="128px"
+        priority
+        className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
+      />
 
       <dl className="flex w-full max-w-md flex-col gap-4">
         <Field label="Bio">{profile.bio}</Field>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
@@ -26,6 +27,14 @@ export default async function ProfilePage() {
         </Link>
       </div>
 
+      <Avatar
+        name={profile.displayName}
+        url={profile.avatarUrl}
+        sizes="128px"
+        priority
+        className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
+      />
+
       <dl className="flex w-full max-w-md flex-col gap-4">
         <Field label="Display name">{profile.displayName}</Field>
         <Field label="Bio">{profile.bio}</Field>
@@ -33,7 +42,6 @@ export default async function ProfilePage() {
         <Field label="Location">{profile.location}</Field>
         <Field label="Live desire">{profile.liveDesire}</Field>
         <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
-        <Field label="Avatar URL">{profile.avatarUrl}</Field>
         <Field label="Emergency contact">{profile.emergencyContact}</Field>
       </dl>
 

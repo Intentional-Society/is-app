@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-16 | James | Profile pictures
+
+Members upload a photo on the welcome/edit-profile screen and crop it in a circular modal (react-easy-crop); the server re-encodes it with `sharp` to a 1024² WebP and stores it in a private Supabase Storage `avatars` bucket. Avatars are served as 24h signed URLs — batched and cached in `src/server/avatars.ts` — and rendered through `next/image`. The `avatar_url` column (TS property `avatarPath`) now holds a Storage object path. Full design: `docs/design-profile-pictures.md`.
+
 ## 2026-05-15 | James | Node 24 LTS upgrade
 
 `.nvmrc`, the three CI workflows, and `@types/node` move to Node 24 — catching CI and local dev up to production, which Vercel already runs on 24. `engines.node` now pins the version in source so the two can't drift again.
