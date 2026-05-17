@@ -20,26 +20,30 @@ export const initials = (name: string | null): string =>
 // our own Supabase Storage host, so next/image optimisation applies.
 // `sizes` lets a caller hint the rendered size; the 96px default suits
 // the small avatars (graph nodes, typeahead) — the members grid and
-// profile page pass larger values. Default `alt=""` because every call
-// site renders the displayName as visible sibling text, so the avatar
-// is decorative for screen readers.
+// profile page pass larger values. `priority` opts an above-the-fold
+// single avatar (profile page, uploader preview) out of next/image's
+// default lazy-loading. Default `alt=""` because every call site
+// renders the displayName as visible sibling text, so the avatar is
+// decorative for screen readers.
 export function Avatar({
   name,
   url,
   alt = "",
   sizes = "96px",
+  priority = false,
   className,
 }: {
   name: string | null;
   url: string | null | undefined;
   alt?: string;
   sizes?: string;
+  priority?: boolean;
   className?: string;
 }) {
   return (
     <div className={`relative ${className ?? ""}`}>
       {url ? (
-        <Image src={url} alt={alt} fill sizes={sizes} className="object-cover" />
+        <Image src={url} alt={alt} fill sizes={sizes} priority={priority} className="object-cover" />
       ) : (
         <span>{initials(name)}</span>
       )}

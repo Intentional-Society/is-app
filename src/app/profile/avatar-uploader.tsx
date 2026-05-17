@@ -160,7 +160,7 @@ export function AvatarUploader({ name, initialUrl }: { name: string | null; init
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <Avatar name={name} url={url} sizes="128px" className={AVATAR_CLASS} />
+      <Avatar name={name} url={url} sizes="128px" priority className={AVATAR_CLASS} />
 
       <div className="flex gap-2">
         <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>
