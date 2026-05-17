@@ -57,7 +57,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 ## CI/CD
 
 - **ci.yml**: lint + functional tests on every PR (required to pass)
-- **e2e.yml**: Playwright against Vercel preview URL, triggered by `deployment_status` event (not required, but check results before merging)
+- **e2e.yml**: Playwright against Vercel preview URL, triggered by `deployment_status` event. Not a required GitHub check, but team policy requires it green before merging to `main`.
 - Vercel auto-deploys `main` to production; the build command runs `drizzle-kit migrate` before `next build` on production deploys only (gated by `VERCEL_ENV`)
 
 ## Key docs
