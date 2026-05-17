@@ -169,6 +169,40 @@ export function SigninForm() {
           {state.message}
         </p>
       )}
+      {password.length > 0 && (
+        <ForgotPasswordLink email={email} />
+      )}
     </form>
+  );
+}
+
+function ForgotPasswordLink({ email }: { email: string }) {
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const handleClick = async () => {
+    if (!email) return;
+    setSending(true);
+    const supabase = createClient();
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+    });
+    setSending(false);
+    setSent(true);
+  };
+
+  if (sent) {
+    return <p className="text-sm text-muted-foreground">Password reset email sent — check your inbox.</p>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={sending || !email}
+      className="self-start text-sm text-muted-foreground underline hover:no-underline disabled:opacity-50"
+    >
+      {sending ? "Sending…" : "Forgot password?"}
+    </button>
   );
 }
