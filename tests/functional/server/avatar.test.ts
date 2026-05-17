@@ -12,7 +12,7 @@ import { createServerClient } from "@supabase/ssr";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import app from "@/server/api";
-import { AVATAR_BUCKET } from "@/server/avatars";
+import { AVATAR_BUCKET, MAX_AVATAR_UPLOAD_BYTES } from "@/server/avatars";
 import { db } from "@/server/db";
 import { profiles } from "@/server/schema";
 
@@ -61,13 +61,9 @@ describe("POST/DELETE /api/me/avatar", () => {
     // Idempotent — the bucket is normally provisioned from config.toml,
     // but creating it here keeps the suite robust on an already-running
     // local stack. The "already exists" error is expected and ignored.
-    // The Storage REST API wants MB/KB/GB units (config.toml's MiB is a
-    // CLI-side format). The endpoint's MAX_AVATAR_UPLOAD_BYTES is the
-    // real gate; this bucket limit is just a backstop, so a round 3MB
-    // comfortably above it is fine.
     await supabaseAdmin.storage.createBucket(AVATAR_BUCKET, {
       public: false,
-      fileSizeLimit: "3MB",
+      fileSizeLimit: "1MB",
       allowedMimeTypes: ["image/webp"],
     });
   });
@@ -115,7 +111,7 @@ describe("POST/DELETE /api/me/avatar", () => {
   });
 
   it("rejects an oversize upload", async () => {
-    const tooBig = new Uint8Array(2 * 1024 * 1024 + 1);
+    const tooBig = new Uint8Array(MAX_AVATAR_UPLOAD_BYTES + 1);
     const res = await postAvatar(tooBig, "image/webp");
     expect(res.status).toBe(400);
   });

@@ -80,7 +80,7 @@ export const attachAvatarUrls = async <T extends { avatarPath: string | null }>(
 // Maximum accepted upload size. The browser shrinks the image well
 // below this; the cap is defence-in-depth against a client that does
 // not (see docs/design-profile-pictures.md decision 3).
-export const MAX_AVATAR_UPLOAD_BYTES = 2 * 1024 * 1024;
+export const MAX_AVATAR_UPLOAD_BYTES = 1_000_000;
 
 const AVATAR_DIMENSION = 1024;
 

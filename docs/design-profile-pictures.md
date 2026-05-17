@@ -298,11 +298,11 @@ avatar a new path, so a replace shows immediately.
     ```toml
     [storage.buckets.avatars]
     public = false
-    file_size_limit = "3MiB"
+    file_size_limit = "1MB"
     allowed_mime_types = ["image/webp"]
     ```
 12. **Hosted Supabase** — create the same `avatars` bucket (private,
-    3 MB, `image/webp`) in the dashboard. Document it in
+    1 MB, `image/webp`) in the dashboard. Document it in
     `docs/doc-supabase.md`.
 13. **Env var** — add `SUPABASE_SECRET_KEY` (server-only; follows the
     existing `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` naming).

@@ -123,7 +123,7 @@ file_size_limit = "50MiB"
 # fresh stack; an already-running stack needs a restart to pick it up.
 [storage.buckets.avatars]
 public = false
-file_size_limit = "3MiB"
+file_size_limit = "1MB"
 allowed_mime_types = ["image/webp"]
 
 # Allow connections via S3 compatible clients

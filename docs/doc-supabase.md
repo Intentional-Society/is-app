@@ -96,7 +96,7 @@ Profile pictures (issue #131) live in a Storage bucket named **`avatars`**. Crea
 
 - **Name:** `avatars`
 - **Public:** off — objects are served via short-lived signed URLs
-- **File size limit:** 3 MB (the dashboard field takes decimal B/KB/MB, not MiB) — a loose backstop; the upload endpoint enforces the real ~2 MiB cap
+- **File size limit:** 1 MB (the field takes decimal MB/KB/B units, not MiB)
 - **Allowed MIME types:** `image/webp`
 
 The server reaches Storage with the **secret key** (`src/lib/supabase/admin.ts`), which bypasses Storage RLS — so no bucket policies are needed, the same posture as the `postgres` superuser for the database.
