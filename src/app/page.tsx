@@ -99,10 +99,11 @@ export default async function Home() {
     );
   }
 
-  // Incomplete-profile heuristic: bio null means the member has not
-  // completed /welcome yet. bio is the one field the welcome form
-  // always collects, so it's a reliable sentinel.
-  if (me.profile && me.profile.bio === null) {
+  // Gate: redirect to /welcome until the member has explicitly submitted
+  // the welcome form (welcomeCompletedAt set by POST /api/me/complete-welcome).
+  // Falls back to the old bio-null heuristic for members who completed
+  // welcome before this column existed, so existing members aren't re-gated.
+  if (me.profile && !me.profile.welcomeCompletedAt && me.profile.bio === null) {
     redirect("/welcome");
   }
 

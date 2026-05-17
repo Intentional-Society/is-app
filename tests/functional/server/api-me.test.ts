@@ -84,6 +84,7 @@ describe("GET /api/me", () => {
         emergencyContact: null,
         liveDesire: null,
         isAdmin: false,
+        welcomeCompletedAt: null,
         lastUpdatedWeb: null,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
