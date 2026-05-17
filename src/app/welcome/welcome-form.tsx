@@ -77,6 +77,8 @@ export function WelcomeForm({ initial }: { initial: Initial }) {
         }
       }
 
+      await apiClient.api.me["complete-welcome"].$post();
+
       router.push("/");
       router.refresh();
     } catch (err) {
