@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { UrlObject } from "node:url";
 
 import { Avatar } from "@/components/avatar";
 import { serverApiClient } from "@/lib/api-server";
@@ -37,7 +38,9 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
   const { profile }: { profile: MemberProfile } = await res.json();
   const memberSince = new Date(profile.createdAt).getFullYear();
   const invitedBy = profile.invitedBy;
-  const inviterHref = invitedBy ? `/members/${invitedBy.slug ?? invitedBy.id}` : null;
+  const inviterHref: UrlObject | null = invitedBy
+    ? { pathname: `/members/${invitedBy.slug ?? invitedBy.id}` }
+    : null;
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
