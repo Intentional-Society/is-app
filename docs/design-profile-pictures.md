@@ -33,7 +33,7 @@ Two problems with the free-text field, from #136:
 
 ## Functionality in scope
 
-- Upload a photo from the Edit-profile screen.
+- Upload a photo from the Edit-profile or Welcome screen.
 - Crop + zoom + reposition to a circle before saving.
 - Resize/compress to a sane fixed size before it leaves the browser.
 - Store the file on Supabase Storage; record its location on the
