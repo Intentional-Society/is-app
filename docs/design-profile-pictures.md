@@ -1,10 +1,7 @@
 # Design — Profile pictures
 
-Status: implemented on branch `profile-pictures` (2026-05-16). Two
-provisioning steps remain before production works: create the hosted
-`avatars` bucket and set `SUPABASE_SECRET_KEY` in the Vercel project
-env (see `docs/doc-supabase.md`). Closes #131 (and #136, the
-avatar-URL tracking-pixel issue, folded in).
+Status: implemented 2026-05-16. Closes #131 (and #136, the avatar-URL
+tracking-pixel issue, folded in).
 
 ## Goal
 
