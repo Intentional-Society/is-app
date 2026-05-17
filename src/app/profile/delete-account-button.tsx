@@ -63,7 +63,7 @@ export function DeleteAccountButton() {
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant="primary"
           onClick={() => setConfirming(false)}
           disabled={deleting}
         >
