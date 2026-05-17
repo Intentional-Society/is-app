@@ -25,7 +25,18 @@ const ovo = Ovo({
 
 export const metadata: Metadata = {
   title: "Intentional Society",
-  description: "Community application for Intentional Society",
+  description: "A community of people practicing relational growth together.",
+  openGraph: {
+    title: "Intentional Society",
+    description: "A community of people practicing relational growth together.",
+    url: "https://app.intentionalsociety.org",
+    siteName: "Intentional Society",
+    type: "website",
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default async function RootLayout({
