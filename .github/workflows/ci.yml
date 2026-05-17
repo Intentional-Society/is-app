@@ -3,13 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - 'CLAUDE.md'
 
-# Minimum GITHUB_TOKEN scope the job actually needs. Default on public
-# repos is `write` on most resources, which would let a compromised
-# dependency in `npm install` push to main or open PRs under our name.
+# Minimum GITHUB_TOKEN scope the job actually needs.
 permissions:
   contents: read
 
@@ -21,24 +16,54 @@ jobs:
     name: Lint & Functional Tests
     runs-on: ubuntu-latest
     env:
-      # Local Supabase CLI Postgres defaults — matches what `supabase start` provisions.
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - uses: actions/checkout@v6
+
+      # Detect whether any non-docs files changed. Docs-only PRs skip
+      # every subsequent step but the job still reports success, which
+      # satisfies the branch-protection required check.
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '!(docs/**|CLAUDE.md)'
+
+      - if: steps.filter.outputs.code == 'false'
+        run: echo "Docs-only PR — lint and functional tests skipped."
+
       - uses: actions/setup-node@v6
+        if: steps.filter.outputs.code == 'true'
         with:
           node-version: 24
           cache: npm
+
       - uses: supabase/setup-cli@v2
+        if: steps.filter.outputs.code == 'true'
         with:
           version: latest
-      - run: supabase start
-      - run: npm install
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: node scripts/migrate.mjs
+
+      - if: steps.filter.outputs.code == 'true'
+        run: supabase start
+
+      - if: steps.filter.outputs.code == 'true'
+        run: npm install
+
+      - if: steps.filter.outputs.code == 'true'
+        run: npm run lint
+
+      - if: steps.filter.outputs.code == 'true'
+        run: npm run typecheck
+
+      - if: steps.filter.outputs.code == 'true'
+        run: node scripts/migrate.mjs
+
       # check-env (first step of dev:db) requires .env.local. CI's
       # DATABASE_URL env var above still wins over the file value
       # because process.env beats dotenv-loaded values.
-      - run: cp .env.local.example .env.local
-      - run: npm run test:functional
+      - if: steps.filter.outputs.code == 'true'
+        run: cp .env.local.example .env.local
+
+      - if: steps.filter.outputs.code == 'true'
+        run: npm run test:functional
