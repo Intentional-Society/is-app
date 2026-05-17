@@ -36,13 +36,27 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
 
   const { profile }: { profile: MemberProfile } = await res.json();
   const memberSince = new Date(profile.createdAt).getFullYear();
+  const invitedBy = profile.invitedBy;
+  const inviterHref = invitedBy ? `/members/${invitedBy.slug ?? invitedBy.id}` : null;
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <div className="flex w-full max-w-md items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{profile.displayName ?? "Member"}</h1>
-          <p className="text-sm text-muted-foreground">Member since {memberSince}</p>
+          <p className="text-sm text-muted-foreground">
+            Member since {memberSince}
+            {invitedBy && inviterHref && (
+              <> · Invited by{" "}
+                <Link href={inviterHref} className="underline hover:no-underline">
+                  {invitedBy.displayName ?? "a member"}
+                </Link>
+              </>
+            )}
+            {!invitedBy && profile.referredByLegacy && (
+              <> · Invited by {profile.referredByLegacy}</>
+            )}
+          </p>
         </div>
         <Link href="/members" className="text-base text-muted-foreground hover:text-foreground">
           ← Directory

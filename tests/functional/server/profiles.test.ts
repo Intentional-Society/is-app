@@ -143,6 +143,8 @@ describe("getProfileForMember", () => {
         "avatarUrl",
         "liveDesire",
         "createdAt",
+        "invitedBy",
+        "referredByLegacy",
       ].sort(),
     );
   });

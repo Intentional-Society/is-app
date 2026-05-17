@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { alias } from "drizzle-orm/pg-core";
 import { asc, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
@@ -149,6 +150,8 @@ export type ProfileForMember = {
   avatarUrl: string | null;
   liveDesire: string | null;
   createdAt: Date;
+  invitedBy: { id: string; displayName: string | null; slug: string | null } | null;
+  referredByLegacy: string | null;
 };
 
 // Accepts either a UUID or a slug so /members/aria-chen and
@@ -158,6 +161,8 @@ export const getProfileForMember = async (idOrSlug: string): Promise<ProfileForM
   const where = isUuid(idOrSlug)
     ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
     : eq(profiles.slug, idOrSlug);
+
+  const inviters = alias(profiles, "inviters");
 
   const [row] = await db
     .select({
@@ -171,13 +176,22 @@ export const getProfileForMember = async (idOrSlug: string): Promise<ProfileForM
       avatarPath: profiles.avatarPath,
       liveDesire: profiles.liveDesire,
       createdAt: profiles.createdAt,
+      referredByLegacy: profiles.referredByLegacy,
+      invitedById: profiles.referredBy,
+      invitedByName: inviters.displayName,
+      invitedBySlug: inviters.slug,
     })
     .from(profiles)
+    .leftJoin(inviters, eq(inviters.id, profiles.referredBy))
     .where(where);
 
   if (!row) return null;
-  const [profile] = await attachAvatarUrls([row]);
-  return profile;
+  const { invitedById, invitedByName, invitedBySlug, ...rest } = row;
+  const withAvatar = await attachAvatarUrls([rest]);
+  return {
+    ...withAvatar[0],
+    invitedBy: invitedById ? { id: invitedById, displayName: invitedByName, slug: invitedBySlug } : null,
+  };
 };
 
 export type MemberSummary = {
