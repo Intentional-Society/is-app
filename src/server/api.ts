@@ -16,7 +16,6 @@ import {
   listMembers,
   markWebUpdated,
   parseEditableProfile,
-  toSlug,
   upsertProfile,
 } from "./profiles";
 import { joinProgram, leaveProgram, listPrograms } from "./programs";
@@ -102,11 +101,10 @@ const api = new Hono<{ Variables: ApiVariables }>()
     }
 
     if (Object.keys(parsed).length > 0) {
-      const update = {
-        ...parsed,
-        ...(parsed.displayName !== undefined ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null } : {}),
-      };
-      await db.update(profiles).set(update).where(eq(profiles.id, user.id));
+      // Slug is set once on upsertProfile and never changed — updating
+      // it here would silently break any existing links to the old slug.
+      // See #188.
+      await db.update(profiles).set(parsed).where(eq(profiles.id, user.id));
     }
 
     const profile = await getProfileForSelf(user.id);
