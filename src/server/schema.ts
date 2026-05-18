@@ -47,7 +47,7 @@ export const profiles = pgTable("profiles", {
   emergencyContact: text("emergency_contact"),
   liveDesire: text("live_desire"),
   isAdmin: boolean("is_admin").notNull().default(false),
-  welcomeCompletedAt: timestamp("welcome_completed_at", { withTimezone: true }),
+  lastUpdatedProfile: timestamp("last_updated_profile", { withTimezone: true }),
   lastUpdatedWeb: timestamp("last_updated_web", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })

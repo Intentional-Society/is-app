@@ -119,11 +119,11 @@ export default async function Home() {
     );
   }
 
-  // Gate: redirect to /welcome until the member has explicitly submitted
-  // the welcome form (welcomeCompletedAt set by POST /api/me/complete-welcome).
-  // Falls back to the old bio-null heuristic for members who completed
-  // welcome before this column existed, so existing members aren't re-gated.
-  if (me.profile && !me.profile.welcomeCompletedAt && me.profile.bio === null) {
+  // Gate: redirect to /welcome until the member has saved their profile
+  // at least once (lastUpdatedProfile set by PUT /me). This includes
+  // pre-filled profiles from the CSV import — we want those members to
+  // go through the welcome flow to confirm and update their details.
+  if (me.profile && !me.profile.lastUpdatedProfile) {
     redirect("/welcome");
   }
 

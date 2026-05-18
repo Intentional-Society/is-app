@@ -15,7 +15,6 @@ import {
   getProfileForSelf,
   listMembers,
   markWebUpdated,
-  markWelcomeCompleted,
   parseEditableProfile,
   toSlug,
   upsertProfile,
@@ -106,17 +105,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
       const update = {
         ...parsed,
         ...(parsed.displayName !== undefined ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null } : {}),
+        lastUpdatedProfile: sql`now()`,
       };
       await db.update(profiles).set(update).where(eq(profiles.id, user.id));
     }
 
     const profile = await getProfileForSelf(user.id);
     return c.json({ id: user.id, email: user.email, profile });
-  })
-  .post("/me/complete-welcome", async (c) => {
-    const user = c.get("user");
-    await markWelcomeCompleted(user.id);
-    return c.json({ ok: true });
   })
   .put("/me/last-updated-web", async (c) => {
     const user = c.get("user");
