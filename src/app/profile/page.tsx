@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Avatar } from "@/components/avatar";
+import { KeywordChips } from "@/components/keyword-chips";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
@@ -38,7 +39,9 @@ export default async function ProfilePage() {
       <dl className="flex w-full max-w-md flex-col gap-4">
         <Field label="Display name">{profile.displayName}</Field>
         <Field label="Bio">{profile.bio}</Field>
-        <Field label="Keywords">{profile.keywords.length > 0 ? profile.keywords.join(", ") : null}</Field>
+        <Field label="Keywords">
+          <KeywordChips keywords={profile.keywords} max={20} className="flex flex-wrap gap-1" />
+        </Field>
         <Field label="Location">{profile.location}</Field>
         <Field label="Live desire">{profile.liveDesire}</Field>
         <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
