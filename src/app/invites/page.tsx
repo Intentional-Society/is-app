@@ -4,9 +4,6 @@ import { requireUser } from "@/lib/api-server";
 
 import { InvitesPanel } from "./invites-panel";
 
-export const metadata = { robots: { index: false, follow: false } };
-
-
 export default async function InvitesPage() {
   const me = await requireUser();
 

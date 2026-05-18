@@ -4,9 +4,6 @@ import { requireUser } from "@/lib/api-server";
 
 import { ProgramsList } from "./programs-list";
 
-export const metadata = { robots: { index: false, follow: false } };
-
-
 export default async function ProgramsPage() {
   await requireUser();
 

@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getServerUser } from "@/lib/supabase/server-user";
 
 import { SigninForm } from "./signin-form";
+
+// Public page — opt back in to indexing (root layout is noindex by default).
+export const metadata: Metadata = { robots: { index: true, follow: true } };
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing_code: "That sign-in link was incomplete. Please request a new one.",

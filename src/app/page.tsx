@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { loadMe } from "@/lib/api-server";
+
+// Public landing page — opt back in to indexing (root layout is noindex by default).
+export const metadata: Metadata = { robots: { index: true, follow: true } };
 
 function LoggedOutHome() {
   return (

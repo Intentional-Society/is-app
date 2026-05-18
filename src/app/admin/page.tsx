@@ -5,9 +5,6 @@ import { requireUser, serverApiClient } from "@/lib/api-server";
 
 import { AdminHints } from "./admin-hints";
 
-export const metadata = { robots: { index: false, follow: false } };
-
-
 export default async function AdminPage() {
   const me = await requireUser();
   // Generic 404 for non-admins so the page doesn't advertise itself.

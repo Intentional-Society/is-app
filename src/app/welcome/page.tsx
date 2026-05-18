@@ -4,9 +4,6 @@ import type { Me } from "@/lib/api-types";
 import { AvatarUploader } from "../profile/avatar-uploader";
 import { WelcomeForm } from "./welcome-form";
 
-export const metadata = { robots: { index: false, follow: false } };
-
-
 export default async function WelcomePage() {
   const me: Me = await requireUser();
   const profile = me.profile;

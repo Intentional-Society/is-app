@@ -23,12 +23,13 @@ const ovo = Ovo({
   variable: "--font-ovo",
 });
 
-// Default metadata for the app. Public pages (/, /signin, /signup)
-// inherit this and are indexable. Authenticated pages add their own
-// metadata export with robots: { index: false } to opt out.
+// Default metadata for the app. The whole app is noindex by default —
+// it's a members-only network. The three public pages (/, /signin,
+// /signup) opt back in with their own robots: { index: true } export.
 export const metadata: Metadata = {
   title: "Intentional Society Web App",
   description: "The IS Web App — for the member network of Intentional Society",
+  robots: { index: false, follow: false },
   openGraph: {
     title: "Intentional Society Web App",
     description: "The IS Web App — for the member network of Intentional Society",

@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getServerUser } from "@/lib/supabase/server-user";
 
 import { SignupForm } from "./signup-form";
+
+// Public page — opt back in to indexing (root layout is noindex by default).
+export const metadata: Metadata = { robots: { index: true, follow: true } };
 
 type SignupPageProps = {
   searchParams: Promise<{ code?: string }>;
