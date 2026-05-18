@@ -4,6 +4,24 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-18 | Ola | Member experience polish and security fixes
+
+A batch of smaller features and fixes across the member-facing surface, plus several security and UX improvements that had been queued up.
+
+**Member directory** got a client-side search/filter bar (name, location, keywords) and the member card grid now uses `KeywordChips` for visual consistency with the rest of the app. Member profile pages now show "Invited by [Name]" — a linked reference to whoever brought the member in — using a self-join on profiles. Member profile slugs are now frozen on first set, so editing your display name doesn't silently break existing links to your profile.
+
+**Account management** — members can now delete their own account from `/profile`. The deletion clears the avatar from Storage, cascades through relations and program memberships, and removes the auth row via the Admin API. Admin accounts return a 403 until they revoke their own admin flag. A "Change password" section was added to `/profile/edit` so members who set a password during onboarding can update it later without going back through welcome. A password reset flow ("Forgot password?") was added to the signin page — always visible, toggles to an inline form.
+
+**Programs page** was redesigned from a stacked list to a responsive 1/2/3-column card grid matching the IS website layout. Each card shows name, member count, joined date, and a collapsible description. The Leave button no longer uses destructive styling since leaving isn't irreversible.
+
+**Welcome gate** — replaced the fragile `bio === null` redirect heuristic with an explicit `lastUpdatedProfile` timestamp. `PUT /me` now stamps the field on every save. This means CSV-imported members with pre-filled bios still go through the welcome flow to confirm their details, which is the right behaviour.
+
+**Infrastructure** — added `public/robots.txt` disallowing crawlers from all member routes, and Open Graph meta tags so shared links show a preview. Per-page `noindex` on authenticated routes keeps member content out of search indexes while leaving the public landing page indexable. The CI workflow was consolidated from two same-named jobs (`ci.yml` + `ci-docs-skip.yml`) into one path-aware job using `dorny/paths-filter`, fixing an observability issue where the no-op run could mask a real failure in `gh pr checks`.
+
+**Invite UX** — the "Copy" button now copies the full signup URL (`/signup?code=…`) instead of the bare code.
+
+**CSV member import** — `scripts/import-members-csv.mjs` reads a Google Sheet CSV export and upserts members into Supabase via the Admin API. Uses `ON CONFLICT DO NOTHING` so app edits take precedence over CSV data. Supports `--dry-run`. Column mapping is configurable at the top of the file.
+
 ## 2026-05-16 | James | Profile pictures
 
 Members upload a photo on the welcome/edit-profile screen and crop it in a circular modal (react-easy-crop); the server re-encodes it with `sharp` to a 1024² WebP and stores it in a private Supabase Storage `avatars` bucket. Avatars are served as 24h signed URLs — batched and cached in `src/server/avatars.ts` — and rendered through `next/image`. The `avatar_url` column (TS property `avatarPath`) now holds a Storage object path. Full design: `docs/design-profile-pictures.md`.
