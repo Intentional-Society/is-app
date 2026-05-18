@@ -38,6 +38,11 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import postgres from "postgres";
 
+// NOT READY — this importer is incomplete (see #141) and must not be run
+// against any database. Remove this guard once the script is finished.
+console.error("import-members-csv: NOT READY — work in progress, see #141. Aborting.");
+process.exit(1);
+
 config({ path: resolve(process.cwd(), ".env.local"), quiet: true });
 
 // ---------------------------------------------------------------------------

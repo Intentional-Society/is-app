@@ -14,7 +14,6 @@
     "dev:db:reset": "npx supabase db reset && npx drizzle-kit migrate",
     "prod:db:expand": "node scripts/forward-migrate-prod-schema-expansion.mjs",
     "seed:dev": "npx tsx scripts/seed-dev.ts",
-    "import:members": "node scripts/import-members-csv.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "biome lint .",
