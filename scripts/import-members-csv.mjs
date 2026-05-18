@@ -19,14 +19,14 @@
  * Idempotency:
  *   - Auth users are created with createUser if they don't exist, or
  *     looked up by email if they do. Re-running is safe.
- *   - Profile rows use INSERT ... ON CONFLICT DO UPDATE so edits to
- *     the CSV and re-running will overwrite previous imports.
+ *   - Profile rows use INSERT ... ON CONFLICT DO NOTHING — app edits
+ *     take precedence over CSV data, so re-running will not overwrite
+ *     changes members have made themselves.
  *   - Rows with no email are skipped with a warning.
  *
  * Photos:
  *   Google Form saves photos to Google Drive. Downloading and uploading
- *   them to Supabase Storage requires the Google Drive API and is not
- *   handled here. See docs/doc-email.md for the planned approach.
+ *   them to Supabase Storage is not handled here.
  *   The avatarUrl column in the CSV (if present) is imported as-is
  *   and should be a publicly accessible URL or a Supabase Storage path.
  */
@@ -206,16 +206,7 @@ async function main() {
             ${keywords}::text[],
             ${avatarUrl}
           )
-          ON CONFLICT (id) DO UPDATE SET
-            display_name    = EXCLUDED.display_name,
-            slug            = EXCLUDED.slug,
-            bio             = EXCLUDED.bio,
-            location        = EXCLUDED.location,
-            live_desire     = EXCLUDED.live_desire,
-            emergency_contact = EXCLUDED.emergency_contact,
-            supplementary_info = EXCLUDED.supplementary_info,
-            keywords        = EXCLUDED.keywords,
-            avatar_url      = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url)
+          ON CONFLICT (id) DO NOTHING
         `;
         if (found) stats.updated++;
       } else {
