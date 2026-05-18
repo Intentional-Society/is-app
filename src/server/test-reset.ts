@@ -71,7 +71,7 @@ export const resetE2EUsers = async (): Promise<{
       displayName: null,
       slug: null,
       bio: null,
-      welcomeCompletedAt: null,
+      lastUpdatedProfile: null,
       keywords: sql`'{}'::text[]`,
       location: null,
       supplementaryInfo: null,

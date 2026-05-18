@@ -1,5 +1,5 @@
 {
-  "id": "0bab793c-1c6d-4fa1-90f4-4cb8cdf2cf3a",
+  "id": "fc9dd055-e977-477d-b79c-a90bc3ebac04",
   "prevId": "4427bf30-e874-44db-8d6b-4ce55a11ca45",
   "version": "7",
   "dialect": "postgresql",
@@ -345,8 +345,8 @@
           "notNull": true,
           "default": false
         },
-        "welcome_completed_at": {
-          "name": "welcome_completed_at",
+        "last_updated_profile": {
+          "name": "last_updated_profile",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

@@ -1,1 +1,0 @@
-ALTER TABLE "profiles" ADD COLUMN "welcome_completed_at" timestamp with time zone;

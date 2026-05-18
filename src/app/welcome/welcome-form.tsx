@@ -7,7 +7,6 @@ import { ProfileFields } from "@/components/profile-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiClient } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { type ProfileFormValues, useProfileForm } from "@/lib/use-profile-form";
 
@@ -32,8 +31,6 @@ export function WelcomeForm({ initial }: { initial: ProfileFormValues }) {
         return;
       }
     }
-
-    await apiClient.api.me["complete-welcome"].$post();
 
     router.push("/");
     router.refresh();

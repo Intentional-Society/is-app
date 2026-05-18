@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "last_updated_profile" timestamp with time zone;

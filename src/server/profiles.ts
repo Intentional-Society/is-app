@@ -98,7 +98,7 @@ export type ProfileForSelf = {
   emergencyContact: string | null;
   liveDesire: string | null;
   isAdmin: boolean;
-  welcomeCompletedAt: Date | null;
+  lastUpdatedProfile: Date | null;
   lastUpdatedWeb: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -119,7 +119,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       emergencyContact: profiles.emergencyContact,
       liveDesire: profiles.liveDesire,
       isAdmin: profiles.isAdmin,
-      welcomeCompletedAt: profiles.welcomeCompletedAt,
+      lastUpdatedProfile: profiles.lastUpdatedProfile,
       lastUpdatedWeb: profiles.lastUpdatedWeb,
       createdAt: profiles.createdAt,
       updatedAt: profiles.updatedAt,
@@ -130,10 +130,6 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
   if (!row) return null;
   const [profile] = await attachAvatarUrls([row]);
   return profile;
-};
-
-export const markWelcomeCompleted = async (userId: string): Promise<void> => {
-  await db.update(profiles).set({ welcomeCompletedAt: sql`now()` }).where(eq(profiles.id, userId));
 };
 
 // Bumps lastUpdatedWeb to now() on the user's profile. The Done button
