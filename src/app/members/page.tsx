@@ -6,6 +6,9 @@ import { KeywordChips } from "@/components/keyword-chips";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberSummary } from "@/lib/api-types";
 
+export const metadata = { robots: { index: false, follow: false } };
+
+
 function MemberCard({ member }: { member: MemberSummary }) {
   const href: UrlObject = { pathname: `/members/${member.slug ?? member.id}` };
   return (

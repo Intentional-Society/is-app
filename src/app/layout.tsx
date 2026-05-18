@@ -23,19 +23,18 @@ const ovo = Ovo({
   variable: "--font-ovo",
 });
 
+// Default metadata for the app. Public pages (/, /signin, /signup)
+// inherit this and are indexable. Authenticated pages add their own
+// metadata export with robots: { index: false } to opt out.
 export const metadata: Metadata = {
-  title: "Intentional Society",
-  description: "A community of people practicing relational growth together.",
+  title: "Intentional Society Web App",
+  description: "The IS Web App — for the member network of Intentional Society",
   openGraph: {
-    title: "Intentional Society",
-    description: "A community of people practicing relational growth together.",
+    title: "Intentional Society Web App",
+    description: "The IS Web App — for the member network of Intentional Society",
     url: "https://app.intentionalsociety.org",
-    siteName: "Intentional Society",
+    siteName: "Intentional Society Web App",
     type: "website",
-  },
-  robots: {
-    index: false,
-    follow: false,
   },
 };
 

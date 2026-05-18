@@ -6,6 +6,9 @@ import { requireUser, serverApiClient } from "@/lib/api-server";
 import { MyWeb } from "./my-web";
 import { DEFAULT_SUBGRAPH_VIEW, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
 
+export const metadata = { robots: { index: false, follow: false } };
+
+
 export default async function MyWebPage() {
   const me = await requireUser();
   // ProfileForSelf surfaces lastUpdatedWeb as a Date; the JSON wire
