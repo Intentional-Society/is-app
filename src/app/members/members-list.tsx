@@ -31,7 +31,7 @@ function MemberCard({ member }: { member: MemberSummary }) {
   );
 }
 
-export function MembersSearch({ members }: { members: MemberSummary[] }) {
+export function MembersList({ members }: { members: MemberSummary[] }) {
   const [query, setQuery] = useState("");
 
   const filtered = query.trim()

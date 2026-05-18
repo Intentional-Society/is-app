@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberSummary } from "@/lib/api-types";
 
-import { MembersSearch } from "./members-search";
+import { MembersList } from "./members-list";
 
 export default async function MembersPage() {
   await requireUser();
@@ -21,7 +21,7 @@ export default async function MembersPage() {
         </Link>
       </div>
 
-      <MembersSearch members={members} />
+      <MembersList members={members} />
     </main>
   );
 }
