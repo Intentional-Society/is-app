@@ -47,7 +47,7 @@ When a change touches the database schema or API response shape, deploy it in ph
 2. **Migrate** — update clients (frontend, mobile, etc.) to use the new shape. Deploy.
 3. **Contract** — remove the old columns/fields/endpoints. Deploy.
 
-Each phase is its own PR and deploy. Never combine expand and contract in a single deploy — that's the window where things break.
+Never combine an expand and a contract in a single deploy — that's the window where things break. How the phases map onto PRs is stack-specific: for our Drizzle setup, see "Running each phase on this stack" below.
 
 ### When migrations run
 
@@ -59,7 +59,7 @@ Because migrations always run first, the only timing constraint to think about i
 
 The expand-contract pattern naturally satisfies this: the expand phase adds schema that the old code ignores, and the contract phase only removes schema that the new code no longer references.
 
-**Preview caveat.** Preview deploys skip the migration and share the prod DB, so a PR that both adds columns *and* reads them ships new code against the still-old preview database. Any page that queries the new columns will 500 ("Application error" in production builds — the real `column "X" does not exist` message is hidden). Production itself is unaffected because its build runs the migration before `next build`, but the preview can't exercise the new flow until the PR merges. To keep previews functional end-to-end, land the schema change in its own PR (Expand) before the PR that uses it (Migrate).
+**Preview caveat.** Preview deploys skip `drizzle-kit migrate` and share the production database, so they run new code against an un-migrated schema. Adding a column to `src/server/schema.ts` therefore breaks the branch's preview broadly: Drizzle expands every `db.select().from(table)` to all of the table's schema columns, so every select-all on that table 500s — not just code that reads the new column. (The page shows a generic "Application error"; the real `column "X" does not exist` is hidden in production builds.) Production itself wouldn't break — its build runs the migration before `next build` — but the preview stays broken until the schema is expanded with `npm run prod:db:expand` (see "Running each phase on this stack" below).
 
 ### Writing safe migrations
 
@@ -70,24 +70,26 @@ Every migration must be safe to run against a database that is actively serving 
 - **`NOT NULL` without a default** on an existing table will fail if rows exist. Add the column as nullable (or with a default) first, backfill, then add the constraint in a follow-up migration.
 - **Keep migrations fast.** Long-running locks on a small database are unlikely to cause problems today, but avoid patterns (like rewriting entire tables) that would become a problem at scale.
 
-### Verifying each phase with this stack
+### Running each phase on this stack
 
-Each phase is its own PR, merged and deployed before the next one opens. Here's how each phase gets verified:
+**Expand can't be a schema-only PR.** Drizzle's schema is code: `db.select().from(profiles)` compiles to `SELECT <every column in the schema object>`. The moment you add a column to `src/server/schema.ts`, every select-all query enumerates it — there is no "schema only, no code" change. And since preview deploys skip `drizzle-kit migrate` and share the prod DB, such a PR selects a column prod doesn't have yet, so every page running a select-all 500s.
 
-**PR #1 (Expand)** — add the new schema to `src/server/schema.ts`, run `drizzle-kit generate` to produce the additive migration. No code changes (or only additive, backward-compatible ones). CI functional tests and the e2e preview both run cleanly because the old code still works against the new schema. On merge, the migration runs against prod and the schema is expanded.
+So the expand runs against the **database**, ahead of the code PR:
 
-**PR #2 (Migrate)** — update code to read/write the new schema. No schema or migration changes. By the time this PR opens, PR #1 has merged and the prod DB already has the new schema, so the e2e preview (which hits the prod DB) can exercise the new code paths against real data. CI functional tests pass because the tests can rely on the new schema being present locally after `npm run dev:db:reset`.
+**Expand** — `npm run prod:db:expand` dispatches the `forward-migrate-prod-schema-expansion` workflow against your pushed branch. It pauses on a review gate — a maintainer approves before prod credentials are injected — then applies the branch's migration to the production database. This is safe ahead of merge because additive migrations only *add*: the currently deployed code enumerates only the columns it already knows, so a new one is invisible to it. (Expand-only for that reason — a drop or rename would break the still-running old code; those go through Contract.)
 
-**PR #3 (Contract)** — this is the interesting one. The preview deploy hits a prod DB that *still has the old schema* (the contract migration hasn't run yet), so the preview can't verify that the drop is safe. Instead we use the TypeScript compiler as the verification mechanism:
+**Migrate** — a single PR that adds the column to `src/server/schema.ts`, commits the `npx drizzle-kit generate` output, and uses the column. Expand has already run, so the PR's preview and e2e hit a prod DB that has the column and pass. On merge, the production build's `drizzle-kit migrate` re-runs but the migration is already recorded — a no-op. (The textbook "Expand PR then Migrate PR" split collapses into this one PR, because there is no viable schema-only PR to separate out.)
+
+**Contract** — removing old schema *can* be a clean PR: dropping a column from `schema.ts` makes select-all queries stop enumerating it, which is safe against a database that still has the column. The preview can't prove the drop is safe (prod still has the old schema), so the TypeScript compiler is the verification mechanism:
 
 1. Remove the old column/table from `src/server/schema.ts`
 2. Run `npx tsc --noEmit` — the compiler lists every stray reference to the removed schema
-3. Fix each reference. (Most should already be gone from PR #2 — this step catches stragglers, including anything in code paths that weren't touched by PR #2.)
+3. Fix each reference
 4. Run `npx drizzle-kit generate` to produce the DROP migration
 5. Reset the local DB (`npm run dev:db:reset`) and run `npm test` to confirm the whole suite passes against the contracted schema. This catches raw SQL or dynamic references the type checker can't see.
 6. Merge. On production deploy, the DROP migration runs against a codebase the type checker has already proven doesn't reference the old schema.
 
-This works because Drizzle's schema is TypeScript code, so removing it from the schema turns "prove no code still uses this column" into a compile error — a much stronger signal than runtime monitoring or grep. Other stacks (Rails, SQLAlchemy) achieve similar safety by adding an intermediate deploy that marks the column as hidden from the ORM, but with Drizzle + TS we get it for free at build time.
+This works because Drizzle's schema is TypeScript code, so removing a column turns "prove no code still uses this column" into a compile error — a much stronger signal than runtime monitoring or grep. Other stacks (Rails, SQLAlchemy) achieve similar safety by adding an intermediate deploy that marks the column as hidden from the ORM, but with Drizzle + TS we get it for free at build time.
 
 ## AI-assisted commits
 
