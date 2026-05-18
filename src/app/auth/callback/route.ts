@@ -20,6 +20,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/signin?error=exchange_failed", request.url));
   }
 
+  // Password reset — skip profile upsert, redirect to set-password page.
+  if (request.nextUrl.searchParams.get("type") === "recovery") {
+    return NextResponse.redirect(new URL("/auth/reset-password", request.url));
+  }
+
   // Ordinary sign-in — Phase 1 upsert, referredBy stays null.
   if (!invite) {
     try {

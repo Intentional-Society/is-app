@@ -57,6 +57,11 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
       )}
       <SigninForm />
       <p className="text-base text-muted-foreground">
+        <Link href="/forgot-password" className="underline text-muted-foreground hover:text-foreground">
+          Forgot your password?
+        </Link>
+      </p>
+      <p className="text-base text-muted-foreground">
         Have an invite code?{" "}
         <Link href="/signup" className="underline text-muted-foreground hover:text-foreground">
           Sign up
