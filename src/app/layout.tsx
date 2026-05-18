@@ -23,9 +23,20 @@ const ovo = Ovo({
   variable: "--font-ovo",
 });
 
+// Default metadata for the app. The whole app is noindex by default —
+// it's a members-only network. The three public pages (/, /signin,
+// /signup) opt back in with their own robots: { index: true } export.
 export const metadata: Metadata = {
-  title: "Intentional Society",
-  description: "Community application for Intentional Society",
+  title: "Intentional Society Web App",
+  description: "The IS Web App — for the member network of Intentional Society",
+  robots: { index: false, follow: false },
+  openGraph: {
+    title: "Intentional Society Web App",
+    description: "The IS Web App — for the member network of Intentional Society",
+    url: "https://app.intentionalsociety.org",
+    siteName: "Intentional Society Web App",
+    type: "website",
+  },
 };
 
 export default async function RootLayout({

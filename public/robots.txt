@@ -1,0 +1,12 @@
+User-agent: *
+Disallow: /members/
+Disallow: /profile/
+Disallow: /programs/
+Disallow: /myweb/
+Disallow: /invites/
+Disallow: /welcome/
+Disallow: /admin/
+Disallow: /auth/
+Allow: /
+Allow: /signin
+Allow: /signup
