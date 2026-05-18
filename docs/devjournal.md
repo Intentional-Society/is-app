@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-18 | James | Schema additions go through prod:db:expand
+
+Updated `strategy-committing`: additive schema changes need manual action `npm run prod:db:expand` and then ship the schema and code in a single PR.
+
 ## 2026-05-16 | James | Profile pictures
 
 Members upload a photo on the welcome/edit-profile screen and crop it in a circular modal (react-easy-crop); the server re-encodes it with `sharp` to a 1024² WebP and stores it in a private Supabase Storage `avatars` bucket. Avatars are served as 24h signed URLs — batched and cached in `src/server/avatars.ts` — and rendered through `next/image`. The `avatar_url` column (TS property `avatarPath`) now holds a Storage object path. Full design: `docs/design-profile-pictures.md`.
