@@ -6,11 +6,11 @@ import { db } from "./db";
 import { validateInviteHints } from "./relations";
 import { invites } from "./schema";
 
-// Alphabet: 23 uppercase letters (no I, O — visually confusable with 1/0)
-// plus 8 digits (no 0, 1 — same reason). 31 chars.
+// Alphabet: 24 uppercase letters (no I, O — visually confusable with
+// 1/0) plus 8 digits (no 0, 1 — same reason). 32 chars.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 10;
-// 31^10 ≈ 8.2e14 — sparse enough that collisions are vanishingly rare;
+// 32^10 ≈ 1.1e15 — sparse enough that collisions are vanishingly rare;
 // the unique constraint is the real safety net.
 
 const MAX_ACTIVE_INVITES_PER_USER = 10;
@@ -29,11 +29,22 @@ export type InviteForCreator = {
   status: InviteStatus;
 };
 
+// Rejection sampling. A random byte is 0–255; mapping it onto the
+// alphabet with plain modulo would over-represent the low indices
+// unless the alphabet size divides 256 evenly. Discard any byte at or
+// above `cutoff` (the largest multiple of the alphabet size that fits
+// in a byte), then index by an equal-width bucket — every kept byte is
+// then uniformly distributed, whatever the alphabet size.
 const generateInviteCode = (): string => {
-  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));
+  const cutoff = 256 - (256 % CODE_ALPHABET.length);
+  const bucket = cutoff / CODE_ALPHABET.length;
   let out = "";
-  for (const b of bytes) {
-    out += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  while (out.length < CODE_LENGTH) {
+    for (const b of crypto.getRandomValues(new Uint8Array(CODE_LENGTH))) {
+      if (b >= cutoff) continue;
+      out += CODE_ALPHABET[Math.floor(b / bucket)];
+      if (out.length === CODE_LENGTH) break;
+    }
   }
   return out;
 };
