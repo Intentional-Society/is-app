@@ -169,40 +169,58 @@ export function SigninForm() {
           {state.message}
         </p>
       )}
-      {password.length > 0 && (
-        <ForgotPasswordLink email={email} />
-      )}
     </form>
   );
 }
 
-function ForgotPasswordLink({ email }: { email: string }) {
-  const [sent, setSent] = useState(false);
-  const [sending, setSending] = useState(false);
+export function ForgotPasswordForm() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleClick = async () => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (!email) return;
-    setSending(true);
-    const supabase = createClient();
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
-    });
-    setSending(false);
-    setSent(true);
+    setStatus("sending");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+      });
+      if (error) {
+        setErrorMsg(error.message);
+        setStatus("error");
+      } else {
+        setStatus("sent");
+      }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Unexpected error.");
+      setStatus("error");
+    }
   };
 
-  if (sent) {
-    return <p className="text-sm text-muted-foreground">Password reset email sent — check your inbox.</p>;
+  if (status === "sent") {
+    return <p className="text-base text-muted-foreground text-center">Password reset email sent — check your inbox.</p>;
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={sending || !email}
-      className="self-start text-sm text-muted-foreground underline hover:no-underline disabled:opacity-50"
-    >
-      {sending ? "Sending…" : "Forgot password?"}
-    </button>
+    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-3">
+      <Label htmlFor="reset-email">Email</Label>
+      <Input
+        id="reset-email"
+        type="email"
+        required
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        disabled={status === "sending"}
+      />
+      <Button type="submit" disabled={status === "sending"}>
+        {status === "sending" ? "Sending…" : "Send reset link"}
+      </Button>
+      {status === "error" && (
+        <p role="alert" className="text-base text-destructive">{errorMsg}</p>
+      )}
+    </form>
   );
 }

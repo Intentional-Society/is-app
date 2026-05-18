@@ -27,13 +27,17 @@ export default function ResetPasswordPage() {
       return;
     }
     setStatus({ kind: "submitting" });
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      setStatus({ kind: "error", message: error.message });
-    } else {
-      setStatus({ kind: "done" });
-      setTimeout(() => router.push("/"), 2000);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        setStatus({ kind: "error", message: error.message });
+      } else {
+        setStatus({ kind: "done" });
+        setTimeout(() => router.push("/"), 2000);
+      }
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Unexpected error." });
     }
   };
 

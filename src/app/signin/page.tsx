@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getServerUser } from "@/lib/supabase/server-user";
 
-import { SigninForm } from "./signin-form";
+import { SigninOrReset } from "./signin-or-reset";
 
 // Public page — opt back in to indexing (root layout is noindex by default).
 export const metadata: Metadata = { robots: { index: true, follow: true } };
@@ -55,7 +55,7 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
           {errorMessage}
         </p>
       )}
-      <SigninForm />
+      <SigninOrReset />
       <p className="text-base text-muted-foreground">
         Have an invite code?{" "}
         <Link href="/signup" className="underline text-muted-foreground hover:text-foreground">
