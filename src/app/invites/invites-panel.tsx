@@ -119,7 +119,7 @@ export function InvitesPanel({ me }: { me: Me }) {
 
   const copy = async (code: string) => {
     try {
-      const link = `${window.location.origin}/signup?invite=${code}`;
+      const link = `${window.location.origin}/signup?code=${code}`;
       await navigator.clipboard.writeText(link);
       setCopiedCode(code);
       setTimeout(() => {
