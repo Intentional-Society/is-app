@@ -289,21 +289,39 @@
   "programs": [
     {
       "id": "00000000-0000-0000-0000-0000000000a1",
-      "slug": "gumball-machine",
+      "slug": "curated-introductions",
       "name": "The Gumball Machine",
-      "description": "Pull a lever and get matched with a fellow member for an intro call. A lightweight way to meet people across the community you wouldn't otherwise cross paths with."
+      "description": "(LOCAL DEV) For those who want to meet new people but aren't sure where to start, pull a lever and get matched with a stranger for an intro call, and be surprised by who you meet."
     },
     {
       "id": "00000000-0000-0000-0000-0000000000a2",
-      "slug": "presence-pods",
-      "name": "Presence Pods",
-      "description": "Small groups of four rotating across four sessions, each using Circling-style inquiry to give one member focused, unhurried attention. Builds the kind of connection that takes years in most contexts."
+      "slug": "presence-pods-2026-q2",
+      "name": "Presence Pods (2026 Q2)",
+      "description": "(LOCAL DEV) For those craving real connection and wanting to feel truly seen, join a small group of four rotating over four calls where each person gets a turn being held by the group's warm, Circling-style curiosity and reflection. Running Q2 of 2026."
     },
     {
       "id": "00000000-0000-0000-0000-0000000000a3",
-      "slug": "thematic-crews",
-      "name": "Thematic Crews",
-      "description": "Self-organised groups forming around a shared interest or practice — reading, making, a field of inquiry. For members who want to do specific things with like-minded people."
+      "slug": "community-calls",
+      "name": "Community Calls",
+      "description": "(LOCAL DEV) Running for 5+ years as the heartbeat of mutual support in this ecosystem, community members gather each Sunday for developmental-relational practices and growth-edge explorations. Growth, belonging, companionship, solidarity, all rooted in \"being who we want to be\"."
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000a4",
+      "slug": "casework-pods-2026-q3",
+      "name": "Casework Pods (2026 Q3)",
+      "description": "(LOCAL DEV) For those who want support with something real and to offer that same support to others, bring a live challenge into a group of four rotating over four calls where each person gets a turn being met with empathic reflection focused on what they're navigating. Running Q3 of 2026."
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000a5",
+      "slug": "arts-in-is",
+      "name": "Arts in IS",
+      "description": "(LOCAL DEV) This group believes artistic expression has the capacity to be a vibrant part of culture and personal development. We meet as a group to encourage exploration of multiple modes of artistic creation, develop ways to do co-creation, and offer sessions at occasional IS community calls."
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000a6",
+      "slug": "weekly-web-updates",
+      "name": "Weekly Web Updates",
+      "description": "(LOCAL DEV) This is a subscription to the weekly internal newsletter containing event links and announcements across the IS Web."
     }
   ],
   "profilePrograms": [
@@ -330,7 +348,26 @@
     { "profileId": "00000000-0000-0000-0000-000000000008", "programId": "00000000-0000-0000-0000-0000000000a3" },
     { "profileId": "00000000-0000-0000-0000-000000000009", "programId": "00000000-0000-0000-0000-0000000000a3" },
     { "profileId": "00000000-0000-0000-0000-000000000011", "programId": "00000000-0000-0000-0000-0000000000a3" },
-    { "profileId": "00000000-0000-0000-0000-000000000015", "programId": "00000000-0000-0000-0000-0000000000a3" }
+    { "profileId": "00000000-0000-0000-0000-000000000015", "programId": "00000000-0000-0000-0000-0000000000a3" },
+    { "profileId": "00000000-0000-0000-0000-000000000001", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000002", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000003", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000004", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000005", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000006", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000007", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000008", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000009", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000010", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000011", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000012", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000013", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000014", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000015", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000016", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000017", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000018", "programId": "00000000-0000-0000-0000-0000000000a6" },
+    { "profileId": "00000000-0000-0000-0000-000000000019", "programId": "00000000-0000-0000-0000-0000000000a6" }
   ],
   "invites": [
     {

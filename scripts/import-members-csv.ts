@@ -39,9 +39,10 @@
  *
  * PROGRAMS — PREFLIGHT, NEVER CREATED
  *   This script never creates programs. It links members to programs
- *   that must already exist, matched by the slugs in PROGRAM_SLUG_BY_LABEL
- *   below. A preflight check aborts before any write if a required slug
- *   is missing — create those programs first.
+ *   that must already exist — the ones they checked on the form
+ *   (PROGRAM_SLUG_BY_LABEL) plus the auto-subscribe programs everyone
+ *   gets (AUTO_SUBSCRIBE_SLUGS). A preflight check aborts before any
+ *   write if a required slug is missing — create those programs first.
  *
  * IDEMPOTENCY
  *   - Auth users: looked up by email, created only if absent.
@@ -82,10 +83,16 @@ const COLUMN = {
 const PROGRAM_SLUG_BY_LABEL: Record<string, string> = {
   "Community Calls (weekly)": "community-calls",
   "Curated 1-on-1 Introductions (monthly)": "curated-introductions",
-  "Q2 Presence Pods (4 calls)": "q2-presence-pods",
-  "Q3 Casework Pods (4 calls)": "q3-casework-pods",
+  "Q2 Presence Pods (4 calls)": "presence-pods-2026-q2",
+  "Q3 Casework Pods (4 calls)": "casework-pods-2026-q3",
   "Arts in IS (monthly)": "arts-in-is",
 };
+
+// Programs every imported member is linked to regardless of what they
+// checked on the form — the weekly newsletter is an auto-subscription,
+// not a signup checkbox. Like the labelled programs, these must already
+// exist; the preflight checks them too.
+const AUTO_SUBSCRIBE_SLUGS = ["weekly-web-updates"];
 
 // ---------------------------------------------------------------------------
 // CSV parsing — a state machine that correctly handles commas, escaped
@@ -279,7 +286,7 @@ async function main() {
   console.log(`Parsed ${rows.length} rows from ${csvPath}.`);
 
   // ---- Program preflight — abort before any write if a slug is missing --
-  const requiredSlugs = [...new Set(Object.values(PROGRAM_SLUG_BY_LABEL))];
+  const requiredSlugs = [...new Set([...Object.values(PROGRAM_SLUG_BY_LABEL), ...AUTO_SUBSCRIBE_SLUGS])];
   const existingPrograms = await db
     .select({ id: programs.id, slug: programs.slug })
     .from(programs)
@@ -418,17 +425,23 @@ async function main() {
 
       // 4. Program links — only for profiles inserted by this run, so a
       //    re-run does not re-add a program a member removed in-app.
+      //    Each member is linked to the programs they checked on the
+      //    form plus the auto-subscribe programs (the newsletter).
       if (profileInserted) {
+        const slugs = new Set(AUTO_SUBSCRIBE_SLUGS);
         const labels = (row[COLUMN.programs] ?? "")
           .split(",")
           .map((p) => p.trim())
           .filter(Boolean);
         for (const label of labels) {
           const programSlug = PROGRAM_SLUG_BY_LABEL[label];
-          if (!programSlug) {
+          if (programSlug) {
+            slugs.add(programSlug);
+          } else {
             console.warn(`  WARN   ${email}: unknown program "${label}" — not linked`);
-            continue;
           }
+        }
+        for (const programSlug of slugs) {
           const programId = programIdBySlug.get(programSlug)!;
           if (!isDryRun) {
             await db.insert(profilePrograms).values({ profileId: userId!, programId }).onConflictDoNothing();
