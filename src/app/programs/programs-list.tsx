@@ -61,7 +61,7 @@ function ProgramCard({
             variant="primary"
             disabled={pending}
             onClick={() => onLeave(program.id)}
-            className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive/40"
+            className="w-full"
           >
             {pending ? "Leaving…" : "Leave program"}
           </Button>
