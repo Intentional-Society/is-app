@@ -10,9 +10,9 @@
  * USAGE
  *   npx tsx scripts/import-members-csv.ts "<path-to-csv>" [--dry-run] [--prod]
  *
- *   --dry-run  Parse the CSV, download + re-encode every photo in
- *              memory, and report what would be written. Touches no
- *              database and uploads nothing. Run this first.
+ *   --dry-run  Parse the CSV, fetch + re-encode every photo, and
+ *              report what would be written. Touches no database and
+ *              uploads nothing. Run this first.
  *   --prod     Load .env.prod and target production. Without it the
  *              script loads .env.local and refuses to run if the
  *              Supabase URL does not look local.
@@ -30,6 +30,15 @@
  *   NEXT_PUBLIC_SUPABASE_URL
  *   SUPABASE_SECRET_KEY
  *   DATABASE_URL
+ *
+ * PHOTO CACHE
+ *   Downloaded photos are cached under scripts/.import-cache/, keyed by
+ *   Drive file ID. Re-runs read the cache and skip the network. The
+ *   cache is also the override point: drop a file named exactly
+ *   <fileId> there and the run uses it instead of the Drive original
+ *   — used to swap HEIC photos (which sharp cannot decode) for
+ *   hand-converted JPEGs. A photo that still fails is reported and
+ *   skipped; the member imports without an avatar.
  *
  * EMAIL SAFETY
  *   Auth users are created with the Admin API (`createUser`), which
@@ -54,7 +63,7 @@
  *     a re-run does not re-add a program a member removed in-app.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { config } from "dotenv";
@@ -191,21 +200,40 @@ function driveFileId(url: string): string | null {
   return match ? match[1] : null;
 }
 
-async function downloadDrivePhoto(url: string): Promise<Buffer> {
+// On-disk cache of photo bytes, keyed by Drive file ID. A re-run reads
+// from here and skips the network entirely. It is also the override
+// point: drop a file named exactly <fileId> here and the run uses it
+// instead of the Drive original — how the HEIC photos sharp cannot
+// decode get swapped for hand-converted JPEGs.
+const PHOTO_CACHE_DIR = resolve(process.cwd(), "scripts/.import-cache");
+
+// Returns photo bytes for a Drive URL: from the cache if present,
+// otherwise downloaded and then written to the cache. The encoder
+// (sharp) is the format validator — this only guards against caching
+// Drive's HTML interstitial as if it were a file.
+async function getPhoto(url: string): Promise<Buffer> {
   const id = driveFileId(url);
   if (!id) throw new Error(`unrecognised Drive URL: ${url}`);
+  const cachePath = resolve(PHOTO_CACHE_DIR, id);
+
+  if (existsSync(cachePath)) {
+    return readFileSync(cachePath);
+  }
+
   const res = await fetch(`https://drive.google.com/uc?export=download&id=${id}`, {
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`);
-  const contentType = res.headers.get("content-type") ?? "";
-  if (!contentType.startsWith("image/")) {
-    // Drive serves an HTML interstitial instead of the file for some
-    // objects; treat anything non-image as a failure rather than
-    // feeding a web page to the encoder.
-    throw new Error(`expected an image, got "${contentType}"`);
+  if ((res.headers.get("content-type") ?? "").startsWith("text/html")) {
+    // Drive serves an HTML page (file too large / access-restricted)
+    // instead of the bytes — don't cache a web page as a photo.
+    throw new Error("Drive returned an HTML page, not a file");
   }
-  return Buffer.from(await res.arrayBuffer());
+
+  const bytes = Buffer.from(await res.arrayBuffer());
+  mkdirSync(PHOTO_CACHE_DIR, { recursive: true });
+  writeFileSync(cachePath, bytes);
+  return bytes;
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +354,7 @@ async function main() {
     profilesSkipped: 0,
     photosImported: 0,
     photosSkipped: 0,
+    photoErrors: 0,
     programLinks: 0,
     errors: 0,
   };
@@ -373,6 +402,8 @@ async function main() {
       let currentAvatarPath: string | null = null;
       if (isDryRun) {
         profileInserted = !userExisted;
+        if (profileInserted) stats.profilesInserted++;
+        else stats.profilesSkipped++;
         console.log(`  ${userExisted ? "PROFILE skip (exists)" : "PROFILE insert"}  ${email} -> slug "${slug}"`);
       } else {
         const inserted = await db
@@ -404,23 +435,32 @@ async function main() {
         }
       }
 
-      // 3. Photo — import only when the profile has no avatar yet.
+      // 3. Photo — import only when the profile has no avatar yet. A
+      //    photo failure is isolated in its own try/catch: the member
+      //    still imports without an avatar rather than the whole row
+      //    aborting, and can be fixed later via the cache override.
       const photoUrl = row[COLUMN.photo] ?? "";
       if (!photoUrl) {
         // No photo on the form row — nothing to import.
       } else if (!isDryRun && currentAvatarPath) {
         stats.photosSkipped++;
       } else {
-        const original = await downloadDrivePhoto(photoUrl);
-        const webp = await encodeAvatar(original);
-        if (isDryRun) {
-          console.log(
-            `  PHOTO  ${email}  ${(original.length / 1024).toFixed(0)}KB -> ${(webp.length / 1024).toFixed(0)}KB WebP  [dry run]`,
-          );
-        } else {
-          await replaceAvatar(userId!, webp);
+        try {
+          const original = await getPhoto(photoUrl);
+          const webp = await encodeAvatar(original);
+          if (isDryRun) {
+            console.log(
+              `  PHOTO  ${email}  ${(original.length / 1024).toFixed(0)}KB -> ${(webp.length / 1024).toFixed(0)}KB WebP  [dry run]`,
+            );
+          } else {
+            await replaceAvatar(userId!, webp);
+          }
+          stats.photosImported++;
+        } catch (err) {
+          console.error(`  PHOTO FAIL  ${email}: ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`              override: place a JPEG/PNG at scripts/.import-cache/${driveFileId(photoUrl)}`);
+          stats.photoErrors++;
         }
-        stats.photosImported++;
       }
 
       // 4. Program links — only for profiles inserted by this run, so a
@@ -463,6 +503,7 @@ Done${isDryRun ? " (dry run — nothing was written)" : ""}.
   Profiles skipped:   ${stats.profilesSkipped}
   Photos imported:    ${stats.photosImported}
   Photos skipped:     ${stats.photosSkipped}
+  Photo failures:     ${stats.photoErrors}
   Program links:      ${stats.programLinks}
   Errors:             ${stats.errors}
 `);

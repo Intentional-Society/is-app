@@ -43,3 +43,4 @@ test-results/
 
 # member-import source data — contains member PII, never commit
 scripts/*.csv
+scripts/.import-cache/
