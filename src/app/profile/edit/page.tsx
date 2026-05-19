@@ -39,9 +39,9 @@ export default async function EditProfilePage() {
       />
 
       <div className="flex w-full max-w-md flex-col gap-3 border-t border-border pt-6">
-        <h2 className="text-base font-semibold">Change password</h2>
+        <h2 className="text-base font-semibold">Set or change password</h2>
         <p className="text-sm text-muted-foreground">
-          Leave blank if you prefer to sign in with magic links.
+          If you prefer signing in via email, you don't need a password.
         </p>
         <ChangePasswordForm />
       </div>

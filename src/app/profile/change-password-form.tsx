@@ -26,13 +26,19 @@ export function ChangePasswordForm() {
     }
     setStatus({ kind: "submitting" });
     const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      setStatus({ kind: "error", message: error.message });
-    } else {
-      setStatus({ kind: "success" });
-      setPassword("");
-      setConfirm("");
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        setStatus({ kind: "error", message: error.message });
+      } else {
+        setStatus({ kind: "success" });
+        setPassword("");
+        setConfirm("");
+      }
+    } catch {
+      // A thrown error (network drop, CORS) bypasses the returned { error };
+      // catch it so the button doesn't stick on "Saving…" with no feedback.
+      setStatus({ kind: "error", message: "Something went wrong. Please try again." });
     }
   };
 
@@ -65,7 +71,7 @@ export function ChangePasswordForm() {
       />
 
       <Button type="submit" disabled={disabled} className="mt-1">
-        {disabled ? "Saving…" : "Update password"}
+        {disabled ? "Saving…" : "Set/update password"}
       </Button>
 
       {status.kind === "success" && (
