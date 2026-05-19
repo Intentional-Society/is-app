@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-18 | James | Program administration
+
+Admins manage programs at `/admin/programs`, with a per-program drill-down for editing and adding/removing participants. Deleting a program is intentionally out of scope.
+
 ## 2026-05-18 | James | Schema additions go through prod:db:expand
 
 Updated `strategy-committing`: additive schema changes need manual action `npm run prod:db:expand` and then ship the schema and code in a single PR.

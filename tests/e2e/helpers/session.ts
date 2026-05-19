@@ -91,7 +91,7 @@ export const resetSeededUsers = async (baseURL: string): Promise<void> => {
   // — in beforeEach, instead of 20s later at a /welcome timeout: a row
   // whose bio survived the reset (the #149 symptom), or duplicate
   // tuples for one id. A seeded user with no profile row at all (0 rows
-  // — e.g. e2e-admin, which no test signs in as) is fine, not flagged.
+  // — no test has signed in as them yet this run) is fine, not flagged.
   // The dump shows the surviving bio string (its value names the test
   // that wrote it, since each completeWelcome caller passes a distinct
   // bio), the tuple identity, and whether the read ran on a replica.
