@@ -22,6 +22,7 @@ import {
 import {
   addParticipant,
   createProgram,
+  deleteProgram,
   getProgramDetail,
   joinProgram,
   leaveProgram,
@@ -100,6 +101,13 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       return c.json({ ok: true });
     },
   )
+  .delete("/programs/:id", async (c) => {
+    const result = await deleteProgram(c.req.param("id"));
+    if ("error" in result) {
+      return c.json({ error: result.error }, result.error === "not_found" ? 404 : 409);
+    }
+    return c.json({ ok: true });
+  })
   .post(
     "/programs/:id/participants",
     validator("json", (body, c) => {
