@@ -8,14 +8,19 @@
  * be picked up later without disturbing anyone already imported.
  *
  * USAGE
- *   npx tsx scripts/import-members-csv.ts "<path-to-csv>" [--dry-run] [--prod]
+ *   npx tsx scripts/import-members-csv.ts "<csv>" [--dry-run] [--prod] [--overwrite]
  *
- *   --dry-run  Parse the CSV, fetch + re-encode every photo, and
- *              report what would be written. Touches no database and
- *              uploads nothing. Run this first.
- *   --prod     Load .env.prod and target production. Without it the
- *              script loads .env.local and refuses to run if the
- *              Supabase URL does not look local.
+ *   --dry-run    Parse the CSV, fetch + re-encode every photo, and
+ *                report what would be written. Touches no database
+ *                and uploads nothing. Run this first.
+ *   --prod       Load .env.prod and target production. Without it the
+ *                script loads .env.local and refuses to run if the
+ *                Supabase URL does not look local.
+ *   --overwrite  Update rows that already exist — profile fields,
+ *                program links, and photo — from the CSV, instead of
+ *                leaving them untouched. For the first serious prod
+ *                run, to align the dev-team profiles already on prod
+ *                with the CSV. Omit it on later tidy-up runs.
  *
  * RECOMMENDED WORKFLOW
  *   1. --dry-run against local — shape-checks the CSV and every photo.
@@ -54,6 +59,7 @@
  *   write if a required slug is missing — create those programs first.
  *
  * IDEMPOTENCY
+ *   Default — a re-run only acts on new rows:
  *   - Auth users: looked up by email, created only if absent.
  *   - Profiles: INSERT ... ON CONFLICT (id) DO NOTHING — a re-run never
  *     overwrites edits a member has since made in the app.
@@ -61,6 +67,10 @@
  *     re-run does not re-download or orphan files.
  *   - Program links: written only for profiles inserted by this run, so
  *     a re-run does not re-add a program a member removed in-app.
+ *   With --overwrite, a row that already exists is updated from the
+ *   CSV instead: profile fields are overwritten (the slug is kept),
+ *   program links are reset to the CSV set, and the photo is
+ *   re-imported.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -243,10 +253,11 @@ async function main() {
   const args = process.argv.slice(2);
   const isDryRun = args.includes("--dry-run");
   const isProd = args.includes("--prod");
+  const isOverwrite = args.includes("--overwrite");
   const csvPath = args.find((a) => !a.startsWith("--"));
 
   if (!csvPath) {
-    console.error('Usage: npx tsx scripts/import-members-csv.ts "<path-to-csv>" [--dry-run] [--prod]');
+    console.error('Usage: npx tsx scripts/import-members-csv.ts "<csv>" [--dry-run] [--prod] [--overwrite]');
     process.exit(1);
   }
 
@@ -290,7 +301,12 @@ async function main() {
   const fingerprint = `${secretKey.slice(0, 8)}...${secretKey.slice(-4)}`;
   console.log(`\nTarget:  ${host}`);
   console.log(`Key:     ${fingerprint}`);
-  console.log(`Mode:    ${isDryRun ? "DRY RUN — nothing will be written" : "LIVE — writes enabled"}\n`);
+  const modeLabel = isDryRun
+    ? "DRY RUN — nothing will be written"
+    : isOverwrite
+      ? "LIVE + OVERWRITE — existing rows will be updated from the CSV"
+      : "LIVE — writes enabled";
+  console.log(`Mode:    ${modeLabel}\n`);
 
   if (isProd && !isDryRun) {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -341,9 +357,12 @@ async function main() {
     if (data.users.length < 1000) break;
   }
 
-  // ---- Preload existing profile slugs so new slugs stay unique -----------
+  // ---- Preload existing profiles — slugs (so new slugs stay unique)
+  //      and ids (to tell an insert from an update for the stats) -----------
   const usedSlugs = new Set<string>();
-  for (const p of await db.select({ slug: profiles.slug }).from(profiles)) {
+  const existingProfileIds = new Set<string>();
+  for (const p of await db.select({ id: profiles.id, slug: profiles.slug }).from(profiles)) {
+    existingProfileIds.add(p.id);
     if (p.slug) usedSlugs.add(p.slug);
   }
 
@@ -351,6 +370,7 @@ async function main() {
     usersCreated: 0,
     usersExisting: 0,
     profilesInserted: 0,
+    profilesUpdated: 0,
     profilesSkipped: 0,
     photosImported: 0,
     photosSkipped: 0,
@@ -397,34 +417,57 @@ async function main() {
         stats.usersCreated++;
       }
 
-      // 2. Profile row — INSERT ... ON CONFLICT (id) DO NOTHING.
-      let profileInserted = false;
+      const profileExisted = userId !== undefined && existingProfileIds.has(userId);
+
+      // CSV-derived profile fields. The slug is set only on insert —
+      // an existing member keeps their slug, and so their profile URL,
+      // even under --overwrite.
+      const profileFields = {
+        displayName: name || null,
+        bio: row[COLUMN.bio] || null,
+        keywords,
+        location: row[COLUMN.location] || null,
+        supplementaryInfo: row[COLUMN.supplementaryInfo] || null,
+        referredByLegacy: row[COLUMN.referredByLegacy] || null,
+        emergencyContact: row[COLUMN.emergencyContact] || null,
+        liveDesire: row[COLUMN.liveDesire] || null,
+      };
+
+      // 2. Profile row. Default: INSERT ... ON CONFLICT DO NOTHING, so a
+      //    re-run never clobbers member edits. With --overwrite, an
+      //    existing row is updated from the CSV instead.
+      let profileWritten = false; // inserted, or updated under --overwrite
       let currentAvatarPath: string | null = null;
+
       if (isDryRun) {
-        profileInserted = !userExisted;
-        if (profileInserted) stats.profilesInserted++;
-        else stats.profilesSkipped++;
-        console.log(`  ${userExisted ? "PROFILE skip (exists)" : "PROFILE insert"}  ${email} -> slug "${slug}"`);
-      } else {
-        const inserted = await db
-          .insert(profiles)
-          .values({
-            id: userId!,
-            displayName: name || null,
-            slug,
-            bio: row[COLUMN.bio] || null,
-            keywords,
-            location: row[COLUMN.location] || null,
-            supplementaryInfo: row[COLUMN.supplementaryInfo] || null,
-            referredByLegacy: row[COLUMN.referredByLegacy] || null,
-            emergencyContact: row[COLUMN.emergencyContact] || null,
-            liveDesire: row[COLUMN.liveDesire] || null,
-          })
-          .onConflictDoNothing({ target: profiles.id })
-          .returning({ id: profiles.id });
-        profileInserted = inserted.length > 0;
-        if (profileInserted) {
+        if (!profileExisted) {
           stats.profilesInserted++;
+          profileWritten = true;
+          console.log(`  PROFILE insert  ${email} -> slug "${slug}"`);
+        } else if (isOverwrite) {
+          stats.profilesUpdated++;
+          profileWritten = true;
+          console.log(`  PROFILE overwrite  ${email}`);
+        } else {
+          stats.profilesSkipped++;
+          console.log(`  PROFILE skip (exists)  ${email}`);
+        }
+      } else {
+        const insert = db.insert(profiles).values({ id: userId!, slug, ...profileFields });
+        if (isOverwrite) {
+          await insert.onConflictDoUpdate({
+            target: profiles.id,
+            set: { ...profileFields, updatedAt: new Date() },
+          });
+        } else {
+          await insert.onConflictDoNothing({ target: profiles.id });
+        }
+        if (!profileExisted) {
+          stats.profilesInserted++;
+          profileWritten = true;
+        } else if (isOverwrite) {
+          stats.profilesUpdated++;
+          profileWritten = true;
         } else {
           stats.profilesSkipped++;
           const [existing] = await db
@@ -435,14 +478,16 @@ async function main() {
         }
       }
 
-      // 3. Photo — import only when the profile has no avatar yet. A
+      // 3. Photo — imported when the profile has no avatar, or always
+      //    under --overwrite (replaceAvatar removes the old object). A
       //    photo failure is isolated in its own try/catch: the member
       //    still imports without an avatar rather than the whole row
       //    aborting, and can be fixed later via the cache override.
       const photoUrl = row[COLUMN.photo] ?? "";
+      const needPhoto = isOverwrite || !currentAvatarPath;
       if (!photoUrl) {
         // No photo on the form row — nothing to import.
-      } else if (!isDryRun && currentAvatarPath) {
+      } else if (!isDryRun && !needPhoto) {
         stats.photosSkipped++;
       } else {
         try {
@@ -463,11 +508,13 @@ async function main() {
         }
       }
 
-      // 4. Program links — only for profiles inserted by this run, so a
-      //    re-run does not re-add a program a member removed in-app.
-      //    Each member is linked to the programs they checked on the
-      //    form plus the auto-subscribe programs (the newsletter).
-      if (profileInserted) {
+      // 4. Program links — written for profiles created this run, and
+      //    re-set for profiles overwritten this run. A plain re-run
+      //    leaves an existing member's programs untouched, so it never
+      //    re-adds a program they removed in-app. Each member is linked
+      //    to the programs they checked on the form plus the
+      //    auto-subscribe programs (the newsletter).
+      if (profileWritten) {
         const slugs = new Set(AUTO_SUBSCRIBE_SLUGS);
         const labels = (row[COLUMN.programs] ?? "")
           .split(",")
@@ -480,6 +527,12 @@ async function main() {
           } else {
             console.warn(`  WARN   ${email}: unknown program "${label}" — not linked`);
           }
+        }
+        // Under --overwrite the program set is replaced — clear the
+        // existing links first so a program dropped from the CSV does
+        // not linger.
+        if (isOverwrite && profileExisted && !isDryRun) {
+          await db.delete(profilePrograms).where(eq(profilePrograms.profileId, userId!));
         }
         for (const programSlug of slugs) {
           const programId = programIdBySlug.get(programSlug)!;
@@ -500,6 +553,7 @@ Done${isDryRun ? " (dry run — nothing was written)" : ""}.
   Users created:      ${stats.usersCreated}
   Users existing:     ${stats.usersExisting}
   Profiles inserted:  ${stats.profilesInserted}
+  Profiles updated:   ${stats.profilesUpdated}
   Profiles skipped:   ${stats.profilesSkipped}
   Photos imported:    ${stats.photosImported}
   Photos skipped:     ${stats.photosSkipped}
