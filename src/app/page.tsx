@@ -57,9 +57,7 @@ function NavCard({ href, title, description }: NavCardProps) {
       href={href}
       className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:bg-accent hover:shadow-sm"
     >
-      <h2 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">
-        {title}
-      </h2>
+      <h2 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">{title}</h2>
       <p className="text-sm text-muted-foreground">{description}</p>
     </Link>
   );
@@ -72,37 +70,15 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
     <main className="flex min-h-screen flex-col items-center gap-8 p-8 pt-12">
       <div className="flex flex-col items-center gap-2">
         <h1 className="text-3xl font-bold">{greeting}</h1>
-        <p className="font-serif italic text-muted-foreground">
-          What would you like to do?
-        </p>
+        <p className="font-serif italic text-muted-foreground">What would you like to do?</p>
       </div>
 
       <div className="grid w-full max-w-lg gap-4 sm:grid-cols-2">
-        <NavCard
-          href="/myweb"
-          title="My web"
-          description="See your connections and relational map."
-        />
-        <NavCard
-          href="/profile"
-          title="My profile"
-          description="View and edit your community profile."
-        />
-        <NavCard
-          href="/members"
-          title="Member directory"
-          description="Browse and connect with other members."
-        />
-        <NavCard
-          href="/programs"
-          title="Programs"
-          description="Explore and join community programs."
-        />
-        <NavCard
-          href="/invites"
-          title="Invite a friend"
-          description="Generate invite codes for new members."
-        />
+        <NavCard href="/myweb" title="My web" description="See your connections and relational map." />
+        <NavCard href="/profile" title="My profile" description="View and edit your community profile." />
+        <NavCard href="/members" title="Member directory" description="Browse and connect with other members." />
+        <NavCard href="/programs" title="Programs" description="Explore and join community programs." />
+        <NavCard href="/invites" title="Invite a friend" description="Generate invite codes for new members." />
       </div>
     </main>
   );

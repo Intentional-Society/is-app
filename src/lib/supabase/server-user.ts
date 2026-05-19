@@ -11,8 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 // second supabase.auth.getUser() round-trip.
 export const SUPABASE_USER_HEADER = "x-supabase-user";
 
-export const encodeUser = (user: User): string =>
-  Buffer.from(JSON.stringify(user), "utf8").toString("base64");
+export const encodeUser = (user: User): string => Buffer.from(JSON.stringify(user), "utf8").toString("base64");
 
 export const decodeUser = (encoded: string | null | undefined): User | null => {
   if (!encoded) return null;

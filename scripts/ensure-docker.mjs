@@ -73,7 +73,7 @@ const main = async () => {
   }
 
   process.stderr.write(
-    `Timed out waiting for Docker daemon after ${DAEMON_READY_TIMEOUT_MS / 1000}s. ` + "Please check Docker Desktop.\n",
+    `Timed out waiting for Docker daemon after ${DAEMON_READY_TIMEOUT_MS / 1000}s. Please check Docker Desktop.\n`,
   );
   process.exit(1);
 };

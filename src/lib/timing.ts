@@ -8,14 +8,9 @@
 // boolean check. The helper is meant to stay in the codebase so we
 // don't have to re-instrument every time something feels slow.
 
-const enabled = (request: { headers: Headers }): boolean =>
-  request.headers.get("x-debug-timing") === "1";
+const enabled = (request: { headers: Headers }): boolean => request.headers.get("x-debug-timing") === "1";
 
-export const timed = async <T>(
-  request: { headers: Headers },
-  label: string,
-  fn: () => Promise<T>,
-): Promise<T> => {
+export const timed = async <T>(request: { headers: Headers }, label: string, fn: () => Promise<T>): Promise<T> => {
   if (!enabled(request)) return fn();
   const start = performance.now();
   try {

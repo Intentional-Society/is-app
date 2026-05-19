@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 
 import { ProfileFields } from "@/components/profile-fields";
 import { Button } from "@/components/ui/button";
-import { useProfileForm, type ProfileFormValues } from "@/lib/use-profile-form";
+import { type ProfileFormValues, useProfileForm } from "@/lib/use-profile-form";
 
 export function ProfileForm({ initial }: { initial: ProfileFormValues }) {
   const router = useRouter();

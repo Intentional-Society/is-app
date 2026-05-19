@@ -103,7 +103,7 @@ test.describe("/signup — unauthed invite flow", () => {
       await memberPage.getByRole("button", { name: "Create invite" }).click();
       const codeLocator = memberPage.locator("code").first();
       await expect(codeLocator).toHaveText(/^[A-HJ-NP-Z2-9]{10}$/);
-      code = (await codeLocator.textContent())!.trim();
+      code = ((await codeLocator.textContent()) ?? "").trim();
     } finally {
       await memberContext.close();
     }

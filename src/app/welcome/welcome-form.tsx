@@ -7,8 +7,8 @@ import { ProfileFields } from "@/components/profile-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useProfileForm, type ProfileFormValues } from "@/lib/use-profile-form";
 import { createClient } from "@/lib/supabase/client";
+import { type ProfileFormValues, useProfileForm } from "@/lib/use-profile-form";
 
 export function WelcomeForm({ initial }: { initial: ProfileFormValues }) {
   const router = useRouter();

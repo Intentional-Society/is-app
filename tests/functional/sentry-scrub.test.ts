@@ -86,8 +86,8 @@ describe("scrubServerEvent", () => {
     const result = scrubServerEvent(event);
 
     expect(result.request?.cookies).toBeUndefined();
-    expect(result.request?.headers?.["authorization"]).toBeUndefined();
-    expect(result.request?.headers?.["cookie"]).toBeUndefined();
+    expect(result.request?.headers?.authorization).toBeUndefined();
+    expect(result.request?.headers?.cookie).toBeUndefined();
   });
 
   it("preserves non-sensitive headers", () => {

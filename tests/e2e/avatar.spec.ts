@@ -51,7 +51,5 @@ test("a member can upload, crop, and see their profile picture", async ({ page }
   await page.goto("/profile");
   const avatarImg = page.locator("main img").first();
   await expect(avatarImg).toBeVisible();
-  await expect
-    .poll(() => avatarImg.evaluate((el) => (el as HTMLImageElement).naturalWidth))
-    .toBeGreaterThan(0);
+  await expect.poll(() => avatarImg.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
 });

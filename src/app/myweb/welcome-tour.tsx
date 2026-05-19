@@ -37,10 +37,7 @@ const STEPS: Step[] = [
 // (skip / close / next-on-last-step) leaves passive teardowns alone.
 export function WelcomeTour({ run, onClose }: { run: boolean; onClose: () => void }) {
   const handleEvent = (data: EventData) => {
-    if (
-      data.type === "tour:end" &&
-      (data.action === "skip" || data.action === "close" || data.action === "next")
-    ) {
+    if (data.type === "tour:end" && (data.action === "skip" || data.action === "close" || data.action === "next")) {
       onClose();
     }
   };

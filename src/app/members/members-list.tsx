@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import type { UrlObject } from "node:url";
 import Link from "next/link";
+import { useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { KeywordChips } from "@/components/keyword-chips";
@@ -56,9 +56,7 @@ export function MembersList({ members }: { members: MemberSummary[] }) {
       />
 
       {filtered.length === 0 ? (
-        <p className="text-muted-foreground">
-          {query ? "No members match your search." : "No members yet."}
-        </p>
+        <p className="text-muted-foreground">{query ? "No members match your search." : "No members yet."}</p>
       ) : (
         <ul className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {filtered.map((member) => (

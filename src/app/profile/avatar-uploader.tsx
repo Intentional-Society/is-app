@@ -66,17 +66,7 @@ const cropToWebp = async (src: string, area: Area): Promise<Blob> => {
   const canvas = document.createElement("canvas");
   canvas.width = OUTPUT_DIMENSION;
   canvas.height = OUTPUT_DIMENSION;
-  getContext(canvas).drawImage(
-    img,
-    area.x,
-    area.y,
-    area.width,
-    area.height,
-    0,
-    0,
-    OUTPUT_DIMENSION,
-    OUTPUT_DIMENSION,
-  );
+  getContext(canvas).drawImage(img, area.x, area.y, area.width, area.height, 0, 0, OUTPUT_DIMENSION, OUTPUT_DIMENSION);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.88));
   if (!blob) throw new Error("could not encode image");
   return blob;

@@ -16,7 +16,7 @@ const connectionString =
 // globalThis branch is bypassed, so a single fresh client is created
 // once at process start as usual.
 declare global {
-  // biome-ignore lint: globalThis augmentation requires `var`
+  // globalThis augmentation requires `var` — `let`/`const` don't declare a global.
   var __pgClient: ReturnType<typeof postgres> | undefined;
 }
 

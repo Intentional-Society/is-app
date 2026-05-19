@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { Program } from "@/lib/api-types";
-import { Button } from "@/components/ui/button";
 
 type ListState = { kind: "loading" } | { kind: "loaded"; programs: Program[] } | { kind: "error"; message: string };
 
@@ -31,17 +31,13 @@ function ProgramCard({
         <h2 className="text-lg font-semibold">{program.name}</h2>
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
-          {program.joined && program.joinedAt && (
-            <> · Joined {formatDate(program.joinedAt)}</>
-          )}
+          {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}
         </p>
       </div>
 
       {description && (
         <div className="flex flex-col gap-1">
-          <p className="font-serif text-sm text-muted-foreground leading-relaxed">
-            {visibleDescription}
-          </p>
+          <p className="font-serif text-sm text-muted-foreground leading-relaxed">{visibleDescription}</p>
           {isLong && (
             <button
               type="button"
@@ -66,12 +62,7 @@ function ProgramCard({
             {pending ? "Leaving…" : "Leave program"}
           </Button>
         ) : (
-          <Button
-            type="button"
-            disabled={pending}
-            onClick={() => onJoin(program.id)}
-            className="w-full"
-          >
+          <Button type="button" disabled={pending} onClick={() => onJoin(program.id)} className="w-full">
             {pending ? "Joining…" : "Join program"}
           </Button>
         )}
@@ -104,7 +95,9 @@ export function ProgramsList() {
       }
     }
     void fetchPrograms();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [reloadKey]);
 
   const reload = () => setReloadKey((k) => k + 1);
@@ -143,13 +136,20 @@ export function ProgramsList() {
   };
 
   if (state.kind === "loading") return <p className="text-sm text-muted-foreground">Loading programs…</p>;
-  if (state.kind === "error") return <p role="alert" className="text-sm text-destructive">{state.message}</p>;
+  if (state.kind === "error")
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {state.message}
+      </p>
+    );
   if (state.programs.length === 0) return <p className="text-sm text-muted-foreground">No programs available yet.</p>;
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-4">
       {actionError && (
-        <p role="alert" className="text-sm text-destructive">{actionError}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {actionError}
+        </p>
       )}
       <ul className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {state.programs.map((program) => (
