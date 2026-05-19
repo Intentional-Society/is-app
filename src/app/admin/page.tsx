@@ -36,7 +36,12 @@ export default async function AdminPage() {
 
       <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">Programs</h2>
-        <p className="text-sm text-muted-foreground">Coming soon.</p>
+        <Link
+          href="/admin/programs"
+          className="text-sm text-muted-foreground underline hover:text-foreground hover:no-underline"
+        >
+          Manage programs →
+        </Link>
       </section>
 
       <section className="flex w-full max-w-xl flex-col gap-2">

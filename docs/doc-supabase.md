@@ -32,7 +32,7 @@ The Playwright e2e suite signs in as two long-lived users instead of admin-provi
 **Accounts (seed these once via the Supabase dashboard → Authentication → Users → Add user):**
 
 - `e2e-regular@testfake.local` — standard member. Used by welcome/invites/signout/session-helper specs.
-- `e2e-admin@testfake.local` — admin member. Not yet used by any spec; reserved for future admin-surface tests. After creating the user, set `profiles.is_admin = true` for this row via the SQL editor.
+- `e2e-admin@testfake.local` — admin member. Used by `tests/e2e/admin.spec.ts`. **This account must have `profiles.is_admin = true`** — without it `/admin` calls `notFound()` and the admin specs fail. The `profiles` row is created on first sign-in (via the `/api/me` self-heal); set the flag for it in the SQL editor.
 
 Both users should be created with "Auto Confirm User" checked so they can sign in with a password immediately.
 
@@ -44,7 +44,7 @@ Both users should be created with "Auto Confirm User" checked so they can sign i
 
 **Blast radius if leaked:**
 
-- Passwords: attacker can sign in as one of two fake accounts. Regular sees its own profile + up to 10 self-created invites. Admin sees whatever admin surface exists (currently a `NotImplemented` stub). Rotate by changing the password in the Supabase dashboard.
+- Passwords: attacker can sign in as one of two fake accounts. Regular sees its own profile + up to 10 self-created invites. Admin additionally sees the admin surface (app settings, relation hints, program administration). Rotate by changing the password in the Supabase dashboard.
 - Reset token: attacker can wipe the profile fields + delete invites for those two accounts, on any environment (preview and prod share the same Supabase). Rotate by generating a new string and updating both the GH secret and Vercel env var.
 
 **Reset endpoint:** `POST /api/_test/reset`, token-gated. Defined in `src/server/test-reset.ts`; the Playwright setup project (`tests/e2e/reset.setup.ts`) calls it once at the top of every run. The token is the sole gate — preview and prod share one Supabase, so an environment gate would be theatre against a token that already mutates prod data either way. The destructive scope is fixed at the seeded e2e users, not arbitrary rows.

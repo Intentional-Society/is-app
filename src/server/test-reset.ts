@@ -44,7 +44,7 @@ export const resetE2EUsers = async (): Promise<{
   updatedIds: string[];
   // Post-commit read-back per seeded user. `rows` holds every physical
   // profile row for that id: length 0 means no profile row at all (fine
-  // — e.g. e2e-admin, which no test signs in as), length > 1 means
+  // — no test has signed in as them yet this run), length > 1 means
   // duplicate tuples.
   profiles: { id: string; email: string; rows: ResetProbeRow[] }[];
 }> => {

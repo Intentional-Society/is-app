@@ -19,7 +19,19 @@ import {
   toSlug,
   upsertProfile,
 } from "./profiles";
-import { joinProgram, leaveProgram, listPrograms } from "./programs";
+import {
+  addParticipant,
+  createProgram,
+  getProgramDetail,
+  joinProgram,
+  leaveProgram,
+  listAllProgramsForAdmin,
+  listPrograms,
+  parseProgramCreate,
+  parseProgramUpdate,
+  removeParticipant,
+  updateProgram,
+} from "./programs";
 import {
   createRelationHint,
   deleteRelationHint,
@@ -46,6 +58,72 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/hints", async (c) => {
     const hints = await listPendingHints();
     return c.json({ hints });
+  })
+  .get("/programs", async (c) => {
+    const programsList = await listAllProgramsForAdmin();
+    return c.json({ programs: programsList });
+  })
+  .post("/programs", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    const parsed = parseProgramCreate(body);
+    if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+
+    const result = await createProgram(parsed);
+    if ("error" in result) return c.json({ error: result.error }, 409);
+    return c.json({ program: result.program }, 201);
+  })
+  .get("/programs/:id", async (c) => {
+    const result = await getProgramDetail(c.req.param("id"));
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ program: result.program });
+  })
+  // validator-typed body: Hono's RPC inference rejects a `json` key on a
+  // route that also has a path param unless the body is declared this
+  // way (same reason as PUT /relations/value/:relateeId below).
+  .patch(
+    "/programs/:id",
+    validator("json", (body, c) => {
+      const parsed = parseProgramUpdate(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      const result = await updateProgram(c.req.param("id"), c.req.valid("json"));
+      if ("error" in result) {
+        return c.json({ error: result.error }, result.error === "not_found" ? 404 : 409);
+      }
+      return c.json({ ok: true });
+    },
+  )
+  .post(
+    "/programs/:id/participants",
+    validator("json", (body, c) => {
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "body must be a JSON object" }, 400);
+      }
+      const profileId = (body as Record<string, unknown>).profileId;
+      if (typeof profileId !== "string" || !profileId) {
+        return c.json({ error: "profileId is required" }, 400);
+      }
+      return { profileId };
+    }),
+    async (c) => {
+      const result = await addParticipant(c.req.param("id"), c.req.valid("json").profileId);
+      if ("error" in result) {
+        return c.json({ error: result.error }, result.error === "already_member" ? 409 : 404);
+      }
+      return c.json({ ok: true });
+    },
+  )
+  .delete("/programs/:id/participants/:profileId", async (c) => {
+    const result = await removeParticipant(c.req.param("id"), c.req.param("profileId"));
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ ok: true });
   });
 
 const api = new Hono<{ Variables: ApiVariables }>()
