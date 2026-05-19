@@ -32,15 +32,17 @@ test.describe("/myweb — tour pre-dismissed", () => {
     await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
-    const doneButton = page.getByRole("button", { name: "Done" });
+    // exact: true — a substring match on "Done" / "Edit" also catches
+    // member cards (role=button), e.g. "Lyn McDonell" contains "done".
+    const doneButton = page.getByRole("button", { name: "Done", exact: true });
     await expect(doneButton).toBeVisible();
 
     await doneButton.click();
-    await expect(page.getByRole("button", { name: "Edit" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeHidden();
 
-    await page.getByRole("button", { name: "Edit" }).click();
-    await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Done", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Add people to your relational web" })).toBeVisible();
   });
 });
