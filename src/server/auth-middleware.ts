@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import type { MiddlewareHandler } from "hono";
 
+import { supabasePublishableKey, supabaseUrl } from "@/lib/supabase/env";
 import { decodeUser, SUPABASE_USER_HEADER } from "@/lib/supabase/server-user";
 
 import { db } from "./db";
@@ -79,16 +80,12 @@ export const requireAuth: MiddlewareHandler<{ Variables: ApiVariables }> = async
     // path that still routes through requireAuth.
     const cookies = parseCookieHeader(c.req.raw.headers.get("cookie"));
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-      {
-        cookies: {
-          getAll: () => cookies,
-          setAll: () => {},
-        },
+    const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
+      cookies: {
+        getAll: () => cookies,
+        setAll: () => {},
       },
-    );
+    });
 
     const {
       data: { user: fetched },
