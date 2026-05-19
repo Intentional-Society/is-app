@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
 
+import { DeleteAccountButton } from "./delete-account-button";
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
@@ -49,6 +51,10 @@ export default async function ProfilePage() {
       </dl>
 
       <Button render={<Link href="/profile/edit" />}>Edit profile</Button>
+
+      <div className="w-full max-w-md border-t border-border pt-6">
+        <DeleteAccountButton />
+      </div>
     </main>
   );
 }
