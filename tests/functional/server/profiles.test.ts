@@ -102,6 +102,7 @@ describe("getProfileForSelf", () => {
         "emergencyContact",
         "liveDesire",
         "isAdmin",
+        "lastUpdatedProfile",
         "lastUpdatedWeb",
         "createdAt",
         "updatedAt",

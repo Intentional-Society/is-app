@@ -123,10 +123,11 @@ export default async function Home() {
     );
   }
 
-  // Incomplete-profile heuristic: bio null means the member has not
-  // completed /welcome yet. bio is the one field the welcome form
-  // always collects, so it's a reliable sentinel.
-  if (me.profile && me.profile.bio === null) {
+  // Gate: redirect to /welcome until the member has saved their profile
+  // at least once (lastUpdatedProfile set by PUT /me). This includes
+  // pre-filled profiles from the CSV import — we want those members to
+  // go through the welcome flow to confirm and update their details.
+  if (me.profile && !me.profile.lastUpdatedProfile) {
     redirect("/welcome");
   }
 
