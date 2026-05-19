@@ -45,6 +45,11 @@
  *   hand-converted JPEGs. A photo that still fails is reported and
  *   skipped; the member imports without an avatar.
  *
+ * RUN LOG
+ *   Every run mirrors its console output to a timestamped file under
+ *   scripts/.import-logs/ — a record of which member got which UUID,
+ *   any failures, and the final counts.
+ *
  * EMAIL SAFETY
  *   Auth users are created with the Admin API (`createUser`), which
  *   sends no email. Nothing else here sends mail either — the import
@@ -73,9 +78,10 @@
  *   re-imported.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { format } from "node:util";
 import { config } from "dotenv";
 import { eq, inArray } from "drizzle-orm";
 
@@ -261,6 +267,24 @@ async function main() {
     process.exit(1);
   }
 
+  // ---- Run log — mirror every console line to a timestamped file so
+  //      each run leaves a record (which member got which UUID, any
+  //      failures, the final counts). appendFileSync is synchronous,
+  //      so the file is complete even if the run aborts. ----------------
+  const logDir = resolve(process.cwd(), "scripts/.import-logs");
+  mkdirSync(logDir, { recursive: true });
+  const logPath = resolve(logDir, `import-${new Date().toISOString().replace(/[:.]/g, "-")}.log`);
+  const consoleLog = console.log.bind(console);
+  const consoleError = console.error.bind(console);
+  console.log = (...a: unknown[]) => {
+    consoleLog(...a);
+    appendFileSync(logPath, `${format(...a)}\n`);
+  };
+  console.error = (...a: unknown[]) => {
+    consoleError(...a);
+    appendFileSync(logPath, `${format(...a)}\n`);
+  };
+
   // Env file: .env.prod for production, .env.local otherwise.
   const envFile = isProd ? ".env.prod" : ".env.local";
   config({ path: resolve(process.cwd(), envFile), quiet: true });
@@ -301,6 +325,7 @@ async function main() {
   const fingerprint = `${secretKey.slice(0, 8)}...${secretKey.slice(-4)}`;
   console.log(`\nTarget:  ${host}`);
   console.log(`Key:     ${fingerprint}`);
+  console.log(`Log:     ${logPath}`);
   const modeLabel = isDryRun
     ? "DRY RUN — nothing will be written"
     : isOverwrite
@@ -391,10 +416,16 @@ async function main() {
     try {
       const name = row[COLUMN.name] ?? "";
       const slug = uniqueSlug(toSlug(name), usedSlugs);
-      const keywords = (row[COLUMN.keywords] ?? "")
-        .split(",")
-        .map((k) => k.trim())
-        .filter(Boolean);
+      // De-duplicate keywords — a CSV cell can repeat a value, and a
+      // stored duplicate breaks KeywordChips' React keys (see #219).
+      const keywords = [
+        ...new Set(
+          (row[COLUMN.keywords] ?? "")
+            .split(",")
+            .map((k) => k.trim())
+            .filter(Boolean),
+        ),
+      ];
 
       // 1. Auth user — look up, create only if absent.
       let userId = userIdByEmail.get(email);
@@ -560,6 +591,8 @@ Done${isDryRun ? " (dry run — nothing was written)" : ""}.
   Photo failures:     ${stats.photoErrors}
   Program links:      ${stats.programLinks}
   Errors:             ${stats.errors}
+
+  Log written to: ${logPath}
 `);
 
   process.exit(stats.errors > 0 ? 1 : 0);
