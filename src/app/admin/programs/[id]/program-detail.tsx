@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Avatar } from "@/components/avatar";
@@ -50,11 +51,14 @@ export function ProgramDetail({ programId }: { programId: string }) {
 
 function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [name, setName] = useState(program.name);
   const [slug, setSlug] = useState(program.slug);
   const [description, setDescription] = useState(program.description ?? "");
   const [editError, setEditError] = useState<string | null>(null);
   const [participantError, setParticipantError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: programQueryKey(program.id) });
 
@@ -128,6 +132,33 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.api.admin.programs[":id"].$delete({
+        param: { id: program.id },
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          body.error === "has_participants"
+            ? "Remove every participant before deleting this program."
+            : (body.error ?? `admin/programs DELETE: ${res.status}`),
+        );
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      // The list cache still holds the deleted program; drop it, then
+      // leave the now-dead detail page for the programs list.
+      queryClient.invalidateQueries({ queryKey: ["admin", "programs"] });
+      router.push("/admin/programs");
+    },
+    onError: (err) => {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete program.");
+      setConfirmingDelete(false);
+    },
+  });
+
   const trimmedName = name.trim();
   const trimmedSlug = slug.trim();
   const dirty =
@@ -152,6 +183,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   };
 
   const participantIds = program.participants.map((p) => p.id);
+  const hasParticipants = program.participants.length > 0;
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-6">
@@ -242,6 +274,53 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3 rounded border border-destructive/40 p-3">
+        <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground">Delete program</h2>
+        <p className="text-sm text-muted-foreground">
+          {hasParticipants
+            ? "Remove every participant before deleting. Programs in real use will get a dedicated retire flow later."
+            : "Permanently deletes this empty program. This can't be undone."}
+        </p>
+        {confirmingDelete ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Yes, delete program"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={deleteMutation.isPending}
+              onClick={() => setConfirmingDelete(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={hasParticipants}
+            onClick={() => {
+              setDeleteError(null);
+              setConfirmingDelete(true);
+            }}
+            className="self-start"
+          >
+            Delete program
+          </Button>
+        )}
+        {deleteError && (
+          <p role="alert" className="text-sm text-destructive">
+            {deleteError}
+          </p>
         )}
       </section>
     </div>

@@ -6,7 +6,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-05-18 | James | Program administration
 
-Admins manage programs at `/admin/programs`, with a per-program drill-down for editing and adding/removing participants. Deleting a program is intentionally out of scope.
+Admins manage programs at `/admin/programs`, with a per-program drill-down for editing and adding/removing participants.
 
 ## 2026-05-18 | James | Schema additions go through prod:db:expand
 

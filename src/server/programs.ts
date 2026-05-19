@@ -1,4 +1,4 @@
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, ne, notExists, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -102,8 +102,9 @@ export const leaveProgram = async (
 // --- Admin program administration (issue #139) ---------------------
 //
 // The functions above are member-facing: browse, join, leave. Below is
-// the admin surface — create/edit programs and manage who is enrolled.
-// Deleting a program is intentionally out of scope.
+// the admin surface — create/edit programs, manage who is enrolled, and
+// delete empty programs. Programs with participants are kept; a richer
+// "retire" flow for live programs comes later.
 
 export type AdminProgram = {
   id: string;
@@ -354,6 +355,39 @@ export const addParticipant = async (
 
   if (result.length === 0) return { error: "already_member" };
   return { ok: true };
+};
+
+// Deletes a program only while it has no participants — the guardrail
+// for clearing out test data and mistakes without touching live ones.
+// The "no participants" check rides on the DELETE as a NOT EXISTS
+// subquery so it's atomic: a join landing between a separate check and
+// the delete can't slip a participant past the FK cascade.
+export const deleteProgram = async (
+  programId: string,
+): Promise<{ ok: true } | { error: "not_found" | "has_participants" }> => {
+  if (!isUuid(programId)) return { error: "not_found" };
+
+  const deleted = await db
+    .delete(programs)
+    .where(
+      and(
+        eq(programs.id, programId),
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(profilePrograms)
+            .where(eq(profilePrograms.programId, programId)),
+        ),
+      ),
+    )
+    .returning({ id: programs.id });
+
+  if (deleted.length > 0) return { ok: true };
+
+  // Nothing deleted: the program is either gone or still has
+  // participants. Re-read to tell 404 apart from 409 for the caller.
+  const [program] = await db.select({ id: programs.id }).from(programs).where(eq(programs.id, programId));
+  return program ? { error: "has_participants" } : { error: "not_found" };
 };
 
 export const removeParticipant = async (

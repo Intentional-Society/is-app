@@ -242,6 +242,58 @@ describe("Admin programs API", () => {
     });
   });
 
+  describe("DELETE /api/admin/programs/:id", () => {
+    const del = (id: string) => app.request(`/api/admin/programs/${id}`, { method: "DELETE" });
+
+    it("deletes a program that has no participants", async () => {
+      const programId = await seedProgram("Disposable Program");
+
+      authAs(admin);
+      const res = await del(programId);
+      expect(res.status).toBe(200);
+
+      const rows = await db.select().from(programs).where(eq(programs.id, programId));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("returns 409 and leaves the program intact when it has participants", async () => {
+      const programId = await seedProgram("Occupied Program");
+      await db.insert(profilePrograms).values({ profileId: member, programId });
+
+      authAs(admin);
+      const res = await del(programId);
+      expect(res.status).toBe(409);
+      expect((await res.json()) as { error: string }).toEqual({ error: "has_participants" });
+
+      // The program and the enrollment both survive a rejected delete.
+      const rows = await db.select().from(programs).where(eq(programs.id, programId));
+      expect(rows).toHaveLength(1);
+      const enrolled = await db
+        .select()
+        .from(profilePrograms)
+        .where(eq(profilePrograms.programId, programId));
+      expect(enrolled).toHaveLength(1);
+    });
+
+    it("returns 404 for a non-existent program", async () => {
+      authAs(admin);
+      const res = await del(randomUUID());
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 404 for a non-admin", async () => {
+      const programId = await seedProgram("Guarded Delete Program");
+
+      authAs(nonAdmin);
+      const res = await del(programId);
+      expect(res.status).toBe(404);
+
+      // The guard rejects before any delete runs.
+      const rows = await db.select().from(programs).where(eq(programs.id, programId));
+      expect(rows).toHaveLength(1);
+    });
+  });
+
   describe("POST /api/admin/programs/:id/participants", () => {
     const addParticipant = (programId: string, profileId: string) =>
       app.request(`/api/admin/programs/${programId}/participants`, {
