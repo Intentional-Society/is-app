@@ -53,15 +53,31 @@ export const expectAuthed = async (page: Page): Promise<void> => {
   await expect(page).not.toHaveURL(/\/signin/);
 };
 
-// After reset, bio is null and `/` redirects to `/welcome`. Tests that
-// want to land on `/` (e.g. to navigate to /invites) call this to fill the form.
+// After reset, a seeded user has no welcome markers, so `/` redirects
+// into the multi-step welcome flow. This walks all three steps —
+// agreements, profile, programs — and leaves the page on `/`. Tests
+// that just need to get past onboarding call it; the profile-step opts
+// (displayName/bio) still flow through, so the #149 probe keeps its
+// distinct-bio-per-caller invariant.
 export const completeWelcome = async (page: Page, opts: { displayName?: string; bio?: string } = {}): Promise<void> => {
-  await page.waitForURL((url) => url.pathname === "/welcome", {
-    timeout: TIMEOUT_MS,
-  });
+  // Step 1 — agreements.
+  await page.waitForURL((url) => url.pathname === "/welcome/agreements", { timeout: TIMEOUT_MS });
+  await page.getByRole("button", { name: "I agree" }).click();
+
+  // Step 2 — profile.
+  await page.waitForURL((url) => url.pathname === "/welcome/profile", { timeout: TIMEOUT_MS });
   await page.getByLabel("Display name").fill(opts.displayName ?? "E2E User");
   await page.getByLabel("Bio").fill(opts.bio ?? "Short bio to clear the welcome redirect.");
   await page.getByRole("button", { name: "Save" }).click();
+
+  // Step 3 — programs.
+  await page.waitForURL((url) => url.pathname === "/welcome/programs", { timeout: TIMEOUT_MS });
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+
+  // Onboarding complete: the flow hands off to /myweb. Return to `/` so
+  // callers start from the home page.
+  await page.waitForURL((url) => url.pathname === "/myweb", { timeout: TIMEOUT_MS });
+  await page.goto("/");
   await page.waitForURL((url) => url.pathname === "/", { timeout: TIMEOUT_MS });
 };
 

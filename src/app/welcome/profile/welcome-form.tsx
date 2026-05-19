@@ -32,7 +32,8 @@ export function WelcomeForm({ initial }: { initial: ProfileFormValues }) {
       }
     }
 
-    router.push("/");
+    // Back to the /welcome index, which routes on to the next step.
+    router.push("/welcome");
     router.refresh();
   };
 

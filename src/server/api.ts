@@ -14,6 +14,8 @@ import {
   getProfileForMember,
   getProfileForSelf,
   listMembers,
+  markAgreementsSigned,
+  markProgramsReviewed,
   markWebUpdated,
   parseEditableProfile,
   toSlug,
@@ -202,6 +204,16 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .put("/me/last-updated-web", async (c) => {
     const user = c.get("user");
     await markWebUpdated(user.id);
+    return c.json({ ok: true });
+  })
+  .put("/me/last-signed-agreements", async (c) => {
+    const user = c.get("user");
+    await markAgreementsSigned(user.id);
+    return c.json({ ok: true });
+  })
+  .put("/me/last-reviewed-programs", async (c) => {
+    const user = c.get("user");
+    await markProgramsReviewed(user.id);
     return c.json({ ok: true });
   })
   .post("/me/avatar", async (c) => {

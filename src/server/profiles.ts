@@ -98,7 +98,9 @@ export type ProfileForSelf = {
   emergencyContact: string | null;
   liveDesire: string | null;
   isAdmin: boolean;
+  lastSignedAgreements: Date | null;
   lastUpdatedProfile: Date | null;
+  lastReviewedPrograms: Date | null;
   lastUpdatedWeb: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -119,7 +121,9 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       emergencyContact: profiles.emergencyContact,
       liveDesire: profiles.liveDesire,
       isAdmin: profiles.isAdmin,
+      lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
+      lastReviewedPrograms: profiles.lastReviewedPrograms,
       lastUpdatedWeb: profiles.lastUpdatedWeb,
       createdAt: profiles.createdAt,
       updatedAt: profiles.updatedAt,
@@ -138,6 +142,18 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
 // other members' "recently active" suggestion source.
 export const markWebUpdated = async (userId: string): Promise<void> => {
   await db.update(profiles).set({ lastUpdatedWeb: sql`now()` }).where(eq(profiles.id, userId));
+};
+
+// Stamps the agreements step of the welcome flow as done. The "I agree"
+// button on /welcome/agreements is the only caller.
+export const markAgreementsSigned = async (userId: string): Promise<void> => {
+  await db.update(profiles).set({ lastSignedAgreements: sql`now()` }).where(eq(profiles.id, userId));
+};
+
+// Stamps the programs step of the welcome flow as done. The "Done"
+// button on /welcome/programs is the only caller.
+export const markProgramsReviewed = async (userId: string): Promise<void> => {
+  await db.update(profiles).set({ lastReviewedPrograms: sql`now()` }).where(eq(profiles.id, userId));
 };
 
 export type ProfileForMember = {

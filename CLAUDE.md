@@ -68,6 +68,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - `docs/strategy-project-management.md` — GitHub Projects board conventions
 - `docs/strategy-security.md` — security headers and rationale for each directive
 - `docs/strategy-ui.md` — theme tokens, the `/colors` dev page, Button variants, buttons vs anchors
+- `docs/design-welcome.md` — multi-step onboarding/welcome flow design
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-supabase.md` — Supabase dashboard settings (auth URLs, API keys)
 - `docs/doc-github.md` — GitHub settings and CI workflows

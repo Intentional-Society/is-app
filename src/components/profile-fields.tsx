@@ -88,14 +88,18 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
       />
 
       <Label htmlFor="emergencyContact">Emergency contact</Label>
-      <Input
+      <p id="emergencyContact-description" className="text-sm text-muted-foreground">
+        Visible only to you and admins in case of emergency.
+      </p>
+      <Textarea
         id="emergencyContact"
-        type="text"
+        aria-describedby="emergencyContact-description"
         value={fields.emergencyContact}
         onChange={(e) => setters.setEmergencyContact(e.target.value)}
         disabled={disabled}
+        rows={3}
       />
-      <p className="text-sm text-muted-foreground">Visible only to you and admins in case of emergency.</p>
+
     </>
   );
 }

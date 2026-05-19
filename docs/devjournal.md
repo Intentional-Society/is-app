@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-19 | James | Multi-step welcome flow
+
+Onboarding is now a sequence — agreements, profile, programs, then the personal web — with each step's completion recorded so the flow is resumable. Design: `docs/design-welcome.md` (#166).
+
 ## 2026-05-18 | James | Program administration
 
 Admins manage programs at `/admin/programs`, with a per-program drill-down for editing and adding/removing participants.

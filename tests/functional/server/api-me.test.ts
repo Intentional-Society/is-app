@@ -84,7 +84,9 @@ describe("GET /api/me", () => {
         emergencyContact: null,
         liveDesire: null,
         isAdmin: false,
+        lastSignedAgreements: null,
         lastUpdatedProfile: null,
+        lastReviewedPrograms: null,
         lastUpdatedWeb: null,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -198,5 +200,48 @@ describe("PUT /api/me/last-updated-web", () => {
     const [second] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
 
     expect(second.lastUpdatedWeb?.getTime() ?? 0).toBeGreaterThan(first.lastUpdatedWeb?.getTime() ?? 0);
+  });
+});
+
+describe("PUT /api/me welcome-step markers", () => {
+  let testUserId: string;
+
+  beforeEach(async () => {
+    testUserId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${testUserId}::uuid, 'welcome-marker-test@testfake.local', false, false)`,
+    );
+    await db.insert(profiles).values({ id: testUserId, displayName: "Marker Tester" });
+
+    mockCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: makeUser(testUserId, "welcome-marker-test@testfake.local") },
+          error: null,
+        }),
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: test mock shape
+    } as any);
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await db.delete(profiles).where(eq(profiles.id, testUserId));
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`);
+  });
+
+  it.each([
+    ["/api/me/last-signed-agreements", "lastSignedAgreements"],
+    ["/api/me/last-reviewed-programs", "lastReviewedPrograms"],
+  ] as const)("PUT %s stamps %s on the profile", async (path, column) => {
+    const before = new Date();
+    const res = await app.request(path, { method: "PUT" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+
+    const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
+    const stamped = row[column];
+    expect(stamped).not.toBeNull();
+    expect(stamped?.getTime() ?? 0).toBeGreaterThanOrEqual(before.getTime() - 1000);
   });
 });

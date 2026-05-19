@@ -2,11 +2,10 @@ import { expect, test } from "@playwright/test";
 
 import { resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
-// Phase 2 backfill: verify that a fresh user lands on /welcome, can
-// save the form, and is then allowed through to / where the "Manage
-// invites" link is visible. Both tests in this file depend on the regular
-// seeded user having bio=null, so we re-run the reset per-test to
-// survive CI retries cleanly.
+// The multi-step welcome flow (#166): a fresh user is routed through
+// agreements → profile → programs, then handed off to /myweb. Both tests
+// depend on the regular seeded user starting with no welcome markers, so
+// we re-reset per-test to survive CI retries cleanly.
 
 test.describe.configure({ mode: "serial" });
 
@@ -16,12 +15,18 @@ test.beforeEach(async ({ baseURL }) => {
 });
 
 // Declared BEFORE the happy-path test so the file's final state leaves
-// regular with bio filled — downstream specs in the chromium project
-// expect to land on / rather than bouncing through /welcome.
-test("welcome form surfaces a validation failure instead of getting stuck", async ({ page }) => {
+// the regular user fully onboarded.
+test("welcome profile step surfaces a validation failure instead of getting stuck", async ({ page }) => {
   await signInAs(page, "regular");
-  await page.waitForURL((u) => u.pathname === "/welcome", { timeout: TIMEOUT_MS });
 
+  // Pass the agreements step to reach the profile form.
+  await page.waitForURL((u) => u.pathname === "/welcome/agreements", { timeout: TIMEOUT_MS });
+  await page.getByRole("button", { name: "I agree" }).click();
+  await page.waitForURL((u) => u.pathname === "/welcome/profile", { timeout: TIMEOUT_MS });
+
+  // Force PUT /api/me to fail. The glob matches /api/me exactly, not
+  // /api/me/last-signed-agreements, so the agreements click above ran
+  // against the real endpoint.
   await page.route("**/api/me", async (route) => {
     if (route.request().method() === "PUT") {
       await route.fulfill({
@@ -39,21 +44,31 @@ test("welcome form surfaces a validation failure instead of getting stuck", asyn
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByText("forced failure for e2e")).toBeVisible();
-  expect(page.url()).toContain("/welcome");
+  expect(page.url()).toContain("/welcome/profile");
   await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
 });
 
-test("fresh user lands on /welcome and can complete their profile", async ({ page }) => {
+test("fresh user completes the welcome flow end to end", async ({ page }) => {
   await signInAs(page, "regular");
-  await page.waitForURL((u) => u.pathname === "/welcome", { timeout: TIMEOUT_MS });
 
+  // Step 1 — agreements.
+  await page.waitForURL((u) => u.pathname === "/welcome/agreements", { timeout: TIMEOUT_MS });
+  await expect(page.getByRole("heading", { name: "Welcome" })).toBeVisible();
+  await page.getByRole("button", { name: "I agree" }).click();
+
+  // Step 2 — profile.
+  await page.waitForURL((u) => u.pathname === "/welcome/profile", { timeout: TIMEOUT_MS });
   await page.getByLabel("Display name").fill("Welcome Tester");
   await page.getByLabel("Bio").fill("Loves writing, hikes, long coffees.");
   await page.getByLabel("Keywords (comma-separated)").fill("writing, coffee, hiking");
   await page.getByLabel("Location").fill("Lisbon");
-
   await page.getByRole("button", { name: "Save" }).click();
 
-  await page.waitForURL((u) => u.pathname === "/", { timeout: TIMEOUT_MS });
-  await expect(page.getByRole("link", { name: "Invite a friend" })).toBeVisible();
+  // Step 3 — programs.
+  await page.waitForURL((u) => u.pathname === "/welcome/programs", { timeout: TIMEOUT_MS });
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+
+  // Onboarding complete — the flow hands off to /myweb.
+  await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
+  await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
 });

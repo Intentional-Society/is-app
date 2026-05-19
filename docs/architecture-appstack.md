@@ -130,6 +130,10 @@ The Hono API is the contract boundary for all clients. When the schema evolves, 
 
 Drizzle Kit generates SQL migration files from TypeScript schema changes. Migrations run via a CI/CD pipeline step (GitHub Actions) or manually before deployment — not at serverless function startup. The expand-contract pattern is mandatory for any migration that changes or removes existing columns or tables to avoid breaking clients that haven't updated yet.
 
+### Timestamps
+
+All persisted timestamps are `timestamptz` (`timestamp(..., { withTimezone: true })`); the app speaks UTC end-to-end. DB writes use `sql\`now()\``, JSON serialisation is ISO 8601 UTC via `Date.toJSON()`, and display calls `toLocaleDateString(undefined, …)` so each viewer sees the instant in their own browser locale and zone — no explicit zone handling in app code.
+
 ### Authentication Flow
 
 Supabase Auth handles signup, login, magic links, password reset, and JWT issuance. Supabase sends its own emails for these flows (magic link delivery, email verification, password reset links) — no external email provider is needed for authentication. The Supabase client library in the React frontend manages the auth flow and stores the JWT. The JWT is sent with API requests and verified in Hono middleware before any route handler executes. This means auth is enforced in one place (the middleware) and every handler can trust that the user is authenticated.
