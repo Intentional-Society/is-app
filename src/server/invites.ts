@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
@@ -6,11 +7,11 @@ import { db } from "./db";
 import { validateInviteHints } from "./relations";
 import { invites } from "./schema";
 
-// Alphabet: 23 uppercase letters (no I, O — visually confusable with 1/0)
-// plus 8 digits (no 0, 1 — same reason). 31 chars.
+// Alphabet: 24 uppercase letters (no I, O — visually confusable with
+// 1/0) plus 8 digits (no 0, 1 — same reason). 32 chars.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 10;
-// 31^10 ≈ 8.2e14 — sparse enough that collisions are vanishingly rare;
+// 32^10 ≈ 1.1e15 — sparse enough that collisions are vanishingly rare;
 // the unique constraint is the real safety net.
 
 const MAX_ACTIVE_INVITES_PER_USER = 10;
@@ -29,11 +30,14 @@ export type InviteForCreator = {
   status: InviteStatus;
 };
 
+// randomInt does uniform bounded sampling (rejection sampling
+// internally), so indexing the alphabet with its result is unbiased
+// for any alphabet size — no hand-rolled modulo or scaling on the raw
+// random bytes, which is what CodeQL flags as a biasing operation.
 const generateInviteCode = (): string => {
-  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));
   let out = "";
-  for (const b of bytes) {
-    out += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   }
   return out;
 };
