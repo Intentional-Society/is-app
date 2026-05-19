@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { loadMe } from "@/lib/api-server";
+import { welcomeEntryStep } from "@/lib/welcomeEntryStep";
 
 // Public landing page — opt back in to indexing (root layout is noindex by default).
 export const metadata: Metadata = { robots: { index: true, follow: true } };
@@ -99,12 +100,13 @@ export default async function Home() {
     );
   }
 
-  // Gate: redirect to /welcome until the member has saved their profile
-  // at least once (lastUpdatedProfile set by PUT /me). This includes
-  // pre-filled profiles from the CSV import — we want those members to
-  // go through the welcome flow to confirm and update their details.
-  if (me.profile && !me.profile.lastUpdatedProfile) {
-    redirect("/welcome");
+  // Gate: route members into the multi-step welcome flow until every
+  // onboarding step is done — agreements, profile, then programs. This
+  // includes pre-filled profiles from the CSV import; we want those
+  // members to confirm their details. See docs/design-welcome.md.
+  const welcomeStep = welcomeEntryStep(me.profile);
+  if (welcomeStep) {
+    redirect(`/welcome/${welcomeStep}`);
   }
 
   return <LoggedInHome displayName={me.profile?.displayName ?? null} />;

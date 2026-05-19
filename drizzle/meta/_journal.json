@@ -43,6 +43,13 @@
       "when": 1779111268177,
       "tag": "0005_add_last_updated_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779223860997,
+      "tag": "0006_add_welcome_markers",
+      "breakpoints": true
     }
   ]
 }

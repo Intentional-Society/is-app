@@ -1,31 +1,14 @@
+import { redirect } from "next/navigation";
+
 import { requireUser } from "@/lib/api-server";
-import type { Me } from "@/lib/api-types";
+import { welcomeEntryStep } from "@/lib/welcomeEntryStep";
 
-import { AvatarUploader } from "../profile/avatar-uploader";
-import { WelcomeForm } from "./welcome-form";
-
-export default async function WelcomePage() {
-  const me: Me = await requireUser();
-  const profile = me.profile;
-
-  return (
-    <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <h1 className="text-4xl font-bold">Welcome</h1>
-      <p className="max-w-md text-center text-base text-muted-foreground">
-        Tell us a little about yourself. You can edit this later.
-      </p>
-      <AvatarUploader name={profile?.displayName ?? null} initialUrl={profile?.avatarUrl ?? null} />
-      <WelcomeForm
-        initial={{
-          displayName: profile?.displayName ?? "",
-          bio: profile?.bio ?? "",
-          keywords: profile?.keywords ?? [],
-          location: profile?.location ?? "",
-          supplementaryInfo: profile?.supplementaryInfo ?? "",
-          emergencyContact: profile?.emergencyContact ?? "",
-          liveDesire: profile?.liveDesire ?? "",
-        }}
-      />
-    </main>
-  );
+// The welcome flow has no landing screen of its own: /welcome forwards
+// to the member's first unfinished step, or to /myweb once onboarding is
+// done. Each step returns here after stamping its marker, so this single
+// recompute drives all forward progress. See docs/design-welcome.md.
+export default async function WelcomeIndexPage() {
+  const me = await requireUser();
+  const step = welcomeEntryStep(me.profile);
+  redirect(step ? `/welcome/${step}` : "/myweb");
 }
