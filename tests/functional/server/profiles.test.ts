@@ -88,7 +88,7 @@ describe("getProfileForSelf", () => {
     // future refactors and locks in emergencyContact visibility for
     // self. Programs are deliberately NOT a profile field.
     expect(profile).not.toBeNull();
-    expect(Object.keys(profile!).sort()).toEqual(
+    expect(Object.keys(profile ?? {}).sort()).toEqual(
       [
         "id",
         "displayName",
@@ -131,7 +131,7 @@ describe("getProfileForMember", () => {
     const profile = await getProfileForMember(memberId);
     expect(profile).not.toBeNull();
     expect(profile?.displayName).toBe("Test Member");
-    expect(Object.keys(profile!).sort()).toEqual(
+    expect(Object.keys(profile ?? {}).sort()).toEqual(
       [
         "id",
         "slug",

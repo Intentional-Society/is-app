@@ -17,7 +17,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default async function ProfilePage() {
   const me: Me = await requireUser();
-  const profile = me.profile!;
+  // /api/me self-heals a missing profile row, so this is effectively
+  // unreachable — the guard keeps the type honest and fails loudly if
+  // that invariant ever breaks.
+  if (!me.profile) throw new Error("authenticated user has no profile");
+  const profile = me.profile;
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">

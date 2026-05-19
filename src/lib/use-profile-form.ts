@@ -69,7 +69,15 @@ export function useProfileForm(initial: ProfileFormValues) {
 
   return {
     fields: { displayName, bio, keywordsText, location, supplementaryInfo, emergencyContact, liveDesire },
-    setters: { setDisplayName, setBio, setKeywordsText, setLocation, setSupplementaryInfo, setEmergencyContact, setLiveDesire },
+    setters: {
+      setDisplayName,
+      setBio,
+      setKeywordsText,
+      setLocation,
+      setSupplementaryInfo,
+      setEmergencyContact,
+      setLiveDesire,
+    },
     status,
     setStatus,
     submit,

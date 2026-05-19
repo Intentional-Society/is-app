@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 
@@ -110,10 +109,7 @@ export const replaceAvatar = async (userId: string, webp: Buffer): Promise<strin
     .upload(path, webp, { contentType: "image/webp", upsert: false });
   if (uploadError) throw uploadError;
 
-  const [existing] = await db
-    .select({ avatarPath: profiles.avatarPath })
-    .from(profiles)
-    .where(eq(profiles.id, userId));
+  const [existing] = await db.select({ avatarPath: profiles.avatarPath }).from(profiles).where(eq(profiles.id, userId));
   // Single autocommit statement — safe on the transaction pooler.
   await db.update(profiles).set({ avatarPath: path }).where(eq(profiles.id, userId));
 
@@ -126,10 +122,7 @@ export const replaceAvatar = async (userId: string, webp: Buffer): Promise<strin
 
 // Clears a user's avatar: nulls the column, then removes the object.
 export const clearAvatar = async (userId: string): Promise<void> => {
-  const [existing] = await db
-    .select({ avatarPath: profiles.avatarPath })
-    .from(profiles)
-    .where(eq(profiles.id, userId));
+  const [existing] = await db.select({ avatarPath: profiles.avatarPath }).from(profiles).where(eq(profiles.id, userId));
   if (!existing?.avatarPath) return;
 
   await db.update(profiles).set({ avatarPath: null }).where(eq(profiles.id, userId));

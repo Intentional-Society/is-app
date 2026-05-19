@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { timed } from "@/lib/timing";
 
+import { supabasePublishableKey, supabaseUrl } from "./env";
 import { encodeUser, SUPABASE_USER_HEADER } from "./server-user";
 
 type CookieToSet = { name: string; value: string; options: Record<string, unknown> };
@@ -16,25 +17,21 @@ export const updateSession = async (request: NextRequest) => {
 
   const cookieUpdates: CookieToSet[] = [];
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const c of cookiesToSet) {
-            // Mutate request.cookies so Server Components called later
-            // in this same render see the refreshed token.
-            request.cookies.set(c.name, c.value);
-            cookieUpdates.push(c);
-          }
-        },
+  const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        for (const c of cookiesToSet) {
+          // Mutate request.cookies so Server Components called later
+          // in this same render see the refreshed token.
+          request.cookies.set(c.name, c.value);
+          cookieUpdates.push(c);
+        }
       },
     },
-  );
+  });
 
   const {
     data: { user },

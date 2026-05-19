@@ -126,7 +126,9 @@ describe("GET /api/admin/hints", () => {
     authAs(admin);
     const res = await app.request("/api/admin/hints");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { hints: Array<{ relator: { id: string }; relatee: { id: string }; hintedBy: { id: string } | null }> };
+    const body = (await res.json()) as {
+      hints: Array<{ relator: { id: string }; relatee: { id: string }; hintedBy: { id: string } | null }>;
+    };
     // The endpoint lists every pending hint in the DB, so other rows
     // (from parallel test files or stale local-dev state) may appear.
     // Filter to this test's seeded UUIDs before asserting.

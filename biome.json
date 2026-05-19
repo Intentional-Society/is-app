@@ -34,7 +34,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "style": {
+        "noNonNullAssertion": "error"
+      }
     }
   },
   "assist": {
@@ -85,6 +88,16 @@
           "a11y": {
             "useSemanticElements": "off",
             "useKeyWithClickEvents": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tests/**", "scripts/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
           }
         }
       }

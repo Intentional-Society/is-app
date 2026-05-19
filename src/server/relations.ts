@@ -18,7 +18,7 @@ import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
-import { inviteHints, invites, profiles, relations } from "./schema";
+import { inviteHints, profiles, relations } from "./schema";
 
 // Validates the optional `relationValue` body field shared by POST
 // /api/invites and any future route that accepts an optional 1..4.
@@ -548,14 +548,8 @@ export const validateInviteHints = async (params: {
 
 // Tx | typeof db lets the materializer run inside the auth-callback
 // transaction or, in tests, directly against the connection.
-type Tx = PgTransaction<
-  // biome-ignore lint/suspicious/noExplicitAny: Drizzle's published
-  // postgres-js transaction type is genuinely `PgTransaction<any, any, any>`
-  // for consumers; the wide generic surface is unavoidable here.
-  any,
-  any,
-  any
->;
+// biome-ignore lint/suspicious/noExplicitAny: Drizzle's published postgres-js transaction type is genuinely `PgTransaction<any, any, any>` for consumers; the wide generic surface is unavoidable here.
+type Tx = PgTransaction<any, any, any>;
 
 export const materializeInviteRelations = async (
   tx: Tx | typeof db,

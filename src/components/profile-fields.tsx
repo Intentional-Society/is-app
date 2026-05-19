@@ -95,9 +95,7 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
         onChange={(e) => setters.setEmergencyContact(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-sm text-muted-foreground">
-        Visible only to you and admins in case of emergency.
-      </p>
+      <p className="text-sm text-muted-foreground">Visible only to you and admins in case of emergency.</p>
     </>
   );
 }

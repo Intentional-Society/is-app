@@ -185,7 +185,7 @@ describe("PUT /api/me/last-updated-web", () => {
 
     const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
     expect(row.lastUpdatedWeb).not.toBeNull();
-    expect(row.lastUpdatedWeb!.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
+    expect(row.lastUpdatedWeb?.getTime() ?? 0).toBeGreaterThanOrEqual(before.getTime() - 1000);
   });
 
   it("re-clicking Done bumps the timestamp forward", async () => {
@@ -196,6 +196,6 @@ describe("PUT /api/me/last-updated-web", () => {
     await app.request("/api/me/last-updated-web", { method: "PUT" });
     const [second] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
 
-    expect(second.lastUpdatedWeb!.getTime()).toBeGreaterThan(first.lastUpdatedWeb!.getTime());
+    expect(second.lastUpdatedWeb?.getTime() ?? 0).toBeGreaterThan(first.lastUpdatedWeb?.getTime() ?? 0);
   });
 });

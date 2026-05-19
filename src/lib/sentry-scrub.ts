@@ -21,8 +21,8 @@ export const scrubServerEvent = (event: ErrorEvent): ErrorEvent => {
   if (!event.request) return event;
   delete event.request.cookies;
   if (event.request.headers) {
-    delete event.request.headers["authorization"];
-    delete event.request.headers["cookie"];
+    delete event.request.headers.authorization;
+    delete event.request.headers.cookie;
   }
   return event;
 };
