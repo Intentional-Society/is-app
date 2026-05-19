@@ -36,6 +36,13 @@
       "when": 1778171917828,
       "tag": "0004_add_profile_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779111268177,
+      "tag": "0005_add_last_updated_profile",
+      "breakpoints": true
     }
   ]
 }

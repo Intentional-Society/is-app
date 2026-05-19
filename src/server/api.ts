@@ -191,6 +191,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
       const update = {
         ...parsed,
         ...(parsed.displayName !== undefined ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null } : {}),
+        lastUpdatedProfile: sql`now()`,
       };
       await db.update(profiles).set(update).where(eq(profiles.id, user.id));
     }

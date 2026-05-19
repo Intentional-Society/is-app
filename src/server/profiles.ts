@@ -98,6 +98,7 @@ export type ProfileForSelf = {
   emergencyContact: string | null;
   liveDesire: string | null;
   isAdmin: boolean;
+  lastUpdatedProfile: Date | null;
   lastUpdatedWeb: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -118,6 +119,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       emergencyContact: profiles.emergencyContact,
       liveDesire: profiles.liveDesire,
       isAdmin: profiles.isAdmin,
+      lastUpdatedProfile: profiles.lastUpdatedProfile,
       lastUpdatedWeb: profiles.lastUpdatedWeb,
       createdAt: profiles.createdAt,
       updatedAt: profiles.updatedAt,
