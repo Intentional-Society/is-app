@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
@@ -29,22 +30,14 @@ export type InviteForCreator = {
   status: InviteStatus;
 };
 
-// Rejection sampling. A random byte is 0–255; mapping it onto the
-// alphabet with plain modulo would over-represent the low indices
-// unless the alphabet size divides 256 evenly. Discard any byte at or
-// above `cutoff` (the largest multiple of the alphabet size that fits
-// in a byte), then index by an equal-width bucket — every kept byte is
-// then uniformly distributed, whatever the alphabet size.
+// randomInt does uniform bounded sampling (rejection sampling
+// internally), so indexing the alphabet with its result is unbiased
+// for any alphabet size — no hand-rolled modulo or scaling on the raw
+// random bytes, which is what CodeQL flags as a biasing operation.
 const generateInviteCode = (): string => {
-  const cutoff = 256 - (256 % CODE_ALPHABET.length);
-  const bucket = cutoff / CODE_ALPHABET.length;
   let out = "";
-  while (out.length < CODE_LENGTH) {
-    for (const b of crypto.getRandomValues(new Uint8Array(CODE_LENGTH))) {
-      if (b >= cutoff) continue;
-      out += CODE_ALPHABET[Math.floor(b / bucket)];
-      if (out.length === CODE_LENGTH) break;
-    }
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   }
   return out;
 };
