@@ -18,21 +18,24 @@ to the hosted project.
 
 The IS app uses passwordless sign-in plus a password-reset flow, and does not
 call Supabase's admin `inviteUserByEmail` (the IS invite-code system runs on
-top of an ordinary magic-link send). That makes three Supabase templates
+top of an ordinary magic-link send). That makes two Supabase templates
 reachable:
 
 | Supabase template | Triggered by                                    |
 | ----------------- | ----------------------------------------------- |
-| `magic_link`      | `/signin`, `/signup` for an existing email      |
-| `confirmation`    | `/signup` for a brand-new email                 |
+| `magic_link`      | `/signin` and `/signup` (both existing and new emails) |
 | `recovery`        | `/forgot-password`                              |
 
-The remaining templates (`invite`, `email_change`, `reauthentication`) are
-unreachable from current UI and stay on Supabase defaults.
+**Verified in Inbucket during implementation:** the `confirmation` template
+(commonly assumed to fire for brand-new signups) is *not* reached by current
+flows. GoTrue's `/otp` endpoint sends the `magic_link` template for both
+existing and new users; `confirmation` only fires from `signUp({ email, password })`,
+which the app doesn't call anywhere. So a single magic-link template body
+needs to read naturally for both "sign in" and "first-time sign up" cases.
 
-The `magic_link` vs `confirmation` split for `signInWithOtp` is verified
-empirically against local Inbucket during implementation rather than assumed
-from documentation.
+The remaining templates (`invite`, `confirmation`, `email_change`,
+`reauthentication`) are unreachable from current UI and stay on Supabase
+defaults.
 
 ---
 
@@ -163,10 +166,12 @@ Supabase substitutes Go-template variables before sending. The ones in use:
 - `{{ .Email }}` — recipient address. Useful for clarity in body copy.
 - `{{ .SiteURL }}` — hosted site URL (`https://app.intentionalsociety.org`
   in prod). Useful for footer links.
-- `{{ .Data.displayName }}` — only populated on signup (set via
-  `signInWithOtp`'s `options.data` in `signup-form.tsx`). Conditional
-  with `{{ if .Data.displayName }}` so plain `/signin` doesn't render
-  "Hi ,".
+- `{{ .Data.displayName }}` — `auth.users.user_metadata.displayName`.
+  Populated by `/signup` (`signInWithOtp` `options.data`) and by the
+  CSV importer; absent on admin-created users. Always wrap with
+  `{{ if .Data.displayName }}…{{ end }}` so the missing case renders
+  cleanly. Verified against Supabase docs: `{{ .Data }}` is
+  user_metadata, not per-request options.data.
 
 Templates are HTML; Supabase wraps them in a minimal MIME envelope. Email
 clients vary wildly in CSS support — keep styling inline and conservative
@@ -174,15 +179,37 @@ clients vary wildly in CSS support — keep styling inline and conservative
 
 ---
 
+## Deliverability and visual consistency
+
+Templates are written for inbox placement, not just rendering: table-based
+layout with inline styles, system font stack only, no images, single CTA
+per email, plain-text fallback URL beside each button, and subject lines
+free of urgency/marketing language. SPF, DKIM, and DMARC alignment are
+already handled at the Resend layer (see `doc-resend.md`).
+
+The outer page background is hardcoded `#eff5f2` — the sRGB equivalent
+of the app's `--background` token (`oklch(0.965 0.007 165)` in
+`src/app/globals.css`). It lives as a hex literal because email clients
+don't reliably support `oklch()` (Outlook in particular). If the app
+token changes, re-derive: there's a worked conversion in the issue-45
+PR description, or use any oklch-to-sRGB tool.
+
+The Resend changelog (2025-08-21) documents automatic plain-text
+generation for the Node SDK but is silent on the SMTP relay path. Empirical
+check on past sends from our prod stack: they arrive as `multipart/alternative`
+with both `text/plain` and `text/html` parts, so Resend's auto-text covers
+the SMTP path too. Authoring HTML-only templates is safe.
+
 ## Doc cleanup
 
-The same PR moves the Supabase dashboard SMTP config out of
+The introducing PR moves the Supabase dashboard SMTP config out of
 `doc-resend.md` into `doc-supabase.md` (new "Authentication → SMTP"
 subsection) — `doc-supabase.md` is where Supabase dashboard fields
 live. The move also clears doc-resend's stale "Current state" section,
 leaving doc-resend focused on the Resend provider itself (sending
 domain, DMARC, alternatives). The header line's "Email templates
-pending customization" wording clears once the templates ship.
+pending customization" wording is cleared the moment the templates
+ship.
 
 ---
 
@@ -200,3 +227,10 @@ pending customization" wording clears once the templates ship.
 - **Shared layout** — composed build step into
   `supabase/templates/_generated/` if the template count grows past
   three.
+- **VML bulletproof button for Outlook Windows desktop** — Mailpit's
+  HTML Check (caniemail unweighted) puts us at ~90%; the remaining gap
+  is mostly Outlook 2007–2019 (no `border-radius`, no `display:inline-block`
+  on anchors) and niche regional webmail. The standard fix is
+  `<!--[if mso]>` conditional comments wrapping a VML `RoundRect`
+  around the button. Deferred unless an Outlook-using member complains
+  — market-share-weighted, real-world rendering is already ~95%+.

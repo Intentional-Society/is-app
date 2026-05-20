@@ -1,6 +1,6 @@
 # Email — Configuration Reference
 
-Covers transactional email (auth confirmations, password resets, invite-flow magic links) and how it relates to the existing newsletter stack. **Status: live since 2026-05-11 — Resend via SMTP into Supabase Auth. Email templates pending customization.**
+Covers transactional email (auth confirmations, password resets, invite-flow magic links) and how it relates to the existing newsletter stack. **Status: live since 2026-05-11 — Resend via SMTP into Supabase Auth.**
 
 ---
 
@@ -10,6 +10,7 @@ Transactional email runs through Resend as a standalone account (not the Vercel 
 
 - **Sending domain:** `mail.intentionalsociety.org` — separate from the apex used by Buttondown. DKIM-signed and SPF-authenticated at this subdomain.
 - **Visible From:** `devteam@mail.intentionalsociety.org`. Matches the sending domain, so DKIM signs with `d=mail.intentionalsociety.org` and DMARC alignment is strict (not just relaxed).
+- **Sender name:** `Intentional Society Web App` — chosen to differentiate from Buttondown's "Intentional Society" newsletter sender, so recipients can triage app-triggered mail at a glance. The same brand carries into email copy: subjects compress it to "IS Web App" for inbox density, bodies use the full form.
 - **Replies:** routed via Zoho subdomain stripping. `mail.intentionalsociety.org` has Zoho MX records, and subdomain stripping is enabled on the apex Zoho domain — so any `<anything>@mail.intentionalsociety.org` is delivered to `<anything>@intentionalsociety.org`. The existing `devteam@` alias at the apex then forwards to the operator's inbox. End result: replies to a magic-link email land cleanly without needing a mailbox on the subdomain.
 
 ### Why Resend over Postmark

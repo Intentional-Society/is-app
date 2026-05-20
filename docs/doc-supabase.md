@@ -85,13 +85,19 @@ Production routes auth emails through custom SMTP (Resend). Configure under Auth
 - **Username:** `resend`
 - **Password:** Resend API key (from Resend dashboard → API Keys)
 - **Sender email:** `devteam@mail.intentionalsociety.org`
-- **Sender name:** `Intentional Society Web App` — chosen to differentiate from Buttondown's "Intentional Society" newsletter sender, so recipients can triage app-triggered mail at a glance.
+- **Sender name:** `Intentional Society Web App` (see `docs/doc-resend.md` for why this differs from the newsletter sender and what it implies for in-product copy).
 
 Also raise Authentication → Rate Limits → "emails sent per hour" from the default 30/hour. We use **50/hour** — chosen to sit comfortably below Resend's free-tier 100/day cap so that a misconfiguration or runaway loop hits Supabase's per-hour cap long before exhausting Resend's daily allotment, leaving headroom to fix the issue and send legitimate mail afterward. The custom SMTP path no longer hits the built-in 2/hour cap once Custom SMTP is enabled, but Supabase still applies its own per-project rate limit.
 
 Local dev does not route through Resend — the local stack uses Inbucket (see "Local stack → Inbucket" below).
 
 See `docs/doc-resend.md` for why Resend over alternatives, the sending-domain rationale, and reply routing.
+
+### Authentication → Email templates
+
+Auth email templates (magic link, signup confirmation, password recovery) are **managed from the repo**, not the dashboard. Source files live in `supabase/templates/` with a manifest at `supabase/templates/templates.manifest.mjs`. The local stack picks them up via `[auth.email.template.*]` blocks in `supabase/config.toml`. To update prod, edit the files and run `npm run update_email_templates` — the script PATCHes the Supabase Management API and overwrites whatever's in the dashboard. Dashboard edits will be silently clobbered on the next push; the repo wins.
+
+Design and rationale: `docs/design-emails.md`.
 
 ### API keys
 
