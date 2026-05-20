@@ -45,16 +45,17 @@ jobs:
           node-version: 24
           cache: npm
 
-      - uses: supabase/setup-cli@a4d563a017eb7e7da097c40c441f85dbdcc4411f # v2.0.1
-        if: steps.filter.outputs.code == 'true'
-        with:
-          version: latest
-
-      - if: steps.filter.outputs.code == 'true'
-        run: supabase start
-
+      # The `supabase` devDependency is the same native binary that
+      # supabase/setup-cli would download — its postinstall fetches it
+      # from supabase/cli releases. Running it via npm keeps the CLI
+      # version locked in package-lock.json (and tracked by Dependabot)
+      # rather than floating behind `version: latest`, and removes one
+      # third-party Action from the supply chain.
       - if: steps.filter.outputs.code == 'true'
         run: npm install
+
+      - if: steps.filter.outputs.code == 'true'
+        run: npx supabase start
 
       - if: steps.filter.outputs.code == 'true'
         run: npm run lint
