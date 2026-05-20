@@ -35,3 +35,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    # Shorter than npm's 3 days: Actions bumps are lower-volume and
+    # tag-pinned, but a brief bake window still catches a freshly-published
+    # tag that gets retagged or yanked.
+    cooldown:
+      default-days: 2
