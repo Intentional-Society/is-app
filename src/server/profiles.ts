@@ -136,6 +136,88 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
   return profile;
 };
 
+// MVCC + connection metadata captured alongside a profile read. Logged
+// at the GET /me call site when the `x-debug-timing` debug header is
+// on, to diagnose #149: a welcome-flow read intermittently sees an
+// older snapshot of the same row a moments-earlier read saw populated.
+// xmin pins the txid of the visible tuple — different xmin across two
+// reads of the same row identifies a stale-snapshot read; inRecovery /
+// serverAddr / backendPid describe the Postgres backend the read
+// landed on, so we can tell whether requests scatter across Supavisor
+// backends or stick. Remove once #149 is closed.
+export type ProfileReadProbe = {
+  ctid: string;
+  xmin: string;
+  inRecovery: boolean;
+  serverAddr: string | null;
+  backendPid: number;
+};
+
+// Same SELECT as getProfileForSelf with the probe columns appended in
+// the same statement so the metadata unambiguously describes the
+// connection that served *this* read. Production GET /me still uses
+// the plain variant; this one runs only when the debug header is set.
+export const getProfileForSelfWithProbe = async (
+  userId: string,
+): Promise<{ profile: ProfileForSelf | null; probe: ProfileReadProbe | null }> => {
+  const [row] = await db
+    .select({
+      id: profiles.id,
+      displayName: profiles.displayName,
+      bio: profiles.bio,
+      keywords: profiles.keywords,
+      location: profiles.location,
+      supplementaryInfo: profiles.supplementaryInfo,
+      referredBy: profiles.referredBy,
+      referredByLegacy: profiles.referredByLegacy,
+      avatarPath: profiles.avatarPath,
+      emergencyContact: profiles.emergencyContact,
+      liveDesire: profiles.liveDesire,
+      isAdmin: profiles.isAdmin,
+      lastSignedAgreements: profiles.lastSignedAgreements,
+      lastUpdatedProfile: profiles.lastUpdatedProfile,
+      lastReviewedPrograms: profiles.lastReviewedPrograms,
+      lastUpdatedWeb: profiles.lastUpdatedWeb,
+      createdAt: profiles.createdAt,
+      updatedAt: profiles.updatedAt,
+      __ctid: sql<string>`ctid::text`,
+      __xmin: sql<string>`xmin::text`,
+      __inRecovery: sql<boolean>`pg_is_in_recovery()`,
+      __serverAddr: sql<string | null>`inet_server_addr()::text`,
+      __backendPid: sql<number>`pg_backend_pid()`,
+    })
+    .from(profiles)
+    .where(eq(profiles.id, userId));
+
+  if (!row) {
+    // No row — capture connection identity from a separate metadata
+    // query so callers still get backend info for missing-profile
+    // requests. May land on a different backend than the missing read.
+    const [meta] = (await db.execute(sql`
+      SELECT pg_is_in_recovery() AS "inRecovery",
+             inet_server_addr()::text AS "serverAddr",
+             pg_backend_pid() AS "backendPid"
+    `)) as unknown as { inRecovery: boolean; serverAddr: string | null; backendPid: number }[];
+    return {
+      profile: null,
+      probe: meta ? { ctid: "", xmin: "", ...meta } : null,
+    };
+  }
+
+  const { __ctid, __xmin, __inRecovery, __serverAddr, __backendPid, ...rest } = row;
+  const [profile] = await attachAvatarUrls([rest]);
+  return {
+    profile,
+    probe: {
+      ctid: __ctid,
+      xmin: __xmin,
+      inRecovery: __inRecovery,
+      serverAddr: __serverAddr,
+      backendPid: __backendPid,
+    },
+  };
+};
+
 // Bumps lastUpdatedWeb to now() on the user's profile. The Done button
 // at the bottom of /myweb is the only caller — clicking it captures
 // "I'm done updating my relations for now" and surfaces the user in
