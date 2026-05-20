@@ -10,21 +10,35 @@
 //
 // Usage:
 //   node scripts/update-email-templates.mjs --dry-run    # print what would be sent
-//   node scripts/update-email-templates.mjs --download   # snapshot the current hosted templates to supabase/templates/_backup/<timestamp>/
+//   node scripts/update-email-templates.mjs --download   # snapshot the current hosted templates to supabase/templates/_remote-snapshot/
 //   node scripts/update-email-templates.mjs              # PATCH the hosted project
 //
 // Recommended first-time workflow: --download once (so you have the
 // pre-customization content), then run without flags to push.
 //
-// Requires SUPABASE_ACCESS_TOKEN for the real push and for --download.
-// Generate one at https://supabase.com/dashboard/account/tokens. This
-// is an operator secret — never set it as a Vercel env var or commit it.
+// SUPABASE_ACCESS_TOKEN is read from .env.prod (gitignored via .env.*),
+// matching the prod-targeting convention used by scripts/import-members-csv.ts
+// and scripts/normalize-referrals.ts. Workflow:
+//
+//   1. Generate a token at https://supabase.com/dashboard/account/tokens.
+//   2. Create .env.prod in the repo root with:
+//        SUPABASE_ACCESS_TOKEN=<the token>
+//   3. Run the script.
+//   4. Delete .env.prod when done — the token grants account-wide
+//      access, treat the file as temporary.
+//
+// See docs/doc-supabase.md → "Personal access token (Management API)"
+// for blast radius and rotation.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { config } from "dotenv";
+
 import { TEMPLATES } from "../supabase/templates/templates.manifest.mjs";
+
+config({ path: resolve(process.cwd(), ".env.prod"), quiet: true });
 
 // From docs/doc-supabase.md → Production (hosted).
 const PROJECT_REF = "oyuzjowguujwhqyhijzx";
@@ -42,9 +56,11 @@ if (dryRun && download) {
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 if (!token && !dryRun) {
   console.error(
-    "Missing SUPABASE_ACCESS_TOKEN. Create a personal access token at\n" +
-      "  https://supabase.com/dashboard/account/tokens\n" +
-      "and export it before re-running (or pass --dry-run to skip the network call).",
+    "Missing SUPABASE_ACCESS_TOKEN. Create .env.prod in the repo root with:\n" +
+      "  SUPABASE_ACCESS_TOKEN=<your-token>\n" +
+      "Generate the token at https://supabase.com/dashboard/account/tokens.\n" +
+      ".env.prod is gitignored; delete it after the script run.\n" +
+      "Pass --dry-run to skip the network call without a token.",
   );
   process.exit(1);
 }
@@ -68,10 +84,13 @@ if (download) {
   }
   const config = await res.json();
 
-  // Timestamp like 2026-05-20T17-12-26 — filesystem-safe and sortable.
-  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const backupDir = join(templatesDir, "_backup", ts);
-  await mkdir(backupDir, { recursive: true });
+  // Single-slot, always overwritten. Git provides the time dimension
+  // via commit history; the filesystem doesn't need to. Wipe and
+  // recreate so types that aren't currently set on the hosted project
+  // don't linger as stale files from a previous run.
+  const snapshotDir = join(templatesDir, "_remote-snapshot");
+  await rm(snapshotDir, { recursive: true, force: true });
+  await mkdir(snapshotDir, { recursive: true });
 
   const subjects = {};
   let contentCount = 0;
@@ -80,16 +99,19 @@ if (download) {
     const content = config[`mailer_templates_${type}_content`];
     if (subject != null && subject !== "") subjects[type] = subject;
     if (content) {
-      await writeFile(join(backupDir, `${type}.html`), content, "utf8");
+      await writeFile(join(snapshotDir, `${type}.html`), content, "utf8");
       contentCount++;
     }
   }
-  await writeFile(join(backupDir, "subjects.json"), `${JSON.stringify(subjects, null, 2)}\n`, "utf8");
+  await writeFile(join(snapshotDir, "subjects.json"), `${JSON.stringify(subjects, null, 2)}\n`, "utf8");
 
   console.log(`Snapshotted hosted templates from project ${PROJECT_REF}:`);
-  console.log(`  ${backupDir}`);
+  console.log(`  ${snapshotDir}`);
   console.log(`  ${contentCount} non-empty HTML files, ${Object.keys(subjects).length} subjects`);
-  console.log("\nRe-run without --download to push the repo templates.");
+  console.log("\nNext steps:");
+  console.log("  git diff supabase/templates/_remote-snapshot   # see what's currently in prod");
+  console.log("  npm run update_email_templates -- --dry-run    # preview the push payload");
+  console.log("  npm run update_email_templates                 # push, after reviewing");
   process.exit(0);
 }
 

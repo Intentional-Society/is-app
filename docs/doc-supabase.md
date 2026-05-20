@@ -95,9 +95,19 @@ See `docs/doc-resend.md` for why Resend over alternatives, the sending-domain ra
 
 ### Authentication → Email templates
 
-Auth email templates (magic link, signup confirmation, password recovery) are **managed from the repo**, not the dashboard. Source files live in `supabase/templates/` with a manifest at `supabase/templates/templates.manifest.mjs`. The local stack picks them up via `[auth.email.template.*]` blocks in `supabase/config.toml`. To update prod, edit the files and run `npm run update_email_templates` — the script PATCHes the Supabase Management API and overwrites whatever's in the dashboard. Dashboard edits will be silently clobbered on the next push; the repo wins. Run `npm run download_email_templates` first to snapshot the current hosted state to `supabase/templates/_backup/<timestamp>/` as a safety net.
+Auth email templates (magic link, signup confirmation, password recovery) are **managed from the repo**, not the dashboard. Source files live in `supabase/templates/` with a manifest at `supabase/templates/templates.manifest.mjs`. The local stack picks them up via `[auth.email.template.*]` blocks in `supabase/config.toml`. To update prod, edit the files and run `npm run update_email_templates` — the script PATCHes the Supabase Management API and overwrites whatever's in the dashboard. Dashboard edits will be silently clobbered on the next push; the repo wins. `npm run download_email_templates` snapshots the current hosted state to the committed `supabase/templates/_remote-snapshot/` directory — run it before each push so the snapshot stays current and the PR diff shows exactly what's changing for recipients.
 
 Design and rationale: `docs/design-emails.md`.
+
+### Personal access token (Management API)
+
+`scripts/update-email-templates.mjs` (and any future operator scripts that hit the Supabase Management API) authenticate with a **personal access token**, account-scoped — not project-scoped, not a Vercel env var.
+
+- **Generate at:** https://supabase.com/dashboard/account/tokens. Any descriptive name is fine; we use one named for the script that consumes it.
+- **Purpose:** lets the operator push email templates from the repo to the hosted project's auth config via `PATCH /v1/projects/{ref}/config/auth`, and download the current state for snapshotting. No app code path uses it.
+- **Storage:** read from `.env.prod` (gitignored via `.env.*`) as `SUPABASE_ACCESS_TOKEN`, matching the prod-targeting convention used by `scripts/import-members-csv.ts` and `scripts/normalize-referrals.ts`. Treat the file as temporary — create it with the token, run the script, delete the file. Never commit, never set in Vercel, never put in CI.
+- **Blast radius if leaked:** broad — a personal access token can do anything the issuing account can do across every Supabase project that account belongs to, including reading API keys, mutating auth config, and managing databases. Revoke at the same URL and regenerate if exposed.
+- **Rotation:** revoke + regenerate at the dashboard. No app-side coordination needed; the next script run reads the new value from `.env.prod`.
 
 ### API keys
 

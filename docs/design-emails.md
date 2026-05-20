@@ -121,28 +121,35 @@ Shape and conventions mirror `scripts/update-main-branch-protection.mjs`:
 - `--dry-run` prints the payload without sending.
 - `--download` snapshots the current hosted templates (all six GoTrue
   template types, not just the two we manage) to
-  `supabase/templates/_backup/<timestamp>/` as `<type>.html` files plus
-  a `subjects.json`. Useful as a pre-push safety net and as the
-  foundation for future drift detection. The `_backup/` directory is
-  `.gitignore`d — backups are operator-local artifacts.
-- Reads `SUPABASE_ACCESS_TOKEN` from the environment; refuses to run if
-  unset (except `--dry-run`, which needs no token). The token is an
-  ops-time secret, not a runtime env var — it is **not** set in Vercel,
-  only on the operator's machine (like the `gh` token used by the
-  branch-protection script).
+  `supabase/templates/_remote-snapshot/` as `<type>.html` files plus a
+  `subjects.json`. Single-slot, overwritten on each run — git provides
+  the time dimension via commit history. The snapshot is **committed**
+  to the repo: it doubles as a known-good rollback target without
+  needing ops-token access, and the PR diff of snapshot vs source files
+  is exactly what's changing for recipients.
+- Reads `SUPABASE_ACCESS_TOKEN` from `.env.prod` (gitignored), matching
+  the prod-targeting convention used by `import-members-csv.ts` and
+  `normalize-referrals.ts`. Refuses to run if unset (except `--dry-run`,
+  which needs no token). The token is an ops-time secret — see
+  `doc-supabase.md` → "Personal access token (Management API)" for the
+  create-temporarily / delete-after-run workflow and blast radius.
 - Project ref is the constant `oyuzjowguujwhqyhijzx` (already in
   `doc-supabase.md`).
 
 Recommended workflow:
 
 ```
-npm run download_email_templates                 # snapshot current remote first
-npm run update_email_templates -- --dry-run      # preview the payload
+npm run download_email_templates                 # overwrites _remote-snapshot/ with current prod state
+git diff supabase/templates/_remote-snapshot     # what's in prod right now
+# (edit templates/*.html as needed; compare against the snapshot)
+npm run update_email_templates -- --dry-run      # preview the payload (the `--` separator is npm's way of forwarding flags to the script)
 npm run update_email_templates                   # PATCH the hosted project
+git add -A && git commit                         # snapshot + source changes land together
 ```
 
-The download step is strictly optional once you trust the workflow, but
-makes the first run safe and gives you a known-good rollback target.
+The snapshot in each PR reflects what prod looked like *right before*
+that PR's push, so future readers can see the exact recipient-facing
+change by diffing snapshot vs source files within the PR.
 
 CI integration (auto-push on changes to `supabase/templates/**`) is
 plausible but deferred — the manual model matches every other ops script
@@ -160,12 +167,13 @@ The Management API `PATCH` is surgical: only the `mailer_*` fields move.
 
 ### Drift detection
 
-`--download` is the building block: it pulls the current hosted state
-into a backup directory, which can be diffed against the repo manually.
-A future `--check` mode would do that diff automatically. Until then,
-the manifest's stated subjects are the contract — if someone edits a
-template in the Supabase dashboard, the next `update-email-templates.mjs`
-run silently overwrites it. That's the intended behaviour: repo wins.
+`--download` overwrites `_remote-snapshot/` with current prod state.
+After running it, `git status` immediately shows whether the dashboard
+has drifted from the last committed snapshot, and `git diff` shows
+exactly what changed. A future `--check` mode could automate the diff,
+but the manual flow is already serviceable. If drift is found, the
+next `update-email-templates.mjs` push silently overwrites the
+dashboard. That's the intended behaviour: repo wins.
 
 ---
 

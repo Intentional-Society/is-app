@@ -1,0 +1,8 @@
+{
+  "invite": "You have been invited",
+  "confirmation": "Confirm Your Signup",
+  "recovery": "Reset your IS Web App password",
+  "magic_link": "Sign in to the IS Web App",
+  "email_change": "Confirm Email Change",
+  "reauthentication": "Confirm Reauthentication"
+}
