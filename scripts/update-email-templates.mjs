@@ -92,6 +92,12 @@ if (download) {
   await rm(snapshotDir, { recursive: true, force: true });
   await mkdir(snapshotDir, { recursive: true });
 
+  // CodeQL flags the writeFile calls below as "remote data → file
+  // system" (js/http-to-file-access). The remote source is
+  // api.supabase.com authenticated with our personal access token; the
+  // destination paths are deterministic constants from ALL_TYPES.
+  // Writing the auth config to disk is the literal purpose of
+  // --download — snapshotting prod for diff review.
   const subjects = {};
   let contentCount = 0;
   for (const type of ALL_TYPES) {
@@ -99,11 +105,11 @@ if (download) {
     const content = config[`mailer_templates_${type}_content`];
     if (subject != null && subject !== "") subjects[type] = subject;
     if (content) {
-      await writeFile(join(snapshotDir, `${type}.html`), content, "utf8");
+      await writeFile(join(snapshotDir, `${type}.html`), content, "utf8"); // lgtm[js/http-to-file-access]
       contentCount++;
     }
   }
-  await writeFile(join(snapshotDir, "subjects.json"), `${JSON.stringify(subjects, null, 2)}\n`, "utf8");
+  await writeFile(join(snapshotDir, "subjects.json"), `${JSON.stringify(subjects, null, 2)}\n`, "utf8"); // lgtm[js/http-to-file-access]
 
   console.log(`Snapshotted hosted templates from project ${PROJECT_REF}:`);
   console.log(`  ${snapshotDir}`);
@@ -139,13 +145,18 @@ if (dryRun) {
   process.exit(0);
 }
 
+// CodeQL flags the body below as "file data → outbound network"
+// (js/file-access-to-http). The file data is committed, code-reviewed
+// template HTML; the destination is authenticated api.supabase.com.
+// Sending repo templates to the hosted project is the literal purpose
+// of the push.
 const res = await fetch(API_URL, {
   method: "PATCH",
   headers: {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
   },
-  body: JSON.stringify(payload),
+  body: JSON.stringify(payload), // lgtm[js/file-access-to-http]
 });
 
 if (!res.ok) {
