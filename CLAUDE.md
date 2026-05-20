@@ -69,8 +69,12 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - `docs/strategy-security.md` — security headers and rationale for each directive
 - `docs/strategy-ui.md` — theme tokens, the `/colors` dev page, Button variants, buttons vs anchors
 - `docs/design-welcome.md` — multi-step onboarding/welcome flow design
+- `docs/design-emails.md` — auth email template authoring and prod sync
+- `docs/design-profile-pictures.md` — avatar uploads, storage bucket, signed URLs
+- `docs/design-relations.md` — the relationship web (schema, flows, rationale)
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-supabase.md` — Supabase dashboard settings (auth URLs, API keys)
+- `docs/doc-resend.md` — Resend transactional email (sending domain, DMARC, alternatives)
 - `docs/doc-github.md` — GitHub settings and CI workflows
 - `docs/doc-sentry.md` — Sentry error tracking and performance monitoring
 - `docs/doc-axiom.md` — Axiom logging and Web Vitals

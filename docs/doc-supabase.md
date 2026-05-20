@@ -73,7 +73,41 @@ The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRed
 
 ### Auth providers
 
-- **Email (magic link):** enabled. No password-based sign-in.
+- **Email (magic link):** enabled — primary sign-in path.
+- **Email + password:** enabled — backs the password-reset flow at `/forgot-password` and the change-password form in profile edit. Sign-in via password is also possible from `/signin` for any member who has set one.
+
+### Authentication → SMTP
+
+Production routes auth emails through custom SMTP (Resend). Configure under Authentication → SMTP Settings:
+
+- **Host:** `smtp.resend.com`
+- **Port:** `587` (STARTTLS)
+- **Username:** `resend`
+- **Password:** Resend API key (from Resend dashboard → API Keys)
+- **Sender email:** `devteam@mail.intentionalsociety.org`
+- **Sender name:** `Intentional Society Web App` (see `docs/doc-resend.md` for why this differs from the newsletter sender and what it implies for in-product copy).
+
+Also raise Authentication → Rate Limits → "emails sent per hour" from the default 30/hour. We use **50/hour** — chosen to sit comfortably below Resend's free-tier 100/day cap so that a misconfiguration or runaway loop hits Supabase's per-hour cap long before exhausting Resend's daily allotment, leaving headroom to fix the issue and send legitimate mail afterward. The custom SMTP path no longer hits the built-in 2/hour cap once Custom SMTP is enabled, but Supabase still applies its own per-project rate limit.
+
+Local dev does not route through Resend — the local stack uses Inbucket (see "Local stack → Inbucket" below).
+
+See `docs/doc-resend.md` for why Resend over alternatives, the sending-domain rationale, and reply routing.
+
+### Authentication → Email templates
+
+Auth email templates (magic link, signup confirmation, password recovery) are **managed from the repo**, not the dashboard. Source files live in `supabase/templates/` with a manifest at `supabase/templates/templates.manifest.mjs`. The local stack picks them up via `[auth.email.template.*]` blocks in `supabase/config.toml`. To update prod, edit the files and run `npm run update_email_templates` — the script PATCHes the Supabase Management API and overwrites whatever's in the dashboard. Dashboard edits will be silently clobbered on the next push; the repo wins. `npm run download_email_templates` snapshots the current hosted state to the committed `supabase/templates/_remote-snapshot/` directory — run it before each push so the snapshot stays current and the PR diff shows exactly what's changing for recipients.
+
+Design and rationale: `docs/design-emails.md`.
+
+### Personal access token (Management API)
+
+`scripts/update-email-templates.mjs` (and any future operator scripts that hit the Supabase Management API) authenticate with a **personal access token**, account-scoped — not project-scoped, not a Vercel env var.
+
+- **Generate at:** https://supabase.com/dashboard/account/tokens. Any descriptive name is fine; we use one named for the script that consumes it.
+- **Purpose:** lets the operator push email templates from the repo to the hosted project's auth config via `PATCH /v1/projects/{ref}/config/auth`, and download the current state for snapshotting. No app code path uses it.
+- **Storage:** read from `.env.prod` (gitignored via `.env.*`) as `SUPABASE_ACCESS_TOKEN`, matching the prod-targeting convention used by `scripts/import-members-csv.ts` and `scripts/normalize-referrals.ts`. Treat the file as temporary — create it with the token, run the script, delete the file. Never commit, never set in Vercel, never put in CI.
+- **Blast radius if leaked:** broad — a personal access token can do anything the issuing account can do across every Supabase project that account belongs to, including reading API keys, mutating auth config, and managing databases. Revoke at the same URL and regenerate if exposed.
+- **Rotation:** revoke + regenerate at the dashboard. No app-side coordination needed; the next script run reads the new value from `.env.prod`.
 
 ### API keys
 

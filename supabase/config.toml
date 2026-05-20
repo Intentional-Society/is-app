@@ -248,16 +248,26 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Auth email templates. The HTML files in supabase/templates/ are the
+# repo source of truth — local stack picks them up here, and
+# scripts/update-email-templates.mjs pushes the same files to the
+# hosted project via the Supabase Management API. Subjects must match
+# supabase/templates/templates.manifest.mjs. Restart the local stack
+# (`npm run dev:db:stop && npm run dev`) after editing.
+[auth.email.template.magic_link]
+subject = "Sign in to the IS Web App"
+content_path = "./supabase/templates/magic-link.html"
 
-# Uncomment to customize notification email template
+[auth.email.template.recovery]
+subject = "Reset your IS Web App password"
+content_path = "./supabase/templates/recovery.html"
+
+# Uncomment to enable a "your password was changed" notification email
+# (security hygiene — deferred, see docs/design-emails.md → Future work).
 # [auth.email.notification.password_changed]
 # enabled = true
 # subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+# content_path = "./supabase/templates/password-changed-notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
