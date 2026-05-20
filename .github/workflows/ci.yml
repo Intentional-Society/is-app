@@ -45,7 +45,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - uses: supabase/setup-cli@v2
+      - uses: supabase/setup-cli@v2.0.1
         if: steps.filter.outputs.code == 'true'
         with:
           version: latest
