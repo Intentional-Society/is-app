@@ -4,17 +4,6 @@ Covers transactional email (auth confirmations, password resets, invite-flow mag
 
 ---
 
-## Current state
-
-Supabase auth emails are sent via Supabase's built-in SMTP. Supabase explicitly labels this service for testing only:
-
-- 2 emails/hour rate limit on the default service
-- No SLA on delivery or uptime
-- Sender domain not aligned to `intentionalsociety.org`, so SPF/DKIM/DMARC do nothing for us
-- Risk at launch: a small burst of signups (or password resets after a comms blast) can hit the rate limit and break onboarding
-
----
-
 ## Provider: Resend
 
 Transactional email runs through Resend as a standalone account (not the Vercel Marketplace integration — separation of vendors over auto-provisioning convenience).
@@ -73,20 +62,9 @@ Ratcheting to `p=quarantine` is a future move after a few weeks of clean reports
 
 ---
 
-## Supabase Auth → Custom SMTP
+## Wiring into Supabase Auth
 
-Once the Resend domain is verified, configure Supabase Auth → SMTP Settings (production project) with the credentials Resend provides:
-
-- **Host:** `smtp.resend.com`
-- **Port:** `587` (STARTTLS)
-- **Username:** `resend`
-- **Password:** Resend API key (from Resend dashboard → API Keys)
-- **Sender email:** `devteam@mail.intentionalsociety.org`
-- **Sender name:** `Intentional Society Web App` — chosen to differentiate from Buttondown's "Intentional Society" newsletter sender, so recipients can triage app-triggered mail at a glance
-
-Also raise the Supabase Auth rate limit (Auth → Rate Limits → "emails sent per hour") from the default 30/hour. We use **50/hour** — chosen to sit comfortably below Resend's free-tier 100/day cap so that a misconfiguration or runaway loop hits Supabase's per-hour cap long before exhausting Resend's daily allotment, leaving headroom to fix the issue and send legitimate mail afterward. The custom SMTP path no longer hits the 2/hour built-in cap once Custom SMTP is enabled, but Supabase still applies its own per-project rate limit.
-
-Local dev does **not** route through Resend. The local Supabase stack continues to use Inbucket (`http://localhost:54324`) for outbound mail capture — `supabase/config.toml` is unchanged.
+The SMTP credentials, sender values, and rate-limit setting are entered into the Supabase dashboard — see `docs/doc-supabase.md` → "Authentication → SMTP". Local dev does not route through Resend; the local stack uses Inbucket.
 
 ---
 

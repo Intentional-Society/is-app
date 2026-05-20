@@ -73,7 +73,25 @@ The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRed
 
 ### Auth providers
 
-- **Email (magic link):** enabled. No password-based sign-in.
+- **Email (magic link):** enabled — primary sign-in path.
+- **Email + password:** enabled — backs the password-reset flow at `/forgot-password` and the change-password form in profile edit. Sign-in via password is also possible from `/signin` for any member who has set one.
+
+### Authentication → SMTP
+
+Production routes auth emails through custom SMTP (Resend). Configure under Authentication → SMTP Settings:
+
+- **Host:** `smtp.resend.com`
+- **Port:** `587` (STARTTLS)
+- **Username:** `resend`
+- **Password:** Resend API key (from Resend dashboard → API Keys)
+- **Sender email:** `devteam@mail.intentionalsociety.org`
+- **Sender name:** `Intentional Society Web App` — chosen to differentiate from Buttondown's "Intentional Society" newsletter sender, so recipients can triage app-triggered mail at a glance.
+
+Also raise Authentication → Rate Limits → "emails sent per hour" from the default 30/hour. We use **50/hour** — chosen to sit comfortably below Resend's free-tier 100/day cap so that a misconfiguration or runaway loop hits Supabase's per-hour cap long before exhausting Resend's daily allotment, leaving headroom to fix the issue and send legitimate mail afterward. The custom SMTP path no longer hits the built-in 2/hour cap once Custom SMTP is enabled, but Supabase still applies its own per-project rate limit.
+
+Local dev does not route through Resend — the local stack uses Inbucket (see "Local stack → Inbucket" below).
+
+See `docs/doc-resend.md` for why Resend over alternatives, the sending-domain rationale, and reply routing.
 
 ### API keys
 
