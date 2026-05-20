@@ -10,6 +10,19 @@ Settings made in the GitHub dashboard that are not captured in code.
 - **Repo:** is-app (public)
 - **Default branch:** main
 
+## Pull request settings
+
+Settings → General → Pull Requests. Enforces the merge-commit default from `docs/strategy-branching.md` at the platform level.
+
+- ✓ **Allow merge commits** — the "Create a merge commit" button. Default merge method; preserves the branch boundary in main's history.
+- ☐ **Allow squash merging** — off. Removes the per-PR escape hatch so the merge UI can't collapse a PR's commits.
+- ☐ **Allow rebase merging** — off. "Rebase and merge" replays branch commits onto main without a merge commit, losing the branch boundary; disabling it prevents the wrong method being clicked.
+- ✓ **Always suggest updating pull request branches** — surfaces an "Update branch" prompt when `main` advances. The prompt's default action merges `main` into the branch, which the strategy avoids; treat it as a reminder to rebase locally rather than as an instruction to click.
+- ☐ **Allow auto-merge** — off. "Auto-merge" only waits for *required* status checks; e2e isn't required (it runs post-deploy and can flake on cold start), so enabling auto-merge would let a PR land before e2e finished. Re-enable once e2e is reliable enough to be a required check.
+- **Default merge commit title:** PR title. **Default merge commit message:** PR description. Otherwise the merge commit reads "Merge pull request #N from …" and loses the context the PR body already carries.
+
+`deleteBranchOnMerge` stays off at the repo level; the per-PR `--delete-branch` flag on `gh pr merge` handles cleanup explicitly. Apply or audit these via `gh api repos/Intentional-Society/is-app -X PATCH` (fields: `allow_merge_commit`, `allow_squash_merge`, `allow_rebase_merge`, `allow_update_branch`, `allow_auto_merge`, `merge_commit_title`, `merge_commit_message`).
+
 ## Branch protection on `main`
 
 Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-protection.mjs`. Edit the rules there and run `npm run update_main_branch_protection` to push the changes to GitHub. Current rules:
