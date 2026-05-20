@@ -45,3 +45,8 @@ test-results/
 scripts/*.csv
 scripts/.import-cache/
 scripts/.import-logs/
+
+# operator-local snapshots of hosted email templates (download mode of
+# scripts/update-email-templates.mjs) — useful as a pre-push safety net
+# but not part of the repo source of truth
+supabase/templates/_backup/

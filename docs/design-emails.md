@@ -119,19 +119,30 @@ Shape and conventions mirror `scripts/update-main-branch-protection.mjs`:
 - Idempotent — re-running with no changes is a no-op from the user's
   perspective (the API accepts identical payloads happily).
 - `--dry-run` prints the payload without sending.
+- `--download` snapshots the current hosted templates (all six GoTrue
+  template types, not just the two we manage) to
+  `supabase/templates/_backup/<timestamp>/` as `<type>.html` files plus
+  a `subjects.json`. Useful as a pre-push safety net and as the
+  foundation for future drift detection. The `_backup/` directory is
+  `.gitignore`d — backups are operator-local artifacts.
 - Reads `SUPABASE_ACCESS_TOKEN` from the environment; refuses to run if
-  unset. The token is an ops-time secret, not a runtime env var — it is
-  **not** set in Vercel, only on the operator's machine (like the `gh`
-  token used by the branch-protection script).
+  unset (except `--dry-run`, which needs no token). The token is an
+  ops-time secret, not a runtime env var — it is **not** set in Vercel,
+  only on the operator's machine (like the `gh` token used by the
+  branch-protection script).
 - Project ref is the constant `oyuzjowguujwhqyhijzx` (already in
   `doc-supabase.md`).
 
-Running it is a manual step after editing a template:
+Recommended workflow:
 
 ```
-node scripts/update-email-templates.mjs --dry-run
-node scripts/update-email-templates.mjs
+npm run download_email_templates                 # snapshot current remote first
+npm run update_email_templates -- --dry-run      # preview the payload
+npm run update_email_templates                   # PATCH the hosted project
 ```
+
+The download step is strictly optional once you trust the workflow, but
+makes the first run safe and gives you a known-good rollback target.
 
 CI integration (auto-push on changes to `supabase/templates/**`) is
 plausible but deferred — the manual model matches every other ops script
@@ -149,8 +160,9 @@ The Management API `PATCH` is surgical: only the `mailer_*` fields move.
 
 ### Drift detection
 
-A `--check` mode (later, not in the first cut) would `GET` the same
-endpoint and diff remote subjects/content against the repo. Until then,
+`--download` is the building block: it pulls the current hosted state
+into a backup directory, which can be diffed against the repo manually.
+A future `--check` mode would do that diff automatically. Until then,
 the manifest's stated subjects are the contract — if someone edits a
 template in the Supabase dashboard, the next `update-email-templates.mjs`
 run silently overwrites it. That's the intended behaviour: repo wins.
