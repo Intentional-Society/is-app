@@ -62,17 +62,21 @@ const ruleset = {
         required_review_thread_resolution: false,
       },
     },
-    // Require CI to pass before merge. E2E intentionally not listed:
-    // it runs against the Vercel preview, which can flake on cold
-    // start. Treat as advisory and check manually before merging.
     {
       type: "required_status_checks",
       parameters: {
-        // strict=true would force every PR to be rebased on main
-        // before merging — too much churn for a small project. CI
-        // re-runs on every push so we'll catch breakage on main fast
-        // anyway.
-        strict_required_status_checks_policy: false,
+        // strict=true requires the PR branch to be up to date with
+        // main before the merge button works, and triggers a CI
+        // re-run on the rebased SHA. Pairs with the rebase-when-main-
+        // moves convention in docs/strategy-branching.md so every
+        // merge to main is verified by CI against the exact state
+        // about to land, not a stale green from before main advanced.
+        strict_required_status_checks_policy: true,
+        // Require CI to pass before merge. E2E intentionally not listed:
+        // it triggers on `deployment_status`, which docs-only PRs skip
+        // (Vercel's ignoreCommand suppresses the deploy), so making it
+        // required would block every docs PR forever. Re-add once
+        // `e2e.yml` short-circuits docs-only PRs like `ci.yml` does.
         required_status_checks: [{ context: "Lint & Functional Tests" }],
       },
     },

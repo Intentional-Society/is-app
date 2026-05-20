@@ -28,7 +28,8 @@ Settings → General → Pull Requests. Enforces the merge-commit default from `
 Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-protection.mjs`. Edit the rules there and run `npm run update_main_branch_protection` to push the changes to GitHub. Current rules:
 
 - **PR required** for every change — even solo pushes, so the `pull_request` workflow trigger gates every merge into main.
-- **Required status check:** "Lint & Functional Tests" (E2E is not required — it runs post-deploy against the Vercel preview and can flake on cold start; check manually before merging).
+- **Required status check:** "Lint & Functional Tests". E2E is not required: it triggers on `deployment_status`, which docs-only PRs skip (Vercel's `ignoreCommand` suppresses the deploy), so making it required would block every docs PR forever. Check manually before merging until `e2e.yml` is reworked to short-circuit docs-only PRs the way `ci.yml` does.
+- **Branches must be up to date with `main`** before merging (`strict_required_status_checks_policy: true`). Forces the rebase-when-main-moves convention from `docs/strategy-branching.md` — the merge button stays disabled until the branch is rebased and CI passes on the rebased SHA. The rule enforces *up-to-date*, not *via-rebase*; clicking GitHub's "Update branch" button instead would merge `main` in, which the strategy avoids.
 - **Force-push blocked** and **deletion blocked**.
 - **Zero required approvals globally** — keeps solo work on app code unblocked.
 - **Code-owner review required** on paths listed in `.github/CODEOWNERS` (currently `.github/workflows/` and `.github/CODEOWNERS` itself). A CI-secret-touching workflow change can't land without a second codeowner's approval.
