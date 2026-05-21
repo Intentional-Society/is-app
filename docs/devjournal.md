@@ -6,7 +6,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-05-20 | James | Hidden accounts
 
-Admins can hide a profile from the `/admin` page; hidden profiles disappear from the directory, member profile pages, the suggestion feed, the personal web, and the invite-hint typeahead for non-admins. Admins still see them everywhere so the toggle stays reversible. New `profiles.hidden` column; new `PATCH /api/admin/profiles/:id` and `GET /api/admin/profiles/hidden`. #168.
+Admins can hide profiles from the `/admin` page; hidden profiles disappear from the directory, web, and suggestions for non-admins. #168.
 
 ## 2026-05-19 | James | Multi-step welcome flow
 
