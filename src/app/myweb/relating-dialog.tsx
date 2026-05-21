@@ -9,7 +9,7 @@ import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
 import { RELATION_VALUE_LABELS, RELATION_VALUES, type RelationValue } from "@/lib/relation-value";
 
-import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
+import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY, relationValueQueryKey } from "./query-keys";
 
 export type RelatingTarget = {
   id: string;
@@ -57,12 +57,15 @@ export function RelatingDialog({ target, onClose }: Props) {
         queryClient.setQueryData(RELATION_CANDIDATES_QUERY_KEY, ctx.previous);
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _err, { relateeId }) => {
       // Re-sync candidates and subgraph so any newly-revealed cards
       // (e.g. inviter's connections opened up by this rating) appear
       // and the graph picks up the new edge once it exists.
       queryClient.invalidateQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: RELATION_SUBGRAPH_QUERY_KEY });
+      // Refresh any per-member value reads (e.g. the member-profile control)
+      // so the displayed strength reflects the edit.
+      queryClient.invalidateQueries({ queryKey: relationValueQueryKey(relateeId) });
     },
   });
 

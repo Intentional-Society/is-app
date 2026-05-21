@@ -15,6 +15,7 @@ import { createInvite } from "@/server/invites";
 import {
   getPersonalWeb,
   getRelationSuggestions,
+  getRelationValue,
   materializeInviteRelations,
   updateRelationValue,
 } from "@/server/relations";
@@ -133,6 +134,42 @@ describe("updateRelationValue", () => {
   it("rejects rating a non-existent ratee", async () => {
     const r = await updateRelationValue({ relatorId, relateeId: randomUUID(), value: 3 });
     expect(r).toEqual({ error: "relatee_not_found" });
+  });
+});
+
+describe("getRelationValue", () => {
+  let relatorId: string;
+  let relateeId: string;
+
+  beforeEach(async () => {
+    relatorId = randomUUID();
+    relateeId = randomUUID();
+    await insertUserAndProfile(relatorId);
+    await insertUserAndProfile(relateeId);
+  });
+
+  afterEach(async () => {
+    await deleteUserAndProfile(relatorId);
+    await deleteUserAndProfile(relateeId);
+  });
+
+  it("returns the value of a confirmed relation", async () => {
+    await updateRelationValue({ relatorId, relateeId, value: 3 });
+    expect(await getRelationValue({ relatorId, relateeId })).toBe(3);
+  });
+
+  it("returns null when no relation exists", async () => {
+    expect(await getRelationValue({ relatorId, relateeId })).toBeNull();
+  });
+
+  it("is directional — does not read the reverse edge", async () => {
+    await updateRelationValue({ relatorId: relateeId, relateeId: relatorId, value: 4 });
+    expect(await getRelationValue({ relatorId, relateeId })).toBeNull();
+  });
+
+  it("ignores hint rows (value-less, isHint=true)", async () => {
+    await db.insert(relations).values({ relatorId, relateeId, value: null, isHint: true, hintedBy: relateeId });
+    expect(await getRelationValue({ relatorId, relateeId })).toBeNull();
   });
 });
 
@@ -647,6 +684,44 @@ describe("materializeInviteRelations", () => {
 
     const rels = await db.select().from(relations).where(eq(relations.relateeId, redeemer));
     expect(rels).toEqual([]);
+  });
+});
+
+describe("GET /api/relations/value/:relateeId", () => {
+  let me: string;
+  let other: string;
+
+  beforeEach(async () => {
+    me = randomUUID();
+    other = randomUUID();
+    await insertUserAndProfile(me);
+    await insertUserAndProfile(other);
+    authAs(me);
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await deleteUserAndProfile(me);
+    await deleteUserAndProfile(other);
+  });
+
+  const get = (relateeId: string) => app.request(`/api/relations/value/${relateeId}`);
+
+  it("returns the value of an existing relation", async () => {
+    await updateRelationValue({ relatorId: me, relateeId: other, value: 2 });
+    const res = await get(other);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ value: 2 });
+  });
+
+  it("returns null when no relation exists", async () => {
+    const res = await get(other);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ value: null });
+  });
+
+  it("rejects a malformed UUID in the path", async () => {
+    expect((await get("not-a-uuid")).status).toBe(400);
   });
 });
 

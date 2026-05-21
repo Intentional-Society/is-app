@@ -1,6 +1,8 @@
 export const RELATION_CANDIDATES_QUERY_KEY = ["relations", "candidates"] as const;
 export const RELATION_SUBGRAPH_QUERY_KEY = ["relations", "subgraph"] as const;
 
+export const relationValueQueryKey = (relateeId: string) => ["relations", "value", relateeId] as const;
+
 export type SubgraphViewOptions = {
   includeIncoming: boolean;
   hops: 1 | 2;

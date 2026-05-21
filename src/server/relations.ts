@@ -406,6 +406,23 @@ const isForeignKeyViolation = (err: unknown): boolean => {
   return (err as { cause?: { code?: string } }).cause?.code === "23503";
 };
 
+export const getRelationValue = async (params: {
+  relatorId: string;
+  relateeId: string;
+}): Promise<RelationValue | null> => {
+  const [row] = await db
+    .select({ value: relations.value })
+    .from(relations)
+    .where(
+      and(
+        eq(relations.relatorId, params.relatorId),
+        eq(relations.relateeId, params.relateeId),
+        eq(relations.isHint, false),
+      ),
+    );
+  return isRelationValue(row?.value) ? row.value : null;
+};
+
 export type UpdateRelationValueResult = { ok: true } | { error: "self_relating" | "relatee_not_found" };
 
 export const updateRelationValue = async (params: {
