@@ -35,10 +35,17 @@ jobs:
 
     strategy:
       fail-fast: false
+      # `sarif` is the on-disk filename codeql-action/analyze writes for
+      # this language. It matches `language` for single-token languages
+      # (e.g. `actions`), but `javascript-typescript` is normalized down
+      # to `javascript.sarif` — so the two have to be tracked separately
+      # for the dismiss-alerts step below to find the file.
       matrix:
-        language:
-          - actions
-          - javascript-typescript
+        include:
+          - language: actions
+            sarif: actions.sarif
+          - language: javascript-typescript
+            sarif: javascript.sarif
 
     steps:
       - uses: actions/checkout@v6
@@ -77,6 +84,6 @@ jobs:
         uses: advanced-security/dismiss-alerts@046d6b48d2e43cf563f96f67332c47c432eff83e
         with:
           sarif-id: ${{ steps.analyze.outputs.sarif-id }}
-          sarif-file: sarif-results/${{ matrix.language }}.sarif
+          sarif-file: sarif-results/${{ matrix.sarif }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
