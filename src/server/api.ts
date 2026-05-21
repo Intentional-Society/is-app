@@ -14,6 +14,7 @@ import {
   getProfileForMember,
   getProfileForSelf,
   getProfileForSelfWithProbe,
+  listHiddenMembers,
   listMembers,
   markAgreementsSigned,
   markProgramsReviewed,
@@ -21,6 +22,7 @@ import {
   parseEditableProfile,
   type ProfileForSelf,
   type ProfileReadProbe,
+  setProfileHidden,
   toSlug,
   upsertProfile,
 } from "./profiles";
@@ -137,7 +139,36 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
     const result = await removeParticipant(c.req.param("id"), c.req.param("profileId"));
     if ("error" in result) return c.json({ error: result.error }, 404);
     return c.json({ ok: true });
-  });
+  })
+  .get("/profiles/hidden", async (c) => {
+    const members = await listHiddenMembers();
+    return c.json({ members });
+  })
+  // hono/validator typed body — same path-param + JSON inference reason
+  // as PATCH /programs/:id above.
+  .patch(
+    "/profiles/:id",
+    validator("json", (body, c) => {
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "body must be a JSON object" }, 400);
+      }
+      const hidden = (body as Record<string, unknown>).hidden;
+      if (typeof hidden !== "boolean") {
+        return c.json({ error: "hidden must be a boolean" }, 400);
+      }
+      return { hidden };
+    }),
+    async (c) => {
+      const profileId = c.req.param("id");
+      if (!isUuid(profileId)) {
+        return c.json({ error: "profileId must be a UUID" }, 400);
+      }
+      const { hidden } = c.req.valid("json");
+      const result = await setProfileHidden({ profileId, hidden });
+      if ("error" in result) return c.json({ error: result.error }, 404);
+      return c.json({ ok: true });
+    },
+  );
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -361,12 +392,16 @@ const api = new Hono<{ Variables: ApiVariables }>()
     return c.json({ valid: false, reason: result.reason });
   })
   .get("/members", async (c) => {
-    const members = await listMembers();
+    const user = c.get("user");
+    const includeHidden = await isAdmin(user.id);
+    const members = await listMembers({ includeHidden });
     return c.json({ members });
   })
   .get("/members/:id", async (c) => {
+    const user = c.get("user");
     const memberId = c.req.param("id");
-    const profile = await getProfileForMember(memberId);
+    const includeHidden = await isAdmin(user.id);
+    const profile = await getProfileForMember(memberId, { includeHidden });
     if (!profile) return c.json({ error: "not_found" }, 404);
     return c.json({ profile });
   })
@@ -398,7 +433,8 @@ const api = new Hono<{ Variables: ApiVariables }>()
   })
   .get("/relations/candidates", async (c) => {
     const user = c.get("user");
-    const feed = await getRelationSuggestions(user.id);
+    const includeHidden = await isAdmin(user.id);
+    const feed = await getRelationSuggestions(user.id, { includeHidden });
     return c.json(feed);
   })
   .get("/relations/subgraph", async (c) => {
@@ -408,12 +444,14 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const includeOutgoing = c.req.query("out") !== "false";
     const includeIncoming = c.req.query("in") === "true";
     const hops = c.req.query("hops") === "1" ? 1 : 2;
+    const includeHidden = await isAdmin(user.id);
 
     const subgraph = await getPersonalWeb({
       centerId: user.id,
       includeIncoming,
       includeOutgoing,
       hops,
+      includeHidden,
     });
     return c.json(subgraph);
   })

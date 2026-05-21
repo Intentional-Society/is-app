@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-20 | James | Hidden accounts
+
+Admins can hide profiles from the `/admin` page; hidden profiles disappear from the directory, web, and suggestions for non-admins. #168.
+
 ## 2026-05-19 | James | Multi-step welcome flow
 
 Onboarding is now a sequence — agreements, profile, programs, then the personal web — with each step's completion recorded so the flow is resumable. Design: `docs/design-welcome.md` (#166).

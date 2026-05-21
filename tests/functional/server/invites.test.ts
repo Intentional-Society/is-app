@@ -378,6 +378,21 @@ describe("POST /api/invites", () => {
     expect(body.reason).toBe("not_a_member");
   });
 
+  it("rejects hints pointing at hidden profiles", async () => {
+    const h = randomUUID();
+    await insertUserAndProfile(h);
+    try {
+      await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, h));
+      const res = await post({ note: "hidden hint should be rejected", hints: [h] });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("invalid_hints");
+      expect(body.reason).toBe("not_a_member");
+    } finally {
+      await deleteUserAndProfile(h);
+    }
+  });
+
   it("rejects duplicate ids in the hints list", async () => {
     const h = randomUUID();
     await insertUserAndProfile(h);

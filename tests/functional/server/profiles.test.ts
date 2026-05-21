@@ -4,7 +4,15 @@ import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/server/db";
-import { getProfileForAdmin, getProfileForMember, getProfileForSelf, upsertProfile } from "@/server/profiles";
+import {
+  getProfileForAdmin,
+  getProfileForMember,
+  getProfileForSelf,
+  listHiddenMembers,
+  listMembers,
+  setProfileHidden,
+  upsertProfile,
+} from "@/server/profiles";
 import { profiles } from "@/server/schema";
 
 describe("upsertProfile", () => {
@@ -165,5 +173,63 @@ describe("getProfileForMember", () => {
 describe("getProfileForAdmin stub", () => {
   it("getProfileForAdmin throws NotImplemented", async () => {
     await expect(getProfileForAdmin()).rejects.toThrow(/NotImplemented/);
+  });
+});
+
+describe("profiles.hidden", () => {
+  let visibleId: string;
+  let hiddenId: string;
+
+  beforeEach(async () => {
+    visibleId = randomUUID();
+    hiddenId = randomUUID();
+    for (const id of [visibleId, hiddenId]) {
+      await db.execute(
+        sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${id}::uuid, false, false)`,
+      );
+    }
+    await db.insert(profiles).values({ id: visibleId, displayName: "Visible Vera" });
+    await db.insert(profiles).values({ id: hiddenId, displayName: "Hidden Henry", hidden: true });
+  });
+
+  afterEach(async () => {
+    for (const id of [visibleId, hiddenId]) {
+      await db.delete(profiles).where(eq(profiles.id, id));
+      await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
+    }
+  });
+
+  it("defaults to false on insert", async () => {
+    const [row] = await db.select({ hidden: profiles.hidden }).from(profiles).where(eq(profiles.id, visibleId));
+    expect(row.hidden).toBe(false);
+  });
+
+  it("listMembers excludes hidden by default and includes when includeHidden=true", async () => {
+    const visible = await listMembers();
+    expect(visible.find((m) => m.id === hiddenId)).toBeUndefined();
+    expect(visible.find((m) => m.id === visibleId)).toBeDefined();
+
+    const all = await listMembers({ includeHidden: true });
+    expect(all.find((m) => m.id === hiddenId)).toBeDefined();
+  });
+
+  it("getProfileForMember returns null for hidden by default; returns the row when includeHidden=true", async () => {
+    expect(await getProfileForMember(hiddenId)).toBeNull();
+    const admin = await getProfileForMember(hiddenId, { includeHidden: true });
+    expect(admin?.id).toBe(hiddenId);
+  });
+
+  it("listHiddenMembers returns only hidden profiles", async () => {
+    const rows = await listHiddenMembers();
+    expect(rows.find((m) => m.id === hiddenId)).toBeDefined();
+    expect(rows.find((m) => m.id === visibleId)).toBeUndefined();
+  });
+
+  it("setProfileHidden flips the flag both ways and 404s for unknown ids", async () => {
+    expect(await setProfileHidden({ profileId: visibleId, hidden: true })).toEqual({ ok: true });
+    expect(await getProfileForMember(visibleId)).toBeNull();
+    expect(await setProfileHidden({ profileId: visibleId, hidden: false })).toEqual({ ok: true });
+    expect(await getProfileForMember(visibleId)).not.toBeNull();
+    expect(await setProfileHidden({ profileId: randomUUID(), hidden: true })).toEqual({ error: "not_found" });
   });
 });

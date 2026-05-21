@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "hidden" boolean DEFAULT false NOT NULL;

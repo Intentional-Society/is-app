@@ -395,6 +395,103 @@ describe("getPersonalWeb", () => {
     expect(sub.nodes).toHaveLength(1);
     expect(sub.edges).toEqual([]);
   });
+
+  it("drops hidden nodes and any edge touching one (non-admin viewer)", async () => {
+    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
+    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, b));
+
+    const sub = await getPersonalWeb({
+      centerId: center,
+      includeIncoming: false,
+      includeOutgoing: true,
+      hops: 1,
+    });
+    expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a]));
+    expect(sub.edges).toHaveLength(1);
+    expect(sub.edges[0]).toMatchObject({ relatorId: center, relateeId: a });
+  });
+
+  it("includeHidden=true keeps hidden nodes and their edges (admin viewer)", async () => {
+    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
+    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, b));
+
+    const sub = await getPersonalWeb({
+      centerId: center,
+      includeIncoming: false,
+      includeOutgoing: true,
+      hops: 1,
+      includeHidden: true,
+    });
+    expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a, b]));
+    expect(sub.edges).toHaveLength(2);
+  });
+
+  it("hops=2 drops a hidden second-degree neighbor and the edge that reaches it", async () => {
+    const c = randomUUID();
+    await insertUserAndProfile(c, { displayName: "C" });
+    try {
+      await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+      await updateRelationValue({ relatorId: a, relateeId: c, value: 4 });
+      await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, c));
+
+      const sub = await getPersonalWeb({
+        centerId: center,
+        includeIncoming: false,
+        includeOutgoing: true,
+        hops: 2,
+      });
+      expect(sub.nodes.map((n) => n.id).includes(c)).toBe(false);
+      expect(sub.edges.some((e) => e.relateeId === c)).toBe(false);
+    } finally {
+      await deleteUserAndProfile(c);
+    }
+  });
+});
+
+describe("getRelationSuggestions — hidden filter", () => {
+  let me: string;
+  let visibleOther: string;
+  let hiddenOther: string;
+
+  beforeEach(async () => {
+    me = randomUUID();
+    visibleOther = randomUUID();
+    hiddenOther = randomUUID();
+    await insertUserAndProfile(me, { displayName: "Me" });
+    await insertUserAndProfile(visibleOther, { displayName: "Visible" });
+    await insertUserAndProfile(hiddenOther, { displayName: "Hidden" });
+    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, hiddenOther));
+  });
+
+  afterEach(async () => {
+    await deleteUserAndProfile(me);
+    await deleteUserAndProfile(visibleOther);
+    await deleteUserAndProfile(hiddenOther);
+  });
+
+  it("source 1 — addedYou skips hidden raters", async () => {
+    await updateRelationValue({ relatorId: visibleOther, relateeId: me, value: 3 });
+    await updateRelationValue({ relatorId: hiddenOther, relateeId: me, value: 4 });
+    const feed = await getRelationSuggestions(me);
+    const allIds = [...feed.suggestions, ...feed.otherMembers].map((c) => c.id);
+    expect(allIds).toContain(visibleOther);
+    expect(allIds).not.toContain(hiddenOther);
+  });
+
+  it("source 5 — everyoneElse skips hidden profiles", async () => {
+    const feed = await getRelationSuggestions(me);
+    const allIds = [...feed.suggestions, ...feed.otherMembers].map((c) => c.id);
+    expect(allIds).toContain(visibleOther);
+    expect(allIds).not.toContain(hiddenOther);
+  });
+
+  it("includeHidden=true keeps hidden profiles in the feed", async () => {
+    const feed = await getRelationSuggestions(me, { includeHidden: true });
+    const allIds = [...feed.suggestions, ...feed.otherMembers].map((c) => c.id);
+    expect(allIds).toContain(hiddenOther);
+  });
 });
 
 describe("materializeInviteRelations", () => {

@@ -50,6 +50,13 @@
       "when": 1779223860997,
       "tag": "0006_add_welcome_markers",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779343350896,
+      "tag": "0007_add_profile_hidden",
+      "breakpoints": true
     }
   ]
 }

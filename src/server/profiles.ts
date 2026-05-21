@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import { asc, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -254,10 +254,16 @@ export type ProfileForMember = {
 // Accepts either a UUID or a slug so /members/aria-chen and
 // /members/<uuid> both work. UUID-shaped strings go straight to the id
 // column; anything else is treated as a slug lookup.
-export const getProfileForMember = async (idOrSlug: string): Promise<ProfileForMember | null> => {
-  const where = isUuid(idOrSlug)
+// includeHidden=true bypasses the profiles.hidden filter so admins can
+// view hidden test accounts; the API handler decides which to pass.
+export const getProfileForMember = async (
+  idOrSlug: string,
+  options: { includeHidden?: boolean } = {},
+): Promise<ProfileForMember | null> => {
+  const match = isUuid(idOrSlug)
     ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
     : eq(profiles.slug, idOrSlug);
+  const where = options.includeHidden ? match : and(match, eq(profiles.hidden, false));
 
   const [row] = await db
     .select({
@@ -289,7 +295,11 @@ export type MemberSummary = {
   avatarUrl: string | null;
 };
 
-export const listMembers = async (): Promise<MemberSummary[]> => {
+// includeHidden=true returns hidden profiles too — admins only.
+export const listMembers = async (options: { includeHidden?: boolean } = {}): Promise<MemberSummary[]> => {
+  const where = options.includeHidden
+    ? isNotNull(profiles.displayName)
+    : and(isNotNull(profiles.displayName), eq(profiles.hidden, false));
   const rows = await db
     .select({
       id: profiles.id,
@@ -300,9 +310,45 @@ export const listMembers = async (): Promise<MemberSummary[]> => {
       avatarPath: profiles.avatarPath,
     })
     .from(profiles)
-    .where(isNotNull(profiles.displayName))
+    .where(where)
     .orderBy(asc(profiles.displayName));
   return (await attachAvatarUrls(rows)) as MemberSummary[];
+};
+
+export type HiddenMemberSummary = MemberSummary;
+
+// Hidden-only directory for the admin page. Includes profiles with
+// null displayName too, since a profile can be hidden before its owner
+// finishes onboarding.
+export const listHiddenMembers = async (): Promise<HiddenMemberSummary[]> => {
+  const rows = await db
+    .select({
+      id: profiles.id,
+      slug: profiles.slug,
+      displayName: profiles.displayName,
+      location: profiles.location,
+      keywords: profiles.keywords,
+      avatarPath: profiles.avatarPath,
+    })
+    .from(profiles)
+    .where(eq(profiles.hidden, true))
+    .orderBy(asc(profiles.displayName));
+  return (await attachAvatarUrls(rows)) as HiddenMemberSummary[];
+};
+
+export type SetProfileHiddenResult = { ok: true } | { error: "not_found" };
+
+export const setProfileHidden = async (params: {
+  profileId: string;
+  hidden: boolean;
+}): Promise<SetProfileHiddenResult> => {
+  const result = await db
+    .update(profiles)
+    .set({ hidden: params.hidden })
+    .where(eq(profiles.id, params.profileId))
+    .returning({ id: profiles.id });
+  if (result.length === 0) return { error: "not_found" };
+  return { ok: true };
 };
 
 // Placeholder. Same rationale as getProfileForMember — admin tooling

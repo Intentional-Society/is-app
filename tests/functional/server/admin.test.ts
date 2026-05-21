@@ -159,3 +159,117 @@ describe("GET /api/admin/hints", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("PATCH /api/admin/profiles/:id", () => {
+  let admin: string;
+  let nonAdmin: string;
+  let target: string;
+
+  beforeEach(async () => {
+    admin = randomUUID();
+    nonAdmin = randomUUID();
+    target = randomUUID();
+    await insertUserAndProfile(admin, { isAdmin: true });
+    await insertUserAndProfile(nonAdmin);
+    await insertUserAndProfile(target);
+    await db.update(profiles).set({ displayName: "Target" }).where(eq(profiles.id, target));
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await deleteUserAndProfile(admin);
+    await deleteUserAndProfile(nonAdmin);
+    await deleteUserAndProfile(target);
+  });
+
+  it("hides and unhides a profile when called by an admin", async () => {
+    authAs(admin);
+    const hide = await app.request(`/api/admin/profiles/${target}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: true }),
+    });
+    expect(hide.status).toBe(200);
+    const [hidden] = await db.select({ hidden: profiles.hidden }).from(profiles).where(eq(profiles.id, target));
+    expect(hidden.hidden).toBe(true);
+
+    const unhide = await app.request(`/api/admin/profiles/${target}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: false }),
+    });
+    expect(unhide.status).toBe(200);
+    const [unhidden] = await db.select({ hidden: profiles.hidden }).from(profiles).where(eq(profiles.id, target));
+    expect(unhidden.hidden).toBe(false);
+  });
+
+  it("returns 400 when body is not { hidden: boolean }", async () => {
+    authAs(admin);
+    const res = await app.request(`/api/admin/profiles/${target}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: "true" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 for non-admins", async () => {
+    authAs(nonAdmin);
+    const res = await app.request(`/api/admin/profiles/${target}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: true }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 for a non-existent profile id", async () => {
+    authAs(admin);
+    const res = await app.request(`/api/admin/profiles/${randomUUID()}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: true }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/admin/profiles/hidden", () => {
+  let admin: string;
+  let nonAdmin: string;
+  let hidden: string;
+
+  beforeEach(async () => {
+    admin = randomUUID();
+    nonAdmin = randomUUID();
+    hidden = randomUUID();
+    await insertUserAndProfile(admin, { isAdmin: true });
+    await insertUserAndProfile(nonAdmin);
+    await insertUserAndProfile(hidden);
+    await db
+      .update(profiles)
+      .set({ displayName: "Hidden Test", hidden: true })
+      .where(eq(profiles.id, hidden));
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await deleteUserAndProfile(admin);
+    await deleteUserAndProfile(nonAdmin);
+    await deleteUserAndProfile(hidden);
+  });
+
+  it("returns the hidden profile for admins", async () => {
+    authAs(admin);
+    const res = await app.request("/api/admin/profiles/hidden");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { members: Array<{ id: string }> };
+    expect(body.members.find((m) => m.id === hidden)).toBeDefined();
+  });
+
+  it("returns 404 for non-admins", async () => {
+    authAs(nonAdmin);
+    const res = await app.request("/api/admin/profiles/hidden");
+    expect(res.status).toBe(404);
+  });
+});

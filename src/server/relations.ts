@@ -103,7 +103,13 @@ const collectInto = <T extends { id: string }>(
 // IDs via `seen`. Sources 1–4 land in `suggestions` (signal-bearing);
 // source 5 lands in `otherMembers` (catch-all of the rest of the
 // directory) so the feed never goes empty while a member remains.
-export const getRelationSuggestions = async (userId: string): Promise<RelationSuggestionFeed> => {
+// includeHidden=true skips profiles.hidden filtering across all five
+// sources so admins still see hidden test accounts in suggestions.
+export const getRelationSuggestions = async (
+  userId: string,
+  options: { includeHidden?: boolean } = {},
+): Promise<RelationSuggestionFeed> => {
+  const notHidden = options.includeHidden ? sql`true` : sql`${profiles.hidden} = false`;
   const seen = new Set<string>([userId]);
   const suggestions: SuggestionCardRow[] = [];
   const otherMembers: SuggestionCardRow[] = [];
@@ -124,6 +130,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
           eq(relations.relateeId, userId),
           isNotNull(relations.value),
           noRelationFromUserTo(userId, relations.relatorId),
+          notHidden,
         ),
       )
       .orderBy(desc(relations.updatedAt)),
@@ -134,7 +141,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
       .select({ ...cardColumns, hintedBy: relations.hintedBy })
       .from(relations)
       .innerJoin(profiles, eq(profiles.id, relations.relateeId))
-      .where(and(eq(relations.relatorId, userId), eq(relations.isHint, true)))
+      .where(and(eq(relations.relatorId, userId), eq(relations.isHint, true), notHidden))
       .orderBy(desc(relations.updatedAt)),
     db
       .select({ referredBy: profiles.referredBy, lastUpdatedWeb: profiles.lastUpdatedWeb })
@@ -147,7 +154,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
     db
       .select(cardColumns)
       .from(profiles)
-      .where(and(ne(profiles.id, userId), noRelationFromUserTo(userId, profiles.id)))
+      .where(and(ne(profiles.id, userId), noRelationFromUserTo(userId, profiles.id), notHidden))
       .orderBy(sql`${profiles.lastUpdatedWeb} DESC NULLS LAST`, asc(profiles.displayName)),
   ]);
 
@@ -187,6 +194,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
               sql`${relations.value} >= 3`,
               ne(relations.relateeId, userId),
               noRelationFromUserTo(userId, relations.relateeId),
+              notHidden,
             ),
           )
           .orderBy(desc(relations.value), desc(relations.updatedAt))
@@ -202,6 +210,7 @@ export const getRelationSuggestions = async (userId: string): Promise<RelationSu
           ne(profiles.id, userId),
           noRelationFromUserTo(userId, profiles.id),
           myLastUpdated ? sql`${profiles.lastUpdatedWeb} > ${myLastUpdated.toISOString()}` : sql`true`,
+          notHidden,
         ),
       )
       .orderBy(desc(profiles.lastUpdatedWeb)),
@@ -264,15 +273,24 @@ const edgeKey = (e: { relatorId: string; relateeId: string }): string => `${e.re
 // feed, not the rendered web. centerId is parameterized so the same
 // component can later embed read-only on member profile pages (see
 // design-relations.md "Embedded subgraph displays").
+// includeHidden=true keeps hidden profiles in the graph — admins see
+// everything. When false, hidden profiles are excluded as nodes AND
+// edges touching them are dropped, so the rendered web never shows a
+// dangling edge to a vanished node.
 export const getPersonalWeb = async (params: {
   centerId: string;
   includeIncoming: boolean;
   includeOutgoing: boolean;
   hops: 1 | 2;
+  includeHidden?: boolean;
 }): Promise<Subgraph> => {
   const { centerId, includeIncoming, includeOutgoing, hops } = params;
+  const includeHidden = params.includeHidden ?? false;
 
-  // First hop — direct relations involving centerId.
+  // First hop — direct relations involving centerId. If the viewer is
+  // not an admin, the join to profiles on both endpoints is what filters
+  // an edge whose other end is hidden; we do that pruning in JS rather
+  // than two subquery joins.
   const firstHopWhere = (() => {
     if (includeIncoming && includeOutgoing) {
       return or(eq(relations.relatorId, centerId), eq(relations.relateeId, centerId));
@@ -291,18 +309,40 @@ export const getPersonalWeb = async (params: {
     .from(relations)
     .where(and(firstHopWhere, isNotNull(relations.value)));
 
+  // Determine which ids are hidden so we can drop them as nodes and as
+  // edge endpoints before rendering. Skipped entirely for admins.
+  const candidateIds = new Set<string>([centerId]);
+  for (const e of firstHop) {
+    candidateIds.add(e.relatorId);
+    candidateIds.add(e.relateeId);
+  }
+  const hiddenIds = new Set<string>();
+  if (!includeHidden && candidateIds.size > 0) {
+    const rows = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(and(inArray(profiles.id, [...candidateIds]), eq(profiles.hidden, true)));
+    for (const r of rows) hiddenIds.add(r.id);
+  }
+  // Center is exempt — the viewer's own web always includes themselves,
+  // even if they were somehow hidden.
+  const isVisible = (id: string): boolean => id === centerId || !hiddenIds.has(id);
+
   const nodeIds = new Set<string>([centerId]);
   for (const e of firstHop) {
+    if (!isVisible(e.relatorId) || !isVisible(e.relateeId)) continue;
     nodeIds.add(e.relatorId);
     nodeIds.add(e.relateeId);
   }
 
-  const edges: SubgraphEdge[] = firstHop.map((e) => ({
-    relatorId: e.relatorId,
-    relateeId: e.relateeId,
-    // value is filtered IS NOT NULL in the WHERE, so the runtime cast is safe.
-    value: e.value as number,
-  }));
+  const edges: SubgraphEdge[] = firstHop
+    .filter((e) => isVisible(e.relatorId) && isVisible(e.relateeId))
+    .map((e) => ({
+      relatorId: e.relatorId,
+      relateeId: e.relateeId,
+      // value is filtered IS NOT NULL in the WHERE, so the runtime cast is safe.
+      value: e.value as number,
+    }));
 
   // Second hop — relations among the first-hop neighbors and to other
   // members they point at. Surfaces "their relations to each other and
@@ -320,8 +360,22 @@ export const getPersonalWeb = async (params: {
         .where(
           and(isNotNull(relations.value), inArray(relations.relatorId, firstHopIds), ne(relations.relateeId, centerId)),
         );
+      // Second-hop relatees can introduce new ids; mark any hidden ones
+      // so the filter below catches them too.
+      if (!includeHidden) {
+        const newIds = secondHop.map((e) => e.relateeId).filter((id) => !candidateIds.has(id));
+        if (newIds.length > 0) {
+          const rows = await db
+            .select({ id: profiles.id })
+            .from(profiles)
+            .where(and(inArray(profiles.id, newIds), eq(profiles.hidden, true)));
+          for (const r of rows) hiddenIds.add(r.id);
+          for (const id of newIds) candidateIds.add(id);
+        }
+      }
       const seen = new Set(edges.map(edgeKey));
       for (const e of secondHop) {
+        if (!isVisible(e.relatorId) || !isVisible(e.relateeId)) continue;
         const key = edgeKey(e);
         if (seen.has(key)) continue;
         seen.add(key);
@@ -444,7 +498,7 @@ export type PendingHint = {
 // the admin /admin Web section; the self-join across profiles is done
 // in JS (two queries) for the same reason getRelationSuggestions does
 // — Drizzle profile aliasing is more code than the joined volume here
-// is worth.
+// is worth. Admin-only caller, so no hidden filter is applied.
 export const listPendingHints = async (): Promise<PendingHint[]> => {
   const rows = await db
     .select({
@@ -540,7 +594,13 @@ export const validateInviteHints = async (params: {
   }
 
   const ids = [...seen];
-  const found = await db.select({ id: profiles.id }).from(profiles).where(inArray(profiles.id, ids));
+  // Hidden accounts are treated as "not a member" for invite-hint
+  // purposes — non-admins can't pick them in the typeahead, and the
+  // backend refuses them even if a hand-crafted request slips one in.
+  const found = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(inArray(profiles.id, ids), eq(profiles.hidden, false)));
   if (found.length !== ids.length) return { error: "invalid", reason: "not_a_member" };
 
   return { ok: true, ids };
