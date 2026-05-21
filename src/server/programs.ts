@@ -107,6 +107,54 @@ const ensureProfile = async (userId: string): Promise<void> => {
   }
 };
 
+// --- Soft-delete primitives -----------------------------------------
+//
+// The four public functions (joinProgram, leaveProgram, addParticipant,
+// removeParticipant) all differ in their gates and error taxonomy, but
+// the actual mutation reduces to one of two state transitions. These
+// helpers own the mutation; the public functions own the policy.
+
+// First-insert or rejoin. Returns true if the row is newly current — an
+// INSERT (first-ever join) or an UPDATE clearing leftAt (rejoin) — and
+// false if a current row already existed (no-op). assignedAt is set on
+// the first insert and never touched on rejoin, so it survives any
+// leave/rejoin cycle as the stable first-joined date. The conditional
+// DO UPDATE setWhere is what gives us the "already a member" signal:
+// when the existing row is already current, Postgres treats the
+// conflict as DO NOTHING and the RETURNING set comes back empty.
+const setMembershipActive = async (profileId: string, programId: string): Promise<boolean> => {
+  const result = await db
+    .insert(profilePrograms)
+    .values({ profileId, programId })
+    .onConflictDoUpdate({
+      target: [profilePrograms.profileId, profilePrograms.programId],
+      set: { leftAt: null },
+      setWhere: sql`${profilePrograms.leftAt} IS NOT NULL`,
+    })
+    .returning({ profileId: profilePrograms.profileId });
+  return result.length > 0;
+};
+
+// Soft-delete the current membership. Returns true if a current row was
+// ended, false if there was nothing to end (already left, or the
+// (profile, program) pair never had a row). The leftAt IS NULL guard
+// makes this idempotent past the first call — callers can treat the
+// false return as "not_found" without a separate read.
+const setMembershipEnded = async (profileId: string, programId: string): Promise<boolean> => {
+  const result = await db
+    .update(profilePrograms)
+    .set({ leftAt: sql`now()` })
+    .where(
+      and(
+        eq(profilePrograms.profileId, profileId),
+        eq(profilePrograms.programId, programId),
+        isNull(profilePrograms.leftAt),
+      ),
+    )
+    .returning({ profileId: profilePrograms.profileId });
+  return result.length > 0;
+};
+
 export const joinProgram = async (
   userId: string,
   programId: string,
@@ -132,27 +180,7 @@ export const joinProgram = async (
   // Self-heal: ensure profile row exists before FK insert
   await ensureProfile(userId);
 
-  // Three cases on the composite-PK conflict, all handled atomically:
-  //   - No row yet → INSERT. assignedAt = now() is the stable first-
-  //     joined timestamp from this moment forward.
-  //   - Row exists with leftAt IS NOT NULL → rejoin: clear leftAt,
-  //     leave assignedAt alone so the original join date survives.
-  //   - Row exists with leftAt IS NULL → already a current member;
-  //     the WHERE on DO UPDATE blocks the no-op write, returning() is
-  //     empty, and we surface already_joined.
-  const result = await db
-    .insert(profilePrograms)
-    .values({ profileId: userId, programId })
-    .onConflictDoUpdate({
-      target: [profilePrograms.profileId, profilePrograms.programId],
-      set: { leftAt: null },
-      setWhere: sql`${profilePrograms.leftAt} IS NOT NULL`,
-    })
-    .returning({ profileId: profilePrograms.profileId });
-
-  if (result.length === 0) return { error: "already_joined" };
-
-  return { ok: true };
+  return (await setMembershipActive(userId, programId)) ? { ok: true } : { error: "already_joined" };
 };
 
 export const leaveProgram = async (
@@ -161,25 +189,7 @@ export const leaveProgram = async (
 ): Promise<{ ok: true } | { error: "not_found" }> => {
   if (!isUuid(programId)) return { error: "not_found" };
 
-  // Soft delete — flip leftAt instead of removing the row, so a future
-  // rejoin can preserve the original assignedAt. The leftAt IS NULL
-  // predicate makes the call idempotent against double-leaves: a row
-  // already marked left returns no result, surfacing as not_found.
-  const result = await db
-    .update(profilePrograms)
-    .set({ leftAt: sql`now()` })
-    .where(
-      and(
-        eq(profilePrograms.profileId, userId),
-        eq(profilePrograms.programId, programId),
-        isNull(profilePrograms.leftAt),
-      ),
-    )
-    .returning({ profileId: profilePrograms.profileId });
-
-  if (result.length === 0) return { error: "not_found" };
-
-  return { ok: true };
+  return (await setMembershipEnded(userId, programId)) ? { ok: true } : { error: "not_found" };
 };
 
 // --- Per-program detail (member-facing) ------------------------------
@@ -554,21 +564,9 @@ export const addParticipant = async (
   const [profile] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, profileId));
   if (!profile) return { error: "profile_not_found" };
 
-  // Same three-case upsert as joinProgram: insert / rejoin / already-
-  // a-member. The admin path ignores signupsOpen — admins can add a
-  // participant even to a program with closed signups.
-  const result = await db
-    .insert(profilePrograms)
-    .values({ profileId, programId })
-    .onConflictDoUpdate({
-      target: [profilePrograms.profileId, profilePrograms.programId],
-      set: { leftAt: null },
-      setWhere: sql`${profilePrograms.leftAt} IS NOT NULL`,
-    })
-    .returning({ profileId: profilePrograms.profileId });
-
-  if (result.length === 0) return { error: "already_member" };
-  return { ok: true };
+  // The admin path ignores signupsOpen — admins can add a participant
+  // even to a program with closed signups.
+  return (await setMembershipActive(profileId, programId)) ? { ok: true } : { error: "already_member" };
 };
 
 // Deletes a program only while it has no current participants — the
@@ -613,20 +611,5 @@ export const removeParticipant = async (
 ): Promise<{ ok: true } | { error: "not_found" }> => {
   if (!isUuid(programId) || !isUuid(profileId)) return { error: "not_found" };
 
-  // Mirror leaveProgram's soft delete so admin removals also preserve
-  // the original assignedAt for any future rejoin.
-  const result = await db
-    .update(profilePrograms)
-    .set({ leftAt: sql`now()` })
-    .where(
-      and(
-        eq(profilePrograms.programId, programId),
-        eq(profilePrograms.profileId, profileId),
-        isNull(profilePrograms.leftAt),
-      ),
-    )
-    .returning({ profileId: profilePrograms.profileId });
-
-  if (result.length === 0) return { error: "not_found" };
-  return { ok: true };
+  return (await setMembershipEnded(profileId, programId)) ? { ok: true } : { error: "not_found" };
 };
