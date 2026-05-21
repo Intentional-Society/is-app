@@ -83,13 +83,16 @@ describe("invites module", () => {
   });
 
   it("enforces the 50-active-invite cap", async () => {
-    for (let i = 0; i < 50; i++) {
-      const r = await createInvite({
-        createdBy: creatorId,
-        note: `friend number ${i} coming in`,
-      });
-      expect("code" in r).toBe(true);
-    }
+    // Seed 50 active invites directly to avoid 50 round-trips through
+    // the full createInvite path (count + generate + insert each time).
+    const rows = Array.from({ length: 50 }, (_, i) => ({
+      code: `CAP-TEST-${String(i).padStart(3, "0")}`,
+      createdBy: creatorId,
+      note: `friend number ${i} coming in`,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    }));
+    await db.insert(invites).values(rows);
+
     const next = await createInvite({
       createdBy: creatorId,
       note: "one too many friends",
@@ -389,12 +392,15 @@ describe("POST /api/invites", () => {
   });
 
   it("returns 429 when the user is already at the active cap", async () => {
-    for (let i = 0; i < 50; i++) {
-      await createInvite({
-        createdBy: userId,
-        note: `existing invite number ${i}`,
-      });
-    }
+    // Seed 50 active invites directly for speed.
+    const rows = Array.from({ length: 50 }, (_, i) => ({
+      code: `API-CAP-${userId.slice(0, 4)}-${String(i).padStart(3, "0")}`,
+      createdBy: userId,
+      note: `existing invite number ${i}`,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    }));
+    await db.insert(invites).values(rows);
+
     const res = await post({ note: "one more invite should be rejected" });
     expect(res.status).toBe(429);
     const body = await res.json();
