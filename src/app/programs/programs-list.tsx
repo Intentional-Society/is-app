@@ -1,5 +1,7 @@
 "use client";
 
+import type { UrlObject } from "node:url";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +30,14 @@ function ProgramCard({
   return (
     <li className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{program.name}</h2>
+        <h2 className="text-lg font-semibold">
+          <Link
+            href={{ pathname: `/programs/${program.slug}` } satisfies UrlObject}
+            className="hover:underline focus-visible:underline"
+          >
+            {program.name}
+          </Link>
+        </h2>
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
           {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}
@@ -61,9 +70,15 @@ function ProgramCard({
           >
             {pending ? "Leaving…" : "Leave program"}
           </Button>
-        ) : (
+        ) : program.signupsOpen ? (
           <Button type="button" disabled={pending} onClick={() => onJoin(program.id)} className="w-full">
             {pending ? "Joining…" : "Join program"}
+          </Button>
+        ) : (
+          // Self-serve join is gated by signupsOpen — an admin can still
+          // add a member directly, but the button stays out of reach.
+          <Button type="button" disabled className="w-full">
+            Signups closed
           </Button>
         )}
       </div>
@@ -110,7 +125,11 @@ export function ProgramsList() {
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setActionError(
-          body.error === "already_joined" ? "You've already joined this program." : "Failed to join program.",
+          body.error === "already_joined"
+            ? "You've already joined this program."
+            : body.error === "signups_closed"
+              ? "Signups for this program are closed."
+              : "Failed to join program.",
         );
       }
       reload();

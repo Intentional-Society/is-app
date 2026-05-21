@@ -68,9 +68,22 @@ export const programs = pgTable("programs", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
+  // Archived programs are hidden from member-facing listings (admins
+  // still see them in /admin/programs). Set the timestamp instead of
+  // a boolean — it's strictly more information.
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  // Gates the member-facing self-serve join. Closed by default so a
+  // newly-created cohort or pod doesn't accidentally accept signups
+  // before the admin is ready; admin add-participant is unaffected.
+  signupsOpen: boolean("signups_open").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
+// Soft-delete table: a row's existence records "Alice was ever joined
+// to this program"; leftAt distinguishes "currently joined" (NULL) from
+// "left, history preserved" (timestamp). assignedAt is set once on
+// first insert and never updated, so it survives leave/rejoin cycles
+// as the stable first-joined date.
 export const profilePrograms = pgTable(
   "profile_programs",
   {
@@ -81,6 +94,7 @@ export const profilePrograms = pgTable(
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
     assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    leftAt: timestamp("left_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.profileId, table.programId] })],
 ).enableRLS();

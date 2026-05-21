@@ -57,6 +57,20 @@
       "when": 1779343350896,
       "tag": "0007_add_profile_hidden",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779344236894,
+      "tag": "0008_add_programs_archive_signups",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779344925149,
+      "tag": "0009_add_profile_programs_left_at",
+      "breakpoints": true
     }
   ]
 }

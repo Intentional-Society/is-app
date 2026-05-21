@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-21 | James | Polish programs (#226)
+
+Four bundled improvements: new members are auto-subscribed to the weekly web update on first sign-in; programs gain `archivedAt` (hidden from members) and `signupsOpen` (gates self-serve join, closed by default); `profile_programs` becomes soft-deleted via `leftAt` so the original `assignedAt` survives leave/rejoin as a stable first-joined date; per-program detail pages live at `/programs/[slug]`.
+
 ## 2026-05-20 | James | Hidden accounts
 
 Admins can hide profiles from the `/admin` page; hidden profiles disappear from the directory, web, and suggestions for non-admins. #168.

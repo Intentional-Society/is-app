@@ -30,6 +30,7 @@ import {
   addParticipant,
   createProgram,
   deleteProgram,
+  getProgramBySlug,
   getProgramDetail,
   joinProgram,
   leaveProgram,
@@ -410,6 +411,15 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const programsList = await listPrograms(user.id);
     return c.json({ programs: programsList });
   })
+  // Slug lives under a /by-slug/ prefix so it doesn't collide with the
+  // UUID-keyed /:id/join and /:id/leave routes above.
+  .get("/programs/by-slug/:slug", async (c) => {
+    const user = c.get("user");
+    const slug = c.req.param("slug");
+    const result = await getProgramBySlug(slug, user.id);
+    if ("error" in result) return c.json({ error: "not_found" }, 404);
+    return c.json({ program: result.program });
+  })
   .post("/programs/:id/join", async (c) => {
     const user = c.get("user");
     const programId = c.req.param("id");
@@ -417,6 +427,9 @@ const api = new Hono<{ Variables: ApiVariables }>()
     if ("error" in result) {
       if (result.error === "not_found") {
         return c.json({ error: "not_found" }, 404);
+      }
+      if (result.error === "signups_closed") {
+        return c.json({ error: "signups_closed" }, 409);
       }
       return c.json({ error: "already_joined" }, 409);
     }

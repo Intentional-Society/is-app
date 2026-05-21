@@ -1,0 +1,1 @@
+ALTER TABLE "profile_programs" ADD COLUMN "left_at" timestamp with time zone;

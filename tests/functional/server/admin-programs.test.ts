@@ -240,6 +240,84 @@ describe("Admin programs API", () => {
       const res = await patch(randomUUID(), { name: "Whatever" });
       expect(res.status).toBe(404);
     });
+
+    it("archives and unarchives via the boolean toggle, stamping archived_at", async () => {
+      const programId = await seedProgram("Archivable Program");
+      authAs(admin);
+
+      let res = await patch(programId, { archived: true });
+      expect(res.status).toBe(200);
+      let [row] = await db
+        .select({ archivedAt: programs.archivedAt })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.archivedAt).not.toBeNull();
+
+      res = await patch(programId, { archived: false });
+      expect(res.status).toBe(200);
+      [row] = await db
+        .select({ archivedAt: programs.archivedAt })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.archivedAt).toBeNull();
+    });
+
+    it("opens and closes signups via the signupsOpen boolean", async () => {
+      // New programs default to signups closed — flip open, then closed
+      // again to exercise both directions.
+      const programId = await seedProgram("Toggleable Signups Program");
+      authAs(admin);
+
+      let res = await patch(programId, { signupsOpen: true });
+      expect(res.status).toBe(200);
+      let [row] = await db
+        .select({ signupsOpen: programs.signupsOpen })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.signupsOpen).toBe(true);
+
+      res = await patch(programId, { signupsOpen: false });
+      expect(res.status).toBe(200);
+      [row] = await db
+        .select({ signupsOpen: programs.signupsOpen })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.signupsOpen).toBe(false);
+    });
+
+    it("rejects a non-boolean archived or signupsOpen with 400", async () => {
+      const programId = await seedProgram("Type Strict Program");
+      authAs(admin);
+
+      let res = await patch(programId, { archived: "yes" });
+      expect(res.status).toBe(400);
+      res = await patch(programId, { signupsOpen: 1 });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("GET /api/admin/programs (archive/signups state)", () => {
+    it("includes archived programs in the admin listing", async () => {
+      const liveId = await seedProgram("Live Program");
+      const archivedId = await seedProgram("Archived Program");
+      await db.update(programs).set({ archivedAt: sql`now()` }).where(eq(programs.id, archivedId));
+
+      authAs(admin);
+      const res = await app.request("/api/admin/programs");
+      const body = (await res.json()) as {
+        programs: Array<{ id: string; archivedAt: string | null; signupsOpen: boolean }>;
+      };
+
+      const live = body.programs.find((p) => p.id === liveId);
+      const archived = body.programs.find((p) => p.id === archivedId);
+      expect(live).toBeDefined();
+      expect(archived).toBeDefined();
+      expect(archived?.archivedAt).not.toBeNull();
+      expect(live?.archivedAt).toBeNull();
+      // New programs are seeded without specifying signups_open, so they
+      // pick up the closed-by-default policy.
+      expect(live?.signupsOpen).toBe(false);
+    });
   });
 
   describe("DELETE /api/admin/programs/:id", () => {
@@ -273,6 +351,20 @@ describe("Admin programs API", () => {
         .from(profilePrograms)
         .where(eq(profilePrograms.programId, programId));
       expect(enrolled).toHaveLength(1);
+    });
+
+    it("deletes a program whose only members have already left", async () => {
+      // Past memberships shouldn't block deletion — only currently-
+      // joined ones do. The FK cascade cleans up the history rows.
+      const programId = await seedProgram("Vacated Program");
+      await db.insert(profilePrograms).values({ profileId: member, programId, leftAt: new Date() });
+
+      authAs(admin);
+      const res = await del(programId);
+      expect(res.status).toBe(200);
+
+      const rows = await db.select().from(programs).where(eq(programs.id, programId));
+      expect(rows).toHaveLength(0);
     });
 
     it("returns 404 for a non-existent program", async () => {
@@ -345,7 +437,7 @@ describe("Admin programs API", () => {
   });
 
   describe("DELETE /api/admin/programs/:id/participants/:profileId", () => {
-    it("removes a participant", async () => {
+    it("soft-removes a participant by stamping left_at", async () => {
       const programId = await seedProgram("Removable Program");
       await db.insert(profilePrograms).values({ profileId: member, programId });
 
@@ -355,11 +447,47 @@ describe("Admin programs API", () => {
       });
       expect(res.status).toBe(200);
 
+      // The row still exists but is marked left so the original
+      // assignedAt is available for any future re-add.
       const rows = await db
         .select()
         .from(profilePrograms)
         .where(eq(profilePrograms.programId, programId));
-      expect(rows).toHaveLength(0);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].leftAt).not.toBeNull();
+    });
+
+    it("re-adding a previously-left member restores membership and preserves the original assignedAt", async () => {
+      const programId = await seedProgram("Re-Addable Program");
+      await db.insert(profilePrograms).values({ profileId: member, programId });
+
+      const [original] = await db
+        .select()
+        .from(profilePrograms)
+        .where(eq(profilePrograms.programId, programId));
+      const originalAssignedAt = original.assignedAt;
+
+      authAs(admin);
+      // Remove (soft-deletes)
+      let res = await app.request(`/api/admin/programs/${programId}/participants/${member}`, {
+        method: "DELETE",
+      });
+      expect(res.status).toBe(200);
+
+      // Re-add — the existing row's leftAt clears, assignedAt is unchanged.
+      res = await app.request(`/api/admin/programs/${programId}/participants`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profileId: member }),
+      });
+      expect(res.status).toBe(200);
+
+      const [after] = await db
+        .select()
+        .from(profilePrograms)
+        .where(eq(profilePrograms.programId, programId));
+      expect(after.leftAt).toBeNull();
+      expect(after.assignedAt.getTime()).toBe(originalAssignedAt.getTime());
     });
 
     it("returns 404 when the member is not a participant", async () => {

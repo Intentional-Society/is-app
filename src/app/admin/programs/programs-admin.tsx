@@ -142,7 +142,19 @@ export function ProgramsAdmin() {
                   className="flex items-center gap-3 rounded border border-border p-3 hover:bg-muted/50"
                 >
                   <span className="flex flex-col">
-                    <span className="text-sm font-semibold">{p.name}</span>
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      {p.name}
+                      {p.archivedAt && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Archived
+                        </span>
+                      )}
+                      {!p.archivedAt && !p.signupsOpen && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Signups closed
+                        </span>
+                      )}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {p.memberCount} {p.memberCount === 1 ? "participant" : "participants"}
                     </span>
