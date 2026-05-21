@@ -65,7 +65,13 @@ jobs:
       - name: Show migrations to be applied
         run: |
           set -e
-          git fetch --depth=1 origin main
+          # No explicit `git fetch origin main` here — actions/checkout
+          # above ran with fetch-depth: 0, which fetches every branch
+          # (including main) at full depth. A `git fetch --depth=1
+          # origin main` would mark origin/main as shallow at its tip,
+          # which then breaks `git merge-base` for any dispatched ref
+          # whose merge-base with main is more than one commit back —
+          # the failure mode that surfaced in run 26247166397.
           changed=$(git diff --name-only origin/main...HEAD -- 'drizzle/*.sql')
           if [ -z "$changed" ]; then
             echo "::error::No new .sql migrations vs main. Nothing to apply."
