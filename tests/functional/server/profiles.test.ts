@@ -153,6 +153,7 @@ describe("getProfileForMember", () => {
         "supplementaryInfo",
         "avatarUrl",
         "liveDesire",
+        "email",
         "createdAt",
       ].sort(),
     );
