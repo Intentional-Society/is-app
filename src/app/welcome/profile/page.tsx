@@ -26,6 +26,7 @@ export default async function WelcomeProfilePage() {
           supplementaryInfo: profile?.supplementaryInfo ?? "",
           emergencyContact: profile?.emergencyContact ?? "",
           liveDesire: profile?.liveDesire ?? "",
+          currentIntention: profile?.currentIntention ?? "",
         }}
       />
     </>
