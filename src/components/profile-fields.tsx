@@ -11,6 +11,7 @@ type Props = {
     keywordsText: string;
     location: string;
     liveDesire: string;
+    currentIntention: string;
     supplementaryInfo: string;
     emergencyContact: string;
   };
@@ -20,6 +21,7 @@ type Props = {
     setKeywordsText: (v: string) => void;
     setLocation: (v: string) => void;
     setLiveDesire: (v: string) => void;
+    setCurrentIntention: (v: string) => void;
     setSupplementaryInfo: (v: string) => void;
     setEmergencyContact: (v: string) => void;
   };
@@ -76,6 +78,19 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
         onChange={(e) => setters.setLiveDesire(e.target.value)}
         disabled={disabled}
         rows={3}
+      />
+
+      <Label htmlFor="currentIntention">
+        Current intention{" "}
+        <span className="text-muted-foreground">(what are you focused on right now?)</span>
+      </Label>
+      <Textarea
+        id="currentIntention"
+        value={fields.currentIntention}
+        onChange={(e) => setters.setCurrentIntention(e.target.value)}
+        disabled={disabled}
+        rows={3}
+        placeholder="e.g. Building deeper listening skills in my conversations this quarter."
       />
 
       <Label htmlFor="supplementaryInfo">Supplementary info</Label>
