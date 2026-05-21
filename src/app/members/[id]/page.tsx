@@ -64,6 +64,15 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
         <Field label="Live desire">{profile.liveDesire}</Field>
         <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
       </dl>
+
+      {profile.email && (
+        <a
+          href={`mailto:${profile.email}`}
+          className="text-base text-muted-foreground underline hover:text-foreground"
+        >
+          Send email
+        </a>
+      )}
     </main>
   );
 }

@@ -16,8 +16,9 @@ import {
 // drizzle-kit is configured with schemaFilter: ["public"] so it will
 // not attempt to create or alter this table.
 const authSchema = pgSchema("auth");
-const authUsers = authSchema.table("users", {
+export const authUsers = authSchema.table("users", {
   id: uuid("id").primaryKey(),
+  email: text("email"),
 });
 
 // All public tables have RLS enabled with no policies. Drizzle connects as the

@@ -4,7 +4,7 @@ import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
-import { profiles } from "./schema";
+import { authUsers, profiles } from "./schema";
 
 // avatarUrl is intentionally absent: the avatar is set through the
 // dedicated upload endpoint (POST /api/me/avatar), not as free-text
@@ -248,6 +248,7 @@ export type ProfileForMember = {
   supplementaryInfo: string | null;
   avatarUrl: string | null;
   liveDesire: string | null;
+  email: string | null;
   createdAt: Date;
 };
 
@@ -276,9 +277,11 @@ export const getProfileForMember = async (
       supplementaryInfo: profiles.supplementaryInfo,
       avatarPath: profiles.avatarPath,
       liveDesire: profiles.liveDesire,
+      email: authUsers.email,
       createdAt: profiles.createdAt,
     })
     .from(profiles)
+    .innerJoin(authUsers, eq(authUsers.id, profiles.id))
     .where(where);
 
   if (!row) return null;
