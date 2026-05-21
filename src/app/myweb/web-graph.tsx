@@ -76,7 +76,10 @@ const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
 function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div
+      className="flex flex-col items-center gap-1"
+      title={data.isCenter ? undefined : (data.displayName ?? undefined)}
+    >
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
       <Avatar
