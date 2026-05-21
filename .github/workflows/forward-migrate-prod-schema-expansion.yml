@@ -1,4 +1,5 @@
 name: Forward-migrate prod schema (expansion)
+run-name: "Expand prod schema for ${{ inputs.ref }}"
 
 # Manually triggered. Applies additive (expand) drizzle migrations to
 # the prod DB ahead of opening a PR, so previews can exercise new code
@@ -6,6 +7,13 @@ name: Forward-migrate prod schema (expansion)
 # the DB it queries — see docs/strategy-committing.md). Contract
 # migrations do NOT use this workflow — they ride the standard
 # merge-to-main path so they only apply once the new code is live.
+#
+# Two jobs: `prep` runs ungated and surfaces the PR link, migration
+# diff, and destructive-migration guard to the reviewer; `migrate`
+# carries the prod-db environment gate and only runs the actual
+# drizzle-kit migrate after approval. Splitting them lets the reviewer
+# see the migration SQL and refuse early on a destructive pattern,
+# rather than approving first and discovering the workflow self-rejects.
 
 on:
   workflow_dispatch:
@@ -17,12 +25,17 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read    # prep job's `gh pr list` lookup
 
 jobs:
-  migrate:
-    name: Apply expand migrations to production DB
+  prep:
+    name: Preview migrations and look up PR
     runs-on: ubuntu-latest
-    environment: prod-db    # required-reviewer gate lives here
+    outputs:
+      # Surfaced to the gated job as `environment.url`, which becomes
+      # the clickable link on the approval card. Falls back to the repo
+      # root when the dispatched ref has no open PR (e.g., direct SHA).
+      pr_url: ${{ steps.lookup.outputs.pr_url }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -31,37 +44,64 @@ jobs:
           # against main for the show-migrations + destructive-guard
           # steps below.
           fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+
+      - name: Look up PR for ref
+        id: lookup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          pr=$(gh pr list --repo "${{ github.repository }}" \
+                          --head "${{ inputs.ref }}" \
+                          --state open \
+                          --json url --jq '.[0].url' \
+                || true)
+          if [ -z "$pr" ]; then
+            pr="https://github.com/${{ github.repository }}"
+          fi
+          echo "pr_url=$pr" >> "$GITHUB_OUTPUT"
+          echo "PR: $pr"
 
       - name: Show migrations to be applied
         run: |
           set -e
           git fetch --depth=1 origin main
-          echo "## Migration files changed vs main"
-          git diff --stat origin/main...HEAD -- drizzle/ || true
           changed=$(git diff --name-only origin/main...HEAD -- 'drizzle/*.sql')
           if [ -z "$changed" ]; then
-            echo "No new .sql migrations vs main. Nothing to apply — failing fast."
+            echo "::error::No new .sql migrations vs main. Nothing to apply."
             exit 1
           fi
-          echo ""
-          echo "## Migration file contents"
-          for f in $changed; do
-            echo "----- $f -----"
-            cat "$f"
+          # Both stdout (job log) and $GITHUB_STEP_SUMMARY (visible on
+          # the run page before approval — gives the reviewer the diff
+          # to read while deciding).
+          {
+            echo "## Migrations to apply"
             echo ""
-          done
+            echo "**Dispatched ref:** \`${{ inputs.ref }}\`"
+            echo "**PR:** ${{ steps.lookup.outputs.pr_url }}"
+            echo ""
+            echo "### Changed files"
+            echo '```'
+            git diff --stat origin/main...HEAD -- drizzle/
+            echo '```'
+            echo ""
+            echo "### Migration SQL"
+            for f in $changed; do
+              echo ""
+              echo "#### \`$f\`"
+              echo '```sql'
+              cat "$f"
+              echo '```'
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Guard against destructive migrations
         run: |
           set -e
           # Expand-only workflow. Contract migrations (DROP, RENAME, type
           # changes) must ride the merge-to-main path so they only apply
-          # once the new code is live.
+          # once the new code is live. Catching this in the pre-gate job
+          # means a reviewer never approves a run that's going to refuse.
           patterns='drop column|drop table|drop constraint|rename column|rename to|alter column.*drop'
           matches=$(git diff origin/main...HEAD -- 'drizzle/*.sql' | grep -iE "^\+[^+].*($patterns)" || true)
           if [ -n "$matches" ]; then
@@ -70,6 +110,23 @@ jobs:
             echo "$matches"
             exit 1
           fi
+
+  migrate:
+    name: Apply expand migrations to production DB
+    needs: prep
+    runs-on: ubuntu-latest
+    environment:
+      name: prod-db    # required-reviewer gate lives here
+      url: ${{ needs.prep.outputs.pr_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
 
       - name: Run drizzle-kit migrate
         run: node scripts/migrate.mjs
