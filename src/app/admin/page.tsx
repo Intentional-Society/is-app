@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { requireUser, serverApiClient } from "@/lib/api-server";
 
+import { AdminHidden } from "./admin-hidden";
 import { AdminHints } from "./admin-hints";
 
 export default async function AdminPage() {
@@ -47,6 +48,11 @@ export default async function AdminPage() {
       <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">Web</h2>
         <AdminHints />
+      </section>
+
+      <section className="flex w-full max-w-xl flex-col gap-2">
+        <h2 className="text-lg font-semibold">Hidden accounts</h2>
+        <AdminHidden />
       </section>
     </main>
   );

@@ -47,6 +47,10 @@ export const profiles = pgTable("profiles", {
   emergencyContact: text("emergency_contact"),
   liveDesire: text("live_desire"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  // Hidden profiles are invisible to non-admin members everywhere —
+  // directory, suggestions, web, typeaheads. Admins still see them so
+  // the flag is reversible. See docs/devjournal.md (#168).
+  hidden: boolean("hidden").notNull().default(false),
   lastSignedAgreements: timestamp("last_signed_agreements", { withTimezone: true }),
   lastUpdatedProfile: timestamp("last_updated_profile", { withTimezone: true }),
   lastReviewedPrograms: timestamp("last_reviewed_programs", { withTimezone: true }),

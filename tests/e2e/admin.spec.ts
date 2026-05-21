@@ -45,10 +45,12 @@ test("admin can open the /admin hub without console errors", async ({ page }) =>
 
   await expect(page.getByRole("heading", { name: "Admin", level: 1 })).toBeVisible();
   await expect(page.getByRole("link", { name: "Manage programs" })).toBeVisible();
-  // AdminHints settling out of its "Loading…" state means its
-  // /api/admin/hints query resolved — any client-side error has had its
-  // chance to land in `errors`.
-  await expect(page.getByText("Loading…")).toBeHidden();
+  // All "Loading…" placeholders (AdminHints, AdminHidden) settling
+  // means every section's query has resolved — any client-side error
+  // has had its chance to land in `errors`. toHaveCount(0) avoids the
+  // strict-mode violation that `toBeHidden` would trigger when more
+  // than one section is loading at once.
+  await expect(page.getByText("Loading…")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
