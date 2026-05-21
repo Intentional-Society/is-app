@@ -11,7 +11,7 @@ import { GET } from "@/app/auth/callback/route";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
-import { invites, profiles } from "@/server/schema";
+import { invites, profilePrograms, profiles, programs } from "@/server/schema";
 
 const mockCreateClient = vi.mocked(createClient);
 
@@ -55,6 +55,27 @@ const deleteAuthUser = async (id: string) => {
   await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
 };
 
+// Same idea as programs.test.ts's helper: use the seed row if present,
+// otherwise insert one. The boolean tells the caller whether to clean
+// it up so we don't trample the seed.
+const ensureWeeklyProgram = async (): Promise<{ id: string; insertedByTest: boolean }> => {
+  const [existing] = await db
+    .select({ id: programs.id })
+    .from(programs)
+    .where(eq(programs.slug, "weekly-web-updates"));
+  if (existing) return { id: existing.id, insertedByTest: false };
+
+  const [row] = await db
+    .insert(programs)
+    .values({
+      slug: "weekly-web-updates",
+      name: "Weekly Web Updates",
+      description: "Auto-subscribe target (test-inserted).",
+    })
+    .returning({ id: programs.id });
+  return { id: row.id, insertedByTest: true };
+};
+
 describe("GET /auth/callback", () => {
   beforeEach(() => {
     mockCreateClient.mockReset();
@@ -78,9 +99,63 @@ describe("GET /auth/callback", () => {
   });
 });
 
+describe("GET /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-updates)", () => {
+  let userId: string;
+  let weeklyProgramId: string;
+  let weeklyInsertedByTest: boolean;
+
+  beforeEach(async () => {
+    mockCreateClient.mockReset();
+    userId = randomUUID();
+    await insertAuthUser(userId, `${userId}@testfake.local`);
+    const ensured = await ensureWeeklyProgram();
+    weeklyProgramId = ensured.id;
+    weeklyInsertedByTest = ensured.insertedByTest;
+  });
+
+  afterEach(async () => {
+    await db.delete(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    if (weeklyInsertedByTest) {
+      await db.delete(programs).where(eq(programs.id, weeklyProgramId));
+    }
+    await deleteAuthUser(userId);
+  });
+
+  it("auto-subscribes the new member to weekly-web-updates", async () => {
+    mockSupabase({ id: userId, email: "newbie@testfake.local" });
+
+    const res = await GET(makeRequest("/auth/callback?code=pkce"));
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://testfake.local/");
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].programId).toBe(weeklyProgramId);
+  });
+
+  it("does not re-subscribe an existing member who has opted out", async () => {
+    // Simulate a member who signed in once (so their profile exists)
+    // and then opted out of the weekly update.
+    await db.insert(profiles).values({ id: userId, displayName: "Returning" });
+
+    mockSupabase({ id: userId, email: "returning@testfake.local" });
+
+    const res = await GET(makeRequest("/auth/callback?code=pkce"));
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://testfake.local/");
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(0);
+  });
+});
+
 describe("GET /auth/callback?invite=... (invited sign-in)", () => {
   let inviterId: string;
   let newUserId: string;
+  let weeklyProgramId: string;
+  let weeklyInsertedByTest: boolean;
 
   beforeEach(async () => {
     mockCreateClient.mockReset();
@@ -89,9 +164,16 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
     await insertAuthUser(inviterId, `${inviterId}@testfake.local`);
     await db.insert(profiles).values({ id: inviterId, displayName: "Inviter" });
     await insertAuthUser(newUserId, `${newUserId}@testfake.local`);
+    const ensured = await ensureWeeklyProgram();
+    weeklyProgramId = ensured.id;
+    weeklyInsertedByTest = ensured.insertedByTest;
   });
 
   afterEach(async () => {
+    await db.delete(profilePrograms).where(eq(profilePrograms.profileId, newUserId));
+    if (weeklyInsertedByTest) {
+      await db.delete(programs).where(eq(programs.id, weeklyProgramId));
+    }
     await db.delete(invites).where(eq(invites.createdBy, inviterId));
     await deleteAuthUser(newUserId);
     await deleteAuthUser(inviterId);
@@ -155,5 +237,23 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=invite_invalid");
     expect(signOut).toHaveBeenCalledOnce();
+  });
+
+  it("auto-subscribes the newly redeemed member to weekly-web-updates", async () => {
+    const r = await createInvite({
+      createdBy: inviterId,
+      note: "invited path auto-subscribe test",
+    });
+    if ("error" in r) throw new Error("seed failed");
+    mockSupabase({ id: newUserId, email: "newbie@testfake.local" });
+
+    const res = await GET(makeRequest(`/auth/callback?code=pkce&invite=${r.code}`));
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://testfake.local/");
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, newUserId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].programId).toBe(weeklyProgramId);
   });
 });

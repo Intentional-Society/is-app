@@ -1,9 +1,45 @@
-import { and, asc, eq, ne, notExists, sql } from "drizzle-orm";
+import * as Sentry from "@sentry/nextjs";
+import { and, asc, eq, inArray, ne, notExists, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
 import { profilePrograms, profiles, programs } from "./schema";
+
+// Slugs of programs every new member is enrolled in automatically on
+// first sign-in. The welcome flow's "We added one for you" copy on
+// /welcome/programs points at this list. Mirrors the same constant in
+// scripts/import-members-csv.ts — keep them in sync.
+const AUTO_SUBSCRIBE_SLUGS = ["weekly-web-updates"] as const;
+
+// Best-effort: subscribe a freshly-created member to the auto-subscribe
+// programs. A missing slug is logged to Sentry and skipped rather than
+// failing — sign-in shouldn't break over a misconfigured program list,
+// and operators can patch the database after the fact. Idempotent via
+// onConflictDoNothing, but callers should still gate on "is this a new
+// profile" so re-subscribing won't undo a member's opt-out.
+export const autoSubscribeNewMember = async (userId: string): Promise<void> => {
+  const rows = await db
+    .select({ id: programs.id, slug: programs.slug })
+    .from(programs)
+    .where(inArray(programs.slug, AUTO_SUBSCRIBE_SLUGS as unknown as string[]));
+
+  const found = new Set(rows.map((r) => r.slug));
+  for (const slug of AUTO_SUBSCRIBE_SLUGS) {
+    if (!found.has(slug)) {
+      Sentry.captureException(
+        new Error(`autoSubscribeNewMember: program slug "${slug}" not found in database`),
+      );
+    }
+  }
+
+  if (rows.length === 0) return;
+
+  await db
+    .insert(profilePrograms)
+    .values(rows.map((r) => ({ profileId: userId, programId: r.id })))
+    .onConflictDoNothing();
+};
 
 export type ProgramWithMembership = {
   id: string;

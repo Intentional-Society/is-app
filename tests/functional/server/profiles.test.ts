@@ -51,6 +51,22 @@ describe("upsertProfile", () => {
     expect(rows[0]?.displayName).toBe("Test User");
   });
 
+  it("reports created=true on first call and created=false thereafter", async () => {
+    const user = {
+      id: testUserId,
+      user_metadata: { displayName: "Test User" },
+      app_metadata: {},
+      aud: "authenticated",
+      created_at: "2026-01-01T00:00:00Z",
+    } as User;
+
+    const first = await upsertProfile(user);
+    const second = await upsertProfile(user);
+
+    expect(first).toEqual({ created: true });
+    expect(second).toEqual({ created: false });
+  });
+
   it("stores a null displayName when user_metadata is empty", async () => {
     const user = {
       id: testUserId,

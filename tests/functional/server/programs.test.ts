@@ -7,10 +7,19 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(),
 }));
 
+// ESM module namespaces aren't configurable, so vi.spyOn on the
+// @sentry/nextjs export fails. Mocking the module up front lets the
+// missing-program test assert on calls to captureException.
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
+
+import * as Sentry from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
 import app from "@/server/api";
 import { db } from "@/server/db";
+import { autoSubscribeNewMember } from "@/server/programs";
 import { profilePrograms, profiles, programs } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
@@ -162,5 +171,92 @@ describe("Programs API", () => {
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "not_found" });
     });
+  });
+});
+
+// Look up the auto-subscribe target's id, inserting it if the local
+// schema doesn't already have it from the dev seed. Returns the program
+// id either way. The cleanup half tells the caller whether the row was
+// inserted by this helper (so the test can drop it without trampling
+// seed data).
+const ensureWeeklyProgram = async (): Promise<{ id: string; insertedByTest: boolean }> => {
+  const [existing] = await db
+    .select({ id: programs.id })
+    .from(programs)
+    .where(eq(programs.slug, "weekly-web-updates"));
+  if (existing) return { id: existing.id, insertedByTest: false };
+
+  const [row] = await db
+    .insert(programs)
+    .values({
+      slug: "weekly-web-updates",
+      name: "Weekly Web Updates",
+      description: "Auto-subscribe target (test-inserted).",
+    })
+    .returning({ id: programs.id });
+  return { id: row.id, insertedByTest: true };
+};
+
+describe("autoSubscribeNewMember", () => {
+  let userId: string;
+  let weeklyProgramId: string;
+  let weeklyInsertedByTest: boolean;
+
+  beforeEach(async () => {
+    userId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous)
+          VALUES (${userId}::uuid, ${`auto-${userId.slice(0, 8)}@testfake.local`}, false, false)`,
+    );
+    await db.insert(profiles).values({ id: userId });
+    const ensured = await ensureWeeklyProgram();
+    weeklyProgramId = ensured.id;
+    weeklyInsertedByTest = ensured.insertedByTest;
+  });
+
+  afterEach(async () => {
+    await db.delete(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    if (weeklyInsertedByTest) {
+      await db.delete(programs).where(eq(programs.id, weeklyProgramId));
+    }
+    await db.delete(profiles).where(eq(profiles.id, userId));
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${userId}::uuid`);
+  });
+
+  it("inserts a membership row for the auto-subscribe program", async () => {
+    await autoSubscribeNewMember(userId);
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].programId).toBe(weeklyProgramId);
+  });
+
+  it("is idempotent across repeated calls (no duplicate rows)", async () => {
+    await autoSubscribeNewMember(userId);
+    await autoSubscribeNewMember(userId);
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("does not throw or re-subscribe when the program is missing — captures to Sentry instead", async () => {
+    // Drop the program so the slug lookup misses. The function should
+    // log to Sentry and return without inserting anything. After the
+    // delete, the afterEach should not try to delete it again.
+    await db.delete(programs).where(eq(programs.id, weeklyProgramId));
+    weeklyInsertedByTest = false;
+
+    const captureMock = vi.mocked(Sentry.captureException);
+    captureMock.mockClear();
+
+    await expect(autoSubscribeNewMember(userId)).resolves.toBeUndefined();
+
+    expect(captureMock).toHaveBeenCalledOnce();
+    const arg = captureMock.mock.calls[0][0];
+    expect(arg).toBeInstanceOf(Error);
+    expect((arg as Error).message).toMatch(/weekly-web-updates/);
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(0);
   });
 });

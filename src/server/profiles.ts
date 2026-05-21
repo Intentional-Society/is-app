@@ -78,11 +78,22 @@ export const toSlug = (displayName: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-export const upsertProfile = async (user: User) => {
+// Returns { created: true } only when a brand-new profile row was
+// inserted. Callers (notably /auth/callback) use this to gate
+// once-per-member side effects like auto-subscribing to the weekly web
+// update — DO NOTHING returns no rows on conflict, so a non-empty
+// RETURNING means "this was a first-time sign-in".
+export const upsertProfile = async (user: User): Promise<{ created: boolean }> => {
   const displayName = (user.user_metadata?.displayName as string | undefined) ?? null;
   const slug = displayName ? toSlug(displayName) : null;
 
-  await db.insert(profiles).values({ id: user.id, displayName, slug }).onConflictDoNothing({ target: profiles.id });
+  const rows = await db
+    .insert(profiles)
+    .values({ id: user.id, displayName, slug })
+    .onConflictDoNothing({ target: profiles.id })
+    .returning({ id: profiles.id });
+
+  return { created: rows.length > 0 };
 };
 
 export type ProfileForSelf = {

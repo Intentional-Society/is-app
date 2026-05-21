@@ -1,11 +1,24 @@
+import * as Sentry from "@sentry/nextjs";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
+import { autoSubscribeNewMember } from "@/server/programs";
 import { upsertProfile } from "@/server/profiles";
 import { materializeInviteRelations } from "@/server/relations";
 import { invites, profiles } from "@/server/schema";
+
+// Best-effort wrapper around the auto-subscribe step. Failures are
+// captured to Sentry and swallowed so a hiccup here never breaks
+// sign-in — the member can join later from /programs.
+const tryAutoSubscribe = async (userId: string): Promise<void> => {
+  try {
+    await autoSubscribeNewMember(userId);
+  } catch (err) {
+    Sentry.captureException(err);
+  }
+};
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -27,10 +40,14 @@ export async function GET(request: NextRequest) {
 
   // Ordinary sign-in — Phase 1 upsert, referredBy stays null.
   if (!invite) {
+    let result: { created: boolean };
     try {
-      await upsertProfile(data.user);
+      result = await upsertProfile(data.user);
     } catch {
       return NextResponse.redirect(new URL("/signin?error=profile_error", request.url));
+    }
+    if (result.created) {
+      await tryAutoSubscribe(data.user.id);
     }
     return NextResponse.redirect(new URL("/", request.url));
   }
@@ -46,10 +63,13 @@ export async function GET(request: NextRequest) {
   const displayName = (data.user.user_metadata?.displayName as string | undefined) ?? null;
 
   const userId = data.user.id;
-  let ok = false;
+  let result: { wasNewProfile: boolean } | null = null;
   try {
-    ok = await db.transaction(async (tx) => {
-      await tx
+    result = await db.transaction(async (tx) => {
+      // `xmax = 0` distinguishes a true insert from an ON CONFLICT
+      // UPDATE so the auto-subscribe step only fires on first sign-in,
+      // not when an existing member redeems a later invite.
+      const inserted = await tx
         .insert(profiles)
         .values({ id: userId, displayName })
         .onConflictDoUpdate({
@@ -57,7 +77,10 @@ export async function GET(request: NextRequest) {
           set: {
             displayName: sql`coalesce(${profiles.displayName}, excluded.display_name)`,
           },
-        });
+        })
+        .returning({ id: profiles.id, created: sql<boolean>`xmax = 0` });
+
+      const wasNewProfile = inserted[0]?.created === true;
 
       const rows = await tx
         .update(invites)
@@ -97,7 +120,7 @@ export async function GET(request: NextRequest) {
         relationValue,
       });
 
-      return true;
+      return { wasNewProfile };
     });
   } catch (err) {
     if (err instanceof InviteInvalid) {
@@ -107,8 +130,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/signin?error=profile_error", request.url));
   }
 
-  if (!ok) {
+  if (!result) {
     return NextResponse.redirect(new URL("/signin?error=profile_error", request.url));
+  }
+
+  // Auto-subscribe runs outside the redemption transaction: it is
+  // best-effort and a failure here must not roll back the consumed
+  // invite or leave the new member signed out.
+  if (result.wasNewProfile) {
+    await tryAutoSubscribe(userId);
   }
 
   return NextResponse.redirect(new URL("/", request.url));
