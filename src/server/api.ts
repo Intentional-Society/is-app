@@ -13,11 +13,14 @@ import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validate
 import {
   getProfileForMember,
   getProfileForSelf,
+  getProfileForSelfWithProbe,
   listMembers,
   markAgreementsSigned,
   markProgramsReviewed,
   markWebUpdated,
   parseEditableProfile,
+  type ProfileForSelf,
+  type ProfileReadProbe,
   toSlug,
   upsertProfile,
 } from "./profiles";
@@ -155,14 +158,40 @@ const api = new Hono<{ Variables: ApiVariables }>()
   })
   .get("/me", async (c) => {
     const user = c.get("user");
+    const debug = c.req.header("x-debug-timing") === "1";
 
-    let profile = await getProfileForSelf(user.id);
+    // #149 diagnostic: on debug-flagged requests, the read returns
+    // MVCC + connection metadata in the same statement, logged below
+    // so a failing welcome-flow trace can be cross-referenced with the
+    // backend the read landed on. Production traffic stays on the
+    // plain variant. Remove with the probe code once #149 is closed.
+    const load = async (): Promise<{ profile: ProfileForSelf | null; probe: ProfileReadProbe | null }> => {
+      if (debug) return getProfileForSelfWithProbe(user.id);
+      return { profile: await getProfileForSelf(user.id), probe: null };
+    };
+
+    let { profile, probe } = await load();
+    let stage: "initial" | "after-upsert" = "initial";
     if (!profile) {
       // Self-heal: profiles are normally inserted by /auth/callback
       // during sign-in. If that upsert failed but the session still
       // landed, the next authed request creates the row here.
       await upsertProfile(user);
-      profile = await getProfileForSelf(user.id);
+      ({ profile, probe } = await load());
+      stage = "after-upsert";
+    }
+
+    if (debug) {
+      console.log(
+        `[probe-149] route=me stage=${stage} user=${user.id} ` +
+          `bio=${JSON.stringify(profile?.bio ?? null)} ` +
+          `agreements=${profile?.lastSignedAgreements ? "set" : "null"} ` +
+          `profile=${profile?.lastUpdatedProfile ? "set" : "null"} ` +
+          `programs=${profile?.lastReviewedPrograms ? "set" : "null"} ` +
+          `ctid=${probe?.ctid ?? ""} xmin=${probe?.xmin ?? ""} ` +
+          `inRecovery=${probe?.inRecovery ?? ""} ` +
+          `serverAddr=${probe?.serverAddr ?? ""} backendPid=${probe?.backendPid ?? ""}`,
+      );
     }
 
     return c.json({ id: user.id, email: user.email, profile });

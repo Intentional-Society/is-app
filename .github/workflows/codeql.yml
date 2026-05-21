@@ -55,6 +55,28 @@ jobs:
           queries: security-extended
 
       - name: Perform CodeQL analysis
+        id: analyze
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
+          # Write SARIF to a known path so the dismiss-alerts step can
+          # read the in-source suppression markers (see below).
+          output: sarif-results
+
+      # Closes alerts whose source lines carry a `// lgtm[<rule>]` or
+      # `// codeql[<rule>]` suppression marker. CodeQL parses those
+      # markers into the SARIF `suppressions[]` field, but the standard
+      # codeql-action pipeline does not act on them — this step does.
+      # Guarded to main because dismissals are a repo-global property:
+      # running on a PR or feature branch would dismiss main's alerts
+      # based on unmerged code.
+      - name: Dismiss alerts marked suppressed in SARIF
+        if: github.ref == 'refs/heads/main'
+        # v2.0.2 — GitHub-owned but in the advanced-security org
+        # rather than github/, so SHA-pin to lock the version.
+        uses: advanced-security/dismiss-alerts@046d6b48d2e43cf563f96f67332c47c432eff83e
+        with:
+          sarif-id: ${{ steps.analyze.outputs.sarif-id }}
+          sarif-file: sarif-results/${{ matrix.language }}.sarif
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
