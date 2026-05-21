@@ -2,8 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/avatar";
-import { serverApiClient } from "@/lib/api-server";
+import { QueryProvider } from "@/components/query-provider";
+import { loadMe, serverApiClient } from "@/lib/api-server";
 import type { MemberProfile } from "@/lib/api-types";
+
+import { MemberRelationControl } from "./relation-control";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -16,6 +19,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default async function MemberProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const me = await loadMe();
+  if (!me) redirect("/signin");
   const res = await serverApiClient.api.members[":id"].$get({ param: { id } });
   if (res.status === 401) redirect("/signin");
   if (!res.ok && res.status !== 404) throw new Error(`Failed to load member ${id}: ${res.status}`);
@@ -37,42 +42,53 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
   const { profile }: { profile: MemberProfile } = await res.json();
   const memberSince = new Date(profile.createdAt).getFullYear();
 
+  const isOwnProfile = me.id === profile.id;
+
   return (
-    <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <div className="flex w-full max-w-md items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{profile.displayName ?? "Member"}</h1>
-          <p className="text-sm text-muted-foreground">Member since {memberSince}</p>
+    <QueryProvider>
+      <main className="flex min-h-screen flex-col items-center gap-6 p-8">
+        <div className="flex w-full max-w-md items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{profile.displayName ?? "Member"}</h1>
+            <p className="text-sm text-muted-foreground">Member since {memberSince}</p>
+          </div>
+          <Link href="/members" className="text-base text-muted-foreground hover:text-foreground">
+            ← Directory
+          </Link>
         </div>
-        <Link href="/members" className="text-base text-muted-foreground hover:text-foreground">
-          ← Directory
-        </Link>
-      </div>
 
-      <Avatar
-        name={profile.displayName}
-        url={profile.avatarUrl}
-        sizes="128px"
-        priority
-        className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
-      />
+        <Avatar
+          name={profile.displayName}
+          url={profile.avatarUrl}
+          sizes="128px"
+          priority
+          className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
+        />
 
-      <dl className="flex w-full max-w-md flex-col gap-4">
-        <Field label="Bio">{profile.bio}</Field>
-        <Field label="Keywords">{profile.keywords.length > 0 ? profile.keywords.join(", ") : null}</Field>
-        <Field label="Location">{profile.location}</Field>
-        <Field label="Live desire">{profile.liveDesire}</Field>
-        <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
-      </dl>
+        {!isOwnProfile && (
+          <MemberRelationControl
+            memberId={profile.id}
+            memberName={profile.displayName}
+          />
+        )}
 
-      {profile.email && (
-        <a
-          href={`mailto:${profile.email}`}
-          className="text-base text-muted-foreground underline hover:text-foreground"
-        >
-          Send email
-        </a>
-      )}
-    </main>
+        <dl className="flex w-full max-w-md flex-col gap-4">
+          <Field label="Bio">{profile.bio}</Field>
+          <Field label="Keywords">{profile.keywords.length > 0 ? profile.keywords.join(", ") : null}</Field>
+          <Field label="Location">{profile.location}</Field>
+          <Field label="Live desire">{profile.liveDesire}</Field>
+          <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
+        </dl>
+
+        {profile.email && (
+          <a
+            href={`mailto:${profile.email}`}
+            className="text-base text-muted-foreground underline hover:text-foreground"
+          >
+            Send email
+          </a>
+        )}
+      </main>
+    </QueryProvider>
   );
 }

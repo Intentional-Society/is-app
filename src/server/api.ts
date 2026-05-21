@@ -46,6 +46,7 @@ import {
   deleteRelationHint,
   getPersonalWeb,
   getRelationSuggestions,
+  getRelationValue,
   listPendingHints,
   parseOptionalRelationValue,
   updateRelationValue,
@@ -467,6 +468,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
       includeHidden,
     });
     return c.json(subgraph);
+  })
+  .get("/relations/value/:relateeId", async (c) => {
+    const user = c.get("user");
+    const relateeId = c.req.param("relateeId");
+    if (!isUuid(relateeId)) return c.json({ error: "relateeId must be a UUID" }, 400);
+    const value = await getRelationValue({ relatorId: user.id, relateeId });
+    return c.json({ value });
   })
   // hono/validator typed body — without it, Hono's RPC inference on a
   // route with a path param rejects the `json` key on the typed call.
