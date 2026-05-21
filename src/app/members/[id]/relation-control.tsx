@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api";
-import { RELATION_VALUE_LABELS, type RelationValue, isRelationValue } from "@/lib/relation-value";
+import { RELATION_VALUE_LABELS, isRelationValue } from "@/lib/relation-value";
 import { RelatingDialog } from "@/app/myweb/relating-dialog";
 import type { RelatingTarget } from "@/app/myweb/relating-dialog";
+import { relationValueQueryKey } from "@/app/myweb/query-keys";
 
 type Props = {
   memberId: string;
@@ -16,8 +17,8 @@ type Props = {
 export function MemberRelationControl({ memberId, memberName }: Props) {
   const [dialogTarget, setDialogTarget] = useState<RelatingTarget | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["relations", "value", memberId],
+  const { data, isLoading, isError } = useQuery({
+    queryKey: relationValueQueryKey(memberId),
     queryFn: async () => {
       const res = await apiClient.api.relations.value[":relateeId"].$get({
         param: { relateeId: memberId },
@@ -35,9 +36,11 @@ export function MemberRelationControl({ memberId, memberName }: Props) {
         <span className="text-sm text-muted-foreground">
           {isLoading
             ? "Loading…"
-            : value !== null
-              ? `Connected · ${RELATION_VALUE_LABELS[value as RelationValue]}`
-              : "Not yet connected"}
+            : isError
+              ? "Couldn't load connection"
+              : value !== null
+                ? `Connected · ${RELATION_VALUE_LABELS[value].headline}`
+                : "Not yet connected"}
         </span>
         <button
           type="button"

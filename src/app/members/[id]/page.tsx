@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/avatar";
 import { QueryProvider } from "@/components/query-provider";
-import { loadMe, serverApiClient } from "@/lib/api-server";
+import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberProfile } from "@/lib/api-types";
 
 import { MemberRelationControl } from "./relation-control";
@@ -19,8 +19,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default async function MemberProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const me = await loadMe();
-  if (!me) redirect("/signin");
+  const me = await requireUser();
   const res = await serverApiClient.api.members[":id"].$get({ param: { id } });
   if (res.status === 401) redirect("/signin");
   if (!res.ok && res.status !== 404) throw new Error(`Failed to load member ${id}: ${res.status}`);
