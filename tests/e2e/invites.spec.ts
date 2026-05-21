@@ -71,7 +71,7 @@ test.describe("invites — authed member flow", () => {
     await page.getByLabel(/Note \(for your records/).fill("this should trigger the cap message");
     await page.getByRole("button", { name: "Create invite" }).click();
 
-    await expect(page.getByText(/You already have 10 active invites/)).toBeVisible();
+    await expect(page.getByText(/You already have \d+ active invites/)).toBeVisible();
   });
 });
 

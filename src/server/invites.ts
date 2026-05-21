@@ -14,7 +14,7 @@ const CODE_LENGTH = 10;
 // 32^10 ≈ 1.1e15 — sparse enough that collisions are vanishingly rare;
 // the unique constraint is the real safety net.
 
-const MAX_ACTIVE_INVITES_PER_USER = 10;
+const MAX_ACTIVE_INVITES_PER_USER = 50;
 const INVITE_LIFETIME_DAYS = 30;
 const MIN_NOTE_LENGTH = 10;
 

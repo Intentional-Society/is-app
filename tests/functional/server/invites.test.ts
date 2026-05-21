@@ -82,21 +82,21 @@ describe("invites module", () => {
     expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("enforces the 10-active-invite cap", async () => {
-    for (let i = 0; i < 10; i++) {
+  it("enforces the 50-active-invite cap", async () => {
+    for (let i = 0; i < 50; i++) {
       const r = await createInvite({
         createdBy: creatorId,
         note: `friend number ${i} coming in`,
       });
       expect("code" in r).toBe(true);
     }
-    const eleventh = await createInvite({
+    const next = await createInvite({
       createdBy: creatorId,
       note: "one too many friends",
     });
-    expect(eleventh).toEqual({ error: "too_many_active", limit: 10 });
+    expect(next).toEqual({ error: "too_many_active", limit: 50 });
 
-    expect(await countActiveInvitesForCreator(creatorId)).toBe(10);
+    expect(await countActiveInvitesForCreator(creatorId)).toBe(50);
   });
 
   it("redeeming an invite frees the slot so the creator can mint another", async () => {
@@ -389,17 +389,17 @@ describe("POST /api/invites", () => {
   });
 
   it("returns 429 when the user is already at the active cap", async () => {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 50; i++) {
       await createInvite({
         createdBy: userId,
         note: `existing invite number ${i}`,
       });
     }
-    const res = await post({ note: "eleventh invite should be rejected" });
+    const res = await post({ note: "one more invite should be rejected" });
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.error).toBe("too_many_active_invites");
-    expect(body.limit).toBe(10);
+    expect(body.limit).toBe(50);
   });
 });
 

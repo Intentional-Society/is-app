@@ -75,9 +75,11 @@ export function InvitesPanel({ me }: { me: Me }) {
         },
       });
       if (res.status === 429) {
+        const body = (await res.json().catch(() => ({}))) as { limit?: number };
+        const cap = body.limit ?? 50;
         setState({
           kind: "error",
-          message: "You already have 10 active invites. Revoke one first.",
+          message: `You already have ${cap} active invites. Revoke one first.`,
         });
         return;
       }
