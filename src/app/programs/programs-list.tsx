@@ -1,5 +1,7 @@
 "use client";
 
+import type { UrlObject } from "node:url";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +30,14 @@ function ProgramCard({
   return (
     <li className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{program.name}</h2>
+        <h2 className="text-lg font-semibold">
+          <Link
+            href={{ pathname: `/programs/${program.slug}` } satisfies UrlObject}
+            className="hover:underline focus-visible:underline"
+          >
+            {program.name}
+          </Link>
+        </h2>
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
           {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}

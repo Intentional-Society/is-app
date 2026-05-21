@@ -284,35 +284,90 @@ describe("Programs API", () => {
       expect(program.joinedAt).toBeNull();
     });
   });
+
+  describe("GET /api/programs/by-slug/:slug", () => {
+    it("returns program detail keyed by slug with members and viewer's joined flag", async () => {
+      // The viewer is joined; the seed in the outer beforeEach put them
+      // in nothing, so insert a current membership now.
+      await db.insert(profilePrograms).values({ profileId: userId, programId });
+
+      const slug = `test-program-${programId.slice(0, 8)}`;
+      const res = await app.request(`/api/programs/by-slug/${slug}`);
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as {
+        program: {
+          id: string;
+          slug: string;
+          name: string;
+          description: string | null;
+          signupsOpen: boolean;
+          memberCount: number;
+          joined: boolean;
+          joinedAt: string | null;
+          members: Array<{ id: string; displayName: string | null; joinedAt: string }>;
+        };
+      };
+      expect(body.program.id).toBe(programId);
+      expect(body.program.slug).toBe(slug);
+      expect(body.program.signupsOpen).toBe(true);
+      expect(body.program.memberCount).toBe(1);
+      expect(body.program.joined).toBe(true);
+      expect(body.program.joinedAt).toBeTruthy();
+      expect(body.program.members).toHaveLength(1);
+      expect(body.program.members[0].id).toBe(userId);
+    });
+
+    it("excludes members who have left from the members array", async () => {
+      await db
+        .insert(profilePrograms)
+        .values({ profileId: userId, programId, leftAt: new Date() });
+
+      const slug = `test-program-${programId.slice(0, 8)}`;
+      const res = await app.request(`/api/programs/by-slug/${slug}`);
+      const body = await res.json();
+      expect(body.program.members).toHaveLength(0);
+      expect(body.program.memberCount).toBe(0);
+      expect(body.program.joined).toBe(false);
+    });
+
+    it("returns 404 for an archived program", async () => {
+      await db.update(programs).set({ archivedAt: sql`now()` }).where(eq(programs.id, programId));
+
+      const slug = `test-program-${programId.slice(0, 8)}`;
+      const res = await app.request(`/api/programs/by-slug/${slug}`);
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 404 for an unknown slug", async () => {
+      const res = await app.request("/api/programs/by-slug/does-not-exist");
+      expect(res.status).toBe(404);
+    });
+  });
 });
 
-// Look up the auto-subscribe target's id, inserting it if the local
-// schema doesn't already have it from the dev seed. Returns the program
-// id either way. The cleanup half tells the caller whether the row was
-// inserted by this helper (so the test can drop it without trampling
-// seed data).
-const ensureWeeklyProgram = async (): Promise<{ id: string; insertedByTest: boolean }> => {
-  const [existing] = await db
-    .select({ id: programs.id })
-    .from(programs)
-    .where(eq(programs.slug, "weekly-web-updates"));
-  if (existing) return { id: existing.id, insertedByTest: false };
-
-  const [row] = await db
+// Upsert the auto-subscribe target's row and return its id. Never
+// deletes — concurrent tests share the slug (production code hard-
+// codes it), and the unique-slug constraint guarantees a single row.
+const ensureWeeklyProgram = async (): Promise<string> => {
+  await db
     .insert(programs)
     .values({
       slug: "weekly-web-updates",
       name: "Weekly Web Updates",
-      description: "Auto-subscribe target (test-inserted).",
+      description: "Auto-subscribe target (test-managed).",
     })
-    .returning({ id: programs.id });
-  return { id: row.id, insertedByTest: true };
+    .onConflictDoNothing({ target: programs.slug });
+  const [row] = await db
+    .select({ id: programs.id })
+    .from(programs)
+    .where(eq(programs.slug, "weekly-web-updates"));
+  return row.id;
 };
 
 describe("autoSubscribeNewMember", () => {
   let userId: string;
   let weeklyProgramId: string;
-  let weeklyInsertedByTest: boolean;
 
   beforeEach(async () => {
     userId = randomUUID();
@@ -321,16 +376,11 @@ describe("autoSubscribeNewMember", () => {
           VALUES (${userId}::uuid, ${`auto-${userId.slice(0, 8)}@testfake.local`}, false, false)`,
     );
     await db.insert(profiles).values({ id: userId });
-    const ensured = await ensureWeeklyProgram();
-    weeklyProgramId = ensured.id;
-    weeklyInsertedByTest = ensured.insertedByTest;
+    weeklyProgramId = await ensureWeeklyProgram();
   });
 
   afterEach(async () => {
     await db.delete(profilePrograms).where(eq(profilePrograms.profileId, userId));
-    if (weeklyInsertedByTest) {
-      await db.delete(programs).where(eq(programs.id, weeklyProgramId));
-    }
     await db.delete(profiles).where(eq(profiles.id, userId));
     await db.execute(sql`DELETE FROM auth.users WHERE id = ${userId}::uuid`);
   });
@@ -352,23 +402,30 @@ describe("autoSubscribeNewMember", () => {
   });
 
   it("does not throw or re-subscribe when the program is missing — captures to Sentry instead", async () => {
-    // Drop the program so the slug lookup misses. The function should
-    // log to Sentry and return without inserting anything. After the
-    // delete, the afterEach should not try to delete it again.
+    // The slug is shared with other tests running in parallel workers,
+    // so the missingness window has to be tight: delete, exercise the
+    // path, and restore inside the test rather than waiting for the
+    // next beforeEach. The outer await on autoSubscribeNewMember
+    // finishes before any restore concurrency could matter.
     await db.delete(programs).where(eq(programs.id, weeklyProgramId));
-    weeklyInsertedByTest = false;
 
-    const captureMock = vi.mocked(Sentry.captureException);
-    captureMock.mockClear();
+    try {
+      const captureMock = vi.mocked(Sentry.captureException);
+      captureMock.mockClear();
 
-    await expect(autoSubscribeNewMember(userId)).resolves.toBeUndefined();
+      await expect(autoSubscribeNewMember(userId)).resolves.toBeUndefined();
 
-    expect(captureMock).toHaveBeenCalledOnce();
-    const arg = captureMock.mock.calls[0][0];
-    expect(arg).toBeInstanceOf(Error);
-    expect((arg as Error).message).toMatch(/weekly-web-updates/);
+      expect(captureMock).toHaveBeenCalledOnce();
+      const arg = captureMock.mock.calls[0][0];
+      expect(arg).toBeInstanceOf(Error);
+      expect((arg as Error).message).toMatch(/weekly-web-updates/);
 
-    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
-    expect(rows).toHaveLength(0);
+      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+      expect(rows).toHaveLength(0);
+    } finally {
+      // Restore so any concurrent test that depends on the slug isn't
+      // stranded by our delete.
+      await ensureWeeklyProgram();
+    }
   });
 });

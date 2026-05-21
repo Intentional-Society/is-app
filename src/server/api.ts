@@ -30,6 +30,7 @@ import {
   addParticipant,
   createProgram,
   deleteProgram,
+  getProgramBySlug,
   getProgramDetail,
   joinProgram,
   leaveProgram,
@@ -409,6 +410,15 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const user = c.get("user");
     const programsList = await listPrograms(user.id);
     return c.json({ programs: programsList });
+  })
+  // Slug lives under a /by-slug/ prefix so it doesn't collide with the
+  // UUID-keyed /:id/join and /:id/leave routes above.
+  .get("/programs/by-slug/:slug", async (c) => {
+    const user = c.get("user");
+    const slug = c.req.param("slug");
+    const result = await getProgramBySlug(slug, user.id);
+    if ("error" in result) return c.json({ error: "not_found" }, 404);
+    return c.json({ program: result.program });
   })
   .post("/programs/:id/join", async (c) => {
     const user = c.get("user");

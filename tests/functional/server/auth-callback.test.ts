@@ -55,25 +55,25 @@ const deleteAuthUser = async (id: string) => {
   await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
 };
 
-// Same idea as programs.test.ts's helper: use the seed row if present,
-// otherwise insert one. The boolean tells the caller whether to clean
-// it up so we don't trample the seed.
-const ensureWeeklyProgram = async (): Promise<{ id: string; insertedByTest: boolean }> => {
-  const [existing] = await db
-    .select({ id: programs.id })
-    .from(programs)
-    .where(eq(programs.slug, "weekly-web-updates"));
-  if (existing) return { id: existing.id, insertedByTest: false };
-
-  const [row] = await db
+// The auto-subscribe target's slug is fixed in the production code, so
+// concurrent tests would otherwise race on inserting/deleting the same
+// row. Upsert with ON CONFLICT DO NOTHING and never delete — the slug
+// has a unique constraint, so there's only ever one row, and leaving
+// it across tests is harmless.
+const ensureWeeklyProgram = async (): Promise<string> => {
+  await db
     .insert(programs)
     .values({
       slug: "weekly-web-updates",
       name: "Weekly Web Updates",
-      description: "Auto-subscribe target (test-inserted).",
+      description: "Auto-subscribe target (test-managed).",
     })
-    .returning({ id: programs.id });
-  return { id: row.id, insertedByTest: true };
+    .onConflictDoNothing({ target: programs.slug });
+  const [row] = await db
+    .select({ id: programs.id })
+    .from(programs)
+    .where(eq(programs.slug, "weekly-web-updates"));
+  return row.id;
 };
 
 describe("GET /auth/callback", () => {
@@ -102,22 +102,16 @@ describe("GET /auth/callback", () => {
 describe("GET /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-updates)", () => {
   let userId: string;
   let weeklyProgramId: string;
-  let weeklyInsertedByTest: boolean;
 
   beforeEach(async () => {
     mockCreateClient.mockReset();
     userId = randomUUID();
     await insertAuthUser(userId, `${userId}@testfake.local`);
-    const ensured = await ensureWeeklyProgram();
-    weeklyProgramId = ensured.id;
-    weeklyInsertedByTest = ensured.insertedByTest;
+    weeklyProgramId = await ensureWeeklyProgram();
   });
 
   afterEach(async () => {
     await db.delete(profilePrograms).where(eq(profilePrograms.profileId, userId));
-    if (weeklyInsertedByTest) {
-      await db.delete(programs).where(eq(programs.id, weeklyProgramId));
-    }
     await deleteAuthUser(userId);
   });
 
@@ -155,7 +149,6 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
   let inviterId: string;
   let newUserId: string;
   let weeklyProgramId: string;
-  let weeklyInsertedByTest: boolean;
 
   beforeEach(async () => {
     mockCreateClient.mockReset();
@@ -164,16 +157,11 @@ describe("GET /auth/callback?invite=... (invited sign-in)", () => {
     await insertAuthUser(inviterId, `${inviterId}@testfake.local`);
     await db.insert(profiles).values({ id: inviterId, displayName: "Inviter" });
     await insertAuthUser(newUserId, `${newUserId}@testfake.local`);
-    const ensured = await ensureWeeklyProgram();
-    weeklyProgramId = ensured.id;
-    weeklyInsertedByTest = ensured.insertedByTest;
+    weeklyProgramId = await ensureWeeklyProgram();
   });
 
   afterEach(async () => {
     await db.delete(profilePrograms).where(eq(profilePrograms.profileId, newUserId));
-    if (weeklyInsertedByTest) {
-      await db.delete(programs).where(eq(programs.id, weeklyProgramId));
-    }
     await db.delete(invites).where(eq(invites.createdBy, inviterId));
     await deleteAuthUser(newUserId);
     await deleteAuthUser(inviterId);

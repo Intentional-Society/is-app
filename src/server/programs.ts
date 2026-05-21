@@ -182,6 +182,93 @@ export const leaveProgram = async (
   return { ok: true };
 };
 
+// --- Per-program detail (member-facing) ------------------------------
+//
+// The detail page at /programs/[slug] shows a single program's members
+// alongside the description, with a join/leave button for the viewer.
+// Archived programs return not_found here — the listing already hides
+// them, so a deep link to an archived slug should look like any other
+// missing page.
+
+export type ProgramMember = {
+  id: string;
+  slug: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  joinedAt: string;
+};
+
+export type ProgramDetailForMember = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  signupsOpen: boolean;
+  memberCount: number;
+  joined: boolean;
+  joinedAt: string | null;
+  members: ProgramMember[];
+};
+
+export const getProgramBySlug = async (
+  slug: string,
+  viewerId: string,
+): Promise<{ program: ProgramDetailForMember } | { error: "not_found" }> => {
+  const [program] = await db
+    .select({
+      id: programs.id,
+      slug: programs.slug,
+      name: programs.name,
+      description: programs.description,
+      signupsOpen: programs.signupsOpen,
+      archivedAt: programs.archivedAt,
+    })
+    .from(programs)
+    .where(eq(programs.slug, slug));
+
+  if (!program || program.archivedAt !== null) return { error: "not_found" };
+
+  // Current participants only. Left rows live on for the stable
+  // assignedAt but aren't part of the public roster.
+  const memberRows = await db
+    .select({
+      id: profiles.id,
+      slug: profiles.slug,
+      displayName: profiles.displayName,
+      avatarPath: profiles.avatarPath,
+      assignedAt: profilePrograms.assignedAt,
+    })
+    .from(profilePrograms)
+    .innerJoin(profiles, eq(profiles.id, profilePrograms.profileId))
+    .where(and(eq(profilePrograms.programId, program.id), isNull(profilePrograms.leftAt)))
+    .orderBy(asc(profiles.displayName));
+
+  const withUrls = await attachAvatarUrls(memberRows);
+  const members: ProgramMember[] = withUrls.map((m) => ({
+    id: m.id,
+    slug: m.slug,
+    displayName: m.displayName,
+    avatarUrl: m.avatarUrl,
+    joinedAt: m.assignedAt.toISOString(),
+  }));
+
+  const viewer = members.find((m) => m.id === viewerId) ?? null;
+
+  return {
+    program: {
+      id: program.id,
+      slug: program.slug,
+      name: program.name,
+      description: program.description,
+      signupsOpen: program.signupsOpen,
+      memberCount: members.length,
+      joined: viewer !== null,
+      joinedAt: viewer?.joinedAt ?? null,
+      members,
+    },
+  };
+};
+
 // --- Admin program administration (issue #139) ---------------------
 //
 // The functions above are member-facing: browse, join, leave. Below is
