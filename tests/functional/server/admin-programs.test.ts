@@ -353,6 +353,20 @@ describe("Admin programs API", () => {
       expect(enrolled).toHaveLength(1);
     });
 
+    it("deletes a program whose only members have already left", async () => {
+      // Past memberships shouldn't block deletion — only currently-
+      // joined ones do. The FK cascade cleans up the history rows.
+      const programId = await seedProgram("Vacated Program");
+      await db.insert(profilePrograms).values({ profileId: member, programId, leftAt: new Date() });
+
+      authAs(admin);
+      const res = await del(programId);
+      expect(res.status).toBe(200);
+
+      const rows = await db.select().from(programs).where(eq(programs.id, programId));
+      expect(rows).toHaveLength(0);
+    });
+
     it("returns 404 for a non-existent program", async () => {
       authAs(admin);
       const res = await del(randomUUID());
@@ -423,7 +437,7 @@ describe("Admin programs API", () => {
   });
 
   describe("DELETE /api/admin/programs/:id/participants/:profileId", () => {
-    it("removes a participant", async () => {
+    it("soft-removes a participant by stamping left_at", async () => {
       const programId = await seedProgram("Removable Program");
       await db.insert(profilePrograms).values({ profileId: member, programId });
 
@@ -433,11 +447,47 @@ describe("Admin programs API", () => {
       });
       expect(res.status).toBe(200);
 
+      // The row still exists but is marked left so the original
+      // assignedAt is available for any future re-add.
       const rows = await db
         .select()
         .from(profilePrograms)
         .where(eq(profilePrograms.programId, programId));
-      expect(rows).toHaveLength(0);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].leftAt).not.toBeNull();
+    });
+
+    it("re-adding a previously-left member restores membership and preserves the original assignedAt", async () => {
+      const programId = await seedProgram("Re-Addable Program");
+      await db.insert(profilePrograms).values({ profileId: member, programId });
+
+      const [original] = await db
+        .select()
+        .from(profilePrograms)
+        .where(eq(profilePrograms.programId, programId));
+      const originalAssignedAt = original.assignedAt;
+
+      authAs(admin);
+      // Remove (soft-deletes)
+      let res = await app.request(`/api/admin/programs/${programId}/participants/${member}`, {
+        method: "DELETE",
+      });
+      expect(res.status).toBe(200);
+
+      // Re-add — the existing row's leftAt clears, assignedAt is unchanged.
+      res = await app.request(`/api/admin/programs/${programId}/participants`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profileId: member }),
+      });
+      expect(res.status).toBe(200);
+
+      const [after] = await db
+        .select()
+        .from(profilePrograms)
+        .where(eq(profilePrograms.programId, programId));
+      expect(after.leftAt).toBeNull();
+      expect(after.assignedAt.getTime()).toBe(originalAssignedAt.getTime());
     });
 
     it("returns 404 when the member is not a participant", async () => {

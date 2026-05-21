@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@supabase/ssr", () => ({
@@ -183,7 +183,7 @@ describe("Programs API", () => {
   });
 
   describe("POST /api/programs/:id/leave", () => {
-    it("leaves a program successfully", async () => {
+    it("leaves a program by stamping left_at (soft delete)", async () => {
       await db.insert(profilePrograms).values({ profileId: userId, programId });
 
       const res = await app.request(`/api/programs/${programId}/leave`, {
@@ -192,9 +192,13 @@ describe("Programs API", () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ ok: true });
 
-      // Verify row deleted
-      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
-      expect(rows).toHaveLength(0);
+      // Row survives — leftAt stamps the soft delete.
+      const [row] = await db
+        .select()
+        .from(profilePrograms)
+        .where(and(eq(profilePrograms.profileId, userId), eq(profilePrograms.programId, programId)));
+      expect(row).toBeDefined();
+      expect(row.leftAt).not.toBeNull();
     });
 
     it("returns 404 when not a member", async () => {
@@ -203,6 +207,81 @@ describe("Programs API", () => {
       });
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "not_found" });
+    });
+
+    it("returns 404 on a double-leave (idempotent past the first)", async () => {
+      await db.insert(profilePrograms).values({ profileId: userId, programId });
+
+      let res = await app.request(`/api/programs/${programId}/leave`, { method: "POST" });
+      expect(res.status).toBe(200);
+
+      res = await app.request(`/api/programs/${programId}/leave`, { method: "POST" });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("join → leave → rejoin preserves the first-joined date", () => {
+    it("keeps the original assigned_at across a leave/rejoin cycle", async () => {
+      // First join
+      let res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
+      expect(res.status).toBe(200);
+
+      const [firstRow] = await db
+        .select()
+        .from(profilePrograms)
+        .where(and(eq(profilePrograms.profileId, userId), eq(profilePrograms.programId, programId)));
+      const originalAssignedAt = firstRow.assignedAt;
+      expect(originalAssignedAt).toBeInstanceOf(Date);
+      expect(firstRow.leftAt).toBeNull();
+
+      // Leave — soft delete stamps leftAt, row persists with same assignedAt.
+      res = await app.request(`/api/programs/${programId}/leave`, { method: "POST" });
+      expect(res.status).toBe(200);
+
+      const [afterLeave] = await db
+        .select()
+        .from(profilePrograms)
+        .where(and(eq(profilePrograms.profileId, userId), eq(profilePrograms.programId, programId)));
+      expect(afterLeave.leftAt).not.toBeNull();
+      expect(afterLeave.assignedAt.getTime()).toBe(originalAssignedAt.getTime());
+
+      // Rejoin — leftAt clears, assignedAt is unchanged.
+      res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
+      expect(res.status).toBe(200);
+
+      const [afterRejoin] = await db
+        .select()
+        .from(profilePrograms)
+        .where(and(eq(profilePrograms.profileId, userId), eq(profilePrograms.programId, programId)));
+      expect(afterRejoin.leftAt).toBeNull();
+      expect(afterRejoin.assignedAt.getTime()).toBe(originalAssignedAt.getTime());
+
+      // GET /programs surfaces the original date as joinedAt.
+      const list = await app.request("/api/programs");
+      const body = await list.json();
+      const program = body.programs.find((p: { id: string }) => p.id === programId);
+      expect(program.joined).toBe(true);
+      expect(new Date(program.joinedAt).getTime()).toBe(originalAssignedAt.getTime());
+    });
+
+    it("treats a second join while currently joined as already_joined", async () => {
+      let res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
+      expect(res.status).toBe(200);
+
+      res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: "already_joined" });
+    });
+
+    it("member count and joined flag ignore left rows", async () => {
+      await db.insert(profilePrograms).values({ profileId: userId, programId, leftAt: new Date() });
+
+      const res = await app.request("/api/programs");
+      const body = await res.json();
+      const program = body.programs.find((p: { id: string }) => p.id === programId);
+      expect(program.memberCount).toBe(0);
+      expect(program.joined).toBe(false);
+      expect(program.joinedAt).toBeNull();
     });
   });
 });

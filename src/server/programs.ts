@@ -60,6 +60,11 @@ export type ProgramWithMembership = {
 // Archived programs are hidden — admins manage them via /admin/programs.
 // signupsOpen is returned so the client can disable the join button on
 // programs that are still listed but not currently accepting joins.
+//
+// "Member" means currently joined (left_at IS NULL). Left memberships
+// stay in the table to preserve the original assigned_at as the stable
+// first-joined date across rejoin cycles, but they don't count toward
+// member counts or the viewer's joined flag.
 export const listPrograms = async (userId: string): Promise<ProgramWithMembership[]> => {
   const rows = await db
     .select({
@@ -71,11 +76,13 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
       memberCount: sql<number>`(
         SELECT count(*)::int FROM ${profilePrograms}
         WHERE ${profilePrograms.programId} = ${programs.id}
+          AND ${profilePrograms.leftAt} IS NULL
       )`,
       joinedAt: sql<string | null>`(
         SELECT to_json(${profilePrograms.assignedAt}) #>> '{}' FROM ${profilePrograms}
         WHERE ${profilePrograms.programId} = ${programs.id}
           AND ${profilePrograms.profileId} = ${userId}
+          AND ${profilePrograms.leftAt} IS NULL
       )`,
     })
     .from(programs)
@@ -125,11 +132,22 @@ export const joinProgram = async (
   // Self-heal: ensure profile row exists before FK insert
   await ensureProfile(userId);
 
-  // Insert membership — conflict means already joined
+  // Three cases on the composite-PK conflict, all handled atomically:
+  //   - No row yet → INSERT. assignedAt = now() is the stable first-
+  //     joined timestamp from this moment forward.
+  //   - Row exists with leftAt IS NOT NULL → rejoin: clear leftAt,
+  //     leave assignedAt alone so the original join date survives.
+  //   - Row exists with leftAt IS NULL → already a current member;
+  //     the WHERE on DO UPDATE blocks the no-op write, returning() is
+  //     empty, and we surface already_joined.
   const result = await db
     .insert(profilePrograms)
     .values({ profileId: userId, programId })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({
+      target: [profilePrograms.profileId, profilePrograms.programId],
+      set: { leftAt: null },
+      setWhere: sql`${profilePrograms.leftAt} IS NOT NULL`,
+    })
     .returning({ profileId: profilePrograms.profileId });
 
   if (result.length === 0) return { error: "already_joined" };
@@ -143,9 +161,20 @@ export const leaveProgram = async (
 ): Promise<{ ok: true } | { error: "not_found" }> => {
   if (!isUuid(programId)) return { error: "not_found" };
 
+  // Soft delete — flip leftAt instead of removing the row, so a future
+  // rejoin can preserve the original assignedAt. The leftAt IS NULL
+  // predicate makes the call idempotent against double-leaves: a row
+  // already marked left returns no result, surfacing as not_found.
   const result = await db
-    .delete(profilePrograms)
-    .where(and(eq(profilePrograms.profileId, userId), eq(profilePrograms.programId, programId)))
+    .update(profilePrograms)
+    .set({ leftAt: sql`now()` })
+    .where(
+      and(
+        eq(profilePrograms.profileId, userId),
+        eq(profilePrograms.programId, programId),
+        isNull(profilePrograms.leftAt),
+      ),
+    )
     .returning({ profileId: profilePrograms.profileId });
 
   if (result.length === 0) return { error: "not_found" };
@@ -280,7 +309,8 @@ export const parseProgramUpdate = (body: unknown): ProgramUpdate | { error: stri
 // Every program with its member count. Unlike listPrograms this carries
 // no per-user membership — admins manage programs, they don't join them.
 // Archived programs are included here so admins can re-open them; the
-// member-facing listPrograms hides them.
+// member-facing listPrograms hides them. memberCount excludes left
+// rows so admins see the same "currently in" number members do.
 export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
   return db
     .select({
@@ -294,6 +324,7 @@ export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
       memberCount: sql<number>`(
         SELECT count(*)::int FROM ${profilePrograms}
         WHERE ${profilePrograms.programId} = ${programs.id}
+          AND ${profilePrograms.leftAt} IS NULL
       )`,
     })
     .from(programs)
@@ -394,7 +425,7 @@ export const getProgramDetail = async (
     })
     .from(profilePrograms)
     .innerJoin(profiles, eq(profiles.id, profilePrograms.profileId))
-    .where(eq(profilePrograms.programId, programId))
+    .where(and(eq(profilePrograms.programId, programId), isNull(profilePrograms.leftAt)))
     .orderBy(asc(profiles.displayName));
 
   const withUrls = await attachAvatarUrls(rows);
@@ -436,21 +467,31 @@ export const addParticipant = async (
   const [profile] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, profileId));
   if (!profile) return { error: "profile_not_found" };
 
+  // Same three-case upsert as joinProgram: insert / rejoin / already-
+  // a-member. The admin path ignores signupsOpen — admins can add a
+  // participant even to a program with closed signups.
   const result = await db
     .insert(profilePrograms)
     .values({ profileId, programId })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({
+      target: [profilePrograms.profileId, profilePrograms.programId],
+      set: { leftAt: null },
+      setWhere: sql`${profilePrograms.leftAt} IS NOT NULL`,
+    })
     .returning({ profileId: profilePrograms.profileId });
 
   if (result.length === 0) return { error: "already_member" };
   return { ok: true };
 };
 
-// Deletes a program only while it has no participants — the guardrail
-// for clearing out test data and mistakes without touching live ones.
-// The "no participants" check rides on the DELETE as a NOT EXISTS
-// subquery so it's atomic: a join landing between a separate check and
-// the delete can't slip a participant past the FK cascade.
+// Deletes a program only while it has no current participants — the
+// guardrail for clearing out test data and mistakes without touching
+// live ones. The "no participants" check rides on the DELETE as a NOT
+// EXISTS subquery so it's atomic: a join landing between a separate
+// check and the delete can't slip a participant past the FK cascade.
+// Past members (leftAt IS NOT NULL) don't block the delete; the FK
+// cascade still nukes their history rows, which is fine — the program
+// itself is going away.
 export const deleteProgram = async (
   programId: string,
 ): Promise<{ ok: true } | { error: "not_found" | "has_participants" }> => {
@@ -465,7 +506,7 @@ export const deleteProgram = async (
           db
             .select({ one: sql`1` })
             .from(profilePrograms)
-            .where(eq(profilePrograms.programId, programId)),
+            .where(and(eq(profilePrograms.programId, programId), isNull(profilePrograms.leftAt))),
         ),
       ),
     )
@@ -473,7 +514,7 @@ export const deleteProgram = async (
 
   if (deleted.length > 0) return { ok: true };
 
-  // Nothing deleted: the program is either gone or still has
+  // Nothing deleted: the program is either gone or still has current
   // participants. Re-read to tell 404 apart from 409 for the caller.
   const [program] = await db.select({ id: programs.id }).from(programs).where(eq(programs.id, programId));
   return program ? { error: "has_participants" } : { error: "not_found" };
@@ -485,9 +526,18 @@ export const removeParticipant = async (
 ): Promise<{ ok: true } | { error: "not_found" }> => {
   if (!isUuid(programId) || !isUuid(profileId)) return { error: "not_found" };
 
+  // Mirror leaveProgram's soft delete so admin removals also preserve
+  // the original assignedAt for any future rejoin.
   const result = await db
-    .delete(profilePrograms)
-    .where(and(eq(profilePrograms.programId, programId), eq(profilePrograms.profileId, profileId)))
+    .update(profilePrograms)
+    .set({ leftAt: sql`now()` })
+    .where(
+      and(
+        eq(profilePrograms.programId, programId),
+        eq(profilePrograms.profileId, profileId),
+        isNull(profilePrograms.leftAt),
+      ),
+    )
     .returning({ profileId: profilePrograms.profileId });
 
   if (result.length === 0) return { error: "not_found" };

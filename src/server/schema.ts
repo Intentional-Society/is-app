@@ -79,6 +79,11 @@ export const programs = pgTable("programs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
+// Soft-delete table: a row's existence records "Alice was ever joined
+// to this program"; leftAt distinguishes "currently joined" (NULL) from
+// "left, history preserved" (timestamp). assignedAt is set once on
+// first insert and never updated, so it survives leave/rejoin cycles
+// as the stable first-joined date.
 export const profilePrograms = pgTable(
   "profile_programs",
   {
@@ -89,6 +94,7 @@ export const profilePrograms = pgTable(
       .notNull()
       .references(() => programs.id, { onDelete: "cascade" }),
     assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    leftAt: timestamp("left_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.profileId, table.programId] })],
 ).enableRLS();
