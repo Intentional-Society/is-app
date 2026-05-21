@@ -125,6 +125,8 @@ describe("getProfileForSelf", () => {
         "avatarUrl",
         "emergencyContact",
         "liveDesire",
+        "currentIntention",
+        "intentionUpdatedAt",
         "isAdmin",
         "lastSignedAgreements",
         "lastUpdatedProfile",
@@ -170,6 +172,8 @@ describe("getProfileForMember", () => {
         "avatarUrl",
         "liveDesire",
         "email",
+        "currentIntention",
+        "intentionUpdatedAt",
         "createdAt",
       ].sort(),
     );

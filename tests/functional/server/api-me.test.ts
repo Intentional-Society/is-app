@@ -83,6 +83,8 @@ describe("GET /api/me", () => {
         avatarUrl: null,
         emergencyContact: null,
         liveDesire: null,
+        currentIntention: null,
+        intentionUpdatedAt: null,
         isAdmin: false,
         lastSignedAgreements: null,
         lastUpdatedProfile: null,

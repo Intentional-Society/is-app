@@ -35,6 +35,7 @@ export default async function EditProfilePage() {
           supplementaryInfo: profile.supplementaryInfo ?? "",
           emergencyContact: profile.emergencyContact ?? "",
           liveDesire: profile.liveDesire ?? "",
+          currentIntention: profile.currentIntention ?? "",
         }}
       />
 
