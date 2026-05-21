@@ -10,12 +10,26 @@ Settings made in the GitHub dashboard that are not captured in code.
 - **Repo:** is-app (public)
 - **Default branch:** main
 
+## Pull request settings
+
+Settings → General → Pull Requests. Enforces the merge-commit default from `docs/strategy-branching.md` at the platform level.
+
+- ✓ **Allow merge commits** — the "Create a merge commit" button. Default merge method; preserves the branch boundary in main's history.
+- ☐ **Allow squash merging** — off. Removes the per-PR escape hatch so the merge UI can't collapse a PR's commits.
+- ☐ **Allow rebase merging** — off. "Rebase and merge" replays branch commits onto main without a merge commit, losing the branch boundary; disabling it prevents the wrong method being clicked.
+- ✓ **Always suggest updating pull request branches** — surfaces an "Update branch" prompt when `main` advances. The prompt's default action merges `main` into the branch, which the strategy avoids; treat it as a reminder to rebase locally rather than as an instruction to click.
+- ☐ **Allow auto-merge** — off. "Auto-merge" only waits for *required* status checks. e2e can't be required today: it triggers on `deployment_status`, which docs-only PRs skip (no Vercel deploy → no event → the required check would never appear → the PR couldn't merge). Re-enable once `e2e.yml` short-circuits docs-only PRs the way `ci.yml` does and becomes a required check.
+- **Default merge commit title:** PR title. **Default merge commit message:** PR description. Otherwise the merge commit reads "Merge pull request #N from …" and loses the context the PR body already carries.
+
+`deleteBranchOnMerge` is on — the remote feature branch is auto-deleted whenever a PR merges, regardless of merge method (UI button or `gh pr merge`). The per-PR `--delete-branch` flag on `gh pr merge` is still worth keeping because it also deletes the developer's *local* branch in the same step; otherwise the local copy lingers as `[origin/X: gone]` until manually pruned. Recreating a branch with the same name after merge is a normal `git checkout -b <name>` — no special handling needed. Apply or audit these via `gh api repos/Intentional-Society/is-app -X PATCH` (fields: `allow_merge_commit`, `allow_squash_merge`, `allow_rebase_merge`, `allow_update_branch`, `allow_auto_merge`, `delete_branch_on_merge`, `merge_commit_title`, `merge_commit_message`).
+
 ## Branch protection on `main`
 
 Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-protection.mjs`. Edit the rules there and run `npm run update_main_branch_protection` to push the changes to GitHub. Current rules:
 
 - **PR required** for every change — even solo pushes, so the `pull_request` workflow trigger gates every merge into main.
-- **Required status check:** "Lint & Functional Tests" (E2E is not required — it runs post-deploy against the Vercel preview and can flake on cold start; check manually before merging).
+- **Required status check:** "Lint & Functional Tests". E2E is not required: it triggers on `deployment_status`, which docs-only PRs skip (Vercel's `ignoreCommand` suppresses the deploy), so making it required would block every docs PR forever. Check manually before merging until `e2e.yml` is reworked to short-circuit docs-only PRs the way `ci.yml` does.
+- **Branches must be up to date with `main`** before merging (`strict_required_status_checks_policy: true`). Forces the rebase-when-main-moves convention from `docs/strategy-branching.md` — the merge button stays disabled until the branch is rebased and CI passes on the rebased SHA. The rule enforces *up-to-date*, not *via-rebase*; clicking GitHub's "Update branch" button instead would merge `main` in, which the strategy avoids.
 - **Force-push blocked** and **deletion blocked**.
 - **Zero required approvals globally** — keeps solo work on app code unblocked.
 - **Code-owner review required** on paths listed in `.github/CODEOWNERS` (currently `.github/workflows/` and `.github/CODEOWNERS` itself). A CI-secret-touching workflow change can't land without a second codeowner's approval.

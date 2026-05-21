@@ -25,3 +25,15 @@ This requires separate-from-prod dev-testing database(s) for the e2e tests. We a
 - PR back into `main`
 - CI must pass before merge (lint, functional tests, e2e against Vercel preview)
 - Keep branches short-lived
+
+### Keeping the branch current
+
+When `main` advances mid-PR, rebase the branch onto it (`git fetch origin && git rebase origin/main && git push --force-with-lease`); don't merge `main` in. Conflicts get resolved once during the rebase, the eventual PR merge stays conflict-free, and the branch keeps a linear history with no inner merge commits.
+
+Branch protection enforces *up-to-date-with-main* before the merge button works (`strict_required_status_checks_policy: true`), so this isn't optional. The rule doesn't enforce *via rebase*, though — GitHub's "Update branch" button would merge `main` in instead, which the convention above avoids.
+
+### Merging the PR
+
+Default to a merge commit (`gh pr merge --merge --delete-branch`). The merge commit preserves the branch boundary: `git log --first-parent main` reads as one line per PR, with each PR's individual commits still reachable through the merge commit's second parent. Squash loses the commits; rebase keeps the commits but loses the boundary.
+
+`--delete-branch` removes the local and remote branch copies in one shot. Repository settings disable squash and rebase merging entirely, so the merge button can't pick a different method by accident — see `docs/doc-github.md` for the full PR settings.
