@@ -63,7 +63,13 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: programQueryKey(program.id) });
 
   const updateMutation = useMutation({
-    mutationFn: async (vars: { name: string; slug: string; description: string | null }) => {
+    mutationFn: async (vars: {
+      name?: string;
+      slug?: string;
+      description?: string | null;
+      archived?: boolean;
+      signupsOpen?: boolean;
+    }) => {
       const res = await apiClient.api.admin.programs[":id"].$patch({
         param: { id: program.id },
         json: vars,
@@ -231,6 +237,48 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
             {editError}
           </p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3 rounded border border-border p-3">
+        <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground">Visibility</h2>
+        <div className="flex flex-col gap-2 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              <span className="font-medium">Signups</span>{" "}
+              <span className="text-muted-foreground">
+                — {program.signupsOpen ? "members can join from /programs" : "self-serve join is disabled"}
+              </span>
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              disabled={updateMutation.isPending}
+              onClick={() => updateMutation.mutate({ signupsOpen: !program.signupsOpen })}
+            >
+              {program.signupsOpen ? "Close signups" : "Open signups"}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              <span className="font-medium">Archived</span>{" "}
+              <span className="text-muted-foreground">
+                {program.archivedAt
+                  ? `— hidden from /programs since ${new Date(program.archivedAt).toLocaleDateString()}`
+                  : "— visible to members on /programs"}
+              </span>
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              disabled={updateMutation.isPending}
+              onClick={() => updateMutation.mutate({ archived: program.archivedAt === null })}
+            >
+              {program.archivedAt ? "Unarchive" : "Archive"}
+            </Button>
+          </div>
+        </div>
       </section>
 
       <section className="flex flex-col gap-3">

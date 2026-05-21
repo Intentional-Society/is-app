@@ -418,6 +418,9 @@ const api = new Hono<{ Variables: ApiVariables }>()
       if (result.error === "not_found") {
         return c.json({ error: "not_found" }, 404);
       }
+      if (result.error === "signups_closed") {
+        return c.json({ error: "signups_closed" }, 409);
+      }
       return c.json({ error: "already_joined" }, 409);
     }
     return c.json({ ok: true });

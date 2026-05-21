@@ -240,6 +240,84 @@ describe("Admin programs API", () => {
       const res = await patch(randomUUID(), { name: "Whatever" });
       expect(res.status).toBe(404);
     });
+
+    it("archives and unarchives via the boolean toggle, stamping archived_at", async () => {
+      const programId = await seedProgram("Archivable Program");
+      authAs(admin);
+
+      let res = await patch(programId, { archived: true });
+      expect(res.status).toBe(200);
+      let [row] = await db
+        .select({ archivedAt: programs.archivedAt })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.archivedAt).not.toBeNull();
+
+      res = await patch(programId, { archived: false });
+      expect(res.status).toBe(200);
+      [row] = await db
+        .select({ archivedAt: programs.archivedAt })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.archivedAt).toBeNull();
+    });
+
+    it("opens and closes signups via the signupsOpen boolean", async () => {
+      // New programs default to signups closed — flip open, then closed
+      // again to exercise both directions.
+      const programId = await seedProgram("Toggleable Signups Program");
+      authAs(admin);
+
+      let res = await patch(programId, { signupsOpen: true });
+      expect(res.status).toBe(200);
+      let [row] = await db
+        .select({ signupsOpen: programs.signupsOpen })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.signupsOpen).toBe(true);
+
+      res = await patch(programId, { signupsOpen: false });
+      expect(res.status).toBe(200);
+      [row] = await db
+        .select({ signupsOpen: programs.signupsOpen })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.signupsOpen).toBe(false);
+    });
+
+    it("rejects a non-boolean archived or signupsOpen with 400", async () => {
+      const programId = await seedProgram("Type Strict Program");
+      authAs(admin);
+
+      let res = await patch(programId, { archived: "yes" });
+      expect(res.status).toBe(400);
+      res = await patch(programId, { signupsOpen: 1 });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("GET /api/admin/programs (archive/signups state)", () => {
+    it("includes archived programs in the admin listing", async () => {
+      const liveId = await seedProgram("Live Program");
+      const archivedId = await seedProgram("Archived Program");
+      await db.update(programs).set({ archivedAt: sql`now()` }).where(eq(programs.id, archivedId));
+
+      authAs(admin);
+      const res = await app.request("/api/admin/programs");
+      const body = (await res.json()) as {
+        programs: Array<{ id: string; archivedAt: string | null; signupsOpen: boolean }>;
+      };
+
+      const live = body.programs.find((p) => p.id === liveId);
+      const archived = body.programs.find((p) => p.id === archivedId);
+      expect(live).toBeDefined();
+      expect(archived).toBeDefined();
+      expect(archived?.archivedAt).not.toBeNull();
+      expect(live?.archivedAt).toBeNull();
+      // New programs are seeded without specifying signups_open, so they
+      // pick up the closed-by-default policy.
+      expect(live?.signupsOpen).toBe(false);
+    });
   });
 
   describe("DELETE /api/admin/programs/:id", () => {

@@ -52,6 +52,9 @@ describe("Programs API", () => {
       slug: `test-program-${programId.slice(0, 8)}`,
       name: "Test Program",
       description: "A program for testing.",
+      // Tests exercising the member-facing join path need signups open;
+      // the closed-by-default policy is exercised by a dedicated test.
+      signupsOpen: true,
     });
 
     mockCreateServerClient.mockReturnValue({
@@ -85,6 +88,7 @@ describe("Programs API", () => {
             id: programId,
             name: "Test Program",
             description: "A program for testing.",
+            signupsOpen: true,
             memberCount: 0,
             joined: false,
             joinedAt: null,
@@ -104,6 +108,15 @@ describe("Programs API", () => {
       expect(program.joined).toBe(true);
       expect(program.joinedAt).toBeTruthy();
       expect(program.memberCount).toBe(1);
+    });
+
+    it("hides archived programs from the member listing", async () => {
+      await db.update(programs).set({ archivedAt: sql`now()` }).where(eq(programs.id, programId));
+
+      const res = await app.request("/api/programs");
+      const body = await res.json();
+      const hit = body.programs.find((p: { id: string }) => p.id === programId);
+      expect(hit).toBeUndefined();
     });
   });
 
@@ -144,6 +157,26 @@ describe("Programs API", () => {
       const res = await app.request("/api/programs/not-a-uuid/join", {
         method: "POST",
       });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "not_found" });
+    });
+
+    it("returns 409 signups_closed when the program has signups disabled", async () => {
+      await db.update(programs).set({ signupsOpen: false }).where(eq(programs.id, programId));
+
+      const res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: "signups_closed" });
+
+      // No membership row landed.
+      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("returns 404 when the program is archived", async () => {
+      await db.update(programs).set({ archivedAt: sql`now()` }).where(eq(programs.id, programId));
+
+      const res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "not_found" });
     });

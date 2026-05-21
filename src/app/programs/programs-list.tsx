@@ -61,9 +61,15 @@ function ProgramCard({
           >
             {pending ? "Leaving…" : "Leave program"}
           </Button>
-        ) : (
+        ) : program.signupsOpen ? (
           <Button type="button" disabled={pending} onClick={() => onJoin(program.id)} className="w-full">
             {pending ? "Joining…" : "Join program"}
+          </Button>
+        ) : (
+          // Self-serve join is gated by signupsOpen — an admin can still
+          // add a member directly, but the button stays out of reach.
+          <Button type="button" disabled className="w-full">
+            Signups closed
           </Button>
         )}
       </div>
@@ -110,7 +116,11 @@ export function ProgramsList() {
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setActionError(
-          body.error === "already_joined" ? "You've already joined this program." : "Failed to join program.",
+          body.error === "already_joined"
+            ? "You've already joined this program."
+            : body.error === "signups_closed"
+              ? "Signups for this program are closed."
+              : "Failed to join program.",
         );
       }
       reload();

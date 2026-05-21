@@ -68,6 +68,14 @@ export const programs = pgTable("programs", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
+  // Archived programs are hidden from member-facing listings (admins
+  // still see them in /admin/programs). Set the timestamp instead of
+  // a boolean — it's strictly more information.
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  // Gates the member-facing self-serve join. Closed by default so a
+  // newly-created cohort or pod doesn't accidentally accept signups
+  // before the admin is ready; admin add-participant is unaffected.
+  signupsOpen: boolean("signups_open").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 

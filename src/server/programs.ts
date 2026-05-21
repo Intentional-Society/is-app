@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { and, asc, eq, inArray, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -46,6 +46,7 @@ export type ProgramWithMembership = {
   slug: string;
   name: string;
   description: string | null;
+  signupsOpen: boolean;
   memberCount: number;
   joined: boolean;
   joinedAt: string | null;
@@ -55,6 +56,10 @@ export type ProgramWithMembership = {
 // fine for a small number of programs. If the programs table grows
 // significantly, refactor to LEFT JOIN + GROUP BY with a conditional
 // aggregate for the current user's assigned_at.
+//
+// Archived programs are hidden — admins manage them via /admin/programs.
+// signupsOpen is returned so the client can disable the join button on
+// programs that are still listed but not currently accepting joins.
 export const listPrograms = async (userId: string): Promise<ProgramWithMembership[]> => {
   const rows = await db
     .select({
@@ -62,6 +67,7 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
       slug: programs.slug,
       name: programs.name,
       description: programs.description,
+      signupsOpen: programs.signupsOpen,
       memberCount: sql<number>`(
         SELECT count(*)::int FROM ${profilePrograms}
         WHERE ${profilePrograms.programId} = ${programs.id}
@@ -73,6 +79,7 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
       )`,
     })
     .from(programs)
+    .where(isNull(programs.archivedAt))
     .orderBy(programs.name);
 
   return rows.map((r) => ({
@@ -96,13 +103,24 @@ const ensureProfile = async (userId: string): Promise<void> => {
 export const joinProgram = async (
   userId: string,
   programId: string,
-): Promise<{ ok: true } | { error: "not_found" | "already_joined" }> => {
+): Promise<{ ok: true } | { error: "not_found" | "already_joined" | "signups_closed" }> => {
   if (!isUuid(programId)) return { error: "not_found" };
 
-  // Verify program exists
-  const [program] = await db.select({ id: programs.id }).from(programs).where(eq(programs.id, programId));
+  // Read archive + signupsOpen alongside the existence check. Archived
+  // programs are surfaced as "not_found" — members shouldn't see them
+  // in their listing, so a join attempt with the id is treated like an
+  // attempt at any other unknown program.
+  const [program] = await db
+    .select({
+      id: programs.id,
+      archivedAt: programs.archivedAt,
+      signupsOpen: programs.signupsOpen,
+    })
+    .from(programs)
+    .where(eq(programs.id, programId));
 
-  if (!program) return { error: "not_found" };
+  if (!program || program.archivedAt !== null) return { error: "not_found" };
+  if (!program.signupsOpen) return { error: "signups_closed" };
 
   // Self-heal: ensure profile row exists before FK insert
   await ensureProfile(userId);
@@ -147,6 +165,8 @@ export type AdminProgram = {
   slug: string;
   name: string;
   description: string | null;
+  archivedAt: string | null;
+  signupsOpen: boolean;
   memberCount: number;
   createdAt: string;
 };
@@ -208,14 +228,23 @@ export const parseProgramCreate = (
 
 // Parses an edit-program body. Every field is optional — only the keys
 // present are updated — but a present `name` or `slug` must be valid.
-export const parseProgramUpdate = (
-  body: unknown,
-): { name?: string; slug?: string; description?: string | null } | { error: string } => {
+// `archived` is a boolean toggle: true stamps archived_at = now(), false
+// clears it. `signupsOpen` flips directly. Both are passed through as
+// their resolved column values so updateProgram doesn't have to know.
+export type ProgramUpdate = {
+  name?: string;
+  slug?: string;
+  description?: string | null;
+  archived?: boolean;
+  signupsOpen?: boolean;
+};
+
+export const parseProgramUpdate = (body: unknown): ProgramUpdate | { error: string } => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "body must be a JSON object" };
   }
   const obj = body as Record<string, unknown>;
-  const result: { name?: string; slug?: string; description?: string | null } = {};
+  const result: ProgramUpdate = {};
 
   if ("name" in obj) {
     const name = trimmedString(obj.name);
@@ -237,11 +266,21 @@ export const parseProgramUpdate = (
     }
     result.description = description || null;
   }
+  if ("archived" in obj) {
+    if (typeof obj.archived !== "boolean") return { error: "archived must be a boolean" };
+    result.archived = obj.archived;
+  }
+  if ("signupsOpen" in obj) {
+    if (typeof obj.signupsOpen !== "boolean") return { error: "signupsOpen must be a boolean" };
+    result.signupsOpen = obj.signupsOpen;
+  }
   return result;
 };
 
 // Every program with its member count. Unlike listPrograms this carries
 // no per-user membership — admins manage programs, they don't join them.
+// Archived programs are included here so admins can re-open them; the
+// member-facing listPrograms hides them.
 export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
   return db
     .select({
@@ -249,6 +288,8 @@ export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
       slug: programs.slug,
       name: programs.name,
       description: programs.description,
+      archivedAt: sql<string | null>`to_json(${programs.archivedAt}) #>> '{}'`,
+      signupsOpen: programs.signupsOpen,
       createdAt: sql<string>`to_json(${programs.createdAt}) #>> '{}'`,
       memberCount: sql<number>`(
         SELECT count(*)::int FROM ${profilePrograms}
@@ -278,6 +319,8 @@ export const createProgram = async (input: {
       slug: row.slug,
       name: row.name,
       description: row.description,
+      archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
+      signupsOpen: row.signupsOpen,
       memberCount: 0,
       createdAt: row.createdAt.toISOString(),
     },
@@ -286,16 +329,22 @@ export const createProgram = async (input: {
 
 export const updateProgram = async (
   programId: string,
-  input: { name?: string; slug?: string; description?: string | null },
+  input: ProgramUpdate,
 ): Promise<{ ok: true } | { error: "not_found" | "slug_conflict" }> => {
   if (!isUuid(programId)) return { error: "not_found" };
 
   const [program] = await db.select({ id: programs.id }).from(programs).where(eq(programs.id, programId));
   if (!program) return { error: "not_found" };
 
-  const update: { name?: string; slug?: string; description?: string | null } = {};
+  // Drizzle's set() accepts an SQL expression for archived_at when we
+  // want now()/null, so split the type out from the validated input.
+  const update: Record<string, unknown> = {};
   if (input.name !== undefined) update.name = input.name;
   if (input.description !== undefined) update.description = input.description;
+  if (input.archived !== undefined) {
+    update.archivedAt = input.archived ? sql`now()` : null;
+  }
+  if (input.signupsOpen !== undefined) update.signupsOpen = input.signupsOpen;
   if (input.slug !== undefined) {
     // Reject a slug a different program already holds; the row keeping
     // its own slug unchanged is fine.
@@ -327,6 +376,8 @@ export const getProgramDetail = async (
       slug: programs.slug,
       name: programs.name,
       description: programs.description,
+      archivedAt: programs.archivedAt,
+      signupsOpen: programs.signupsOpen,
       createdAt: programs.createdAt,
     })
     .from(programs)
@@ -361,6 +412,8 @@ export const getProgramDetail = async (
       slug: program.slug,
       name: program.name,
       description: program.description,
+      archivedAt: program.archivedAt ? program.archivedAt.toISOString() : null,
+      signupsOpen: program.signupsOpen,
       createdAt: program.createdAt.toISOString(),
       memberCount: participants.length,
       participants,

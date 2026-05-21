@@ -129,11 +129,16 @@ async function seedProfiles(): Promise<SeedResult> {
 }
 
 async function seedPrograms(): Promise<SeedResult> {
+  // The column default for signups_open is false (closed-by-default for
+  // newly-created programs), but the dev seed represents the live state
+  // of running programs — they should be joinable without admin
+  // intervention. Override here so a fresh seed isn't dead on arrival.
   const values = seedData.programs.map((p) => ({
     id: p.id,
     slug: p.slug,
     name: p.name,
     description: p.description,
+    signupsOpen: true,
   }));
   const result = await db.insert(programs).values(values).onConflictDoNothing().returning({ id: programs.id });
   return { inserted: result.length, skipped: values.length - result.length };

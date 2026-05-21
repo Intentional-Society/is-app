@@ -57,6 +57,13 @@
       "when": 1779343350896,
       "tag": "0007_add_profile_hidden",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779344236894,
+      "tag": "0008_add_programs_archive_signups",
+      "breakpoints": true
     }
   ]
 }
