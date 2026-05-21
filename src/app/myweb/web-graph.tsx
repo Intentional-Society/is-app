@@ -312,8 +312,16 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_event, node) => {
-          // Center node has no profile destination distinct from "you
-          // are here" — clicking yourself is a no-op.
+          if (node.data.isCenter) return;
+          // Re-center the viewport on the clicked node so members can
+          // explore the graph without navigating away. Double-click
+          // navigates to the member's profile page.
+          flowRef.current?.setCenter(node.position.x, node.position.y, {
+            zoom: flowRef.current.getZoom(),
+            duration: 400,
+          });
+        }}
+        onNodeDoubleClick={(_event, node) => {
           if (node.data.isCenter) return;
           const slug = node.data.slug ?? node.data.id;
           router.push(`/members/${slug}`);
