@@ -151,6 +151,28 @@ describe("GET /api/me", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("PUT /me returns 409 when the display name's slug is already taken", async () => {
+    // Seed another member who already owns the slug "member-name".
+    const otherId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${otherId}::uuid, 'slug-clash@testfake.local', false, false)`,
+    );
+    await db.insert(profiles).values({ id: otherId, displayName: "Member Name", slug: "member-name" });
+
+    try {
+      const res = await putMe({ displayName: "Member Name" });
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toMatch(/already taken/i);
+
+      // The failed update must leave the caller's own slug untouched.
+      const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
+      expect(row?.slug).not.toBe("member-name");
+    } finally {
+      await db.delete(profiles).where(eq(profiles.id, otherId));
+      await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);
+    }
+  });
 });
 
 describe("PUT /api/me/last-updated-web", () => {

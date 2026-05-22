@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppWordmark } from "@/components/app-wordmark";
 import { getServerUser } from "@/lib/supabase/server-user";
 
 import { SigninForm } from "./signin-form";
@@ -33,14 +34,14 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-4xl font-bold">Intentional Society</h1>
+      <AppWordmark asLink />
       <p className="max-w-sm text-center text-base text-muted-foreground">
-        Sign in with your password, or leave it blank to receive a magic link by email.
+        Receive a sign-in link by email, or sign in with your password if you've set one.
       </p>
       {process.env.NODE_ENV === "development" && (
         <p className="max-w-sm rounded border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
           <strong>Local dev:</strong> this database is separate from production. Use a seeded email (e.g.{" "}
-          <code>aria.chen@example.com</code>) or run <code>npm run seed:dev</code> first. Magic links arrive at{" "}
+          <code>aria.chen@example.com</code>) or run <code>npm run seed:dev</code> first. Sign-in links arrive at{" "}
           <a href="http://localhost:54324" target="_blank" rel="noopener noreferrer" className="underline">
             Inbucket
           </a>

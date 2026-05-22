@@ -257,7 +257,17 @@ const api = new Hono<{ Variables: ApiVariables }>()
         ...(parsed.displayName !== undefined ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null } : {}),
         lastUpdatedProfile: sql`now()`,
       };
-      await db.update(profiles).set(update).where(eq(profiles.id, user.id));
+      try {
+        await db.update(profiles).set(update).where(eq(profiles.id, user.id));
+      } catch (err) {
+        // Display name maps to a unique slug; a clash means another member
+        // already uses this name. Surface it instead of a generic 500.
+        const cause = (err as { cause?: { code?: string; constraint_name?: string } }).cause;
+        if (cause?.code === "23505" && cause.constraint_name === "profiles_slug_unique") {
+          return c.json({ error: "That display name is already taken. Please choose a different one." }, 409);
+        }
+        throw err;
+      }
     }
 
     const profile = await getProfileForSelf(user.id);

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppWordmark } from "@/components/app-wordmark";
 import { Button } from "@/components/ui/button";
 import { loadMe } from "@/lib/api-server";
 import { welcomeEntryStep } from "@/lib/welcomeEntryStep";
@@ -13,12 +14,23 @@ export const metadata: Metadata = { robots: { index: true, follow: true } };
 function LoggedOutHome() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <div className="flex flex-col items-center gap-1">
-        <h1 className="text-4xl font-bold">Intentional Society</h1>
-        <p className="font-serif italic text-2xl text-muted-foreground">The IS Web App</p>
-      </div>
-      <p className="max-w-md text-center text-muted-foreground">
-        A community of people practicing relational growth together.
+      <AppWordmark />
+      <p className="w-full max-w-sm text-center text-base text-muted-foreground">
+        This site is for network members. Don&apos;t have an invite?{" "}
+        <a
+          href="https://www.intentionalsociety.org/get-involved#connection-calls"
+          className="underline text-muted-foreground hover:text-foreground"
+        >
+          Join a Connection Call
+        </a>{" "}
+        to introduce yourself! In the meantime,{" "}
+        <a
+          href="https://www.intentionalsociety.org/web"
+          className="underline text-muted-foreground hover:text-foreground"
+        >
+          read more here
+        </a>
+        .
       </p>
 
       <div className="flex w-full max-w-sm flex-col gap-3">
@@ -29,19 +41,6 @@ function LoggedOutHome() {
           Join with an invite code
         </Button>
       </div>
-
-      <p className="max-w-sm text-center text-base text-muted-foreground">
-        Don&apos;t have an invite?{" "}
-        <a
-          href="https://www.intentionalsociety.org/get-involved#connection-calls"
-          className="underline text-muted-foreground hover:text-foreground"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Join a Connection Call
-        </a>{" "}
-        to meet the community and learn more.
-      </p>
     </main>
   );
 }
@@ -70,16 +69,26 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
   return (
     <main className="flex min-h-screen flex-col items-center gap-8 p-8 pt-12">
       <div className="flex flex-col items-center gap-2">
-        <h1 className="text-3xl font-bold">{greeting}</h1>
-        <p className="font-serif italic text-muted-foreground">What would you like to do?</p>
+        <h1 className="text-4xl font-bold">The IS Web App</h1>
+        <p className="font-serif italic text-muted-foreground">{greeting}. What would you like to do?</p>
+        <p className="mt-2 max-w-md text-center text-base text-muted-foreground">
+          We&apos;re actively building across this app still, but please try everything here — especially setting up
+          your Web connections! Send any feedback to{" "}
+          <a
+            href="mailto:devteam@mail.intentionalsociety.org"
+            className="underline text-muted-foreground hover:text-foreground"
+          >
+            devteam@mail.intentionalsociety.org
+          </a>
+        </p>
       </div>
 
       <div className="grid w-full max-w-lg gap-4 sm:grid-cols-2">
-        <NavCard href="/myweb" title="My web" description="See your connections and relational map." />
-        <NavCard href="/profile" title="My profile" description="View and edit your community profile." />
-        <NavCard href="/members" title="Member directory" description="Browse and connect with other members." />
-        <NavCard href="/programs" title="Programs" description="Explore and join community programs." />
-        <NavCard href="/invites" title="Invite a friend" description="Generate invite codes for new members." />
+        <NavCard href="/programs" title="Programs" description="Explore and join IS Web programs." />
+        <NavCard href="/members" title="Member directory" description="Browse and find other members." />
+        <NavCard href="/myweb" title="My web" description="Build your relational map by adding connections!" />
+        <NavCard href="/profile" title="My profile" description="View and edit your profile information." />
+        <NavCard href="/invites" title="Invite a friend" description="Generate an invite code to bring someone into the network." />
       </div>
     </main>
   );

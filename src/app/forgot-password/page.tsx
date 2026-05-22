@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppWordmark } from "@/components/app-wordmark";
 import { getServerUser } from "@/lib/supabase/server-user";
 
 import { ForgotPasswordForm } from "./forgot-password-form";
@@ -17,7 +18,7 @@ export default async function ForgotPasswordPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-4xl font-bold">Intentional Society</h1>
+      <AppWordmark asLink />
       <p className="max-w-sm text-center text-base text-muted-foreground">
         Enter your email and we will send you a link to reset your password.
       </p>

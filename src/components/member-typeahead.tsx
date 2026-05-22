@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiClient } from "@/lib/api";
 import type { MemberSummary } from "@/lib/api-types";
+import { memberKeywords, memberSearchFilter } from "@/lib/member-search";
 
 const MEMBERS_QUERY_KEY = ["members"] as const;
 
@@ -20,12 +21,6 @@ const fetchMembers = async (): Promise<MemberSummary[]> => {
   const body = await res.json();
   return body.members;
 };
-
-// cmdk filters CommandItems by their `value` prop. Build one search
-// string per member so typing matches display name, location, or any
-// keyword without us needing a custom filter function.
-const searchValue = (m: MemberSummary): string =>
-  [m.displayName ?? "", m.location ?? "", ...(m.keywords ?? [])].join(" ");
 
 export function MemberTypeahead({
   label,
@@ -83,7 +78,7 @@ export function MemberTypeahead({
           }
         />
         <PopoverContent align="start" className="w-(--anchor-width) p-0">
-          <Command>
+          <Command filter={memberSearchFilter}>
             <CommandInput placeholder="Search members…" />
             <CommandList>
               <CommandEmpty>{isPending ? "Loading…" : "No member found."}</CommandEmpty>
@@ -91,7 +86,8 @@ export function MemberTypeahead({
                 {visible.map((m) => (
                   <CommandItem
                     key={m.id}
-                    value={searchValue(m)}
+                    value={m.displayName ?? ""}
+                    keywords={memberKeywords(m)}
                     onSelect={() => {
                       onSelect(m);
                       // Closing on every pick is friendlier than staying

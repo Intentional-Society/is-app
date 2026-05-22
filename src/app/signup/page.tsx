@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppWordmark } from "@/components/app-wordmark";
 import { getServerUser } from "@/lib/supabase/server-user";
 
 import { SignupForm } from "./signup-form";
@@ -24,7 +25,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-4xl font-bold">Intentional Society</h1>
+      <AppWordmark asLink />
       <p className="max-w-sm text-center text-base text-muted-foreground">
         Joining by invite? Enter the code a member shared with you.
       </p>

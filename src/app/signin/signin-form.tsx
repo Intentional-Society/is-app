@@ -57,9 +57,9 @@ function SentView({ email, origin }: { email: string; origin: string }) {
           type="button"
           onClick={handleResend}
           disabled={!canResend}
-          className="text-base text-muted-foreground underline disabled:no-underline disabled:opacity-50"
+          className="text-base text-muted-foreground underline cursor-pointer disabled:cursor-default disabled:no-underline disabled:opacity-50"
         >
-          {sending ? "Resending…" : secondsLeft > 0 ? `Resend in ${secondsLeft}s` : "Resend email"}
+          {sending ? "Resending…" : secondsLeft > 0 ? `Resend available in ${secondsLeft}s` : "Resend email"}
         </button>
       )}
     </div>
@@ -84,7 +84,7 @@ export function SigninForm() {
         password,
       });
       if (error) {
-        // No fallback to magic link — a failed password means the
+        // No fallback to the email sign-in link — a failed password means the
         // member mistyped it; falling through silently would be
         // confusing. They can clear the field and resubmit.
         setState({ status: "error", message: error.message });
@@ -150,7 +150,7 @@ export function SigninForm() {
         id="password"
         type="password"
         autoComplete="current-password"
-        placeholder="Leave blank to use magic link"
+        placeholder="Leave blank to use a sign-in link"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         disabled={state.status === "submitting"}

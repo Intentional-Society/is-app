@@ -48,12 +48,12 @@ export function WelcomeForm({ initial }: { initial: ProfileFormValues }) {
         id="password"
         type="password"
         autoComplete="new-password"
-        placeholder="Leave blank to continue using magic links"
+        placeholder="Leave blank to continue using sign-in links"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-sm text-muted-foreground">You can always sign in with a magic link instead.</p>
+      <p className="text-sm text-muted-foreground">You can always use a sign-in link instead.</p>
 
       <Button type="submit" className="mt-3" disabled={disabled}>
         {disabled ? "Saving…" : "Save"}
