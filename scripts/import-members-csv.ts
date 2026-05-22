@@ -17,10 +17,12 @@
  *                script loads .env.local and refuses to run if the
  *                Supabase URL does not look local.
  *   --overwrite  Update rows that already exist — profile fields,
- *                program links, and photo — from the CSV, instead of
- *                leaving them untouched. For the first serious prod
- *                run, to align the dev-team profiles already on prod
- *                with the CSV. Omit it on later tidy-up runs.
+ *                program links, and photo — from the CSV, and reset
+ *                their onboarding so they re-run the welcome flow,
+ *                instead of leaving them untouched. For the first
+ *                serious prod run, to align the dev-team profiles
+ *                already on prod with the CSV. Omit it on later tidy-up
+ *                runs.
  *
  * RECOMMENDED WORKFLOW
  *   1. --dry-run against local — shape-checks the CSV and every photo.
@@ -56,6 +58,13 @@
  *   is silent. Members are sign-in-able immediately (no password; they
  *   sign in via magic link once you onboard them).
  *
+ * JOIN DATE
+ *   The form's signup timestamp (the "Timestamp" column) becomes the
+ *   member's app-level join date — profiles.createdAt, surfaced as
+ *   "member since" — and the assignedAt (join date) of every program
+ *   they are linked to. A row with a blank or unparseable timestamp is
+ *   warned about and falls back to the column default (now()).
+ *
  * PROGRAMS — PREFLIGHT, NEVER CREATED
  *   This script never creates programs. It links members to programs
  *   that must already exist — the ones they checked on the form
@@ -74,8 +83,10 @@
  *     a re-run does not re-add a program a member removed in-app.
  *   With --overwrite, a row that already exists is updated from the
  *   CSV instead: profile fields are overwritten (the slug is kept),
- *   program links are reset to the CSV set, and the photo is
- *   re-imported.
+ *   the join date is re-set from the form timestamp, program links are
+ *   reset to the CSV set, the photo is re-imported, and the onboarding
+ *   markers (agreements / profile / programs) are cleared so the member
+ *   re-runs the full welcome flow.
  */
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -89,6 +100,7 @@ import { eq, inArray } from "drizzle-orm";
 // CSV column headers — the exact strings from the IS signup sheet export.
 // ---------------------------------------------------------------------------
 const COLUMN = {
+  timestamp: "Timestamp",
   email: "Email address",
   name: "Name",
   bio: "Who are you?",
@@ -174,6 +186,19 @@ function parseCSV(text: string): Record<string, string>[] {
     });
     return obj;
   });
+}
+
+// Parses the Google Forms signup timestamp ("M/D/YYYY H:MM:SS", US
+// locale, 24-hour, no leading zeros) into a Date. Returns null when the
+// cell is empty or malformed, so the caller can fall back to the column
+// default. Interpreted as UTC so the stored instant is identical no
+// matter which machine runs the import — the hour is immaterial for a
+// join date, only the day/year is ever surfaced.
+function parseSignupDate(raw: string): Date | null {
+  const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const [, mo, d, y, h, mi, s] = m;
+  return new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +s));
 }
 
 function toSlug(name: string): string {
@@ -416,6 +441,14 @@ async function main() {
     try {
       const name = row[COLUMN.name] ?? "";
       const slug = uniqueSlug(toSlug(name), usedSlugs);
+      // The form's signup time becomes the member's app-level join date
+      // (profiles.createdAt) and the join date of every program they're
+      // linked to (profile_programs.assignedAt). A blank/unparseable
+      // cell is surfaced rather than silently defaulting to now().
+      const signupDate = parseSignupDate(row[COLUMN.timestamp] ?? "");
+      if (!signupDate) {
+        console.warn(`  WARN   ${email}: unparseable signup timestamp "${row[COLUMN.timestamp] ?? ""}" — join date defaults to now`);
+      }
       // De-duplicate keywords — a CSV cell can repeat a value, and a
       // stored duplicate breaks KeywordChips' React keys (see #219).
       const keywords = [
@@ -462,6 +495,10 @@ async function main() {
         referredByLegacy: row[COLUMN.referredByLegacy] || null,
         emergencyContact: row[COLUMN.emergencyContact] || null,
         liveDesire: row[COLUMN.liveDesire] || null,
+        // Join date from the form timestamp. Omitted when unparseable so
+        // the column default (now()) applies on insert and an existing
+        // value is left untouched on overwrite.
+        ...(signupDate ? { createdAt: signupDate } : {}),
       };
 
       // 2. Profile row. Default: INSERT ... ON CONFLICT DO NOTHING, so a
@@ -471,14 +508,15 @@ async function main() {
       let currentAvatarPath: string | null = null;
 
       if (isDryRun) {
+        const joined = signupDate ? signupDate.toISOString().slice(0, 10) : "default(now)";
         if (!profileExisted) {
           stats.profilesInserted++;
           profileWritten = true;
-          console.log(`  PROFILE insert  ${email} -> slug "${slug}"`);
+          console.log(`  PROFILE insert  ${email} -> slug "${slug}"  joined ${joined}`);
         } else if (isOverwrite) {
           stats.profilesUpdated++;
           profileWritten = true;
-          console.log(`  PROFILE overwrite  ${email}`);
+          console.log(`  PROFILE overwrite  ${email}  joined ${joined}`);
         } else {
           stats.profilesSkipped++;
           console.log(`  PROFILE skip (exists)  ${email}`);
@@ -488,7 +526,17 @@ async function main() {
         if (isOverwrite) {
           await insert.onConflictDoUpdate({
             target: profiles.id,
-            set: { ...profileFields, updatedAt: new Date() },
+            set: {
+              ...profileFields,
+              // Reset the onboarding markers so an overwritten member is
+              // sent back through the whole welcome flow (agreements ->
+              // profile -> programs) and reviews the freshly-imported
+              // data, rather than skipping steps they completed before.
+              lastSignedAgreements: null,
+              lastUpdatedProfile: null,
+              lastReviewedPrograms: null,
+              updatedAt: new Date(),
+            },
           });
         } else {
           await insert.onConflictDoNothing({ target: profiles.id });
@@ -568,7 +616,10 @@ async function main() {
         for (const programSlug of slugs) {
           const programId = programIdBySlug.get(programSlug)!;
           if (!isDryRun) {
-            await db.insert(profilePrograms).values({ profileId: userId!, programId }).onConflictDoNothing();
+            await db
+              .insert(profilePrograms)
+              .values({ profileId: userId!, programId, ...(signupDate ? { assignedAt: signupDate } : {}) })
+              .onConflictDoNothing();
           }
           stats.programLinks++;
         }
