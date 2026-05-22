@@ -8,6 +8,7 @@ import { Avatar } from "@/components/avatar";
 import { KeywordChips } from "@/components/keyword-chips";
 import { Input } from "@/components/ui/input";
 import type { MemberSummary } from "@/lib/api-types";
+import { scoreMember } from "@/lib/member-search";
 
 function MemberCard({ member }: { member: MemberSummary }) {
   const href: UrlObject = { pathname: `/members/${member.slug ?? member.id}` };
@@ -34,15 +35,14 @@ function MemberCard({ member }: { member: MemberSummary }) {
 export function MembersList({ members }: { members: MemberSummary[] }) {
   const [query, setQuery] = useState("");
 
+  // Same matcher and threshold as MemberTypeahead (see lib/member-search).
+  // Sort by score so the closest matches lead, like the typeahead does.
   const filtered = query.trim()
-    ? members.filter((m) => {
-        const q = query.toLowerCase();
-        return (
-          m.displayName.toLowerCase().includes(q) ||
-          (m.location?.toLowerCase().includes(q) ?? false) ||
-          m.keywords.some((k) => k.toLowerCase().includes(q))
-        );
-      })
+    ? members
+        .map((m) => ({ m, score: scoreMember(m, query) }))
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(({ m }) => m)
     : members;
 
   return (
