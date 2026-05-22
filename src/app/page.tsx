@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppWordmark } from "@/components/app-wordmark";
 import { Button } from "@/components/ui/button";
 import { loadMe } from "@/lib/api-server";
 import { welcomeEntryStep } from "@/lib/welcomeEntryStep";
@@ -13,12 +14,23 @@ export const metadata: Metadata = { robots: { index: true, follow: true } };
 function LoggedOutHome() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <div className="flex flex-col items-center gap-1">
-        <h1 className="text-4xl font-bold">Intentional Society</h1>
-        <p className="font-serif italic text-2xl text-muted-foreground">The IS Web App</p>
-      </div>
-      <p className="max-w-md text-center text-muted-foreground">
-        A community of people practicing relational growth together.
+      <AppWordmark />
+      <p className="w-full max-w-sm text-center text-base text-muted-foreground">
+        This site is for network members. Don&apos;t have an invite?{" "}
+        <a
+          href="https://www.intentionalsociety.org/get-involved#connection-calls"
+          className="underline text-muted-foreground hover:text-foreground"
+        >
+          Join a Connection Call
+        </a>{" "}
+        to introduce yourself! In the meantime,{" "}
+        <a
+          href="https://www.intentionalsociety.org/web"
+          className="underline text-muted-foreground hover:text-foreground"
+        >
+          read more here
+        </a>
+        .
       </p>
 
       <div className="flex w-full max-w-sm flex-col gap-3">
@@ -29,19 +41,6 @@ function LoggedOutHome() {
           Join with an invite code
         </Button>
       </div>
-
-      <p className="max-w-sm text-center text-base text-muted-foreground">
-        Don&apos;t have an invite?{" "}
-        <a
-          href="https://www.intentionalsociety.org/get-involved#connection-calls"
-          className="underline text-muted-foreground hover:text-foreground"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Join a Connection Call
-        </a>{" "}
-        to meet the community and learn more.
-      </p>
     </main>
   );
 }

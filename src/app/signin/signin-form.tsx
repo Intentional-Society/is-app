@@ -84,7 +84,7 @@ export function SigninForm() {
         password,
       });
       if (error) {
-        // No fallback to magic link — a failed password means the
+        // No fallback to the email sign-in link — a failed password means the
         // member mistyped it; falling through silently would be
         // confusing. They can clear the field and resubmit.
         setState({ status: "error", message: error.message });
@@ -150,7 +150,7 @@ export function SigninForm() {
         id="password"
         type="password"
         autoComplete="current-password"
-        placeholder="Leave blank to use magic link"
+        placeholder="Leave blank to use a sign-in link"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         disabled={state.status === "submitting"}
