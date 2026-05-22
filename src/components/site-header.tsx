@@ -35,6 +35,22 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
+                <Link href="/programs" className="rounded px-2 py-2 hover:bg-muted">
+                  Programs
+                </Link>
+              }
+            />
+            <SheetClose
+              nativeButton={false}
+              render={
+                <Link href="/members" className="rounded px-2 py-2 hover:bg-muted">
+                  Member directory
+                </Link>
+              }
+            />
+            <SheetClose
+              nativeButton={false}
+              render={
                 <Link href="/myweb" className="rounded px-2 py-2 hover:bg-muted">
                   My web
                 </Link>
@@ -43,16 +59,16 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/invites" className="rounded px-2 py-2 hover:bg-muted">
-                  Invite a friend
+                <Link href="/profile" className="rounded px-2 py-2 hover:bg-muted">
+                  My profile
                 </Link>
               }
             />
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/profile" className="rounded px-2 py-2 hover:bg-muted">
-                  My profile
+                <Link href="/invites" className="rounded px-2 py-2 hover:bg-muted">
+                  Invite a friend
                 </Link>
               }
             />
