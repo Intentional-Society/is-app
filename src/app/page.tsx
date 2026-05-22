@@ -69,16 +69,26 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
   return (
     <main className="flex min-h-screen flex-col items-center gap-8 p-8 pt-12">
       <div className="flex flex-col items-center gap-2">
-        <h1 className="text-3xl font-bold">{greeting}</h1>
-        <p className="font-serif italic text-muted-foreground">What would you like to do?</p>
+        <h1 className="text-4xl font-bold">The IS Web App</h1>
+        <p className="font-serif italic text-muted-foreground">{greeting}. What would you like to do?</p>
+        <p className="mt-2 max-w-md text-center text-base text-muted-foreground">
+          We&apos;re actively building across this app still, but please try everything here — especially setting up
+          your Web connections! Send any feedback to{" "}
+          <a
+            href="mailto:devteam@mail.intentionalsociety.org"
+            className="underline text-muted-foreground hover:text-foreground"
+          >
+            devteam@mail.intentionalsociety.org
+          </a>
+        </p>
       </div>
 
       <div className="grid w-full max-w-lg gap-4 sm:grid-cols-2">
-        <NavCard href="/myweb" title="My web" description="See your connections and relational map." />
-        <NavCard href="/profile" title="My profile" description="View and edit your community profile." />
-        <NavCard href="/members" title="Member directory" description="Browse and connect with other members." />
-        <NavCard href="/programs" title="Programs" description="Explore and join community programs." />
-        <NavCard href="/invites" title="Invite a friend" description="Generate invite codes for new members." />
+        <NavCard href="/programs" title="Programs" description="Explore and join IS Web programs." />
+        <NavCard href="/members" title="Member directory" description="Browse and find other members." />
+        <NavCard href="/myweb" title="My web" description="Build your relational map by adding connections!" />
+        <NavCard href="/profile" title="My profile" description="View and edit your profile information." />
+        <NavCard href="/invites" title="Invite a friend" description="Generate an invite code to bring someone into the network." />
       </div>
     </main>
   );
