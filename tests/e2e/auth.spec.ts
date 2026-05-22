@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("unauthenticated visit to / shows logged-out home page", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Intentional Society" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The IS Web App" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Join with an invite code" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Join a Connection Call" })).toBeVisible();
