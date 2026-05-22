@@ -57,9 +57,9 @@ function SentView({ email, origin }: { email: string; origin: string }) {
           type="button"
           onClick={handleResend}
           disabled={!canResend}
-          className="text-base text-muted-foreground underline disabled:no-underline disabled:opacity-50"
+          className="text-base text-muted-foreground underline cursor-pointer disabled:cursor-default disabled:no-underline disabled:opacity-50"
         >
-          {sending ? "Resending…" : secondsLeft > 0 ? `Resend in ${secondsLeft}s` : "Resend email"}
+          {sending ? "Resending…" : secondsLeft > 0 ? `Resend available in ${secondsLeft}s` : "Resend email"}
         </button>
       )}
     </div>
