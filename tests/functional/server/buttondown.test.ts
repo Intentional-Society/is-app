@@ -195,6 +195,45 @@ describe("createButtondownClient", () => {
     });
   });
 
+  describe("deleteSubscriber", () => {
+    it("DELETEs and returns void on success when write=true", async () => {
+      // 204 No Content responses must have a null body; build directly.
+      const fetcher = vi.fn<typeof fetch>(async () =>
+        Promise.resolve(new Response(null, { status: 204 })),
+      );
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      const result = await client.deleteSubscriber("sub_abc123");
+      expect(isDryRunOutcome(result)).toBe(false);
+      expect(result).toBeUndefined();
+      const [url, init] = fetcher.mock.calls[0];
+      expect(url).toBe("https://api.buttondown.com/v1/subscribers/sub_abc123");
+      expect(init?.method).toBe("DELETE");
+    });
+
+    it("returns a DryRunOutcome and makes no network call when write=false", async () => {
+      const fetcher = vi.fn<typeof fetch>(async () =>
+        Promise.resolve(new Response(null, { status: 204 })),
+      );
+      const client = createButtondownClient({ apiKey: "k", write: false, fetcher });
+
+      const result = await client.deleteSubscriber("sub_abc123");
+      expect(isDryRunOutcome(result)).toBe(true);
+      if (isDryRunOutcome(result)) {
+        expect(result.intent).toBe("delete");
+        expect(result.payload).toEqual({ id: "sub_abc123" });
+      }
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it("throws ButtondownApiError on non-2xx (e.g., 404)", async () => {
+      const fetcher = mockFetch(404, { detail: "Not found." });
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      await expect(client.deleteSubscriber("sub_missing")).rejects.toBeInstanceOf(ButtondownApiError);
+    });
+  });
+
   describe("updateSubscriber", () => {
     it("PATCHes and returns the updated subscriber when write=true", async () => {
       const updated = { ...sampleSubscriber, tags: ["new-tag-only"] };
@@ -278,6 +317,26 @@ describe("createFakeButtondownClient", () => {
     const fake = createFakeButtondownClient({ write: true, initialSubscribers: [initialSub] });
     await fake.updateSubscriber("preexisting_1", { tags: ["completely", "different"] });
     expect((await fake.getSubscriber("preexisting_1"))?.tags).toEqual(["completely", "different"]);
+  });
+
+  it("deleteSubscriber removes from the store and records an effect (write=true)", async () => {
+    const fake = createFakeButtondownClient({ write: true, initialSubscribers: [initialSub] });
+    await fake.deleteSubscriber("preexisting_1");
+    expect(await fake.getSubscriber("preexisting_1")).toBeNull();
+    expect(fake.effects[0]).toMatchObject({ kind: "delete", id: "preexisting_1", dryRun: false });
+  });
+
+  it("deleteSubscriber records a dry-run effect without mutating when write=false", async () => {
+    const fake = createFakeButtondownClient({ write: false, initialSubscribers: [initialSub] });
+    const result = await fake.deleteSubscriber("preexisting_1");
+    expect(isDryRunOutcome(result)).toBe(true);
+    expect(await fake.getSubscriber("preexisting_1")).toEqual(initialSub);
+    expect(fake.effects[0]).toMatchObject({ kind: "delete", id: "preexisting_1", dryRun: true });
+  });
+
+  it("deleteSubscriber throws on missing id (write=true)", async () => {
+    const fake = createFakeButtondownClient({ write: true });
+    await expect(fake.deleteSubscriber("never_existed")).rejects.toBeInstanceOf(ButtondownApiError);
   });
 
   it("listSubscribers returns a snapshot of every seeded subscriber", async () => {

@@ -47,13 +47,16 @@ export type UpdateSubscriberInput = {
 // dry-run mode. Carries the payload that would have been sent so the
 // caller can log a faithful "would have done X" record without a
 // separate code path.
-export type DryRunOutcome<T extends "create" | "update"> = T extends "create"
+export type DryRunOutcome<T extends "create" | "update" | "delete"> = T extends "create"
   ? { dryRun: true; intent: "create"; payload: CreateSubscriberInput }
-  : { dryRun: true; intent: "update"; payload: { id: string; patch: UpdateSubscriberInput } };
+  : T extends "update"
+    ? { dryRun: true; intent: "update"; payload: { id: string; patch: UpdateSubscriberInput } }
+    : { dryRun: true; intent: "delete"; payload: { id: string } };
 
-export const isDryRunOutcome = <T extends "create" | "update">(
-  result: ButtondownSubscriber | DryRunOutcome<T>,
-): result is DryRunOutcome<T> => "dryRun" in result && result.dryRun === true;
+export const isDryRunOutcome = <T extends "create" | "update" | "delete">(
+  result: ButtondownSubscriber | undefined | DryRunOutcome<T>,
+): result is DryRunOutcome<T> =>
+  typeof result === "object" && result !== null && "dryRun" in result && result.dryRun === true;
 
 export class ButtondownApiError extends Error {
   status: number;
@@ -100,6 +103,13 @@ export interface ButtondownClient {
   /** Throws ButtondownConflictError on 409 (duplicate email). */
   createSubscriber(input: CreateSubscriberInput): Promise<ButtondownSubscriber | DryRunOutcome<"create">>;
   updateSubscriber(id: string, patch: UpdateSubscriberInput): Promise<ButtondownSubscriber | DryRunOutcome<"update">>;
+  /**
+   * Delete a subscriber by id. The cron and inline paths never call
+   * this — it exists for the fidelity probe sequence and for the
+   * seed-fixtures script's empty-then-seed cycle. Returns void on
+   * success; throws on 404 or other non-2xx.
+   */
+  deleteSubscriber(id: string): Promise<undefined | DryRunOutcome<"delete">>;
 }
 
 export type ButtondownClientConfig = {
@@ -194,6 +204,19 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
         throw new ButtondownApiError(res.status, `PATCH subscriber: ${res.status} ${detail}`);
       }
       return (await res.json()) as ButtondownSubscriber;
+    },
+
+    async deleteSubscriber(id) {
+      if (!config.write) {
+        return { dryRun: true, intent: "delete", payload: { id } };
+      }
+      const res = await request("DELETE", `/subscribers/${encodeURIComponent(id)}`);
+      // 204 No Content is the documented success shape; tolerate any
+      // 2xx for forward-compatibility.
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new ButtondownApiError(res.status, `DELETE subscriber: ${res.status} ${detail}`);
+      }
     },
   };
 };

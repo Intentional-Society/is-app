@@ -33,7 +33,8 @@ export type FakeButtondownConfig = {
 
 export type FakeButtondownEffect =
   | { kind: "create"; input: CreateSubscriberInput; dryRun: boolean }
-  | { kind: "update"; id: string; patch: UpdateSubscriberInput; dryRun: boolean };
+  | { kind: "update"; id: string; patch: UpdateSubscriberInput; dryRun: boolean }
+  | { kind: "delete"; id: string; dryRun: boolean };
 
 export type FakeButtondownClient = ButtondownClient & {
   effects: FakeButtondownEffect[];
@@ -107,6 +108,17 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
       };
       subscribers.set(id, updated);
       return updated;
+    },
+
+    async deleteSubscriber(id: string): Promise<undefined | DryRunOutcome<"delete">> {
+      effects.push({ kind: "delete", id, dryRun: !config.write });
+      if (!config.write) {
+        return { dryRun: true, intent: "delete", payload: { id } };
+      }
+      if (!subscribers.has(id)) {
+        throw new ButtondownApiError(404, "fake: subscriber not found");
+      }
+      subscribers.delete(id);
     },
   };
 };
