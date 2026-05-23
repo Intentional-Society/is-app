@@ -22,12 +22,7 @@ const BUTTONDOWN_BASE_URL = "https://api.buttondown.com/v1";
 // from the Buttondown API response shape. The sync only treats
 // "unsubscribed" specially (don't write, raise alert); everything else
 // is "subscriber exists and is reachable, do the diff."
-export type ButtondownSubscriberType =
-  | "regular"
-  | "premium"
-  | "unactivated"
-  | "unsubscribed"
-  | "removed";
+export type ButtondownSubscriberType = "regular" | "premium" | "unactivated" | "unsubscribed" | "removed";
 
 // Minimal projection of the subscriber object — only the fields the
 // sync reads. The API returns more, all ignored by us.
@@ -80,17 +75,31 @@ export class ButtondownConflictError extends ButtondownApiError {
   }
 }
 
+// Shape of one page of the list endpoint's response. `next` is a
+// full URL to the next page or null on the last page.
+type ListSubscribersPage = {
+  results: ButtondownSubscriber[];
+  next: string | null;
+};
+
 export interface ButtondownClient {
-  /** Returns null on 404. Throws ButtondownApiError on other non-2xx. */
+  /**
+   * Fetch every subscriber, following Buttondown's cursor pagination
+   * (`next` URLs) until exhausted. Returns a flat array; intended for
+   * the daily reconciler and the bootstrap script so they can do one
+   * paginated round-trip and then iterate profiles against a local map
+   * instead of doing one GET per profile.
+   */
+  listSubscribers(): Promise<ButtondownSubscriber[]>;
+  /**
+   * Single-shot lookup by id or email. Returns null on 404. Used by
+   * the inline first-profile-save hook, where pre-listing the whole
+   * audience would be wasteful.
+   */
   getSubscriber(idOrEmail: string): Promise<ButtondownSubscriber | null>;
   /** Throws ButtondownConflictError on 409 (duplicate email). */
-  createSubscriber(
-    input: CreateSubscriberInput,
-  ): Promise<ButtondownSubscriber | DryRunOutcome<"create">>;
-  updateSubscriber(
-    id: string,
-    patch: UpdateSubscriberInput,
-  ): Promise<ButtondownSubscriber | DryRunOutcome<"update">>;
+  createSubscriber(input: CreateSubscriberInput): Promise<ButtondownSubscriber | DryRunOutcome<"create">>;
+  updateSubscriber(id: string, patch: UpdateSubscriberInput): Promise<ButtondownSubscriber | DryRunOutcome<"update">>;
 }
 
 export type ButtondownClientConfig = {
@@ -117,7 +126,38 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     });
   };
 
+  // Helper for paginated GETs that follow `next` URLs. `next` from
+  // Buttondown's API comes back as a full absolute URL, so we use it
+  // directly instead of reconstructing from a cursor; once null, the
+  // pagination is done. The `Authorization` header carries forward on
+  // each hop because we route through the same `request` shape.
+  const fetchPage = async (url: string): Promise<ListSubscribersPage> => {
+    // `url` is either a full Buttondown URL (from a `next` link) or a
+    // relative path on the first call.
+    const fullUrl = url.startsWith("http") ? url : `${BUTTONDOWN_BASE_URL}${url}`;
+    const res = await fetcher(fullUrl, {
+      method: "GET",
+      headers: { Authorization: authHeader, "content-type": "application/json" },
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new ButtondownApiError(res.status, `GET subscribers: ${res.status} ${detail}`);
+    }
+    return (await res.json()) as ListSubscribersPage;
+  };
+
   return {
+    async listSubscribers() {
+      const all: ButtondownSubscriber[] = [];
+      let next: string | null = "/subscribers";
+      while (next !== null) {
+        const page = await fetchPage(next);
+        all.push(...page.results);
+        next = page.next;
+      }
+      return all;
+    },
+
     async getSubscriber(idOrEmail) {
       // The endpoint accepts either id or email at the same slot; we
       // URL-encode either way so the "+" and "/" that can appear in
@@ -158,87 +198,6 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
   };
 };
 
-// --- Fake client for tests --------------------------------------------
-//
-// In-memory implementation of the same interface. Tests seed an initial
-// audience and then assert on `effects` (the ordered list of mutation
-// attempts) and `subscribers` (the post-mutation state). The fake
-// honors the same write/dry-run semantics as the real client.
-
-export type FakeButtondownConfig = {
-  write: boolean;
-  initialSubscribers?: ButtondownSubscriber[];
-};
-
-export type FakeButtondownEffect =
-  | { kind: "create"; input: CreateSubscriberInput; dryRun: boolean }
-  | { kind: "update"; id: string; patch: UpdateSubscriberInput; dryRun: boolean };
-
-export type FakeButtondownClient = ButtondownClient & {
-  effects: FakeButtondownEffect[];
-  subscribers: Map<string, ButtondownSubscriber>;
-};
-
-let fakeIdCounter = 0;
-const nextFakeId = () => `fakesub_${++fakeIdCounter}`;
-
-export const createFakeButtondownClient = (
-  config: FakeButtondownConfig = { write: true },
-): FakeButtondownClient => {
-  const subscribers = new Map<string, ButtondownSubscriber>();
-  for (const s of config.initialSubscribers ?? []) {
-    subscribers.set(s.id, { ...s, tags: [...s.tags] });
-  }
-  const effects: FakeButtondownEffect[] = [];
-
-  const findByEmail = (email: string): ButtondownSubscriber | undefined => {
-    const lower = email.toLowerCase();
-    for (const s of subscribers.values()) {
-      if (s.email_address.toLowerCase() === lower) return s;
-    }
-    return undefined;
-  };
-
-  return {
-    effects,
-    subscribers,
-
-    async getSubscriber(idOrEmail) {
-      const byId = subscribers.get(idOrEmail);
-      if (byId) return byId;
-      return findByEmail(idOrEmail) ?? null;
-    },
-
-    async createSubscriber(input) {
-      effects.push({ kind: "create", input, dryRun: !config.write });
-      if (!config.write) {
-        return { dryRun: true, intent: "create", payload: input };
-      }
-      if (findByEmail(input.email_address)) throw new ButtondownConflictError();
-      const sub: ButtondownSubscriber = {
-        id: nextFakeId(),
-        email_address: input.email_address,
-        type: "regular",
-        tags: [...input.tags],
-      };
-      subscribers.set(sub.id, sub);
-      return sub;
-    },
-
-    async updateSubscriber(id, patch) {
-      effects.push({ kind: "update", id, patch, dryRun: !config.write });
-      if (!config.write) {
-        return { dryRun: true, intent: "update", payload: { id, patch } };
-      }
-      const sub = subscribers.get(id);
-      if (!sub) throw new ButtondownApiError(404, "fake: subscriber not found");
-      const updated: ButtondownSubscriber = {
-        ...sub,
-        ...(patch.email_address !== undefined ? { email_address: patch.email_address } : {}),
-        ...(patch.tags !== undefined ? { tags: [...patch.tags] } : {}),
-      };
-      subscribers.set(id, updated);
-      return updated;
-    },
-  };
-};
+// The in-memory fake client used by the test suite lives at
+// tests/functional/server/buttondown-fake.ts so test-only code stays
+// outside the src/ tree.

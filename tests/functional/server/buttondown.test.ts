@@ -5,9 +5,10 @@ import {
   ButtondownConflictError,
   type ButtondownSubscriber,
   createButtondownClient,
-  createFakeButtondownClient,
   isDryRunOutcome,
 } from "@/server/buttondown";
+
+import { createFakeButtondownClient } from "./buttondown-fake";
 
 // A realistic-shape subscriber response. Only the fields the client
 // projects are asserted on; the API returns more that we ignore.
@@ -33,6 +34,79 @@ const mockFetch = (status: number, body: unknown) => {
 };
 
 describe("createButtondownClient", () => {
+  describe("listSubscribers", () => {
+    // Builds a fetcher that returns sequential responses from `pages`,
+    // one per call. Lets us simulate cursor pagination.
+    const sequentialFetch = (pages: { status: number; body: unknown }[]) => {
+      const responses = pages.map(
+        (p) =>
+          new Response(JSON.stringify(p.body), {
+            status: p.status,
+            headers: { "content-type": "application/json" },
+          }),
+      );
+      const fetcher = vi.fn<typeof fetch>(async () => {
+        const next = responses.shift();
+        if (!next) throw new Error("sequentialFetch: out of responses");
+        return Promise.resolve(next);
+      });
+      return fetcher;
+    };
+
+    it("returns all subscribers from a single-page response", async () => {
+      const subs = [sampleSubscriber, { ...sampleSubscriber, id: "sub_def456" }];
+      const fetcher = sequentialFetch([{ status: 200, body: { results: subs, next: null } }]);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      const got = await client.listSubscribers();
+      expect(got).toHaveLength(2);
+      expect(got[0]).toEqual(sampleSubscriber);
+    });
+
+    it("follows `next` URLs to drain every page", async () => {
+      const page1 = [sampleSubscriber];
+      const page2 = [{ ...sampleSubscriber, id: "sub_def456", email_address: "bob@example.com" }];
+      const page3 = [{ ...sampleSubscriber, id: "sub_ghi789", email_address: "carol@example.com" }];
+      const fetcher = sequentialFetch([
+        { status: 200, body: { results: page1, next: "https://api.buttondown.com/v1/subscribers?cursor=2" } },
+        { status: 200, body: { results: page2, next: "https://api.buttondown.com/v1/subscribers?cursor=3" } },
+        { status: 200, body: { results: page3, next: null } },
+      ]);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      const got = await client.listSubscribers();
+      expect(got).toHaveLength(3);
+      expect(got.map((s) => s.id)).toEqual(["sub_abc123", "sub_def456", "sub_ghi789"]);
+      // First call hits the relative path; subsequent calls use the
+      // absolute next URL Buttondown handed back.
+      expect(fetcher.mock.calls[0][0]).toBe("https://api.buttondown.com/v1/subscribers");
+      expect(fetcher.mock.calls[1][0]).toBe("https://api.buttondown.com/v1/subscribers?cursor=2");
+      expect(fetcher.mock.calls[2][0]).toBe("https://api.buttondown.com/v1/subscribers?cursor=3");
+    });
+
+    it("throws on a non-2xx page response", async () => {
+      const fetcher = sequentialFetch([{ status: 500, body: "boom" }]);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+      await expect(client.listSubscribers()).rejects.toBeInstanceOf(ButtondownApiError);
+    });
+
+    it("uses the Token auth header on every page request", async () => {
+      const fetcher = sequentialFetch([
+        {
+          status: 200,
+          body: { results: [sampleSubscriber], next: "https://api.buttondown.com/v1/subscribers?cursor=2" },
+        },
+        { status: 200, body: { results: [], next: null } },
+      ]);
+      const client = createButtondownClient({ apiKey: "secret123", write: true, fetcher });
+      await client.listSubscribers();
+      for (const call of fetcher.mock.calls) {
+        const headers = call[1]?.headers as Record<string, string>;
+        expect(headers.Authorization).toBe("Token secret123");
+      }
+    });
+  });
+
   describe("getSubscriber", () => {
     it("returns the subscriber on 200", async () => {
       const fetcher = mockFetch(200, sampleSubscriber);
@@ -115,9 +189,9 @@ describe("createButtondownClient", () => {
       const fetcher = mockFetch(409, { detail: "Subscriber already exists." });
       const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
 
-      await expect(
-        client.createSubscriber({ email_address: "alice@example.com", tags: [] }),
-      ).rejects.toBeInstanceOf(ButtondownConflictError);
+      await expect(client.createSubscriber({ email_address: "alice@example.com", tags: [] })).rejects.toBeInstanceOf(
+        ButtondownConflictError,
+      );
     });
   });
 
@@ -204,5 +278,23 @@ describe("createFakeButtondownClient", () => {
     const fake = createFakeButtondownClient({ write: true, initialSubscribers: [initialSub] });
     await fake.updateSubscriber("preexisting_1", { tags: ["completely", "different"] });
     expect((await fake.getSubscriber("preexisting_1"))?.tags).toEqual(["completely", "different"]);
+  });
+
+  it("listSubscribers returns a snapshot of every seeded subscriber", async () => {
+    const second: ButtondownSubscriber = {
+      id: "preexisting_2",
+      email_address: "second@example.com",
+      type: "regular",
+      tags: ["other"],
+    };
+    const fake = createFakeButtondownClient({ write: true, initialSubscribers: [initialSub, second] });
+
+    const list = await fake.listSubscribers();
+    expect(list).toHaveLength(2);
+    expect(list.map((s) => s.id).sort()).toEqual(["preexisting_1", "preexisting_2"]);
+    // Returned objects are independent copies — mutating the result
+    // shouldn't bleed back into the fake's store.
+    list[0].tags.push("mutated-after-the-fact");
+    expect((await fake.getSubscriber("preexisting_1"))?.tags).toEqual(["old-tag"]);
   });
 });
