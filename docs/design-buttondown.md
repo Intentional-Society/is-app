@@ -177,6 +177,12 @@ Four independent locks. Any one keeps the integration off:
 
 The inline-on-first-save path uses lock #2 only — no `BUTTONDOWN_API_KEY` in env means it no-ops in dev and preview.
 
+## API version pinning
+
+Buttondown ties each API key to a specific API version and only moves it when we ask. Concretely: `BUTTONDOWN_API_KEY` on production sees the same API surface until someone clicks "migrate to latest version" on that key in Buttondown's UI — drift is impossible by construction, and an upgrade is a deliberate ops action. The fidelity-fixture re-record (Appendix A) is part of that flow.
+
+Optionally we can issue a *second* key on a newer version while keeping the original key in place — useful for A/B comparing behavior under the new version before committing to the migration. Not required; the default is a single in-place key migration when we decide to move forward.
+
 ## Schema changes
 
 ```ts
@@ -247,3 +253,104 @@ Why not embed this in the cron: the bootstrap modifies app state (calls `leavePr
 - **Once-and-done unsubscribe alerts.** Add `profiles.buttondownUnsubscribeAlertedAt` so the cron raises one Sentry alert per unsubscribed member rather than re-firing daily. Defer until the daily noise becomes annoying — at our scale, "one daily reminder per pending case" is also a useful nag.
 - **Tag rename safety.** If an admin changes a program's `buttondownTag` from `foo` to `bar`, subscribers tagged `foo` become stranded — `foo` is no longer in the managed universe so the sweep can't see it. Either keep a tag-history table or document the operational rule "rename ≠ change in place; do it via add-new + retire-old."
 - **Per-program ad-hoc emails from the app.** If we ever want to compose and send from `/admin`, the natural surface is `POST /v1/emails` to Buttondown segmented by the tag this design already maintains. The sync side is the foundation either way.
+
+---
+
+## Appendix A: Fake-vs-real fidelity (recording from a dedicated newsletter)
+
+The in-memory fake at `tests/functional/server/buttondown-fake.ts` reflects how we *believe* Buttondown behaves today. Two ways that belief can be wrong:
+
+- **Wire shape drift.** Buttondown adds, renames, or retypes a response field; the new shape no longer matches our `ButtondownSubscriber` projection or the fake's synthesized responses.
+- **Stateful behavior drift.** The fake's reaction to a sequence (create → PATCH → GET) diverges from real Buttondown's reaction to the same sequence — same wire shape, different transitions.
+
+Both surface as `fake ≠ real`. Both are addressed the same way: record real responses to a dedicated test newsletter, then assert the fake matches when replayed.
+
+### The setup
+
+A dedicated newsletter on our Buttondown account — name: **`unchanging-api-test-fixture`** — holds a stable test audience. Buttondown keys are scoped to a single newsletter, so the test-newsletter key is **structurally incapable** of reaching real subscribers; that's enforced by Buttondown's API, not by our naming convention. Every fidelity activity uses that key against that newsletter.
+
+### Three dev-machine scripts (none run in CI)
+
+The fidelity tests deliberately live outside the `npm test` portfolio. They're run manually when someone touches the fake or adopts a new API version, not on every PR. The npm scripts:
+
+- **`npm run buttondown:seed-fixtures`** — idempotent reset of the test newsletter to a canonical "robust set of subscribers" defined by `seed.json` in the fixtures directory. Empties the newsletter, then creates each subscriber from the seed. Run once when first setting up the test newsletter; re-run whenever the live state has drifted from canonical (e.g., after probe runs that leave residue).
+- **`npm run buttondown:record`** — runs the probe sequence (see below) against the real test newsletter, captures each response, and writes the fixture files. Assumes the newsletter is already in seeded state — does not re-seed.
+- **`npm run buttondown:replay`** — runs the same probe sequence against the in-memory fake, asserts each response deep-equals the recorded fixture. This is the actual fidelity check. Needs no API key.
+
+Record and seed both load `.env.prod` and require `BUTTONDOWN_TEST_API_KEY`. The primary safety is structural — the test key cannot touch real newsletters — so no runtime check is required to protect real data. As an operational sanity check, both scripts issue a startup probe to confirm the key resolves the `unchanging-api-test-fixture` newsletter and bail if it doesn't (guards against accidental key-swap in `.env.prod`).
+
+### One probe sequence
+
+We don't structure this as named scenarios — designing for that level of organization is overkill at our usage size. There's one ordered sequence of probes covering every public method on `ButtondownClient`. The probe sequence lives in code at `tests/manual/buttondown-fidelity-probes.ts`; record and replay both walk it in order.
+
+Probe list:
+
+| #  | Probe                | Call                                                | Expectation                                        |
+|----|----------------------|-----------------------------------------------------|----------------------------------------------------|
+| 01 | list-seeded          | `listSubscribers()`                                 | array matching `seed.json`                         |
+| 02 | get-by-id            | `getSubscriber(seededId)`                           | matching subscriber                                |
+| 03 | get-by-email         | `getSubscriber(seededEmail)`                        | matching subscriber                                |
+| 04 | get-missing-id       | `getSubscriber(nonexistentId)`                      | null                                               |
+| 05 | get-missing-email    | `getSubscriber(nonexistentEmail)`                   | null                                               |
+| 06 | create-fresh         | `createSubscriber({email, tags})`                   | new subscriber object with id                      |
+| 07 | create-duplicate     | `createSubscriber({email: <06's email>, ...})`      | `ButtondownConflictError` (409)                    |
+| 08 | patch-tags           | `updateSubscriber(<06's id>, {tags: [...]})`        | updated subscriber                                 |
+| 09 | patch-email          | `updateSubscriber(<06's id>, {email_address: ...})` | updated subscriber                                 |
+| 10 | patch-both           | `updateSubscriber(<06's id>, {tags, email})`        | both fields applied                                |
+| 11 | list-after-mutations | `listSubscribers()`                                 | seeded + the probe-06 subscriber, in updated state |
+| 12 | delete               | `deleteSubscriber(<06's id>)`                       | success; subsequent list returns to seeded state   |
+
+Probe 12 leaves the test newsletter back at its canonical seeded state — re-running the sequence is idempotent without needing to re-seed.
+
+### Fixture layout
+
+```
+tests/functional/server/__fixtures__/buttondown/
+  meta.json
+  seed.json
+  probes/
+    01-list.json
+    02-get-by-id.json
+    03-get-missing.json
+    ...
+```
+
+- `meta.json` — `{api_version, key_fingerprint, recorded_at, recorded_by}`. One stamp per record run.
+- `seed.json` — the canonical audience the seed script puts into the test newsletter. Plain data, not test logic.
+- `probes/NN-<short-name>.json` — one file per probe step, sorted lexicographically by leading number. Each file holds `{request: {method, path, body}, response: {status, body}}`. Recording is at the HTTP layer (JSON bytes), not the typed-client layer, so wire-shape changes the typed projection happens to absorb still show in the diff.
+
+### Re-record workflow (yearly-ish)
+
+Re-recording is rare and intentional — see [API version pinning](#api-version-pinning) for why drift is impossible without explicit action:
+
+1. In Buttondown's UI, click "migrate to latest version" on the test-newsletter key (`BUTTONDOWN_TEST_API_KEY`). Optionally issue a second key on the new version and migrate that one while leaving the original alone, so old vs new can be A/B compared by swapping which key the script uses.
+2. Run `npm run buttondown:seed-fixtures` if the live state has drifted.
+3. Run `npm run buttondown:record`.
+4. `git diff tests/functional/server/__fixtures__/buttondown/` shows what Buttondown changed.
+5. If the diff is benign (only `meta.api_version` / `meta.recorded_at` move), commit.
+6. If the diff is semantic, update the client and/or fake to match new behavior, then commit fixtures and code together.
+
+The production cron's key is a different key on a different newsletter — it stays on its current API version until someone migrates it separately, which is the actual upgrade event.
+
+### Implementation pieces
+
+- `tests/functional/server/__fixtures__/buttondown/seed.json` — canonical audience.
+- `tests/manual/buttondown-fidelity-probes.ts` — the probe sequence as ordered code.
+- `tests/manual/buttondown-fidelity.test.ts` — Vitest replay runner. Lives under `tests/manual/` so the default vitest config excludes it from `npm test`; the `npm run buttondown:replay` script invokes Vitest with this file as the explicit target.
+- `scripts/buttondown-fidelity/seed-fixtures.ts` — implements `npm run buttondown:seed-fixtures`.
+- `scripts/buttondown-fidelity/record.ts` — implements `npm run buttondown:record`.
+
+`key_fingerprint` in `meta.json` is **first 3 + last 3** characters of the key (e.g., `abc...xyz`). Enough to confirm "same key as last recording" without leaking the value.
+
+### What this catches and what it doesn't
+
+Catches:
+- Field type changes in subscriber responses.
+- New required fields on POST.
+- Status-code changes on known cases.
+- Multi-step state-transition divergences (create-then-read returns the same shape as real Buttondown's create-then-read).
+
+Doesn't catch:
+- Rate-limit shape changes (we don't exercise them).
+- Behavior that only manifests at production scale.
+- Buttondown features we don't yet call.
