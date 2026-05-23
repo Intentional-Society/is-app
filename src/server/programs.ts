@@ -293,6 +293,7 @@ export type AdminProgram = {
   description: string | null;
   archivedAt: string | null;
   signupsOpen: boolean;
+  buttondownTag: string | null;
   memberCount: number;
   createdAt: string;
 };
@@ -310,6 +311,9 @@ export type ProgramDetail = AdminProgram & { participants: ProgramParticipant[] 
 const MAX_PROGRAM_NAME = 120;
 const MAX_PROGRAM_SLUG = 80;
 const MAX_PROGRAM_DESCRIPTION = 2000;
+// Buttondown tag names are short by convention; the cap is well above
+// anything Buttondown surfaces in its UI and keeps the column index-friendly.
+const MAX_BUTTONDOWN_TAG = 100;
 
 // Slugs are chosen by the admin, independently of the display name.
 // Enforce a URL-safe shape: lowercase alphanumerics in hyphen-separated
@@ -329,9 +333,12 @@ const validateSlug = (slug: string): { slug: string } | { error: string } => {
 
 // Parses a create-program body. Name and slug are both required and
 // chosen independently; description is optional, null when blank.
+// buttondownTag is also optional; blank is normalized to null.
 export const parseProgramCreate = (
   body: unknown,
-): { name: string; slug: string; description: string | null } | { error: string } => {
+):
+  | { name: string; slug: string; description: string | null; buttondownTag: string | null }
+  | { error: string } => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "body must be a JSON object" };
   }
@@ -349,7 +356,17 @@ export const parseProgramCreate = (
   if (description && description.length > MAX_PROGRAM_DESCRIPTION) {
     return { error: "description is too long" };
   }
-  return { name, slug, description: description || null };
+
+  const buttondownTag = trimmedString(obj.buttondownTag);
+  if (buttondownTag && buttondownTag.length > MAX_BUTTONDOWN_TAG) {
+    return { error: "buttondownTag is too long" };
+  }
+  return {
+    name,
+    slug,
+    description: description || null,
+    buttondownTag: buttondownTag || null,
+  };
 };
 
 // Parses an edit-program body. Every field is optional — only the keys
@@ -363,6 +380,10 @@ export type ProgramUpdate = {
   description?: string | null;
   archived?: boolean;
   signupsOpen?: boolean;
+  // null = opt this program out of Buttondown sync. Non-empty string =
+  // the exact Buttondown tag to manage. Empty/blank from the client is
+  // normalized to null in the parser.
+  buttondownTag?: string | null;
 };
 
 export const parseProgramUpdate = (body: unknown): ProgramUpdate | { error: string } => {
@@ -400,6 +421,18 @@ export const parseProgramUpdate = (body: unknown): ProgramUpdate | { error: stri
     if (typeof obj.signupsOpen !== "boolean") return { error: "signupsOpen must be a boolean" };
     result.signupsOpen = obj.signupsOpen;
   }
+  if ("buttondownTag" in obj) {
+    // Accept null or a trimmable string; everything else is a 400.
+    // Blank / whitespace-only normalizes to null (the "unset" state).
+    if (obj.buttondownTag === null) {
+      result.buttondownTag = null;
+    } else {
+      const tag = trimmedString(obj.buttondownTag);
+      if (tag === null) return { error: "buttondownTag must be a string or null" };
+      if (tag.length > MAX_BUTTONDOWN_TAG) return { error: "buttondownTag is too long" };
+      result.buttondownTag = tag || null;
+    }
+  }
   return result;
 };
 
@@ -417,6 +450,7 @@ export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
       description: programs.description,
       archivedAt: sql<string | null>`to_json(${programs.archivedAt}) #>> '{}'`,
       signupsOpen: programs.signupsOpen,
+      buttondownTag: programs.buttondownTag,
       createdAt: sql<string>`to_json(${programs.createdAt}) #>> '{}'`,
       memberCount: sql<number>`(
         SELECT count(*)::int FROM ${profilePrograms}
@@ -432,13 +466,19 @@ export const createProgram = async (input: {
   name: string;
   slug: string;
   description: string | null;
+  buttondownTag: string | null;
 }): Promise<{ program: AdminProgram } | { error: "slug_conflict" }> => {
   const [existing] = await db.select({ id: programs.id }).from(programs).where(eq(programs.slug, input.slug));
   if (existing) return { error: "slug_conflict" };
 
   const [row] = await db
     .insert(programs)
-    .values({ slug: input.slug, name: input.name, description: input.description })
+    .values({
+      slug: input.slug,
+      name: input.name,
+      description: input.description,
+      buttondownTag: input.buttondownTag,
+    })
     .returning();
 
   return {
@@ -449,6 +489,7 @@ export const createProgram = async (input: {
       description: row.description,
       archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
       signupsOpen: row.signupsOpen,
+      buttondownTag: row.buttondownTag,
       memberCount: 0,
       createdAt: row.createdAt.toISOString(),
     },
@@ -473,6 +514,7 @@ export const updateProgram = async (
     update.archivedAt = input.archived ? sql`now()` : null;
   }
   if (input.signupsOpen !== undefined) update.signupsOpen = input.signupsOpen;
+  if (input.buttondownTag !== undefined) update.buttondownTag = input.buttondownTag;
   if (input.slug !== undefined) {
     // Reject a slug a different program already holds; the row keeping
     // its own slug unchanged is fine.
@@ -506,6 +548,7 @@ export const getProgramDetail = async (
       description: programs.description,
       archivedAt: programs.archivedAt,
       signupsOpen: programs.signupsOpen,
+      buttondownTag: programs.buttondownTag,
       createdAt: programs.createdAt,
     })
     .from(programs)
@@ -542,6 +585,7 @@ export const getProgramDetail = async (
       description: program.description,
       archivedAt: program.archivedAt ? program.archivedAt.toISOString() : null,
       signupsOpen: program.signupsOpen,
+      buttondownTag: program.buttondownTag,
       createdAt: program.createdAt.toISOString(),
       memberCount: participants.length,
       participants,
