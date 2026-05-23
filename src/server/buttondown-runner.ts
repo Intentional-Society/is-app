@@ -10,7 +10,13 @@ import * as Sentry from "@sentry/nextjs";
 import { log } from "next-axiom";
 
 import { createButtondownClient } from "./buttondown";
-import { runButtondownSync, type SyncLogEvent, type SyncRunSummary, type UnsubscribeAlert } from "./buttondown-sync";
+import {
+  runButtondownSync,
+  runFirstProfileSaveSync,
+  type SyncLogEvent,
+  type SyncRunSummary,
+  type UnsubscribeAlert,
+} from "./buttondown-sync";
 import { acquireLock, releaseLock } from "./sync-locks";
 
 const LOCK_NAME = "buttondown";
@@ -84,5 +90,56 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
     return { status: "ok", summary };
   } finally {
     await releaseLock(LOCK_NAME, options.acquiredBy);
+  }
+};
+
+/**
+ * Best-effort inline hook called from PUT /me on the first save.
+ * Swallows all failures: profile-save UX is the priority and the
+ * cron is the safety net for whatever this misses. Soft-skips when
+ * BUTTONDOWN_API_KEY isn't set (dev / preview).
+ */
+export const runFirstProfileSaveForServer = async (params: {
+  profileId: string;
+  email: string;
+  write: boolean;
+}): Promise<void> => {
+  if (!process.env.BUTTONDOWN_API_KEY) return;
+  try {
+    const client = createButtondownClient({
+      apiKey: process.env.BUTTONDOWN_API_KEY,
+      write: params.write,
+    });
+    await runFirstProfileSaveSync({
+      profileId: params.profileId,
+      email: params.email,
+      client,
+      raiseUnsubscribeAlert: (alert: UnsubscribeAlert) => {
+        Sentry.captureException(new Error("buttondown.unsubscribed_member"), {
+          extra: {
+            profileId: alert.profileId,
+            email: alert.email,
+            programSlugsHeld: alert.programSlugsHeld,
+            buttondownTagsOnSubscriber: alert.buttondownTagsOnSubscriber,
+          },
+          tags: { feature: "buttondown-sync", path: "first-profile-save" },
+        });
+      },
+    });
+    log.info("buttondown sync", {
+      action: "first-profile-save-applied",
+      profileId: params.profileId,
+      write: params.write,
+    });
+  } catch (err) {
+    log.warn("buttondown sync", {
+      action: "first-profile-save-failed",
+      profileId: params.profileId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    Sentry.captureException(err, {
+      tags: { feature: "buttondown-sync", path: "first-profile-save" },
+      extra: { profileId: params.profileId },
+    });
   }
 };

@@ -24,6 +24,100 @@ import {
 import { db } from "./db";
 import { authUsers, profilePrograms, profiles, programs } from "./schema";
 
+/**
+ * Inline first-profile-save hook. Called from PUT /me when the
+ * profile was being saved for the first time (lastUpdatedProfile was
+ * NULL before the save). The "one moment" of full-overwrite tag
+ * writes — see docs/design-buttondown.md → "Write policy".
+ *
+ * Behavior per the design:
+ *   - Missing subscriber → POST create with [...program_tags, "isweb-member", "new"].
+ *   - Unsubscribed → don't write; raise alert.
+ *   - Active with `isweb-member` already → no-op (the app has
+ *     authoritatively touched this subscriber on a previous run and
+ *     overwriting now risks clobbering tags humans set since).
+ *   - Active without `isweb-member` → full-overwrite PATCH with
+ *     [...program_tags, "isweb-member", "returning"]. Clears any
+ *     legacy markers like `active`.
+ *
+ * Best-effort: callers swallow failures so the profile save itself
+ * succeeds. The daily cron picks up any miss.
+ */
+export const runFirstProfileSaveSync = async (params: {
+  profileId: string;
+  email: string;
+  client: ButtondownClient;
+  raiseUnsubscribeAlert?: (alert: UnsubscribeAlert) => void;
+}): Promise<void> => {
+  const { profileId, email, client } = params;
+
+  // This profile's current tagged-program memberships — same shape
+  // the daily reconciler computes but for one profile only.
+  const memberships = await db
+    .select({ buttondownTag: programs.buttondownTag, slug: programs.slug })
+    .from(profilePrograms)
+    .innerJoin(programs, eq(programs.id, profilePrograms.programId))
+    .where(
+      and(
+        eq(profilePrograms.profileId, profileId),
+        isNull(profilePrograms.leftAt),
+        isNull(programs.archivedAt),
+        isNotNull(programs.buttondownTag),
+      ),
+    );
+
+  const desiredTags: string[] = [];
+  const slugs: string[] = [];
+  for (const m of memberships) {
+    if (m.buttondownTag && !desiredTags.includes(m.buttondownTag)) desiredTags.push(m.buttondownTag);
+    if (!slugs.includes(m.slug)) slugs.push(m.slug);
+  }
+
+  const subscriber = await client.getSubscriber(email);
+
+  if (!subscriber) {
+    const result = await client.createSubscriber({
+      email_address: email,
+      tags: [...desiredTags, "isweb-member", "new"],
+    });
+    if (!isDryRunOutcome(result)) {
+      await db
+        .update(profiles)
+        .set({ buttondownSubscriberId: result.id })
+        .where(eq(profiles.id, profileId));
+    }
+    return;
+  }
+
+  // Record the discovered id immediately — every "found subscriber"
+  // branch below benefits from future runs using id-based lookup,
+  // even the no-op "already has isweb-member" case.
+  await db
+    .update(profiles)
+    .set({ buttondownSubscriberId: subscriber.id })
+    .where(eq(profiles.id, profileId));
+
+  if (subscriber.type === "unsubscribed") {
+    params.raiseUnsubscribeAlert?.({
+      profileId,
+      email,
+      programSlugsHeld: slugs,
+      buttondownTagsOnSubscriber: subscriber.tags,
+    });
+    return;
+  }
+
+  if (subscriber.tags.includes("isweb-member")) {
+    // Already authoritatively touched by the app on a previous run;
+    // don't clobber tags humans have added since.
+    return;
+  }
+
+  await client.updateSubscriber(subscriber.id, {
+    tags: [...desiredTags, "isweb-member", "returning"],
+  });
+};
+
 /** Structured event the sync emits to the caller's logger. */
 export type SyncLogEvent =
   | { action: "summary"; runId: string } & Omit<SyncRunSummary, "runId" | "write">

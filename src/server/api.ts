@@ -8,7 +8,7 @@ import { isRelationValue } from "@/lib/relation-value";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
-import { runButtondownSyncForServer } from "./buttondown-runner";
+import { runButtondownSyncForServer, runFirstProfileSaveForServer } from "./buttondown-runner";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -273,6 +273,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
       await upsertProfile(user);
     }
 
+    // Inline first-profile-save detection: lastUpdatedProfile being
+    // null right now (and a real update about to run) is "first
+    // save", which fires the Buttondown inline hook below. See
+    // docs/design-buttondown.md → "Inline hook on first profile save".
+    const isFirstSave = !existing?.lastUpdatedProfile && Object.keys(parsed).length > 0;
+
     if (Object.keys(parsed).length > 0) {
       const update = {
         ...parsed,
@@ -290,6 +296,18 @@ const api = new Hono<{ Variables: ApiVariables }>()
         }
         throw err;
       }
+    }
+
+    // Best-effort Buttondown inline hook. Failures inside the hook
+    // are swallowed by the runner, so even a Buttondown outage
+    // doesn't disturb the PUT /me response. The cron picks up any
+    // miss. Soft-skips on BUTTONDOWN_API_KEY missing (dev / preview).
+    if (isFirstSave && user.email) {
+      await runFirstProfileSaveForServer({
+        profileId: user.id,
+        email: user.email,
+        write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+      });
     }
 
     const profile = await getProfileForSelf(user.id);
