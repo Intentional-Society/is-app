@@ -267,7 +267,7 @@ Both surface as `fake ≠ real`. Both are addressed the same way: record real re
 
 ### The setup
 
-A dedicated newsletter on our Buttondown account — name: **`unchanging-api-test-fixture`** — holds a stable test audience. Buttondown keys are scoped to a single newsletter, so the test-newsletter key is **structurally incapable** of reaching real subscribers; that's enforced by Buttondown's API, not by our naming convention. Every fidelity activity uses that key against that newsletter.
+A dedicated newsletter on our Buttondown account — name: **`api-tests`** — holds a stable test audience. Buttondown keys are scoped to a single newsletter, so the test-newsletter key is **structurally incapable** of reaching real subscribers; that's enforced by Buttondown's API, not by our naming convention. Every fidelity activity uses that key against that newsletter.
 
 ### Three dev-machine scripts (none run in CI)
 
@@ -277,7 +277,7 @@ The fidelity tests deliberately live outside the `npm test` portfolio. They're r
 - **`npm run buttondown:record`** — runs the probe sequence (see below) against the real test newsletter, captures each response, and writes the fixture files. Assumes the newsletter is already in seeded state — does not re-seed.
 - **`npm run buttondown:replay`** — runs the same probe sequence against the in-memory fake, asserts each response deep-equals the recorded fixture. This is the actual fidelity check. Needs no API key.
 
-Record and seed both load `.env.prod` and require `BUTTONDOWN_TEST_API_KEY`. The primary safety is structural — the test key cannot touch real newsletters — so no runtime check is required to protect real data. As an operational sanity check, both scripts issue a startup probe to confirm the key resolves the `unchanging-api-test-fixture` newsletter and bail if it doesn't (guards against accidental key-swap in `.env.prod`).
+Record and seed both load `.env.prod` and require `BUTTONDOWN_TEST_API_KEY`. The primary safety is structural — the test key cannot touch real newsletters — so no runtime check is required to protect real data. As an operational sanity check, both scripts issue a startup probe to confirm the key resolves the `api-tests` newsletter and bail if it doesn't (guards against accidental key-swap in `.env.prod`).
 
 ### One probe sequence
 
