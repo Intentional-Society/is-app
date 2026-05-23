@@ -1,0 +1,14 @@
+[
+  {
+    "email_address": "alice@fixture.test",
+    "tags": ["fixture-alpha", "fixture-shared"]
+  },
+  {
+    "email_address": "bob@fixture.test",
+    "tags": ["fixture-beta", "fixture-shared"]
+  },
+  {
+    "email_address": "carol@fixture.test",
+    "tags": ["fixture-gamma"]
+  }
+]
