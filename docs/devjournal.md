@@ -16,6 +16,10 @@ Program cards now show a ring highlight when the user has joined, replacing the 
 
 Added a "Give Feedback" link to the hamburger menu that opens a Google Form in a new tab. Includes a functional test asserting the link's presence, URL, and target attributes.
 
+## 2026-05-23 | James (draft) | Buttondown sync
+
+Mirrors IS Web program memberships into Buttondown subscriber tags via a daily Vercel cron (08:00 UTC) plus an inline best-effort hook on first profile save, replacing the pre-app Google Form + Apps Script pipeline. Per-program opt-in via a new `programs.buttondown_tag` column; the cron loops over our profiles so the larger non-member newsletter audience is structurally untouchable. Write-vs-dry-run gate lives at the Buttondown API client layer (every PATCH/POST short-circuits when called with `write: false`). Admin gets two "Sync now" buttons (dry-run and write) under /admin. Full design: `docs/design-buttondown.md`. Rollout: schema, then `scripts/buttondown-bootstrap.ts` to reconcile the ~46 CSV-imported members (Buttondown is authoritative for the bootstrap moment), then flip `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script. Tracking: #261.
+
 ## 2026-05-21 | James | Polish programs (#226)
 
 Four bundled improvements: new members are auto-subscribed to the weekly web update on first sign-in; programs gain `archivedAt` (hidden from members) and `signupsOpen` (gates self-serve join, closed by default); `profile_programs` becomes soft-deleted via `leftAt` so the original `assignedAt` survives leave/rejoin as a stable first-joined date; per-program detail pages live at `/programs/[slug]`.
