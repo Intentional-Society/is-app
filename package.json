@@ -27,6 +27,7 @@
     "test:functional:client": "vitest run --project functional-client",
     "watch": "npm run dev:db && vitest",
     "test:e2e": "npm run dev:db && playwright test",
+    "test:manual:buttondown-api-replay": "vitest run --config vitest.manual.config.ts tests/manual/buttondown-replay.test.ts",
     "special:buttondown:seed-fixtures": "npx tsx scripts/buttondown-recording/seed-fixtures.ts",
     "special:buttondown:record-api": "vitest run --config vitest.manual.config.ts tests/manual/buttondown-api-golds.test.ts"
   },
