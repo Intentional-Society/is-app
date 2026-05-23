@@ -147,6 +147,14 @@ describe("runButtondownSync (daily reconciler)", () => {
     ).toBeDefined();
   });
 
+  // TODO: flakes ~1-in-3 under Vitest's default parallel file
+  // execution; deterministic with --no-file-parallelism and in
+  // isolation. Bob's `desired` tag set computes empty even though the
+  // join was just inserted — looks like cross-file DB-state
+  // interference under parallel workers. Most disciplined fix is to
+  // scope runButtondownSync's queries to a caller-supplied profile-id
+  // allowlist (also enables a "sync just this member" admin
+  // affordance). Worth a real issue once this branch is on main.
   it("PATCHes a subscribed person's tags when the managed set has drifted", async () => {
     const profileId = await makeProfile({ email: "bob@example.com" });
     const weeklyProgramId = await makeProgram({ buttondownTag: "weekly" });
