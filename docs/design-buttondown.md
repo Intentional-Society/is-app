@@ -179,7 +179,7 @@ The inline-on-first-save path uses lock #2 only — no `BUTTONDOWN_API_KEY` in e
 
 ## API version pinning
 
-Buttondown ties each API key to a specific API version and only moves it when we ask. Concretely: `BUTTONDOWN_API_KEY` on production sees the same API surface until someone clicks "migrate to latest version" on that key in Buttondown's UI — drift is impossible by construction, and an upgrade is a deliberate ops action. The fidelity-fixture re-record (Appendix A) is part of that flow.
+Buttondown ties each API key to a specific API version and only moves it when we ask. Concretely: `BUTTONDOWN_API_KEY` on production sees the same API surface until someone clicks "migrate to latest version" on that key in Buttondown's UI — drift is impossible by construction, and an upgrade is a deliberate ops action. The api-golds re-record (Appendix A) is part of that flow.
 
 Optionally we can issue a *second* key on a newer version while keeping the original key in place — useful for A/B comparing behavior under the new version before committing to the migration. Not required; the default is a single in-place key migration when we decide to move forward.
 
@@ -256,7 +256,7 @@ Why not embed this in the cron: the bootstrap modifies app state (calls `leavePr
 
 ---
 
-## Appendix A: Fake-vs-real fidelity (recording from a dedicated newsletter)
+## Appendix A: Fake-vs-real comparison (recording from a dedicated newsletter)
 
 The in-memory fake at `tests/functional/server/buttondown-fake.ts` reflects how we *believe* Buttondown behaves today. Two ways that belief can be wrong:
 
@@ -267,21 +267,21 @@ Both surface as `fake ≠ real`. Both are addressed the same way: record real re
 
 ### The setup
 
-A dedicated newsletter on our Buttondown account — name: **`api-tests`** — holds a stable test audience. Buttondown keys are scoped to a single newsletter, so the test-newsletter key is **structurally incapable** of reaching real subscribers; that's enforced by Buttondown's API, not by our naming convention. Every fidelity activity uses that key against that newsletter.
+A dedicated newsletter on our Buttondown account — name: **`api-tests`**, username **`intentional-society-api-tests`** — holds a stable test audience. Buttondown keys are scoped to a single newsletter, so the test-newsletter key is **structurally incapable** of reaching real subscribers; that's enforced by Buttondown's API, not by our naming convention. Every test-related activity uses that key against that newsletter.
 
 ### Three dev-machine scripts (none run in CI)
 
-The fidelity tests deliberately live outside the `npm test` portfolio. They're run manually when someone touches the fake or adopts a new API version, not on every PR. The npm scripts:
+The manual tests deliberately live outside the `npm test` portfolio. They're run manually when someone touches the fake or adopts a new API version, not on every PR. The npm scripts:
 
-- **`npm run buttondown:seed-fixtures`** — idempotent reset of the test newsletter to a canonical "robust set of subscribers" defined by `seed.json` in the fixtures directory. Empties the newsletter, then creates each subscriber from the seed. Run once when first setting up the test newsletter; re-run whenever the live state has drifted from canonical (e.g., after probe runs that leave residue).
-- **`npm run buttondown:record`** — runs the probe sequence (see below) against the real test newsletter, captures each response, and writes the fixture files. Assumes the newsletter is already in seeded state — does not re-seed.
-- **`npm run buttondown:replay`** — runs the same probe sequence against the in-memory fake, asserts each response deep-equals the recorded fixture. This is the actual fidelity check. Needs no API key.
+- **`npm run special:buttondown:seed-fixtures`** — idempotent reset of the test newsletter to a canonical "robust set of subscribers" defined by `seed.json` in the fixtures directory. Empties the newsletter, then creates each subscriber from the seed. Run once when first setting up the test newsletter; re-run whenever the live state has drifted from canonical (e.g., after probe runs that leave residue).
+- **`npm run special:buttondown:record-api`** — runs the probe sequence (see below) against the real test newsletter, captures each response, and writes the gold files. Assumes the newsletter is already in seeded state — does not re-seed.
+- **`npm run test:manual:buttondown-api-replay`** — runs the same probe sequence against the in-memory fake, asserts the normalized typed sequence deep-equals the normalized recorded golds. Needs no API key.
 
 Record and seed both load `.env.prod` and require `BUTTONDOWN_TEST_API_KEY`. The primary safety is structural — Buttondown's per-newsletter key scoping confines writes (and `listSubscribers` reads) to the key's specific newsletter, so a mis-pasted key cannot reach the wrong audience. The operational sanity check is `assertTestNewsletter` in `tests/manual/_buttondown-probes.ts`: it calls `GET /v1/accounts/me`, which returns the single newsletter the key writes to, and refuses to proceed unless the username matches `intentional-society-api-tests`. That catches both wrong-account and wrong-newsletter-same-account swaps. The key needs `administrivia_access` to call `/accounts/me` (in addition to `subscriber_access` for the destructive ops); the seed-fixtures script's startup error message points at this if the permission is missing.
 
 ### One probe sequence
 
-We don't structure this as named scenarios — designing for that level of organization is overkill at our usage size. There's one ordered sequence of probes covering every public method on `ButtondownClient`. The probe sequence lives in code at `tests/manual/buttondown-fidelity-probes.ts`; record and replay both walk it in order.
+We don't structure this as named scenarios — designing for that level of organization is overkill at our usage size. There's one ordered sequence of probes covering every public method on `ButtondownClient`. The probe sequence lives in code at `tests/manual/_buttondown-probes.ts`; record and replay both walk it in order.
 
 Probe list:
 
@@ -302,43 +302,47 @@ Probe list:
 
 Probe 12 leaves the test newsletter back at its canonical seeded state — re-running the sequence is idempotent without needing to re-seed.
 
-### Fixture layout
+### Data layout
 
 ```
-tests/functional/server/__fixtures__/buttondown/
-  meta.json
-  seed.json
-  probes/
-    01-list.json
-    02-get-by-id.json
-    03-get-missing.json
-    ...
+tests/functional/server/__data__/buttondown/
+  fixtures/
+    seed.json
+  golds/
+    meta.json
+    probes/
+      01-list-seeded.json
+      02-get-by-id.json
+      ...
 ```
 
-- `meta.json` — `{api_version, key_fingerprint, recorded_at, recorded_by}`. One stamp per record run.
-- `seed.json` — the canonical audience the seed script puts into the test newsletter. Plain data, not test logic.
-- `probes/NN-<short-name>.json` — one file per probe step, sorted lexicographically by leading number. Each file holds `{request: {method, path, body}, response: {status, body}}`. Recording is at the HTTP layer (JSON bytes), not the typed-client layer, so wire-shape changes the typed projection happens to absorb still show in the diff.
+`fixtures/` holds synthetic inputs we author; `golds/` holds outputs recorded from the real Buttondown API.
+
+- `fixtures/seed.json` — the canonical audience the seed script puts into the test newsletter. Plain data, not test logic.
+- `golds/meta.json` — `{api_version, key_fingerprint, recorded_at, recorded_by}`. One stamp per record run.
+- `golds/probes/NN-<short-name>.json` — one file per probe step, sorted lexicographically by leading number. Each file holds `{probe, http_calls, typed_result}`. The `http_calls` array captures raw request/response bytes (recording is at the HTTP layer, not the typed-client layer, so wire-shape changes the typed projection happens to absorb still show in the diff). `typed_result` is what the replay test deep-equals against, after id-normalization runs identical transforms on both the fake's output and the recorded gold.
 
 ### Re-record workflow (yearly-ish)
 
 Re-recording is rare and intentional — see [API version pinning](#api-version-pinning) for why drift is impossible without explicit action:
 
 1. In Buttondown's UI, click "migrate to latest version" on the test-newsletter key (`BUTTONDOWN_TEST_API_KEY`). Optionally issue a second key on the new version and migrate that one while leaving the original alone, so old vs new can be A/B compared by swapping which key the script uses.
-2. Run `npm run buttondown:seed-fixtures` if the live state has drifted.
-3. Run `npm run buttondown:record`.
-4. `git diff tests/functional/server/__fixtures__/buttondown/` shows what Buttondown changed.
+2. Run `npm run special:buttondown:seed-fixtures` if the live state has drifted.
+3. Run `npm run special:buttondown:record-api`.
+4. `git diff tests/functional/server/__data__/buttondown/golds/` shows what Buttondown changed.
 5. If the diff is benign (only `meta.api_version` / `meta.recorded_at` move), commit.
-6. If the diff is semantic, update the client and/or fake to match new behavior, then commit fixtures and code together.
+6. If the diff is semantic, update the client and/or fake to match new behavior, then commit golds and code together.
 
 The production cron's key is a different key on a different newsletter — it stays on its current API version until someone migrates it separately, which is the actual upgrade event.
 
 ### Implementation pieces
 
-- `tests/functional/server/__fixtures__/buttondown/seed.json` — canonical audience.
-- `tests/manual/buttondown-fidelity-probes.ts` — the probe sequence as ordered code.
-- `tests/manual/buttondown-fidelity.test.ts` — Vitest replay runner. Lives under `tests/manual/` so the default vitest config excludes it from `npm test`; the `npm run buttondown:replay` script invokes Vitest with this file as the explicit target.
-- `scripts/buttondown-fidelity/seed-fixtures.ts` — implements `npm run buttondown:seed-fixtures`.
-- `scripts/buttondown-fidelity/record.ts` — implements `npm run buttondown:record`.
+- `tests/functional/server/__data__/buttondown/fixtures/seed.json` — canonical audience.
+- `tests/manual/_buttondown-probes.ts` — the probe sequence as ordered code, plus `assertTestNewsletter`.
+- `tests/manual/buttondown-api-golds.test.ts` — Vitest test that drives the probe sequence against real Buttondown and writes the gold files. Skipped without `BUTTONDOWN_TEST_API_KEY`. Invoked by `npm run special:buttondown:record-api`.
+- `tests/manual/buttondown-replay.test.ts` — Vitest replay runner against the fake. Lives under `tests/manual/` so the default vitest config excludes it from `npm test`; the `npm run test:manual:buttondown-api-replay` script invokes Vitest with this file as the explicit target.
+- `scripts/buttondown-recording/seed-fixtures.ts` — implements `npm run special:buttondown:seed-fixtures`.
+- `vitest.manual.config.ts` — separate Vitest config that scopes to `tests/manual/**/*.test.ts`; the two manual npm scripts above invoke Vitest with this config.
 
 `key_fingerprint` in `meta.json` is **first 3 + last 3** characters of the key (e.g., `abc...xyz`). Enough to confirm "same key as last recording" without leaking the value.
 

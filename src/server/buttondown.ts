@@ -123,7 +123,7 @@ export interface ButtondownClient {
   updateSubscriber(id: string, patch: UpdateSubscriberInput): Promise<ButtondownSubscriber | DryRunOutcome<"update">>;
   /**
    * Delete a subscriber by id. The cron and inline paths never call
-   * this — it exists for the fidelity probe sequence and for the
+   * this — it exists for the manual probe sequence and for the
    * seed-fixtures script's empty-then-seed cycle. Returns void on
    * success; throws on 404 or other non-2xx.
    */
