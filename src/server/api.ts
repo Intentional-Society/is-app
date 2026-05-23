@@ -8,6 +8,7 @@ import { isRelationValue } from "@/lib/relation-value";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
+import { runButtondownSyncForServer } from "./buttondown-runner";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -170,7 +171,28 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       if ("error" in result) return c.json({ error: result.error }, 404);
       return c.json({ ok: true });
     },
-  );
+  )
+  // Two admin-triggered Buttondown sync routes. The dry-run button
+  // fires immediately and is safe to press anytime; the write button
+  // is wrapped in a confirm step on the UI side. Both call the same
+  // shared runner, distinguished only by `write` and by the
+  // `acquired_by` string recorded on the lock.
+  .post("/buttondown-sync/dry-run", async (c) => {
+    const user = c.get("user");
+    const result = await runButtondownSyncForServer({
+      acquiredBy: `admin:${user.id}:dry-run`,
+      write: false,
+    });
+    return c.json(result);
+  })
+  .post("/buttondown-sync/write", async (c) => {
+    const user = c.get("user");
+    const result = await runButtondownSyncForServer({
+      acquiredBy: `admin:${user.id}:write`,
+      write: true,
+    });
+    return c.json(result);
+  });
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -585,6 +607,24 @@ api.post("/_test/reset", async (c) => {
     return c.json({ error: "not_found" }, 404);
   }
   const result = await resetE2EUsers();
+  return c.json(result);
+});
+
+// Vercel cron entrypoint. Vercel attaches `Authorization: Bearer
+// $CRON_SECRET` when invoking scheduled crons; we reject anything
+// else with 401. The write toggle is BUTTONDOWN_SYNC_WRITE=1 — the
+// design's "Prod-only by construction" lock #4. Unset (the default)
+// means dry-run; set means writes go through.
+api.post("/cron/buttondown-sync", async (c) => {
+  const provided = c.req.header("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || provided !== `Bearer ${cronSecret}`) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const result = await runButtondownSyncForServer({
+    acquiredBy: `cron:${new Date().toISOString()}`,
+    write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+  });
   return c.json(result);
 });
 
