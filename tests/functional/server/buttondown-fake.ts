@@ -17,6 +17,7 @@
 // public surface and the two files are kept in sync by hand.
 
 import {
+  type ButtondownAccount,
   ButtondownApiError,
   type ButtondownClient,
   ButtondownConflictError,
@@ -26,9 +27,21 @@ import {
   type UpdateSubscriberInput,
 } from "@/server/buttondown";
 
+// Default account identity the fake reports from getAccount(). The
+// username matches what the real api-tests key resolves to, so
+// assertTestNewsletter passes during replay without per-test setup.
+const DEFAULT_FAKE_ACCOUNT: ButtondownAccount = {
+  username: "intentional-society-api-tests",
+  email_address: "fake-owner@example.com",
+};
+
 export type FakeButtondownConfig = {
   write: boolean;
   initialSubscribers?: ButtondownSubscriber[];
+  // Override the fake's account identity. Defaults to an api-tests
+  // shape so the sanity check passes. Pass a mismatched username
+  // to exercise the failure path.
+  account?: ButtondownAccount;
 };
 
 export type FakeButtondownEffect =
@@ -49,6 +62,7 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
   for (const s of config.initialSubscribers ?? []) {
     subscribers.set(s.id, { ...s, tags: [...s.tags] });
   }
+  const account: ButtondownAccount = { ...(config.account ?? DEFAULT_FAKE_ACCOUNT) };
   const effects: FakeButtondownEffect[] = [];
 
   const findByEmail = (email: string): ButtondownSubscriber | undefined => {
@@ -67,6 +81,10 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
       // Snapshot — callers shouldn't see in-flight mutations during a
       // single iteration, so we return a copy of the values.
       return Array.from(subscribers.values()).map((s) => ({ ...s, tags: [...s.tags] }));
+    },
+
+    async getAccount() {
+      return { ...account };
     },
 
     async getSubscriber(idOrEmail) {

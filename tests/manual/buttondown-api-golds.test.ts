@@ -20,7 +20,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { ButtondownApiError, createButtondownClient } from "@/server/buttondown";
 
-import { buildProbes, type ProbeContext, type ProbeResult } from "./_buttondown-probes";
+import { assertTestNewsletter, buildProbes, type ProbeContext, type ProbeResult } from "./_buttondown-probes";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = resolve(HERE, "..", "..");
@@ -119,6 +119,12 @@ describe.skipIf(!process.env.BUTTONDOWN_TEST_API_KEY)("buttondown api golds (rec
   beforeAll(async () => {
     const recorder = createRecordingFetcher();
     const client = createButtondownClient({ apiKey, write: true, fetcher: recorder.fetch });
+
+    // Refuse to record if the key points at anything other than the
+    // api-tests newsletter. The recorder also writes (creates and
+    // deletes subscribers in the probe sequence), so the same
+    // safety the seed script needs applies here.
+    await assertTestNewsletter(client);
 
     const ctx: ProbeContext = { seededByEmail: new Map(), createdSubscriber: null };
     const out: ProbeResult[] = [];

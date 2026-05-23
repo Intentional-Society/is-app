@@ -1,4 +1,4 @@
-// Shared probe-sequence definition for the Buttondown fidelity tests.
+// Shared probe-sequence definition for the Buttondown manual tests.
 //
 // Both the recorder (buttondown-api-golds.test.ts) and the replayer
 // (buttondown-replay.test.ts) import from this module so the sequence
@@ -13,6 +13,23 @@ import {
   type ButtondownClient,
   type ButtondownSubscriber,
 } from "@/server/buttondown";
+
+// Username of the Buttondown newsletter every test-related
+// operator action must resolve to. `assertTestNewsletter` calls
+// `GET /v1/accounts/me`, which returns the single newsletter the
+// API key writes to, and refuses to proceed unless its username
+// matches — catches both wrong-account and wrong-newsletter-same-
+// account key swaps in .env.prod.
+export const EXPECTED_TEST_NEWSLETTER_USERNAME = "intentional-society-api-tests";
+
+export const assertTestNewsletter = async (client: ButtondownClient): Promise<void> => {
+  const account = await client.getAccount();
+  if (account.username !== EXPECTED_TEST_NEWSLETTER_USERNAME) {
+    throw new Error(
+      `assertTestNewsletter: refusing to proceed. Key resolves to newsletter "${account.username}" (owner: ${account.email_address}), expected "${EXPECTED_TEST_NEWSLETTER_USERNAME}". Check BUTTONDOWN_TEST_API_KEY in .env.prod.`,
+    );
+  }
+};
 
 // Cross-probe state. Probe 01 (list-seeded) populates `seededByEmail`
 // so later probes can look up ids without knowing them ahead of time.

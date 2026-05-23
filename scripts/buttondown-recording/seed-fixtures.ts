@@ -29,6 +29,8 @@ import { config as loadEnv } from "dotenv";
 
 import { createButtondownClient, isDryRunOutcome } from "@/server/buttondown";
 
+import { assertTestNewsletter } from "../../tests/manual/_buttondown-probes";
+
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = resolve(HERE, "..", "..");
 const SEED_PATH = resolve(
@@ -67,6 +69,12 @@ const main = async (): Promise<void> => {
   }
   console.log();
 
+  const client = createButtondownClient({ apiKey, write: !isDryRun });
+
+  console.log("Verifying the key resolves to the expected newsletter...");
+  await assertTestNewsletter(client);
+  console.log("  ok.\n");
+
   if (!isDryRun) {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     const answer = await rl.question(
@@ -79,8 +87,6 @@ const main = async (): Promise<void> => {
     }
     console.log();
   }
-
-  const client = createButtondownClient({ apiKey, write: !isDryRun });
 
   console.log("Listing current subscribers...");
   const existing = await client.listSubscribers();

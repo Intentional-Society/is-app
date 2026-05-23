@@ -43,6 +43,17 @@ export type UpdateSubscriberInput = {
   email_address?: string;
 };
 
+// Identity of the API key's owning newsletter, returned by
+// `GET /v1/accounts/me`. Single object, not a list — every key
+// resolves to exactly one newsletter, and the username uniquely
+// identifies it. Used by the test scaffolding to refuse to run
+// if a key has been swapped to point at the wrong newsletter
+// (the most common .env.prod accident).
+export type ButtondownAccount = {
+  username: string;
+  email_address: string;
+};
+
 // Sentinel returned from mutation methods when the client is in
 // dry-run mode. Carries the payload that would have been sent so the
 // caller can log a faithful "would have done X" record without a
@@ -94,6 +105,13 @@ export interface ButtondownClient {
    * instead of doing one GET per profile.
    */
   listSubscribers(): Promise<ButtondownSubscriber[]>;
+  /**
+   * Identify the key's owning newsletter. `GET /v1/accounts/me`
+   * returns a single object with the newsletter's username and the
+   * owner's email. Used by the test scaffolding to refuse to run
+   * if the key has been swapped.
+   */
+  getAccount(): Promise<ButtondownAccount>;
   /**
    * Single-shot lookup by id or email. Returns null on 404. Used by
    * the inline first-profile-save hook, where pre-listing the whole
@@ -166,6 +184,15 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
         next = page.next;
       }
       return all;
+    },
+
+    async getAccount() {
+      const res = await request("GET", "/accounts/me");
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new ButtondownApiError(res.status, `GET account: ${res.status} ${detail}`);
+      }
+      return (await res.json()) as ButtondownAccount;
     },
 
     async getSubscriber(idOrEmail) {

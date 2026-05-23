@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  type ButtondownAccount,
   ButtondownApiError,
   ButtondownConflictError,
   type ButtondownSubscriber,
@@ -263,6 +264,37 @@ describe("createButtondownClient", () => {
       expect(fetcher).not.toHaveBeenCalled();
     });
   });
+
+  describe("getAccount", () => {
+    const sampleAccount: ButtondownAccount = {
+      username: "intentional-society-api-tests",
+      email_address: "owner@example.com",
+    };
+
+    it("returns the account identity on 200", async () => {
+      const fetcher = mockFetch(200, sampleAccount);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      const got = await client.getAccount();
+      expect(got).toEqual(sampleAccount);
+      const [url] = fetcher.mock.calls[0];
+      expect(url).toBe("https://api.buttondown.com/v1/accounts/me");
+    });
+
+    it("uses the Token auth header", async () => {
+      const fetcher = mockFetch(200, sampleAccount);
+      const client = createButtondownClient({ apiKey: "secret123", write: true, fetcher });
+      await client.getAccount();
+      const headers = fetcher.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(headers.Authorization).toBe("Token secret123");
+    });
+
+    it("throws ButtondownApiError on non-2xx", async () => {
+      const fetcher = mockFetch(403, { detail: "permission denied" });
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+      await expect(client.getAccount()).rejects.toBeInstanceOf(ButtondownApiError);
+    });
+  });
 });
 
 describe("createFakeButtondownClient", () => {
@@ -337,6 +369,18 @@ describe("createFakeButtondownClient", () => {
   it("deleteSubscriber throws on missing id (write=true)", async () => {
     const fake = createFakeButtondownClient({ write: true });
     await expect(fake.deleteSubscriber("never_existed")).rejects.toBeInstanceOf(ButtondownApiError);
+  });
+
+  it("getAccount returns the default api-tests identity when no override is set", async () => {
+    const fake = createFakeButtondownClient({ write: true });
+    const account = await fake.getAccount();
+    expect(account.username).toBe("intentional-society-api-tests");
+  });
+
+  it("getAccount respects the account override", async () => {
+    const custom: ButtondownAccount = { username: "some-other", email_address: "other@example.com" };
+    const fake = createFakeButtondownClient({ write: true, account: custom });
+    expect(await fake.getAccount()).toEqual(custom);
   });
 
   it("listSubscribers returns a snapshot of every seeded subscriber", async () => {
