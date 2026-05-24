@@ -72,6 +72,19 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
                 </Link>
               }
             />
+            <SheetClose
+              nativeButton={false}
+              render={
+                <a
+                  href="https://docs.google.com/forms/d/e/1FAIpQLScXhdSxbQ3LxjiYhqN2fmuyy66SK292rTYEZV3QaHgzn1eVjA/viewform?usp=dialog"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded px-2 py-2 hover:bg-muted"
+                >
+                  Give Feedback
+                </a>
+              }
+            />
             {isAdmin ? (
               <SheetClose
                 nativeButton={false}
