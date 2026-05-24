@@ -24,6 +24,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 
@@ -99,7 +100,12 @@ const main = async (): Promise<void> => {
   }
 
   console.log("\nCreating from seed.json...");
-  for (const entry of seed) {
+  // 2-second gap between live creates to stay polite against the
+  // 100/day rate limit and avoid burst-flagging on a fresh newsletter.
+  // Skipped in dry-run (no calls are actually made).
+  const CREATE_DELAY_MS = 2000;
+  for (let i = 0; i < seed.length; i++) {
+    const entry = seed[i];
     console.log(`  create  ${entry.email_address}  [${entry.tags.join(", ")}]`);
     const result = await client.createSubscriber({
       email_address: entry.email_address,
@@ -110,6 +116,9 @@ const main = async (): Promise<void> => {
       console.log("    [dry-run — no API call]");
     } else {
       console.log(`    → id ${result.id}`);
+    }
+    if (!isDryRun && i < seed.length - 1) {
+      await sleep(CREATE_DELAY_MS);
     }
   }
 

@@ -50,13 +50,14 @@ export type ProbeResult = {
   result: unknown;
 };
 
-// Email and tag literals used by the probes. The seed-fixtures
-// script reads `SEED_EMAILS` to know what to recreate on the test
-// newsletter; the replay test reads them to seed the fake.
+// Email literals used by the probes. The first three positions in
+// the generated seed are alice (1), bob (2), carol (3); the local
+// part includes the position number to keep emails unique across
+// the alphabet-twice naming scheme.
 export const SEED_EMAILS = {
-  alice: "alice@fixture.test",
-  bob: "bob@fixture.test",
-  carol: "carol@fixture.test",
+  alice: "alice.01@fixture.test",
+  bob: "bob.02@fixture.test",
+  carol: "carol.03@fixture.test",
 } as const;
 
 export const PROBE_CREATED_EMAIL = "probe-created@fixture.test";
