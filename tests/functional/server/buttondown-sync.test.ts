@@ -9,11 +9,12 @@ import { profilePrograms, profiles, programs } from "@/server/schema";
 
 import { createFakeButtondownClient, type FakeButtondownEffect } from "./buttondown-fake";
 
-// The local dev DB may carry a small number of persistent seeded
-// profiles (`scripts/seed-e2e-users.mjs`). The sync correctly scans
-// every saved profile, so tests filter the recorded effects down to
-// the specific test profile under examination rather than asserting
-// on global summary totals — see .scratch/buttondown-emergent.md.
+// Every test scopes runButtondownSync to its own profile ids via
+// `scopeProfileIds`. Without that, parallel test files race on the
+// shared dev DB: the reconciler picks up other workers' profiles,
+// writes their `buttondownSubscriberId`, and the membership-join
+// query sometimes returns nothing for this worker's profile. Both
+// flakes resolve once each test only touches what it created.
 
 const insertUserAndProfile = async (
   id: string,
@@ -126,7 +127,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     const client = createFakeButtondownClient({ write: true });
     const { log, events } = collectingLogger();
 
-    await runButtondownSync({ client, runId: "r1", write: true, log });
+    await runButtondownSync({ client, runId: "r1", write: true, log, scopeProfileIds: [profileId] });
 
     const myEffects = effectsForEmail(client.effects, "alice@example.com");
     expect(myEffects).toHaveLength(1);
@@ -147,14 +148,6 @@ describe("runButtondownSync (daily reconciler)", () => {
     ).toBeDefined();
   });
 
-  // TODO: flakes ~1-in-3 under Vitest's default parallel file
-  // execution; deterministic with --no-file-parallelism and in
-  // isolation. Bob's `desired` tag set computes empty even though the
-  // join was just inserted — looks like cross-file DB-state
-  // interference under parallel workers. Most disciplined fix is to
-  // scope runButtondownSync's queries to a caller-supplied profile-id
-  // allowlist (also enables a "sync just this member" admin
-  // affordance). Worth a real issue once this branch is on main.
   it("PATCHes a subscribed person's tags when the managed set has drifted", async () => {
     const profileId = await makeProfile({ email: "bob@example.com" });
     const weeklyProgramId = await makeProgram({ buttondownTag: "weekly" });
@@ -168,7 +161,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     });
     const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
 
-    await runButtondownSync({ client, runId: "r2", write: true });
+    await runButtondownSync({ client, runId: "r2", write: true, scopeProfileIds: [profileId] });
 
     const myEffects = effectsForSubscriberId(client.effects, "sub_bob");
     expect(myEffects).toHaveLength(1);
@@ -195,7 +188,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     });
     const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
 
-    await runButtondownSync({ client, runId: "r3", write: true });
+    await runButtondownSync({ client, runId: "r3", write: true, scopeProfileIds: [profileId] });
 
     expect(effectsForSubscriberId(client.effects, "sub_carol")).toHaveLength(0);
   });
@@ -215,7 +208,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     });
     const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
 
-    await runButtondownSync({ client, runId: "r4", write: true });
+    await runButtondownSync({ client, runId: "r4", write: true, scopeProfileIds: [profileId] });
 
     const updated = await client.getSubscriber("sub_dan");
     expect(updated?.tags).toEqual(["isweb-member"]);
@@ -238,7 +231,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
     const { alerts, raise } = collectingAlerts();
 
-    await runButtondownSync({ client, runId: "r5", write: true, raiseUnsubscribeAlert: raise });
+    await runButtondownSync({ client, runId: "r5", write: true, raiseUnsubscribeAlert: raise, scopeProfileIds: [profileId] });
 
     expect(effectsForSubscriberId(client.effects, "sub_eve")).toHaveLength(0);
     const my = alerts.find((a) => a.profileId === profileId);
@@ -264,7 +257,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     });
     const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
 
-    await runButtondownSync({ client, runId: "r6", write: true });
+    await runButtondownSync({ client, runId: "r6", write: true, scopeProfileIds: [profileId] });
 
     const updated = await client.getSubscriber("sub_frank");
     expect(updated?.email_address).toBe("frank-new@example.com");
@@ -283,7 +276,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     });
     const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
 
-    await runButtondownSync({ client, runId: "r7", write: true });
+    await runButtondownSync({ client, runId: "r7", write: true, scopeProfileIds: [profileId] });
 
     const [row] = await db
       .select({ buttondownSubscriberId: profiles.buttondownSubscriberId })
@@ -299,7 +292,7 @@ describe("runButtondownSync (daily reconciler)", () => {
 
     const client = createFakeButtondownClient({ write: false });
 
-    await runButtondownSync({ client, runId: "r8", write: false });
+    await runButtondownSync({ client, runId: "r8", write: false, scopeProfileIds: [profileId] });
 
     const myEffects = effectsForEmail(client.effects, "henry@example.com");
     expect(myEffects[0]).toMatchObject({ kind: "create", dryRun: true });
@@ -317,7 +310,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     await join(profileId, programId);
 
     const client = createFakeButtondownClient({ write: true });
-    await runButtondownSync({ client, runId: "r9", write: true });
+    await runButtondownSync({ client, runId: "r9", write: true, scopeProfileIds: [profileId] });
 
     // Isaac's email should never have been touched.
     expect(effectsForEmail(client.effects, "isaac@example.com")).toHaveLength(0);
@@ -329,7 +322,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     await join(profileId, programId);
 
     const client = createFakeButtondownClient({ write: true });
-    await runButtondownSync({ client, runId: "r10", write: true });
+    await runButtondownSync({ client, runId: "r10", write: true, scopeProfileIds: [profileId] });
 
     const myEffects = effectsForEmail(client.effects, "jess@example.com");
     expect(myEffects).toHaveLength(1);

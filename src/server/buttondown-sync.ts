@@ -13,7 +13,7 @@
 // Both share the underlying client; only this function is what the
 // cron and the admin "Sync now" buttons drive.
 
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import {
   type ButtondownClient,
@@ -166,6 +166,10 @@ export type SyncDeps = {
   // enforces the gate; we just thread it through to the summary and
   // logs for observability.
   write: boolean;
+  // Restrict the reconciler to a specific set of profile ids. Omit
+  // for the daily broad sweep; pass for per-member resync paths and
+  // for tests that must not touch profiles from other workers.
+  scopeProfileIds?: string[];
   log?: SyncLogger;
   raiseUnsubscribeAlert?: (alert: UnsubscribeAlert) => void;
 };
@@ -201,7 +205,23 @@ const buildManagedUniverse = async (): Promise<Set<string>> => {
 // programs that have a buttondownTag set, joined with the program so
 // we have the tag string at hand. The result is what feeds the
 // per-profile "desired tags" map.
-const loadCurrentTaggedMemberships = async (): Promise<ProfileMembership[]> => {
+//
+// `scopeProfileIds`, when provided, narrows the query to that subset.
+// Used by per-member resync paths (future admin "sync this member"
+// button) and by tests, so the broad reconciler doesn't act outside
+// its caller's intended blast radius.
+const loadCurrentTaggedMemberships = async (
+  scopeProfileIds?: string[],
+): Promise<ProfileMembership[]> => {
+  const conditions = [
+    isNull(profilePrograms.leftAt),
+    isNull(programs.archivedAt),
+    isNotNull(programs.buttondownTag),
+  ];
+  if (scopeProfileIds) {
+    if (scopeProfileIds.length === 0) return [];
+    conditions.push(inArray(profilePrograms.profileId, scopeProfileIds));
+  }
   return db
     .select({
       profileId: profilePrograms.profileId,
@@ -210,13 +230,7 @@ const loadCurrentTaggedMemberships = async (): Promise<ProfileMembership[]> => {
     })
     .from(profilePrograms)
     .innerJoin(programs, eq(programs.id, profilePrograms.programId))
-    .where(
-      and(
-        isNull(profilePrograms.leftAt),
-        isNull(programs.archivedAt),
-        isNotNull(programs.buttondownTag),
-      ),
-    )
+    .where(and(...conditions))
     .then((rows) =>
       rows
         .filter((r): r is { profileId: string; programSlug: string; buttondownTag: string } => r.buttondownTag !== null),
@@ -225,8 +239,14 @@ const loadCurrentTaggedMemberships = async (): Promise<ProfileMembership[]> => {
 
 // All profiles with a saved profile (lastUpdatedProfile non-null) and
 // the email from auth.users. Members whose profile was created but
-// who haven't saved are out of scope.
-const loadEligibleProfiles = async (): Promise<ProfileRow[]> => {
+// who haven't saved are out of scope. `scopeProfileIds` narrows the
+// scan; see loadCurrentTaggedMemberships.
+const loadEligibleProfiles = async (scopeProfileIds?: string[]): Promise<ProfileRow[]> => {
+  const conditions = [isNotNull(profiles.lastUpdatedProfile)];
+  if (scopeProfileIds) {
+    if (scopeProfileIds.length === 0) return [];
+    conditions.push(inArray(profiles.id, scopeProfileIds));
+  }
   return db
     .select({
       profileId: profiles.id,
@@ -235,7 +255,7 @@ const loadEligibleProfiles = async (): Promise<ProfileRow[]> => {
     })
     .from(profiles)
     .innerJoin(authUsers, eq(authUsers.id, profiles.id))
-    .where(isNotNull(profiles.lastUpdatedProfile));
+    .where(and(...conditions));
 };
 
 // Compute (final tag set, removed-from-managed, added-to-managed)
@@ -302,8 +322,8 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
 
   const [managedUniverse, profileRows, memberships] = await Promise.all([
     buildManagedUniverse(),
-    loadEligibleProfiles(),
-    loadCurrentTaggedMemberships(),
+    loadEligibleProfiles(deps.scopeProfileIds),
+    loadCurrentTaggedMemberships(deps.scopeProfileIds),
   ]);
 
   // Group memberships by profile so each iteration is one lookup.
