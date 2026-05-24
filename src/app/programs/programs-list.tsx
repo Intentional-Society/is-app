@@ -28,7 +28,9 @@ function ProgramCard({
   const visibleDescription = isLong && !expanded ? `${description.slice(0, DESCRIPTION_LIMIT)}…` : description;
 
   return (
-    <li className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+    <li
+      className={`flex flex-col gap-3 rounded-xl bg-card p-5 ${program.joined ? "border border-transparent ring-3 ring-ring/50" : "border border-border"}`}
+    >
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold">
           <Link
