@@ -101,6 +101,7 @@ export const buildProbes = (): Probe[] => [
       const result = await client.createSubscriber({
         email_address: PROBE_CREATED_EMAIL,
         tags: ["probe-fresh"],
+        type: "regular",
       });
       if (!("dryRun" in result)) ctx.createdSubscriber = result;
       return result;
@@ -112,6 +113,7 @@ export const buildProbes = (): Probe[] => [
       client.createSubscriber({
         email_address: PROBE_CREATED_EMAIL,
         tags: ["probe-dup-attempt"],
+        type: "regular",
       }),
   },
   {

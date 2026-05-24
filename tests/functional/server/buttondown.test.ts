@@ -194,6 +194,20 @@ describe("createButtondownClient", () => {
         ButtondownConflictError,
       );
     });
+
+    it("passes `type` through in the POST body when provided", async () => {
+      const fetcher = mockFetch(201, sampleSubscriber);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      await client.createSubscriber({
+        email_address: "alice@example.com",
+        tags: ["welcome"],
+        type: "regular",
+      });
+      const init = fetcher.mock.calls[0][1];
+      const body = JSON.parse(init?.body as string);
+      expect(body.type).toBe("regular");
+    });
   });
 
   describe("deleteSubscriber", () => {

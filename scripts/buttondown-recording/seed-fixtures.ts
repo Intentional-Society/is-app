@@ -104,6 +104,7 @@ const main = async (): Promise<void> => {
     const result = await client.createSubscriber({
       email_address: entry.email_address,
       tags: entry.tags,
+      type: "regular",
     });
     if (isDryRunOutcome(result)) {
       console.log("    [dry-run — no API call]");

@@ -36,6 +36,12 @@ export type ButtondownSubscriber = {
 export type CreateSubscriberInput = {
   email_address: string;
   tags: string[];
+  // Buttondown's default behavior on POST /subscribers is to send a
+  // double-opt-in confirmation email. Pass "regular" to bypass that
+  // when the caller can vouch for the email — which is everywhere we
+  // create subscribers (program membership is the consent act). See
+  // docs.buttondown.com — "API-driven subscriber creation."
+  type?: ButtondownSubscriberType;
 };
 
 export type UpdateSubscriberInput = {
