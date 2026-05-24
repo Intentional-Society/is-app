@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-24 | Benji | Give Feedback link in sidebar
+
+Added a "Give Feedback" link to the hamburger menu that opens a Google Form in a new tab. Includes a functional test asserting the link's presence, URL, and target attributes.
+
 ## 2026-05-21 | James | Polish programs (#226)
 
 Four bundled improvements: new members are auto-subscribed to the weekly web update on first sign-in; programs gain `archivedAt` (hidden from members) and `signupsOpen` (gates self-serve join, closed by default); `profile_programs` becomes soft-deleted via `leftAt` so the original `assignedAt` survives leave/rejoin as a stable first-joined date; per-program detail pages live at `/programs/[slug]`.
