@@ -29,7 +29,7 @@ function ProgramCard({
 
   return (
     <li
-      className={`flex flex-col gap-3 rounded-xl bg-card p-5 ${program.joined ? "ring-3 ring-ring/50" : "border border-border"}`}
+      className={`flex flex-col gap-3 rounded-xl bg-card p-5 ${program.joined ? "border border-transparent ring-3 ring-ring/50" : "border border-border"}`}
     >
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold">
