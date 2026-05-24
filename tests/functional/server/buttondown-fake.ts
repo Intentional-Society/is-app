@@ -20,7 +20,6 @@ import {
   type ButtondownAccount,
   ButtondownApiError,
   type ButtondownClient,
-  ButtondownConflictError,
   type ButtondownSubscriber,
   type CreateSubscriberInput,
   type DryRunOutcome,
@@ -32,7 +31,6 @@ import {
 // assertTestNewsletter passes during replay without per-test setup.
 const DEFAULT_FAKE_ACCOUNT: ButtondownAccount = {
   username: "intentional-society-api-tests",
-  email_address: "fake-owner@example.com",
 };
 
 export type FakeButtondownConfig = {
@@ -57,10 +55,17 @@ export type FakeButtondownClient = ButtondownClient & {
 let fakeIdCounter = 0;
 const nextFakeId = () => `fakesub_${++fakeIdCounter}`;
 
+// Real Buttondown returns each subscriber's `tags` array sorted
+// ascending by tag name, regardless of the order the tags were
+// supplied in. The fake mirrors that so consumers don't accidentally
+// depend on insertion order — code that works against the fake will
+// then keep working against the real API.
+const sortTags = (tags: string[]): string[] => [...tags].sort();
+
 export const createFakeButtondownClient = (config: FakeButtondownConfig = { write: true }): FakeButtondownClient => {
   const subscribers = new Map<string, ButtondownSubscriber>();
   for (const s of config.initialSubscribers ?? []) {
-    subscribers.set(s.id, { ...s, tags: [...s.tags] });
+    subscribers.set(s.id, { ...s, tags: sortTags(s.tags) });
   }
   const account: ButtondownAccount = { ...(config.account ?? DEFAULT_FAKE_ACCOUNT) };
   const effects: FakeButtondownEffect[] = [];
@@ -98,12 +103,18 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
       if (!config.write) {
         return { dryRun: true, intent: "create", payload: input };
       }
-      if (findByEmail(input.email_address)) throw new ButtondownConflictError();
+      if (findByEmail(input.email_address)) {
+        // Real Buttondown returns 400 (not 409) for duplicate
+        // creates — see probe 10's gold. Match the status; the
+        // message text is whatever, since replay compares {name,
+        // status} only.
+        throw new ButtondownApiError(400, "fake: duplicate email");
+      }
       const sub: ButtondownSubscriber = {
         id: nextFakeId(),
         email_address: input.email_address,
         type: "regular",
-        tags: [...input.tags],
+        tags: sortTags(input.tags),
       };
       subscribers.set(sub.id, sub);
       return sub;
@@ -119,10 +130,18 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
       }
       const sub = subscribers.get(id);
       if (!sub) throw new ButtondownApiError(404, "fake: subscriber not found");
+      if (patch.email_address !== undefined && findByEmail(patch.email_address) !== undefined) {
+        // Real Buttondown rejects PATCH email_address when any
+        // subscriber (including the one being patched) already has
+        // that email — so PATCHing to the value the row currently
+        // holds is itself a 400, not a no-op. Probe 13 documents
+        // this wire surprise.
+        throw new ButtondownApiError(400, "fake: email already in use");
+      }
       const updated: ButtondownSubscriber = {
         ...sub,
         ...(patch.email_address !== undefined ? { email_address: patch.email_address } : {}),
-        ...(patch.tags !== undefined ? { tags: [...patch.tags] } : {}),
+        ...(patch.tags !== undefined ? { tags: sortTags(patch.tags) } : {}),
         ...(patch.type !== undefined ? { type: patch.type } : {}),
       };
       subscribers.set(id, updated);

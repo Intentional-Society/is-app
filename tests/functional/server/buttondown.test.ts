@@ -142,6 +142,22 @@ describe("createButtondownClient", () => {
       expect(url).toBe("https://api.buttondown.com/v1/subscribers/a%2Bb%40example.com");
     });
 
+    it("projects the response to the declared four fields, dropping anything else", async () => {
+      const withExtras = {
+        ...sampleSubscriber,
+        creation_date: "2024-01-01T00:00:00Z",
+        secondary_id: 12345,
+        notes: "ignore me",
+        metadata: { foo: "bar" },
+      };
+      const fetcher = mockFetch(200, withExtras);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      const got = await client.getSubscriber("alice@example.com");
+      expect(got).toEqual(sampleSubscriber);
+      expect(Object.keys(got ?? {}).sort()).toEqual(["email_address", "id", "tags", "type"]);
+    });
+
     it("uses the 'Token <key>' auth header (not Bearer)", async () => {
       const fetcher = mockFetch(200, sampleSubscriber);
       const client = createButtondownClient({ apiKey: "secret123", write: true, fetcher });
@@ -292,7 +308,6 @@ describe("createButtondownClient", () => {
   describe("getAccount", () => {
     const sampleAccount: ButtondownAccount = {
       username: "intentional-society-api-tests",
-      email_address: "owner@example.com",
     };
 
     it("returns the account identity on 200", async () => {
@@ -303,6 +318,19 @@ describe("createButtondownClient", () => {
       expect(got).toEqual(sampleAccount);
       const [url] = fetcher.mock.calls[0];
       expect(url).toBe("https://api.buttondown.com/v1/accounts/me");
+    });
+
+    it("projects the response to {username}, dropping email_address and anything else", async () => {
+      const fetcher = mockFetch(200, {
+        ...sampleAccount,
+        email_address: "owner@example.com",
+        plan: "pro",
+      });
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      const got = await client.getAccount();
+      expect(got).toEqual(sampleAccount);
+      expect(Object.keys(got)).toEqual(["username"]);
     });
 
     it("uses the Token auth header", async () => {
@@ -362,11 +390,14 @@ describe("createFakeButtondownClient", () => {
     expect(await fake.getSubscriber("new@example.com")).toBeNull();
   });
 
-  it("rejects creates whose email already exists with ButtondownConflictError", async () => {
+  it("rejects creates whose email already exists with a 400 ButtondownApiError", async () => {
     const fake = createFakeButtondownClient({ write: true, initialSubscribers: [initialSub] });
-    await expect(
-      fake.createSubscriber({ email_address: "preexisting@example.com", tags: ["x"] }),
-    ).rejects.toBeInstanceOf(ButtondownConflictError);
+    const err = await fake
+      .createSubscriber({ email_address: "preexisting@example.com", tags: ["x"] })
+      .then(() => null)
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ButtondownApiError);
+    expect((err as ButtondownApiError).status).toBe(400);
   });
 
   it("overwrites the tag array on update (no merging)", async () => {
@@ -408,7 +439,7 @@ describe("createFakeButtondownClient", () => {
   });
 
   it("getAccount respects the account override", async () => {
-    const custom: ButtondownAccount = { username: "some-other", email_address: "other@example.com" };
+    const custom: ButtondownAccount = { username: "some-other" };
     const fake = createFakeButtondownClient({ write: true, account: custom });
     expect(await fake.getAccount()).toEqual(custom);
   });

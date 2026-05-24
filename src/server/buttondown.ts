@@ -57,7 +57,6 @@ export type UpdateSubscriberInput = {
 // (the most common .env.prod accident).
 export type ButtondownAccount = {
   username: string;
-  email_address: string;
 };
 
 // Sentinel returned from mutation methods when the client is in
@@ -100,6 +99,32 @@ export class ButtondownConflictError extends ButtondownApiError {
 type ListSubscribersPage = {
   results: ButtondownSubscriber[];
   next: string | null;
+};
+
+// Runtime projection from a parsed JSON response to the typed
+// shapes our client exposes. The Buttondown API returns many more
+// fields than we declare (creation_date, secondary_id, notes,
+// metadata, source, utm_*, etc.); without this projection the
+// runtime value would carry them all even though the static type
+// only admits four. That mismatch leaks into the fake-vs-real
+// comparison — the fake stores 4-field subscribers, the real
+// client otherwise returns 15+ — so projecting at the client
+// boundary is what lets the replay deep-equal pass.
+const projectSubscriber = (raw: unknown): ButtondownSubscriber => {
+  const obj = raw as Record<string, unknown>;
+  return {
+    id: obj.id as string,
+    email_address: obj.email_address as string,
+    type: obj.type as ButtondownSubscriberType,
+    tags: obj.tags as string[],
+  };
+};
+
+const projectAccount = (raw: unknown): ButtondownAccount => {
+  const obj = raw as Record<string, unknown>;
+  return {
+    username: obj.username as string,
+  };
 };
 
 export interface ButtondownClient {
@@ -177,7 +202,8 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
       const detail = await res.text().catch(() => "");
       throw new ButtondownApiError(res.status, `GET subscribers: ${res.status} ${detail}`);
     }
-    return (await res.json()) as ListSubscribersPage;
+    const raw = (await res.json()) as { results: unknown[]; next: string | null };
+    return { results: raw.results.map(projectSubscriber), next: raw.next };
   };
 
   return {
@@ -198,7 +224,7 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
         const detail = await res.text().catch(() => "");
         throw new ButtondownApiError(res.status, `GET account: ${res.status} ${detail}`);
       }
-      return (await res.json()) as ButtondownAccount;
+      return projectAccount(await res.json());
     },
 
     async getSubscriber(idOrEmail) {
@@ -211,7 +237,7 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
         const detail = await res.text().catch(() => "");
         throw new ButtondownApiError(res.status, `GET subscriber: ${res.status} ${detail}`);
       }
-      return (await res.json()) as ButtondownSubscriber;
+      return projectSubscriber(await res.json());
     },
 
     async createSubscriber(input) {
@@ -224,7 +250,7 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
         const detail = await res.text().catch(() => "");
         throw new ButtondownApiError(res.status, `POST subscriber: ${res.status} ${detail}`);
       }
-      return (await res.json()) as ButtondownSubscriber;
+      return projectSubscriber(await res.json());
     },
 
     async updateSubscriber(id, patch) {
@@ -236,7 +262,7 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
         const detail = await res.text().catch(() => "");
         throw new ButtondownApiError(res.status, `PATCH subscriber: ${res.status} ${detail}`);
       }
-      return (await res.json()) as ButtondownSubscriber;
+      return projectSubscriber(await res.json());
     },
 
     async deleteSubscriber(id) {
