@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-24 | Benji | Custom 404 page
+
+Added a `not-found.tsx` at the app root so unmatched routes show a styled 404 page consistent with the app's aesthetic — serif italic subtitle, centered layout, and a "Go home" button.
+
 ## 2026-05-24 | Benji | Joined program card ring highlight
 
 Program cards now show a ring highlight when the user has joined, replacing the default border with `ring-3 ring-ring/50` for a clearer visual distinction.
