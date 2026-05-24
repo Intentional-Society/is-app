@@ -108,8 +108,9 @@ describe("runFirstProfileSaveSync (inline hook)", () => {
 
     const after = await client.getSubscriber("sub_bob");
     // Full overwrite — legacy-active and human-vip both gone, as
-    // the design intends for the discrete signup moment.
-    expect(after?.tags).toEqual(["weekly", "isweb-member", "returning"]);
+    // the design intends for the discrete signup moment. Real
+    // Buttondown (and the fake) return tags sorted ascending.
+    expect(after?.tags).toEqual(["isweb-member", "returning", "weekly"]);
 
     const [row] = await db
       .select({ buttondownSubscriberId: profiles.buttondownSubscriberId })
