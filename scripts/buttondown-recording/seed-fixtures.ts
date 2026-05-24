@@ -45,7 +45,7 @@ const SEED_PATH = resolve(
   "seed.json",
 );
 
-type SeedEntry = { email_address: string; tags: string[] };
+type SeedEntry = { email_address: string; tags: string[]; unsubscribed?: true };
 
 const main = async (): Promise<void> => {
   loadEnv({ path: resolve(PROJECT_ROOT, ".env.prod"), quiet: true });
@@ -119,6 +119,25 @@ const main = async (): Promise<void> => {
     }
     if (!isDryRun && i < seed.length - 1) {
       await sleep(CREATE_DELAY_MS);
+    }
+  }
+
+  // Apply the documented PATCH-to-unsubscribed step for any seed
+  // entries that ask for it. Per Buttondown's docs, this is the only
+  // API path that flips a subscriber's type without deleting them.
+  // Reads aren't gated by write, but the PATCH is — dry-run prints
+  // intent without actually calling.
+  const toUnsubscribe = seed.filter((e) => e.unsubscribed === true);
+  if (toUnsubscribe.length > 0) {
+    console.log(`\nMarking ${toUnsubscribe.length} subscriber(s) as unsubscribed...`);
+    for (const entry of toUnsubscribe) {
+      console.log(`  unsubscribe  ${entry.email_address}`);
+      const result = await client.updateSubscriber(entry.email_address, { type: "unsubscribed" });
+      if (isDryRunOutcome(result)) {
+        console.log("    [dry-run — no API call]");
+      } else {
+        console.log(`    → type=${result.type}`);
+      }
     }
   }
 

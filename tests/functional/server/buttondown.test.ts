@@ -277,6 +277,16 @@ describe("createButtondownClient", () => {
       }
       expect(fetcher).not.toHaveBeenCalled();
     });
+
+    it("passes `type` through in the PATCH body when provided", async () => {
+      const fetcher = mockFetch(200, { ...sampleSubscriber, type: "unsubscribed" });
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      await client.updateSubscriber("sub_abc123", { type: "unsubscribed" });
+      const init = fetcher.mock.calls[0][1];
+      const body = JSON.parse(init?.body as string);
+      expect(body.type).toBe("unsubscribed");
+    });
   });
 
   describe("getAccount", () => {
@@ -363,6 +373,12 @@ describe("createFakeButtondownClient", () => {
     const fake = createFakeButtondownClient({ write: true, initialSubscribers: [initialSub] });
     await fake.updateSubscriber("preexisting_1", { tags: ["completely", "different"] });
     expect((await fake.getSubscriber("preexisting_1"))?.tags).toEqual(["completely", "different"]);
+  });
+
+  it("flips the subscriber type when patch.type is provided", async () => {
+    const fake = createFakeButtondownClient({ write: true, initialSubscribers: [initialSub] });
+    await fake.updateSubscriber("preexisting_1", { type: "unsubscribed" });
+    expect((await fake.getSubscriber("preexisting_1"))?.type).toBe("unsubscribed");
   });
 
   it("deleteSubscriber removes from the store and records an effect (write=true)", async () => {

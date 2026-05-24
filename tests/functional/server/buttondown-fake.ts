@@ -123,6 +123,7 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
         ...sub,
         ...(patch.email_address !== undefined ? { email_address: patch.email_address } : {}),
         ...(patch.tags !== undefined ? { tags: [...patch.tags] } : {}),
+        ...(patch.type !== undefined ? { type: patch.type } : {}),
       };
       subscribers.set(id, updated);
       return updated;

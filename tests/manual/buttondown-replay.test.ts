@@ -29,7 +29,7 @@ const DATA_ROOT = resolve(
 const SEED_PATH = resolve(DATA_ROOT, "fixtures", "seed.json");
 const PROBES_DIR = resolve(DATA_ROOT, "golds", "probes");
 
-type SeedEntry = { email_address: string; tags: string[] };
+type SeedEntry = { email_address: string; tags: string[]; unsubscribed?: true };
 
 // ---------------------------------------------------------------------------
 // Normalization
@@ -114,7 +114,7 @@ const loadSeed = (): ButtondownSubscriber[] => {
   return entries.map((entry, i) => ({
     id: `fake-seed-${i + 1}`,
     email_address: entry.email_address,
-    type: "regular" as const,
+    type: entry.unsubscribed === true ? ("unsubscribed" as const) : ("regular" as const),
     tags: [...entry.tags],
   }));
 };

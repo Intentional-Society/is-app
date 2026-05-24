@@ -18,10 +18,9 @@
 
 const BUTTONDOWN_BASE_URL = "https://api.buttondown.com/v1";
 
-// Lifecycle state of a Buttondown subscriber. Strings come straight
-// from the Buttondown API response shape. The sync only treats
-// "unsubscribed" specially (don't write, raise alert); everything else
-// is "subscriber exists and is reachable, do the diff."
+// Lifecycle state of a Buttondown subscriber: regular (active),
+// premium (paid), unactivated (pending confirmation), unsubscribed,
+// removed.
 export type ButtondownSubscriberType = "regular" | "premium" | "unactivated" | "unsubscribed" | "removed";
 
 // Minimal projection of the subscriber object — only the fields the
@@ -47,6 +46,7 @@ export type CreateSubscriberInput = {
 export type UpdateSubscriberInput = {
   tags?: string[];
   email_address?: string;
+  type?: ButtondownSubscriberType;
 };
 
 // Identity of the API key's owning newsletter, returned by
