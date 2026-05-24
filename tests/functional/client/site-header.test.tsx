@@ -69,4 +69,22 @@ describe("SiteHeader", () => {
     fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
     expect(await screen.findByText("Admin")).toBeVisible();
   });
+
+  it("shows Give Feedback link that opens in a new tab", async () => {
+    render(
+      <AuthProvider initialUser={user}>
+        <SiteHeader displayName={null} isAdmin={false} />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
+    const link = await screen.findByText("Give Feedback");
+    expect(link).toBeVisible();
+    expect(link.tagName).toBe("A");
+    expect(link).toHaveAttribute(
+      "href",
+      "https://docs.google.com/forms/d/e/1FAIpQLScXhdSxbQ3LxjiYhqN2fmuyy66SK292rTYEZV3QaHgzn1eVjA/viewform?usp=dialog",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
 });
