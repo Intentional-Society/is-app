@@ -6,6 +6,14 @@
 // is gated by BUTTONDOWN_TEST_API_KEY so an accidental run on a
 // machine without the key no-ops rather than fails.
 //
+// `response.body` is recorded only when the HTTP status is not 200
+// and not 201 — on a successful read or create, the body is fully
+// captured by `typed_result` (modulo the client's field projection),
+// so writing it twice just bloats the gold and creates noisy diffs
+// whenever Buttondown adds a field we don't read. Every other status
+// keeps its body so the error shape (which isn't in `typed_result`)
+// stays diagnosable.
+//
 // Invoked by:  npm run special:buttondown:record-api
 //
 // See docs/design-buttondown.md Appendix A.
@@ -33,12 +41,11 @@ const GOLDS_DIR = resolve(
   "buttondown",
   "golds",
 );
-const PROBES_DIR = resolve(GOLDS_DIR, "probes");
 const META_PATH = resolve(GOLDS_DIR, "meta.json");
 
 type RecordedHttp = {
   request: { method: string; url: string; body: unknown };
-  response: { status: number; body: unknown };
+  response: { status: number; body?: unknown };
 };
 
 // Wraps fetch and tags each call with the currently-active probe so
@@ -72,20 +79,24 @@ const createRecordingFetcher = () => {
     })();
 
     const res = await fetch(input, init);
-    const cloned = res.clone();
-    const text = await cloned.text();
-    const respBody = (() => {
-      if (text.length === 0) return null;
-      try {
-        return JSON.parse(text);
-      } catch {
-        return text;
-      }
-    })();
+    const response: { status: number; body?: unknown } = { status: res.status };
+    if (res.status !== 200 && res.status !== 201) {
+      const text = await res.clone().text();
+      response.body =
+        text.length === 0
+          ? null
+          : (() => {
+              try {
+                return JSON.parse(text);
+              } catch {
+                return text;
+              }
+            })();
+    }
 
     const entry: RecordedHttp = {
       request: { method, url, body: reqBody },
-      response: { status: res.status, body: respBody },
+      response,
     };
     const list = calls.get(currentProbe) ?? [];
     list.push(entry);
@@ -137,7 +148,7 @@ describe.skipIf(!process.env.BUTTONDOWN_TEST_API_KEY)("buttondown api golds (rec
         if (err instanceof ButtondownApiError) {
           out.push({
             name: probe.name,
-            result: { __error: { name: err.name, status: err.status, message: err.message } },
+            result: { __error: { name: err.name, status: err.status } },
           });
         } else {
           throw err;
@@ -147,7 +158,7 @@ describe.skipIf(!process.env.BUTTONDOWN_TEST_API_KEY)("buttondown api golds (rec
     results = out;
     httpCalls = recorder.calls;
 
-    mkdirSync(PROBES_DIR, { recursive: true });
+    mkdirSync(GOLDS_DIR, { recursive: true });
   }, 60_000);
 
   it("writes one gold file per probe", () => {
@@ -157,7 +168,7 @@ describe.skipIf(!process.env.BUTTONDOWN_TEST_API_KEY)("buttondown api golds (rec
         http_calls: httpCalls.get(probeResult.name) ?? [],
         typed_result: probeResult.result,
       };
-      const probePath = resolve(PROBES_DIR, `${probeResult.name}.json`);
+      const probePath = resolve(GOLDS_DIR, `${probeResult.name}.json`);
       writeFileSync(probePath, `${JSON.stringify(gold, null, 2)}\n`);
     }
     expect(results.map((r) => r.name)).toEqual(buildProbes().map((p) => p.name));

@@ -27,7 +27,7 @@ const DATA_ROOT = resolve(
   "buttondown",
 );
 const SEED_PATH = resolve(DATA_ROOT, "fixtures", "seed.json");
-const PROBES_DIR = resolve(DATA_ROOT, "golds", "probes");
+const GOLDS_DIR = resolve(DATA_ROOT, "golds");
 
 type SeedEntry = { email_address: string; tags: string[]; unsubscribed?: true };
 
@@ -103,7 +103,7 @@ const normalizeSequence = (sequence: ProbeResult[]): ProbeResult[] => {
 
 const loadGolds = (): ProbeResult[] => {
   return buildProbes().map((probe) => {
-    const goldPath = resolve(PROBES_DIR, `${probe.name}.json`);
+    const goldPath = resolve(GOLDS_DIR, `${probe.name}.json`);
     const raw = JSON.parse(readFileSync(goldPath, "utf8")) as { typed_result: unknown };
     return { name: probe.name, result: raw.typed_result };
   });

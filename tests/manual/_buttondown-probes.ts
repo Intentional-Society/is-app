@@ -26,7 +26,7 @@ export const assertTestNewsletter = async (client: ButtondownClient): Promise<vo
   const account = await client.getAccount();
   if (account.username !== EXPECTED_TEST_NEWSLETTER_USERNAME) {
     throw new Error(
-      `assertTestNewsletter: refusing to proceed. Key resolves to newsletter "${account.username}" (owner: ${account.email_address}), expected "${EXPECTED_TEST_NEWSLETTER_USERNAME}". Check BUTTONDOWN_TEST_API_KEY in .env.prod.`,
+      `assertTestNewsletter: refusing to proceed. Key resolves to newsletter "${account.username}", expected "${EXPECTED_TEST_NEWSLETTER_USERNAME}". Check BUTTONDOWN_TEST_API_KEY in .env.prod.`,
     );
   }
 };
@@ -67,6 +67,7 @@ export const SEED_EMAILS = {
 
 export const PROBE_CREATED_EMAIL = "probe-created@fixture.test";
 export const PROBE_CREATED_EMAIL_RENAMED = "probe-created-renamed@fixture.test";
+export const PROBE_CREATED_EMAIL_FINAL = "probe-created-final@fixture.test";
 export const PROBE_MISSING_ID = "missing-subscriber-for-probe-04";
 export const PROBE_MISSING_EMAIL = "nobody-here@fixture.test";
 
@@ -153,7 +154,10 @@ export const buildProbes = (): Probe[] => [
     },
   },
   {
-    name: "13-patch-both",
+    // Documents a wire-layer surprise: PATCH email_address to the
+    // subscriber's CURRENT value returns 400 "email_already_exists".
+    // Buttondown's email PATCH is not idempotent.
+    name: "13-patch-both-same-email",
     run: async (client, ctx) => {
       if (!ctx.createdSubscriber) throw new Error("probe 13: createdSubscriber missing");
       return client.updateSubscriber(ctx.createdSubscriber.id, {
@@ -163,34 +167,47 @@ export const buildProbes = (): Probe[] => [
     },
   },
   {
-    name: "14-patch-existing-unsubscribe",
+    // Happy-path patch-both: sends a NEW email value so Buttondown
+    // accepts the change. Pairs with 13 — together they cover both
+    // the success and the same-value-rejection cases.
+    name: "14-patch-both-new-email",
+    run: async (client, ctx) => {
+      if (!ctx.createdSubscriber) throw new Error("probe 14: createdSubscriber missing");
+      return client.updateSubscriber(ctx.createdSubscriber.id, {
+        tags: ["probe-patched-tags", "probe-extra"],
+        email_address: PROBE_CREATED_EMAIL_FINAL,
+      });
+    },
+  },
+  {
+    name: "15-patch-existing-unsubscribe",
     run: async (client, ctx) => {
       const henry = ctx.seededByEmail.get(SEED_EMAILS.henry);
-      if (!henry) throw new Error("probe 14: henry missing from seed");
+      if (!henry) throw new Error("probe 15: henry missing from seed");
       return client.updateSubscriber(henry.id, { type: "unsubscribed" });
     },
   },
   {
-    name: "15-patch-existing-resubscribe",
+    name: "16-patch-existing-resubscribe",
     run: async (client, ctx) => {
       const henry = ctx.seededByEmail.get(SEED_EMAILS.henry);
-      if (!henry) throw new Error("probe 15: henry missing from seed");
+      if (!henry) throw new Error("probe 16: henry missing from seed");
       return client.updateSubscriber(henry.id, { type: "regular" });
     },
   },
   {
-    name: "16-list-after-mutations",
+    name: "17-list-after-mutations",
     run: async (client) => client.listSubscribers(),
   },
   {
-    name: "17-delete-probe-created",
+    name: "18-delete-probe-created",
     run: async (client, ctx) => {
-      if (!ctx.createdSubscriber) throw new Error("probe 17: createdSubscriber missing");
+      if (!ctx.createdSubscriber) throw new Error("probe 18: createdSubscriber missing");
       return client.deleteSubscriber(ctx.createdSubscriber.id);
     },
   },
   {
-    name: "18-delete-missing",
+    name: "19-delete-missing",
     run: async (client) => client.deleteSubscriber(PROBE_MISSING_ID),
   },
 ];
@@ -200,12 +217,12 @@ export const buildProbes = (): Probe[] => [
 // Errors of type ButtondownApiError are captured as a value in the
 // result stream; any other error propagates and aborts the run.
 //
-// Error messages are intentionally NOT captured in the typed result —
-// real Buttondown's "DELETE subscriber: 404 {detail}" formatting
-// differs from the fake's "fake: subscriber not found", but `name`
-// and `status` agree. Comparing those two is enough; the full
-// response body still lives in `http_calls` on the gold file, so a
-// re-record diff still surfaces wire-shape drift in error responses.
+// err.message is omitted because it's a client-side construction
+// (the throw site in buttondown.ts assembles "<METHOD> subscriber:
+// <status> <body>"), not anything Buttondown returns — capturing it
+// would put data in typed_result that has no counterpart in
+// http_calls. Every piece (method, status, body) is in http_calls
+// already, so the string is reconstructable when debugging.
 export const runProbeSequence = async (client: ButtondownClient): Promise<ProbeResult[]> => {
   const ctx: ProbeContext = { seededByEmail: new Map(), createdSubscriber: null };
   const results: ProbeResult[] = [];

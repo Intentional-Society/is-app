@@ -281,26 +281,9 @@ Record and seed both load `.env.prod` and require `BUTTONDOWN_TEST_API_KEY`. The
 
 ### One probe sequence
 
-We don't structure this as named scenarios — designing for that level of organization is overkill at our usage size. There's one ordered sequence of probes covering every public method on `ButtondownClient`. The probe sequence lives in code at `tests/manual/_buttondown-probes.ts`; record and replay both walk it in order.
+There's one ordered sequence of probes covering every public method on `ButtondownClient`, plus targeted error and edge cases. The authoritative list lives in code at `tests/manual/_buttondown-probes.ts` (`buildProbes()`); the recorded outcome for each probe lives at `tests/functional/server/__data__/buttondown/golds/NN-<short-name>.json`. Record and replay both walk the sequence in order.
 
-Probe list:
-
-| #  | Probe                | Call                                                | Expectation                                        |
-|----|----------------------|-----------------------------------------------------|----------------------------------------------------|
-| 01 | list-seeded          | `listSubscribers()`                                 | array matching `seed.json`                         |
-| 02 | get-by-id            | `getSubscriber(seededId)`                           | matching subscriber                                |
-| 03 | get-by-email         | `getSubscriber(seededEmail)`                        | matching subscriber                                |
-| 04 | get-missing-id       | `getSubscriber(nonexistentId)`                      | null                                               |
-| 05 | get-missing-email    | `getSubscriber(nonexistentEmail)`                   | null                                               |
-| 06 | create-fresh         | `createSubscriber({email, tags})`                   | new subscriber object with id                      |
-| 07 | create-duplicate     | `createSubscriber({email: <06's email>, ...})`      | `ButtondownConflictError` (409)                    |
-| 08 | patch-tags           | `updateSubscriber(<06's id>, {tags: [...]})`        | updated subscriber                                 |
-| 09 | patch-email          | `updateSubscriber(<06's id>, {email_address: ...})` | updated subscriber                                 |
-| 10 | patch-both           | `updateSubscriber(<06's id>, {tags, email})`        | both fields applied                                |
-| 11 | list-after-mutations | `listSubscribers()`                                 | seeded + the probe-06 subscriber, in updated state |
-| 12 | delete               | `deleteSubscriber(<06's id>)`                       | success; subsequent list returns to seeded state   |
-
-Probe 12 leaves the test newsletter back at its canonical seeded state — re-running the sequence is idempotent without needing to re-seed.
+The last probe deletes the created subscriber, so re-running the sequence is idempotent without needing to re-seed.
 
 ### Data layout
 
@@ -310,17 +293,16 @@ tests/functional/server/__data__/buttondown/
     seed.json
   golds/
     meta.json
-    probes/
-      01-list-seeded.json
-      02-get-by-id.json
-      ...
+    01-list-seeded.json
+    02-get-account.json
+    ...
 ```
 
 `fixtures/` holds synthetic inputs we author; `golds/` holds outputs recorded from the real Buttondown API.
 
 - `fixtures/seed.json` — the canonical audience the seed script puts into the test newsletter. Plain data, not test logic.
 - `golds/meta.json` — `{api_version, key_fingerprint, recorded_at, recorded_by}`. One stamp per record run.
-- `golds/probes/NN-<short-name>.json` — one file per probe step, sorted lexicographically by leading number. Each file holds `{probe, http_calls, typed_result}`. The `http_calls` array captures raw request/response bytes (recording is at the HTTP layer, not the typed-client layer, so wire-shape changes the typed projection happens to absorb still show in the diff). `typed_result` is what the replay test deep-equals against, after id-normalization runs identical transforms on both the fake's output and the recorded gold.
+- `golds/NN-<short-name>.json` — one file per probe step, sorted lexicographically by leading number. Each file holds `{probe, http_calls, typed_result}`. The `http_calls` array captures raw request/response bytes; `response.body` is omitted on 200 and 201 (the typed projection of that body is what `typed_result` already holds, so re-recording the raw bytes would just be noise) and kept on every other status so error shapes stay diagnosable. `typed_result` is what the replay test deep-equals against, after id-normalization runs identical transforms on both the fake's output and the recorded gold.
 
 ### Re-record workflow (yearly-ish)
 
