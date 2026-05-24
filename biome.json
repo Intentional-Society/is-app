@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!.next", "!next-env.d.ts", "!supabase/templates/**/*.html"]
+    "includes": ["**", "!.next", "!next-env.d.ts", "!supabase/templates/**/*.html", "!docs/_temp-*"]
   },
   "formatter": {
     "enabled": true,

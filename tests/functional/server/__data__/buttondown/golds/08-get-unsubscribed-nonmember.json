@@ -1,0 +1,20 @@
+{
+  "probe": "08-get-unsubscribed-nonmember",
+  "http_calls": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.buttondown.com/v1/subscribers/dave.04%40fixture.test"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_350agfqh1j9gg9k9wk5myw2vnx",
+    "email_address": "dave.04@fixture.test",
+    "type": "unsubscribed",
+    "tags": []
+  }
+}

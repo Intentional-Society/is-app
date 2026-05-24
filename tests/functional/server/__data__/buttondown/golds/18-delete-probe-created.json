@@ -1,0 +1,18 @@
+{
+  "probe": "18-delete-probe-created",
+  "http_calls": [
+    {
+      "request": {
+        "method": "DELETE",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_164q773sbj9agams4jfe6r9m9v"
+      },
+      "response": {
+        "status": 204,
+        "body": null
+      }
+    }
+  ],
+  "typed_result": {
+    "__void": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "probe": "10-create-duplicate",
+  "http_calls": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.buttondown.com/v1/subscribers",
+        "body": {
+          "email_address": "probe-created@fixture.test",
+          "tags": [
+            "probe-dup-attempt"
+          ],
+          "type": "regular"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "code": "email_already_exists",
+          "detail": "That email address (probe-created@fixture.test) is already subscribed (id=2625ce71-e572-4aa0-aa64-927b8d84d13b).",
+          "metadata": {
+            "subscriber_id": "2625ce71-e572-4aa0-aa64-927b8d84d13b"
+          }
+        }
+      }
+    }
+  ],
+  "typed_result": {
+    "__error": {
+      "name": "ButtondownApiError",
+      "status": 400
+    }
+  }
+}

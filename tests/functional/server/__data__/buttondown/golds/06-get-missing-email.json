@@ -1,0 +1,20 @@
+{
+  "probe": "06-get-missing-email",
+  "http_calls": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.buttondown.com/v1/subscribers/nobody-here%40fixture.test"
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "code": "not_found",
+          "detail": "Not found.",
+          "metadata": {}
+        }
+      }
+    }
+  ],
+  "typed_result": null
+}
