@@ -1,0 +1,29 @@
+{
+  "probe": "09-create-fresh",
+  "http_calls": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.buttondown.com/v1/subscribers",
+        "body": {
+          "email_address": "probe-created@fixture.test",
+          "tags": [
+            "probe-fresh"
+          ],
+          "type": "regular"
+        }
+      },
+      "response": {
+        "status": 201
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_164q773sbj9agams4jfe6r9m9v",
+    "email_address": "probe-created@fixture.test",
+    "type": "regular",
+    "tags": [
+      "probe-fresh"
+    ]
+  }
+}

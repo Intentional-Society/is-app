@@ -1,0 +1,27 @@
+{
+  "probe": "11-patch-tags",
+  "http_calls": [
+    {
+      "request": {
+        "method": "PATCH",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_164q773sbj9agams4jfe6r9m9v",
+        "body": {
+          "tags": [
+            "probe-patched-tags"
+          ]
+        }
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_164q773sbj9agams4jfe6r9m9v",
+    "email_address": "probe-created@fixture.test",
+    "type": "regular",
+    "tags": [
+      "probe-patched-tags"
+    ]
+  }
+}

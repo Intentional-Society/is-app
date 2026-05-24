@@ -1,0 +1,26 @@
+{
+  "probe": "07-get-unsubscribed-member",
+  "http_calls": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.buttondown.com/v1/subscribers/frank.06%40fixture.test"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_4yvr49xjv892fb33jmwkhqzm0b",
+    "email_address": "frank.06@fixture.test",
+    "type": "unsubscribed",
+    "tags": [
+      "tarts-in-is",
+      "tcommunity-calls",
+      "tisweb-member",
+      "tpod-program",
+      "tweekly-web-updates"
+    ]
+  }
+}

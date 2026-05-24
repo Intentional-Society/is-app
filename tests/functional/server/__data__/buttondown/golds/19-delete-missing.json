@@ -1,0 +1,25 @@
+{
+  "probe": "19-delete-missing",
+  "http_calls": [
+    {
+      "request": {
+        "method": "DELETE",
+        "url": "https://api.buttondown.com/v1/subscribers/missing-subscriber-for-probe-04"
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "code": "not_found",
+          "detail": "Not found.",
+          "metadata": {}
+        }
+      }
+    }
+  ],
+  "typed_result": {
+    "__error": {
+      "name": "ButtondownApiError",
+      "status": 404
+    }
+  }
+}

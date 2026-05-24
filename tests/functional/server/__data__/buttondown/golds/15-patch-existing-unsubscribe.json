@@ -1,0 +1,28 @@
+{
+  "probe": "15-patch-existing-unsubscribe",
+  "http_calls": [
+    {
+      "request": {
+        "method": "PATCH",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_34t0e9feej9aatyeq7zkjk9p1e",
+        "body": {
+          "type": "unsubscribed"
+        }
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_34t0e9feej9aatyeq7zkjk9p1e",
+    "email_address": "henry.08@fixture.test",
+    "type": "unsubscribed",
+    "tags": [
+      "tarts-in-is",
+      "tcommunity-calls",
+      "tisweb-member",
+      "tweekly-web-updates"
+    ]
+  }
+}

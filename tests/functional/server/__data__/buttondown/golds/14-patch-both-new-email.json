@@ -1,0 +1,30 @@
+{
+  "probe": "14-patch-both-new-email",
+  "http_calls": [
+    {
+      "request": {
+        "method": "PATCH",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_164q773sbj9agams4jfe6r9m9v",
+        "body": {
+          "tags": [
+            "probe-patched-tags",
+            "probe-extra"
+          ],
+          "email_address": "probe-created-final@fixture.test"
+        }
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_164q773sbj9agams4jfe6r9m9v",
+    "email_address": "probe-created-final@fixture.test",
+    "type": "regular",
+    "tags": [
+      "probe-extra",
+      "probe-patched-tags"
+    ]
+  }
+}

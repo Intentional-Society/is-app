@@ -1,0 +1,17 @@
+{
+  "probe": "02-get-account",
+  "http_calls": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.buttondown.com/v1/accounts/me"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "typed_result": {
+    "username": "intentional-society-api-tests"
+  }
+}

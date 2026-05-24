@@ -1,0 +1,32 @@
+{
+  "probe": "13-patch-both-same-email",
+  "http_calls": [
+    {
+      "request": {
+        "method": "PATCH",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_164q773sbj9agams4jfe6r9m9v",
+        "body": {
+          "tags": [
+            "probe-patched-tags",
+            "probe-extra"
+          ],
+          "email_address": "probe-created-renamed@fixture.test"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "code": "email_invalid",
+          "detail": "email_already_exists",
+          "metadata": {}
+        }
+      }
+    }
+  ],
+  "typed_result": {
+    "__error": {
+      "name": "ButtondownApiError",
+      "status": 400
+    }
+  }
+}

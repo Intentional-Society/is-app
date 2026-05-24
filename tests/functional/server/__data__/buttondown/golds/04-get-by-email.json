@@ -1,0 +1,24 @@
+{
+  "probe": "04-get-by-email",
+  "http_calls": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.buttondown.com/v1/subscribers/alice.01%40fixture.test"
+      },
+      "response": {
+        "status": 200
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_1psvey6mfj8dza83gkp8hjbktk",
+    "email_address": "alice.01@fixture.test",
+    "type": "regular",
+    "tags": [
+      "tcommunity-calls",
+      "tisweb-member",
+      "tweekly-web-updates"
+    ]
+  }
+}
