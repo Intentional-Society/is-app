@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-24 | Benji | Joined program card ring highlight
+
+Program cards now show a ring highlight when the user has joined, replacing the default border with `ring-3 ring-ring/50` for a clearer visual distinction.
+
 ## 2026-05-24 | Benji | Give Feedback link in sidebar
 
 Added a "Give Feedback" link to the hamburger menu that opens a Google Form in a new tab. Includes a functional test asserting the link's presence, URL, and target attributes.
