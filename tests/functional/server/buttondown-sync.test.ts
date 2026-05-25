@@ -23,7 +23,13 @@ import { createFakeButtondownClient, type FakeButtondownEffect } from "./buttond
 
 const insertUserAndProfile = async (
   id: string,
-  opts: { displayName?: string; saved?: boolean; buttondownSubscriberId?: string | null; email?: string } = {},
+  opts: {
+    displayName?: string;
+    saved?: boolean;
+    buttondownSubscriberId?: string | null;
+    email?: string;
+    hidden?: boolean;
+  } = {},
 ) => {
   const email = opts.email ?? `${id}@testfake.local`;
   await db.execute(
@@ -34,6 +40,7 @@ const insertUserAndProfile = async (
     displayName: opts.displayName ?? null,
     lastUpdatedProfile: opts.saved === false ? null : new Date(),
     buttondownSubscriberId: opts.buttondownSubscriberId ?? null,
+    hidden: opts.hidden ?? false,
   });
 };
 
@@ -336,6 +343,59 @@ describe("runButtondownSync (daily reconciler)", () => {
       input: { tags: ["isweb-member", "new"] },
     });
     expect(profileId).toBeTruthy();
+  });
+
+  it("skips create for a hidden profile not yet in Buttondown", async () => {
+    const profileId = await makeProfile({ email: "kelvin@example.com", hidden: true });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    const client = createFakeButtondownClient({ write: true });
+    const { log, events } = collectingLogger();
+
+    const summary = await runButtondownSync({
+      client,
+      runId: "r-hidden-create",
+      write: true,
+      log,
+      scopeProfileIds: [profileId],
+    });
+
+    expect(effectsForEmail(client.effects, "kelvin@example.com")).toHaveLength(0);
+    expect(summary.created).toBe(0);
+    expect(summary.skippedHiddenCreate).toBe(1);
+    expect(
+      events.find((e) => e.action === "skipped-hidden-create" && e.profileId === profileId),
+    ).toBeDefined();
+  });
+
+  it("still PATCHes tags for a hidden profile that already has a Buttondown subscriber", async () => {
+    const profileId = await makeProfile({
+      email: "leo@example.com",
+      hidden: true,
+      buttondownSubscriberId: "sub_leo",
+    });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    const initial = sampleSubscriber({
+      id: "sub_leo",
+      email_address: "leo@example.com",
+      tags: ["isweb-member"],
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const summary = await runButtondownSync({
+      client,
+      runId: "r-hidden-update",
+      write: true,
+      scopeProfileIds: [profileId],
+    });
+
+    const updated = await client.getSubscriber("sub_leo");
+    expect(updated?.tags.sort()).toEqual(["isweb-member", "weekly"]);
+    expect(summary.tagsUpdated).toBe(1);
+    expect(summary.skippedHiddenCreate).toBe(0);
   });
 });
 
