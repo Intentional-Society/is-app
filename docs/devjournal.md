@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-25 | James | Buttondown sync
+
+Mirrors program memberships into Buttondown subscriber tags via a daily cron plus inline hooks on join/leave/admin-remove, replacing the Apps Script pipeline. Per-program opt-in via `programs.buttondown_tag`; ships in dry-run, then `scripts/buttondown-bootstrap.ts` reconciles the existing audience and `BUTTONDOWN_SYNC_WRITE=1` flips writes on. Design: `docs/design-buttondown.md`. (#280)
+
 ## 2026-05-24 | Benji | Custom 404 page
 
 Added a `not-found.tsx` at the app root so unmatched routes show a styled 404 page consistent with the app's aesthetic — serif italic subtitle, centered layout, and a "Go home" button.
@@ -15,10 +19,6 @@ Program cards now show a ring highlight when the user has joined, replacing the 
 ## 2026-05-24 | Benji | Give Feedback link in sidebar
 
 Added a "Give Feedback" link to the hamburger menu that opens a Google Form in a new tab. Includes a functional test asserting the link's presence, URL, and target attributes.
-
-## 2026-05-23 | James (draft) | Buttondown sync
-
-Mirrors IS Web program memberships into Buttondown subscriber tags via a daily Vercel cron (08:00 UTC) plus an inline best-effort hook on first profile save, replacing the pre-app Google Form + Apps Script pipeline. Per-program opt-in via a new `programs.buttondown_tag` column; the cron loops over our profiles so the larger non-member newsletter audience is structurally untouchable. Write-vs-dry-run gate lives at the Buttondown API client layer (every PATCH/POST short-circuits when called with `write: false`). Admin gets two "Sync now" buttons (dry-run and write) under /admin. Full design: `docs/design-buttondown.md`. Rollout: schema, then `scripts/buttondown-bootstrap.ts` to reconcile the ~46 CSV-imported members (Buttondown is authoritative for the bootstrap moment), then flip `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script. Tracking: #261.
 
 ## 2026-05-21 | James | Polish programs (#226)
 
