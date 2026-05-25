@@ -204,8 +204,10 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     // Defense-in-depth: pagination follows `next` URLs returned by
     // Buttondown's response body. Refuse to forward our Authorization
     // header to anything outside Buttondown's API in case that field
-    // ever points elsewhere.
-    if (!url.startsWith(BUTTONDOWN_BASE_URL)) {
+    // ever points elsewhere. Trailing slash anchors the hostname
+    // boundary so a lookalike host (api.buttondown.com.evil.com)
+    // can't match.
+    if (!url.startsWith(`${BUTTONDOWN_BASE_URL}/`)) {
       throw new ButtondownApiError(0, `Refusing to fetch URL outside Buttondown: ${url}`);
     }
     const path = url.slice(BUTTONDOWN_BASE_URL.length);
