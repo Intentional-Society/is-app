@@ -237,7 +237,7 @@ describe("Buttondown sync routes", () => {
       // endpoint — the resync ran end-to-end against the real client.
       const buttondownCalls = fetchSpy.mock.calls.filter((args) => {
         const url = typeof args[0] === "string" ? args[0] : (args[0] as URL | Request).toString();
-        return url.includes("api.buttondown.com");
+        return url.startsWith("https://api.buttondown.com");
       });
       expect(buttondownCalls.length).toBeGreaterThan(0);
       // Specifically: a POST to /subscribers (the create path the

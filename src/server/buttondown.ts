@@ -201,7 +201,14 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
   const fetcher: typeof fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const method = init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET");
-    const path = url.startsWith(BUTTONDOWN_BASE_URL) ? url.slice(BUTTONDOWN_BASE_URL.length) : url;
+    // Defense-in-depth: pagination follows `next` URLs returned by
+    // Buttondown's response body. Refuse to forward our Authorization
+    // header to anything outside Buttondown's API in case that field
+    // ever points elsewhere.
+    if (!url.startsWith(BUTTONDOWN_BASE_URL)) {
+      throw new ButtondownApiError(0, `Refusing to fetch URL outside Buttondown: ${url}`);
+    }
+    const path = url.slice(BUTTONDOWN_BASE_URL.length);
     const start = Date.now();
     const res = await rawFetcher(input, init);
     if (logger) {
