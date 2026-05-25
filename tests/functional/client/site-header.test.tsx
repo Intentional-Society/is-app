@@ -57,7 +57,7 @@ describe("SiteHeader", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
     await screen.findByText("Home");
-    expect(screen.queryByText("Admin")).toBeNull();
+    expect(screen.queryByText("Admin dashboard")).toBeNull();
   });
 
   it("shows the Admin link when isAdmin is true", async () => {
@@ -67,7 +67,7 @@ describe("SiteHeader", () => {
       </AuthProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
-    expect(await screen.findByText("Admin")).toBeVisible();
+    expect(await screen.findByText("Admin dashboard")).toBeVisible();
   });
 
   it("shows Give Feedback link that opens in a new tab", async () => {
