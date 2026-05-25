@@ -5,6 +5,7 @@ import { requireUser, serverApiClient } from "@/lib/api-server";
 
 import { AdminHidden } from "./admin-hidden";
 import { AdminHints } from "./admin-hints";
+import { ButtondownSyncButtons } from "./buttondown-sync-buttons";
 
 export default async function AdminPage() {
   const me = await requireUser();
@@ -53,6 +54,11 @@ export default async function AdminPage() {
       <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">Hidden accounts</h2>
         <AdminHidden />
+      </section>
+
+      <section className="flex w-full max-w-xl flex-col gap-2">
+        <h2 className="text-lg font-semibold">Buttondown sync</h2>
+        <ButtondownSyncButtons />
       </section>
     </main>
   );

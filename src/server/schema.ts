@@ -56,6 +56,11 @@ export const profiles = pgTable("profiles", {
   lastUpdatedProfile: timestamp("last_updated_profile", { withTimezone: true }),
   lastReviewedPrograms: timestamp("last_reviewed_programs", { withTimezone: true }),
   lastUpdatedWeb: timestamp("last_updated_web", { withTimezone: true }),
+  // Buttondown subscriber id — populated lazily by the sync the first
+  // time it encounters this profile. Lookups by id are stable across
+  // member email changes; the cron PATCHes the subscriber's email when
+  // it sees a mismatch. See docs/design-buttondown.md.
+  buttondownSubscriberId: text("buttondown_subscriber_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
@@ -76,7 +81,23 @@ export const programs = pgTable("programs", {
   // newly-created cohort or pod doesn't accidentally accept signups
   // before the admin is ready; admin add-participant is unaffected.
   signupsOpen: boolean("signups_open").notNull().default(false),
+  // Buttondown tag name for this program. NULL means "do not sync this
+  // program to Buttondown at all" — the per-program opt-in mechanism.
+  // The value is the exact tag string Buttondown stores; admins set it
+  // to match whatever tag the newsletter already uses for this program.
+  // See docs/design-buttondown.md.
+  buttondownTag: text("buttondown_tag"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// Lease-based concurrency lock for sync jobs (currently just Buttondown).
+// One row per actively held lock; the row is deleted on release, so the
+// table is empty when nothing is running. Acquire via INSERT ... ON
+// CONFLICT DO UPDATE WHERE expired (see docs/design-buttondown.md).
+export const syncLocks = pgTable("sync_locks", {
+  name: text("name").primaryKey(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }).notNull(),
+  acquiredBy: text("acquired_by").notNull(),
 }).enableRLS();
 
 // Soft-delete table: a row's existence records "Alice was ever joined

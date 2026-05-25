@@ -8,6 +8,11 @@ import { isRelationValue } from "@/lib/relation-value";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
+import {
+  runButtondownSyncForServer,
+  runFirstProfileSaveForServer,
+  runProfileResyncForServer,
+} from "./buttondown-runner";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -138,8 +143,17 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
     },
   )
   .delete("/programs/:id/participants/:profileId", async (c) => {
-    const result = await removeParticipant(c.req.param("id"), c.req.param("profileId"));
+    const targetProfileId = c.req.param("profileId");
+    const result = await removeParticipant(c.req.param("id"), targetProfileId);
     if ("error" in result) return c.json({ error: result.error }, 404);
+    // Best-effort inline resync so the removed program's tag drops
+    // off the subscriber within this request instead of waiting for
+    // the next cron. The cron is the safety net.
+    await runProfileResyncForServer({
+      profileId: targetProfileId,
+      reason: "admin-remove-participant",
+      write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    });
     return c.json({ ok: true });
   })
   .get("/profiles/hidden", async (c) => {
@@ -170,7 +184,34 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       if ("error" in result) return c.json({ error: result.error }, 404);
       return c.json({ ok: true });
     },
-  );
+  )
+  // Two admin-triggered Buttondown sync routes. The dry-run button
+  // fires immediately and is safe to press anytime; the write button
+  // is wrapped in a confirm step on the UI side. Both call the same
+  // shared runner, distinguished only by `write` and by the
+  // `acquired_by` string recorded on the lock.
+  .post("/buttondown-sync/dry-run", async (c) => {
+    const user = c.get("user");
+    const result = await runButtondownSyncForServer({
+      acquiredBy: `admin:${user.id}:dry-run`,
+      write: false,
+      // Admin clicked once; absorb brief contention rather than
+      // surfacing a "skipped" surprise. Same budget as inline resync.
+      lockRetries: 2,
+      lockRetryDelayMs: 500,
+    });
+    return c.json(result);
+  })
+  .post("/buttondown-sync/write", async (c) => {
+    const user = c.get("user");
+    const result = await runButtondownSyncForServer({
+      acquiredBy: `admin:${user.id}:write`,
+      write: true,
+      lockRetries: 2,
+      lockRetryDelayMs: 500,
+    });
+    return c.json(result);
+  });
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -251,6 +292,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
       await upsertProfile(user);
     }
 
+    // Inline first-profile-save detection: lastUpdatedProfile being
+    // null right now (and a real update about to run) is "first
+    // save", which fires the Buttondown inline hook below. See
+    // docs/design-buttondown.md → "Inline hook on first profile save".
+    const isFirstSave = !existing?.lastUpdatedProfile && Object.keys(parsed).length > 0;
+
     if (Object.keys(parsed).length > 0) {
       const update = {
         ...parsed,
@@ -268,6 +315,18 @@ const api = new Hono<{ Variables: ApiVariables }>()
         }
         throw err;
       }
+    }
+
+    // Best-effort Buttondown inline hook. Failures inside the hook
+    // are swallowed by the runner, so even a Buttondown outage
+    // doesn't disturb the PUT /me response. The cron picks up any
+    // miss. Soft-skips on BUTTONDOWN_API_KEY missing (dev / preview).
+    if (isFirstSave && user.email) {
+      await runFirstProfileSaveForServer({
+        profileId: user.id,
+        email: user.email,
+        write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+      });
     }
 
     const profile = await getProfileForSelf(user.id);
@@ -444,6 +503,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
       }
       return c.json({ error: "already_joined" }, 409);
     }
+    // Best-effort inline resync; the cron is the safety net.
+    await runProfileResyncForServer({
+      profileId: user.id,
+      reason: "join-program",
+      write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    });
     return c.json({ ok: true });
   })
   .post("/programs/:id/leave", async (c) => {
@@ -453,6 +518,11 @@ const api = new Hono<{ Variables: ApiVariables }>()
     if ("error" in result) {
       return c.json({ error: "not_found" }, 404);
     }
+    await runProfileResyncForServer({
+      profileId: user.id,
+      reason: "leave-program",
+      write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    });
     return c.json({ ok: true });
   })
   .get("/relations/candidates", async (c) => {
@@ -585,6 +655,41 @@ api.post("/_test/reset", async (c) => {
     return c.json({ error: "not_found" }, 404);
   }
   const result = await resetE2EUsers();
+  return c.json(result);
+});
+
+// Vercel cron entrypoint. Vercel attaches `Authorization: Bearer
+// $CRON_SECRET` when invoking scheduled crons; we reject anything
+// else with 401. The write toggle is BUTTONDOWN_SYNC_WRITE=1 — the
+// design's "Prod-only by construction" lock #4. Unset (the default)
+// means dry-run; set means writes go through.
+api.post("/cron/buttondown-sync", async (c) => {
+  const provided = c.req.header("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || provided !== `Bearer ${cronSecret}`) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const result = await runButtondownSyncForServer({
+    acquiredBy: `cron:${new Date().toISOString()}`,
+    write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    // Inline resyncs hold the lock for ~1s each. A daily cron can
+    // realistically collide with one. Skipping costs 24h of drift, so
+    // wait up to 10s for the lock — well under Vercel's 300s function
+    // timeout and far longer than any inline run. If contention
+    // persists past 10s, the prior cron is genuinely stuck and the
+    // existing Sentry warning surfaces it.
+    lockRetries: 20,
+    lockRetryDelayMs: 500,
+  });
+  // Surface per-profile errors to Vercel's cron health view by
+  // returning 500 when any profile failed. Vercel doesn't retry
+  // failed crons, so this is signal-only: the cron dashboard lights
+  // up and the existing Sentry capture in the runner pages someone.
+  // Skipped runs (api-key-missing, lock-held) stay 200 since they
+  // aren't failures from the cron's point of view.
+  if (result.status === "ok" && result.summary.errors > 0) {
+    return c.json(result, 500);
+  }
   return c.json(result);
 });
 

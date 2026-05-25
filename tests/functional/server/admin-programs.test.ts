@@ -294,6 +294,50 @@ describe("Admin programs API", () => {
       res = await patch(programId, { signupsOpen: 1 });
       expect(res.status).toBe(400);
     });
+
+    it("sets buttondownTag from a non-empty string and back to null via null", async () => {
+      const programId = await seedProgram("Buttondown Tag Program");
+      authAs(admin);
+
+      let res = await patch(programId, { buttondownTag: "weekly-updates" });
+      expect(res.status).toBe(200);
+      let [row] = await db
+        .select({ buttondownTag: programs.buttondownTag })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.buttondownTag).toBe("weekly-updates");
+
+      res = await patch(programId, { buttondownTag: null });
+      expect(res.status).toBe(200);
+      [row] = await db
+        .select({ buttondownTag: programs.buttondownTag })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.buttondownTag).toBeNull();
+    });
+
+    it("normalizes an empty buttondownTag string to null (the 'unset' state)", async () => {
+      const programId = await seedProgram("Buttondown Tag Blank Program");
+      // Seed with a non-null value so we can observe the clear.
+      await db.update(programs).set({ buttondownTag: "old-tag" }).where(eq(programs.id, programId));
+
+      authAs(admin);
+      const res = await patch(programId, { buttondownTag: "   " });
+      expect(res.status).toBe(200);
+      const [row] = await db
+        .select({ buttondownTag: programs.buttondownTag })
+        .from(programs)
+        .where(eq(programs.id, programId));
+      expect(row.buttondownTag).toBeNull();
+    });
+
+    it("rejects a non-string non-null buttondownTag with 400", async () => {
+      const programId = await seedProgram("Buttondown Tag Type Strict Program");
+      authAs(admin);
+
+      const res = await patch(programId, { buttondownTag: 42 });
+      expect(res.status).toBe(400);
+    });
   });
 
   describe("GET /api/admin/programs (archive/signups state)", () => {

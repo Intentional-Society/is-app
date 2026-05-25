@@ -154,6 +154,11 @@ export function ProgramsAdmin() {
                           Signups closed
                         </span>
                       )}
+                      {p.buttondownTag && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Buttondown:Linked
+                        </span>
+                      )}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {p.memberCount} {p.memberCount === 1 ? "participant" : "participants"}

@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-25 | James | Buttondown sync
+
+Mirrors program memberships into Buttondown subscriber tags via a daily cron plus inline hooks on join/leave/admin-remove, replacing the Apps Script pipeline. Per-program opt-in via `programs.buttondown_tag`; ships in dry-run, then `scripts/buttondown-bootstrap.ts` reconciles the existing audience and `BUTTONDOWN_SYNC_WRITE=1` flips writes on. Design: `docs/design-buttondown.md`. (#280)
+
 ## 2026-05-24 | Benji | Custom 404 page
 
 Added a `not-found.tsx` at the app root so unmatched routes show a styled 404 page consistent with the app's aesthetic — serif italic subtitle, centered layout, and a "Go home" button.
