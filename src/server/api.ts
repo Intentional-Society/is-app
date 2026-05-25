@@ -195,6 +195,10 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
     const result = await runButtondownSyncForServer({
       acquiredBy: `admin:${user.id}:dry-run`,
       write: false,
+      // Admin clicked once; absorb brief contention rather than
+      // surfacing a "skipped" surprise. Same budget as inline resync.
+      lockRetries: 2,
+      lockRetryDelayMs: 500,
     });
     return c.json(result);
   })
@@ -203,6 +207,8 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
     const result = await runButtondownSyncForServer({
       acquiredBy: `admin:${user.id}:write`,
       write: true,
+      lockRetries: 2,
+      lockRetryDelayMs: 500,
     });
     return c.json(result);
   });
@@ -666,6 +672,14 @@ api.post("/cron/buttondown-sync", async (c) => {
   const result = await runButtondownSyncForServer({
     acquiredBy: `cron:${new Date().toISOString()}`,
     write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    // Inline resyncs hold the lock for ~1s each. A daily cron can
+    // realistically collide with one. Skipping costs 24h of drift, so
+    // wait up to 10s for the lock — well under Vercel's 300s function
+    // timeout and far longer than any inline run. If contention
+    // persists past 10s, the prior cron is genuinely stuck and the
+    // existing Sentry warning surfaces it.
+    lockRetries: 20,
+    lockRetryDelayMs: 500,
   });
   // Surface per-profile errors to Vercel's cron health view by
   // returning 500 when any profile failed. Vercel doesn't retry

@@ -34,6 +34,12 @@ export type RunButtondownSyncOptions = {
   // per-profile resync paths so an inline hook doesn't walk the whole
   // audience. Omit for the daily broad sweep.
   scopeProfileIds?: string[];
+  // If the lock is held by another run on the first try, sleep this
+  // long and retry — once per retry. Inline resyncs use this to hide
+  // brief contention (the typical run is sub-second); the cron and
+  // admin buttons leave it 0 so a held lock surfaces immediately.
+  lockRetries?: number;
+  lockRetryDelayMs?: number;
 };
 
 export type RunResult =
@@ -54,19 +60,46 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
     return { status: "skipped", reason: "api_key_missing" };
   }
 
-  const got = await acquireLock(LOCK_NAME, runId);
+  // Track attempts and total wait so Axiom can answer "how often
+  // does retry save us?" Per-attempt outcome stays implicit — only
+  // the final ack (lock-acquired) or final fail (skipped-lock-held)
+  // is logged, both carrying the same attempts/waitedMs fields.
+  const lockRetries = options.lockRetries ?? 0;
+  const lockRetryDelayMs = options.lockRetryDelayMs ?? 0;
+  let attempts = 1;
+  let waitedMs = 0;
+  let got = await acquireLock(LOCK_NAME, runId);
+  while (!got && attempts <= lockRetries) {
+    await new Promise((resolve) => setTimeout(resolve, lockRetryDelayMs));
+    waitedMs += lockRetryDelayMs;
+    attempts++;
+    got = await acquireLock(LOCK_NAME, runId);
+  }
   if (!got) {
-    log.warn("buttondown sync", { action: "skipped-lock-held", acquiredBy: runId });
-    // A held lock means the previous invocation is still running past
-    // the cron interval — that's a real signal, not just noise. Send
-    // it to Sentry so it pages; the fingerprint stays stable so an
-    // operator sees one issue per ongoing overlap, not one per cron.
+    log.warn("buttondown sync", {
+      action: "skipped-lock-held",
+      acquiredBy: runId,
+      attempts,
+      waitedMs,
+    });
+    // A held lock that survives every retry means the previous
+    // invocation is still running well past its expected window —
+    // that's a real signal, not just noise. Send it to Sentry so it
+    // pages; the fingerprint stays stable so an operator sees one
+    // issue per ongoing overlap, not one per cron.
     Sentry.captureMessage("buttondown.sync_lock_held", {
       level: "warning",
       tags: { feature: "buttondown-sync", action: "skipped-lock-held", acquiredBy: runId },
+      extra: { attempts, waitedMs },
     });
     return { status: "skipped", reason: "lock_held" };
   }
+  log.info("buttondown sync", {
+    action: "lock-acquired",
+    acquiredBy: runId,
+    attempts,
+    waitedMs,
+  });
 
   try {
     const client = createButtondownClient({
@@ -212,6 +245,12 @@ export const runProfileResyncForServer = async (params: {
       acquiredBy: `resync:${params.reason}:${params.profileId}`,
       write: params.write,
       scopeProfileIds: [params.profileId],
+      // Inline resync is user-triggered, so brief contention with the
+      // cron or another inline action should be hidden, not paged.
+      // Two retries at 500ms each = up to 1s wait — covers the typical
+      // sub-second inline run and the long tail (~P90).
+      lockRetries: 2,
+      lockRetryDelayMs: 500,
     });
     log.info("buttondown sync", {
       action: "profile-resync-applied",

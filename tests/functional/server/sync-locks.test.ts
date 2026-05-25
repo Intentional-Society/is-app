@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/server/db";
@@ -6,20 +7,27 @@ import { acquireLock, releaseLock } from "@/server/sync-locks";
 
 const LOCK_NAME = "test-lock-buttondown";
 
+// Scope every read/write to this test's lock name. Vitest runs files
+// in parallel against the shared dev DB, so concurrent routes tests
+// can have a "buttondown" lock row in flight; an unscoped query
+// counts those and breaks length assertions.
+const rowsForOurLock = () => db.select().from(syncLocks).where(eq(syncLocks.name, LOCK_NAME));
+const wipeOurLock = () => db.delete(syncLocks).where(eq(syncLocks.name, LOCK_NAME));
+
 describe("sync-locks", () => {
   beforeEach(async () => {
-    await db.delete(syncLocks);
+    await wipeOurLock();
   });
 
   afterEach(async () => {
-    await db.delete(syncLocks);
+    await wipeOurLock();
   });
 
   it("acquires when no lock exists", async () => {
     const ok = await acquireLock(LOCK_NAME, "caller-a");
     expect(ok).toBe(true);
 
-    const rows = await db.select().from(syncLocks);
+    const rows = await rowsForOurLock();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ name: LOCK_NAME, acquiredBy: "caller-a" });
   });
@@ -28,7 +36,7 @@ describe("sync-locks", () => {
     expect(await acquireLock(LOCK_NAME, "caller-a")).toBe(true);
     expect(await acquireLock(LOCK_NAME, "caller-b")).toBe(false);
 
-    const rows = await db.select().from(syncLocks);
+    const rows = await rowsForOurLock();
     expect(rows[0].acquiredBy).toBe("caller-a");
   });
 
@@ -45,7 +53,7 @@ describe("sync-locks", () => {
     expect(await acquireLock(LOCK_NAME, "caller-a", 0)).toBe(true);
     expect(await acquireLock(LOCK_NAME, "caller-b")).toBe(true);
 
-    const rows = await db.select().from(syncLocks);
+    const rows = await rowsForOurLock();
     expect(rows[0].acquiredBy).toBe("caller-b");
   });
 
@@ -53,7 +61,7 @@ describe("sync-locks", () => {
     await acquireLock(LOCK_NAME, "caller-a");
     await releaseLock(LOCK_NAME, "caller-a");
 
-    const rows = await db.select().from(syncLocks);
+    const rows = await rowsForOurLock();
     expect(rows).toHaveLength(0);
   });
 
@@ -61,7 +69,7 @@ describe("sync-locks", () => {
     await acquireLock(LOCK_NAME, "caller-a");
     await releaseLock(LOCK_NAME, "caller-b");
 
-    const rows = await db.select().from(syncLocks);
+    const rows = await rowsForOurLock();
     expect(rows).toHaveLength(1);
     expect(rows[0].acquiredBy).toBe("caller-a");
   });

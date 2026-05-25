@@ -42,5 +42,8 @@ The sync emits two message families: `"buttondown sync"` (structured events with
   `["vercel"] | where message == "buttondown http" and fields.status == 429`
 - **Dry-run vs write traffic split:**
   `["vercel"] | where message == "buttondown sync" and fields.action == "summary" | summarize count() by fields.write`
+- **Lock retry budget — how often does retry save us?**
+  `["vercel"] | where message == "buttondown sync" and fields.action == "lock-acquired" | summarize count() by fields.attempts`
+  Distribution of `attempts` across runs. `1` means no contention; `>1` means a retry succeeded. Pair with `skipped-lock-held` count (retries exhausted) to size the budget.
 
 Sentry surfaces the page-worthy events: `buttondown.sync_profile_error` (one per failing profile, tagged with `errorKind`), `buttondown.sync_lock_held` (cron overlap), and `buttondown.unsubscribed_member` (member-with-active-program who unsubscribed). Each Sentry issue's `runId` tag links back to the Axiom query above.
