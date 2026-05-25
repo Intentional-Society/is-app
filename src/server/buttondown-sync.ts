@@ -329,19 +329,27 @@ const recordSubscriberId = async (profileId: string, subscriberId: string): Prom
  * Resolves a profile's Buttondown subscriber. Two strategies share
  * the signature so syncOneProfile is agnostic to which is in play:
  *
- *  - Broad reconciler (cron, admin "Sync now"): one listSubscribers
- *    call up front, indexed in memory; per-profile lookups are
- *    free. Cheaper than O(N) per-profile GETs against an audience
- *    that is mostly already correct.
+ *  - Broad reconciler (cron, admin "Sync now", bootstrap script):
+ *    one listSubscribers call up front, indexed in memory; per-
+ *    profile lookups are free. Cheaper than O(N) per-profile GETs
+ *    against an audience that is mostly already correct.
  *  - Per-profile resync (inline join/leave hooks): one or two
  *    getSubscriber calls. Fetching the whole audience to act on a
  *    single row would be the wrong trade.
  *
- * Selected by the presence of `deps.scopeProfileIds`.
+ * Selected by the presence of `deps.scopeProfileIds`. The lookup
+ * accepts the minimum shape used by both syncOneProfile's ProfileRow
+ * and the bootstrap script's member record.
  */
-export type SubscriberLookup = (profile: ProfileRow) => Promise<ButtondownSubscriber | null>;
+export type SubscriberLookupInput = {
+  email: string | null;
+  buttondownSubscriberId: string | null;
+};
 
-// Exported for unit testing. The runner shouldn't call this
+export type SubscriberLookup = (profile: SubscriberLookupInput) => Promise<ButtondownSubscriber | null>;
+
+// Exported for unit testing AND for reuse by the bootstrap script,
+// which is a broad-path run. The runner shouldn't call this
 // directly — runButtondownSync wires it up internally.
 export const buildSubscriberLookup = async (
   client: ButtondownClient,

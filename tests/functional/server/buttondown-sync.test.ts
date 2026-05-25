@@ -386,11 +386,11 @@ describe("buildSubscriberLookup", () => {
     expect(client.getSubscriber).not.toHaveBeenCalled();
 
     // Lookups consult the cached map — no further HTTP.
-    const byId = await lookup({ profileId: "p1", email: "irrelevant@example.com", buttondownSubscriberId: "sub_a" });
+    const byId = await lookup({ email: "irrelevant@example.com", buttondownSubscriberId: "sub_a" });
     expect(byId?.id).toBe("sub_a");
-    const byEmail = await lookup({ profileId: "p2", email: "beta@example.com", buttondownSubscriberId: null });
+    const byEmail = await lookup({ email: "beta@example.com", buttondownSubscriberId: null });
     expect(byEmail?.id).toBe("sub_b");
-    const missing = await lookup({ profileId: "p3", email: "nobody@example.com", buttondownSubscriberId: null });
+    const missing = await lookup({ email: "nobody@example.com", buttondownSubscriberId: null });
     expect(missing).toBeNull();
 
     expect(client.getSubscriber).not.toHaveBeenCalled();
@@ -403,7 +403,6 @@ describe("buildSubscriberLookup", () => {
     const lookup = await buildSubscriberLookup(client as never, undefined);
 
     const found = await lookup({
-      profileId: "p1",
       email: "carla@example.com",
       buttondownSubscriberId: "sub_stale_that_no_longer_exists",
     });
@@ -417,7 +416,7 @@ describe("buildSubscriberLookup", () => {
 
     expect(client.listSubscribers).not.toHaveBeenCalled();
 
-    const found = await lookup({ profileId: "p1", email: "solo@example.com", buttondownSubscriberId: "sub_only" });
+    const found = await lookup({ email: "solo@example.com", buttondownSubscriberId: "sub_only" });
     expect(found?.id).toBe("sub_only");
     // id-first, no email fallback when id resolves.
     expect(client.getSubscriber).toHaveBeenCalledTimes(1);

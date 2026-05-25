@@ -36,17 +36,11 @@ import {
   loadJoinedTaggedPrograms,
   loadManagedUniverse,
 } from "../src/server/buttondown-bootstrap";
+import { buildSubscriberLookup } from "../src/server/buttondown-sync";
 
 const argv = process.argv.slice(2);
 const useProd = argv.includes("--prod");
 const write = argv.includes("--write");
-
-config({ path: useProd ? ".env.prod" : ".env.local" });
-
-if (!process.env.BUTTONDOWN_API_KEY) {
-  console.error("BUTTONDOWN_API_KEY is not set in the loaded env file.");
-  process.exit(1);
-}
 
 const confirmIfWrite = async (): Promise<void> => {
   if (!write) return;
@@ -60,69 +54,88 @@ const confirmIfWrite = async (): Promise<void> => {
   }
 };
 
-await confirmIfWrite();
+async function main() {
+  config({ path: useProd ? ".env.prod" : ".env.local" });
 
-const client = createButtondownClient({
-  apiKey: process.env.BUTTONDOWN_API_KEY,
-  write,
-});
-
-console.log(`# Buttondown bootstrap — ${write ? "WRITE" : "dry-run"} mode (${useProd ? "prod" : "local"})`);
-
-const [members, byProfile, managedUniverse] = await Promise.all([
-  loadBootstrapMembers(),
-  loadJoinedTaggedPrograms(),
-  loadManagedUniverse(),
-]);
-
-console.log(`# ${members.length} saved profiles; managed tag universe: [${[...managedUniverse].join(", ")}]\n`);
-
-const counts = {
-  reconciled: 0,
-  skippedMissingEmail: 0,
-  skippedMissingSubscriber: 0,
-  skippedUnsubscribed: 0,
-  errors: 0,
-};
-
-for (const member of members) {
-  const label = `${member.displayName ?? "(no name)"} <${member.email ?? "(no email)"}>`;
-  try {
-    const joined = byProfile.get(member.profileId) ?? [];
-    const { plan, applied } = await applyBootstrapForMember(member, joined, managedUniverse, { client, write });
-
-    switch (plan.kind) {
-      case "skip-missing-email":
-        counts.skippedMissingEmail++;
-        console.log(`SKIP missing-email   ${label}`);
-        break;
-      case "skip-missing-subscriber":
-        counts.skippedMissingSubscriber++;
-        console.log(`SKIP missing-sub     ${label}  (tried: ${plan.tried.join(", ")})`);
-        break;
-      case "skip-unsubscribed":
-        counts.skippedUnsubscribed++;
-        console.log(`SKIP unsubscribed    ${label}  (subscriber ${plan.subscriberId})`);
-        break;
-      case "reconcile": {
-        counts.reconciled++;
-        const leaveSummary =
-          plan.programsToLeave.length === 0
-            ? "no app-side leaves"
-            : `leaveProgram: ${plan.programsToLeave.map((p) => p.programSlug).join(", ")}`;
-        console.log(
-          `${applied ? "APPLY" : "PLAN "} reconcile        ${label}  (${leaveSummary}; final tags: [${plan.finalTags.join(", ")}])`,
-        );
-        break;
-      }
-    }
-  } catch (err) {
-    counts.errors++;
-    console.log(`ERROR                ${label}  ${err instanceof Error ? err.message : String(err)}`);
+  if (!process.env.BUTTONDOWN_API_KEY) {
+    console.error("BUTTONDOWN_API_KEY is not set in the loaded env file.");
+    process.exit(1);
   }
+
+  await confirmIfWrite();
+
+  const client = createButtondownClient({
+    apiKey: process.env.BUTTONDOWN_API_KEY,
+    write,
+  });
+
+  console.log(`# Buttondown bootstrap — ${write ? "WRITE" : "dry-run"} mode (${useProd ? "prod" : "local"})`);
+
+  const [members, byProfile, managedUniverse] = await Promise.all([
+    loadBootstrapMembers(),
+    loadJoinedTaggedPrograms(),
+    loadManagedUniverse(),
+  ]);
+
+  // Preload the audience once via listSubscribers and index it. The
+  // bootstrap is a broad run (every member), so the same per-member
+  // lookup the cron uses applies here — turning N×(1-2) GETs into
+  // ceil(N_subscribers/100) paginated calls.
+  console.log(`# Preloading Buttondown audience…`);
+  const lookup = await buildSubscriberLookup(client, undefined);
+
+  console.log(`# ${members.length} saved profiles; managed tag universe: [${[...managedUniverse].join(", ")}]\n`);
+
+  const counts = {
+    reconciled: 0,
+    skippedMissingEmail: 0,
+    skippedMissingSubscriber: 0,
+    skippedUnsubscribed: 0,
+    errors: 0,
+  };
+
+  for (const member of members) {
+    const label = `${member.displayName ?? "(no name)"} <${member.email ?? "(no email)"}>`;
+    try {
+      const joined = byProfile.get(member.profileId) ?? [];
+      const { plan, applied } = await applyBootstrapForMember(member, joined, managedUniverse, { client, lookup, write });
+
+      switch (plan.kind) {
+        case "skip-missing-email":
+          counts.skippedMissingEmail++;
+          console.log(`SKIP missing-email   ${label}`);
+          break;
+        case "skip-missing-subscriber":
+          counts.skippedMissingSubscriber++;
+          console.log(`SKIP missing-sub     ${label}  (tried: ${plan.tried.join(", ")})`);
+          break;
+        case "skip-unsubscribed":
+          counts.skippedUnsubscribed++;
+          console.log(`SKIP unsubscribed    ${label}  (subscriber ${plan.subscriberId})`);
+          break;
+        case "reconcile": {
+          counts.reconciled++;
+          const leaveSummary =
+            plan.programsToLeave.length === 0
+              ? "no app-side leaves"
+              : `leaveProgram: ${plan.programsToLeave.map((p) => p.programSlug).join(", ")}`;
+          console.log(
+            `${applied ? "APPLY" : "PLAN "} reconcile        ${label}  (${leaveSummary}; final tags: [${plan.finalTags.join(", ")}])`,
+          );
+          break;
+        }
+      }
+    } catch (err) {
+      counts.errors++;
+      console.log(`ERROR                ${label}  ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  console.log(`\n# Summary: ${JSON.stringify(counts)}`);
+  console.log(write ? "# Wrote changes." : "# Dry-run only — no changes made. Re-run with --write to apply.");
 }
 
-console.log(`\n# Summary: ${JSON.stringify(counts)}`);
-console.log(write ? "# Wrote changes." : "# Dry-run only — no changes made. Re-run with --write to apply.");
-
-process.exit(0);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

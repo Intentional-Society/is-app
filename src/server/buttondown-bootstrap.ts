@@ -16,6 +16,7 @@
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { type ButtondownClient, type ButtondownSubscriber, isDryRunOutcome } from "./buttondown";
+import { type SubscriberLookup } from "./buttondown-sync";
 import { db } from "./db";
 import { authUsers, profilePrograms, profiles, programs } from "./schema";
 import { leaveProgram } from "./programs";
@@ -170,9 +171,13 @@ export const loadManagedUniverse = async (): Promise<Set<string>> => {
 
 // Orchestrates one member's bootstrap: looks up Buttondown, decides,
 // applies. Honors the client's `write` flag for Buttondown writes and
-// the `write` arg for app-side mutations.
+// the `write` arg for app-side mutations. Subscriber resolution goes
+// through a shared `lookup` so the script can preload the audience
+// once via listSubscribers (one paginated call) instead of doing
+// 1-2 GETs per member.
 export type ApplyBootstrapDeps = {
   client: ButtondownClient;
+  lookup: SubscriberLookup;
   write: boolean;
 };
 
@@ -186,17 +191,7 @@ export const applyBootstrapForMember = async (
     return { plan: { kind: "skip-missing-email" }, applied: false };
   }
 
-  // id-first lookup is stable across email changes; fall back to email.
-  let subscriber: ButtondownSubscriber | null = null;
-  const tried: string[] = [];
-  if (member.buttondownSubscriberId) {
-    tried.push(`id:${member.buttondownSubscriberId}`);
-    subscriber = await deps.client.getSubscriber(member.buttondownSubscriberId);
-  }
-  if (!subscriber) {
-    tried.push(`email:${member.email}`);
-    subscriber = await deps.client.getSubscriber(member.email);
-  }
+  const subscriber = await deps.lookup(member);
 
   const plan = planBootstrap({
     subscriber,
@@ -205,6 +200,12 @@ export const applyBootstrapForMember = async (
   });
 
   if (plan.kind === "skip-missing-subscriber") {
+    // Reconstruct the lookup attempts for operator debugging — the
+    // lookup tries id-first then email when both are present, so
+    // surface both whenever they were known.
+    const tried: string[] = [];
+    if (member.buttondownSubscriberId) tried.push(`id:${member.buttondownSubscriberId}`);
+    tried.push(`email:${member.email}`);
     plan.tried = tried;
   }
 
