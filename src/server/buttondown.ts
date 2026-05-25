@@ -212,7 +212,9 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     }
     const path = url.slice(BUTTONDOWN_BASE_URL.length);
     const start = Date.now();
-    const res = await rawFetcher(input, init);
+    // Pass the validated `url` (not the original `input`) so the host
+    // check above also acts as a taint sanitizer for static analysis.
+    const res = await rawFetcher(url, init);
     if (logger) {
       const event: ButtondownHttpLogEvent = {
         method,
