@@ -24,11 +24,16 @@ const LOCK_NAME = "buttondown";
 export type RunButtondownSyncOptions = {
   // Identifier for this run, recorded on the lock and in every log
   // event. Cron uses "cron:<iso-timestamp>"; admin uses
-  // "admin:<profileId>:<dry-run|write>".
+  // "admin:<profileId>:<dry-run|write>"; per-profile resync uses
+  // "resync:<reason>:<profileId>".
   acquiredBy: string;
   // Whether this run is allowed to write. The client itself enforces
   // the gate; the runner threads it through and uses it in logs.
   write: boolean;
+  // Narrow the reconciler to a specific set of profiles. Used by the
+  // per-profile resync paths so an inline hook doesn't walk the whole
+  // audience. Omit for the daily broad sweep.
+  scopeProfileIds?: string[];
 };
 
 export type RunResult =
@@ -76,6 +81,7 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
       client,
       runId,
       write: options.write,
+      scopeProfileIds: options.scopeProfileIds,
       log: (event) => {
         if (isSyncLogEvent(event)) {
           // Project each structured event into next-axiom with the
@@ -173,6 +179,56 @@ export const runFirstProfileSaveForServer = async (params: {
     });
     Sentry.captureException(err, {
       tags: { feature: "buttondown-sync", path: "first-profile-save", runId },
+      extra: { profileId: params.profileId },
+    });
+  }
+};
+
+/**
+ * Reasons an inline per-profile resync fires. Each shows up as a
+ * Sentry tag and an Axiom field, so we can ask "how often does a
+ * program-join trigger a resync that ends in an error?" without
+ * parsing log strings.
+ */
+export type ProfileResyncReason = "join-program" | "leave-program" | "admin-remove-participant";
+
+/**
+ * Best-effort inline resync for a single profile. Called from the
+ * program join / leave / admin-remove handlers so a tag change shows
+ * up in Buttondown within the request instead of after the next
+ * cron. Delegates to the broad runner with a single-profile scope —
+ * inheriting its lock, Sentry alerting, HTTP telemetry, and
+ * dry-run-vs-write gate. Swallows top-level errors so the user's
+ * action isn't blocked; the cron catches up on anything missed.
+ */
+export const runProfileResyncForServer = async (params: {
+  profileId: string;
+  reason: ProfileResyncReason;
+  write: boolean;
+}): Promise<void> => {
+  if (!process.env.BUTTONDOWN_API_KEY) return;
+  try {
+    const result = await runButtondownSyncForServer({
+      acquiredBy: `resync:${params.reason}:${params.profileId}`,
+      write: params.write,
+      scopeProfileIds: [params.profileId],
+    });
+    log.info("buttondown sync", {
+      action: "profile-resync-applied",
+      profileId: params.profileId,
+      reason: params.reason,
+      status: result.status,
+      ...(result.status === "skipped" ? { skipReason: result.reason } : {}),
+    });
+  } catch (err) {
+    log.warn("buttondown sync", {
+      action: "profile-resync-failed",
+      profileId: params.profileId,
+      reason: params.reason,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    Sentry.captureException(err, {
+      tags: { feature: "buttondown-sync", path: "profile-resync", reason: params.reason },
       extra: { profileId: params.profileId },
     });
   }

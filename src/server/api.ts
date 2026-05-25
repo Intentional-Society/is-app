@@ -8,7 +8,11 @@ import { isRelationValue } from "@/lib/relation-value";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
-import { runButtondownSyncForServer, runFirstProfileSaveForServer } from "./buttondown-runner";
+import {
+  runButtondownSyncForServer,
+  runFirstProfileSaveForServer,
+  runProfileResyncForServer,
+} from "./buttondown-runner";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import {
@@ -139,8 +143,17 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
     },
   )
   .delete("/programs/:id/participants/:profileId", async (c) => {
-    const result = await removeParticipant(c.req.param("id"), c.req.param("profileId"));
+    const targetProfileId = c.req.param("profileId");
+    const result = await removeParticipant(c.req.param("id"), targetProfileId);
     if ("error" in result) return c.json({ error: result.error }, 404);
+    // Best-effort inline resync so the removed program's tag drops
+    // off the subscriber within this request instead of waiting for
+    // the next cron. The cron is the safety net.
+    await runProfileResyncForServer({
+      profileId: targetProfileId,
+      reason: "admin-remove-participant",
+      write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    });
     return c.json({ ok: true });
   })
   .get("/profiles/hidden", async (c) => {
@@ -484,6 +497,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
       }
       return c.json({ error: "already_joined" }, 409);
     }
+    // Best-effort inline resync; the cron is the safety net.
+    await runProfileResyncForServer({
+      profileId: user.id,
+      reason: "join-program",
+      write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    });
     return c.json({ ok: true });
   })
   .post("/programs/:id/leave", async (c) => {
@@ -493,6 +512,11 @@ const api = new Hono<{ Variables: ApiVariables }>()
     if ("error" in result) {
       return c.json({ error: "not_found" }, 404);
     }
+    await runProfileResyncForServer({
+      profileId: user.id,
+      reason: "leave-program",
+      write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+    });
     return c.json({ ok: true });
   })
   .get("/relations/candidates", async (c) => {

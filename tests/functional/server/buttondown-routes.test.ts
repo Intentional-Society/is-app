@@ -19,7 +19,7 @@ import { createServerClient } from "@supabase/ssr";
 
 import app from "@/server/api";
 import { db } from "@/server/db";
-import { profiles, syncLocks } from "@/server/schema";
+import { profilePrograms, profiles, programs, syncLocks } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 
@@ -160,6 +160,94 @@ describe("Buttondown sync routes", () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as { status: string };
       expect(body.status).toBe("skipped");
+    });
+  });
+
+  // Inline resync wiring: program join/leave/admin-remove must each
+  // run a per-profile Buttondown sync after their DB write, so a tag
+  // change shows up within the request instead of waiting for the
+  // daily cron. The runner is exercised end-to-end with a stubbed
+  // global fetch that records every outbound call.
+  describe("inline resync on program changes", () => {
+    let memberId: string;
+    let programId: string;
+    let fetchSpy: ReturnType<typeof vi.fn>;
+    const originalFetch = global.fetch;
+
+    const buttondownResponse = (status: number, body: unknown): Response =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+
+    beforeEach(async () => {
+      memberId = randomUUID();
+      programId = randomUUID();
+      await db.execute(
+        sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous)
+            VALUES (${memberId}::uuid, ${`${memberId}@testfake.local`}, false, false)`,
+      );
+      // lastUpdatedProfile is what the sync's loadEligibleProfiles
+      // filters on — without it the resync is a no-op.
+      await db.insert(profiles).values({ id: memberId, lastUpdatedProfile: new Date() });
+      await db.insert(programs).values({
+        id: programId,
+        slug: `inline-resync-${programId.slice(0, 8)}`,
+        name: "Inline resync program",
+        buttondownTag: "weekly",
+        signupsOpen: true,
+      });
+
+      process.env.BUTTONDOWN_API_KEY = "test-key";
+      process.env.BUTTONDOWN_SYNC_WRITE = "1";
+
+      // Canned Buttondown responses: 404 on the initial id/email
+      // lookup, 201 on create. Enough for the runner to walk a happy
+      // path and call createSubscriber, which is what we assert on.
+      fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (url.includes("/v1/subscribers/")) return buttondownResponse(404, { detail: "not found" });
+        if (url.endsWith("/v1/subscribers")) {
+          return buttondownResponse(201, {
+            id: "sub_test",
+            email_address: `${memberId}@testfake.local`,
+            type: "regular",
+            tags: ["weekly", "isweb-member", "new"],
+          });
+        }
+        return buttondownResponse(500, { error: `unexpected url: ${url}` });
+      });
+      global.fetch = fetchSpy as unknown as typeof fetch;
+    });
+
+    afterEach(async () => {
+      global.fetch = originalFetch;
+      await db.delete(profilePrograms).where(eq(profilePrograms.profileId, memberId));
+      await db.delete(programs).where(eq(programs.id, programId));
+      await db.delete(profiles).where(eq(profiles.id, memberId));
+      await db.execute(sql`DELETE FROM auth.users WHERE id = ${memberId}::uuid`);
+    });
+
+    it("POST /api/programs/:id/join hits Buttondown after the DB write", async () => {
+      authAs(memberId);
+      const res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
+      expect(res.status).toBe(200);
+
+      // At least one fetch landed on Buttondown's subscribers
+      // endpoint — the resync ran end-to-end against the real client.
+      const buttondownCalls = fetchSpy.mock.calls.filter((args) => {
+        const url = typeof args[0] === "string" ? args[0] : (args[0] as URL | Request).toString();
+        return url.includes("api.buttondown.com");
+      });
+      expect(buttondownCalls.length).toBeGreaterThan(0);
+      // Specifically: a POST to /subscribers (the create path the
+      // member with no prior subscriber should land on).
+      const created = fetchSpy.mock.calls.find((args) => {
+        const url = typeof args[0] === "string" ? args[0] : (args[0] as URL | Request).toString();
+        const method = (args[1] as RequestInit | undefined)?.method ?? "GET";
+        return url.endsWith("/v1/subscribers") && method === "POST";
+      });
+      expect(created).toBeDefined();
     });
   });
 });
