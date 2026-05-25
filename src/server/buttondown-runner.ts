@@ -38,18 +38,28 @@ export type RunResult =
 const isSyncLogEvent = (event: SyncLogEvent): event is SyncLogEvent => event !== undefined;
 
 export const runButtondownSyncForServer = async (options: RunButtondownSyncOptions): Promise<RunResult> => {
+  const runId = options.acquiredBy;
+
   // Lock #2 from the design doc's "Prod-only by construction" — the
   // sync is a no-op in any environment without the API key. This is
   // the only gate the inline first-save path will share with this
   // path, so it's intentionally a soft skip rather than an error.
   if (!process.env.BUTTONDOWN_API_KEY) {
-    log.warn("buttondown sync", { action: "skipped-api-key-missing", acquiredBy: options.acquiredBy });
+    log.warn("buttondown sync", { action: "skipped-api-key-missing", acquiredBy: runId });
     return { status: "skipped", reason: "api_key_missing" };
   }
 
-  const got = await acquireLock(LOCK_NAME, options.acquiredBy);
+  const got = await acquireLock(LOCK_NAME, runId);
   if (!got) {
-    log.warn("buttondown sync", { action: "skipped-lock-held", acquiredBy: options.acquiredBy });
+    log.warn("buttondown sync", { action: "skipped-lock-held", acquiredBy: runId });
+    // A held lock means the previous invocation is still running past
+    // the cron interval — that's a real signal, not just noise. Send
+    // it to Sentry so it pages; the fingerprint stays stable so an
+    // operator sees one issue per ongoing overlap, not one per cron.
+    Sentry.captureMessage("buttondown.sync_lock_held", {
+      level: "warning",
+      tags: { feature: "buttondown-sync", action: "skipped-lock-held", acquiredBy: runId },
+    });
     return { status: "skipped", reason: "lock_held" };
   }
 
@@ -57,11 +67,14 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
     const client = createButtondownClient({
       apiKey: process.env.BUTTONDOWN_API_KEY,
       write: options.write,
+      logger: (event) => {
+        log.info("buttondown http", { ...event, runId });
+      },
     });
 
     const summary = await runButtondownSync({
       client,
-      runId: options.acquiredBy,
+      runId,
       write: options.write,
       log: (event) => {
         if (isSyncLogEvent(event)) {
@@ -69,6 +82,21 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
           // "buttondown sync" message; downstream Axiom queries filter
           // on that and split on fields.action.
           log.info("buttondown sync", event as unknown as Record<string, unknown>);
+        }
+        // Per-profile errors are signal worth paging on. The sync
+        // core keeps going (so one bad profile doesn't kill the run)
+        // and we re-raise here as a Sentry exception so the alert
+        // story doesn't depend on parsing Axiom logs.
+        if (event.action === "error") {
+          Sentry.captureException(new Error("buttondown.sync_profile_error"), {
+            tags: {
+              feature: "buttondown-sync",
+              action: "sync-error",
+              runId,
+              errorKind: event.errorKind,
+            },
+            extra: { profileId: event.profileId, message: event.message },
+          });
         }
       },
       raiseUnsubscribeAlert: (alert: UnsubscribeAlert) => {
@@ -82,14 +110,14 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
             programSlugsHeld: alert.programSlugsHeld,
             buttondownTagsOnSubscriber: alert.buttondownTagsOnSubscriber,
           },
-          tags: { feature: "buttondown-sync" },
+          tags: { feature: "buttondown-sync", runId, acquiredBy: runId },
         });
       },
     });
 
     return { status: "ok", summary };
   } finally {
-    await releaseLock(LOCK_NAME, options.acquiredBy);
+    await releaseLock(LOCK_NAME, runId);
   }
 };
 
@@ -105,10 +133,14 @@ export const runFirstProfileSaveForServer = async (params: {
   write: boolean;
 }): Promise<void> => {
   if (!process.env.BUTTONDOWN_API_KEY) return;
+  const runId = `first-save:${params.profileId}`;
   try {
     const client = createButtondownClient({
       apiKey: process.env.BUTTONDOWN_API_KEY,
       write: params.write,
+      logger: (event) => {
+        log.info("buttondown http", { ...event, runId, path_kind: "first-profile-save" });
+      },
     });
     await runFirstProfileSaveSync({
       profileId: params.profileId,
@@ -122,23 +154,25 @@ export const runFirstProfileSaveForServer = async (params: {
             programSlugsHeld: alert.programSlugsHeld,
             buttondownTagsOnSubscriber: alert.buttondownTagsOnSubscriber,
           },
-          tags: { feature: "buttondown-sync", path: "first-profile-save" },
+          tags: { feature: "buttondown-sync", path: "first-profile-save", runId },
         });
       },
     });
     log.info("buttondown sync", {
       action: "first-profile-save-applied",
       profileId: params.profileId,
+      runId,
       write: params.write,
     });
   } catch (err) {
     log.warn("buttondown sync", {
       action: "first-profile-save-failed",
       profileId: params.profileId,
+      runId,
       message: err instanceof Error ? err.message : String(err),
     });
     Sentry.captureException(err, {
-      tags: { feature: "buttondown-sync", path: "first-profile-save" },
+      tags: { feature: "buttondown-sync", path: "first-profile-save", runId },
       extra: { profileId: params.profileId },
     });
   }

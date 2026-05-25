@@ -643,6 +643,15 @@ api.post("/cron/buttondown-sync", async (c) => {
     acquiredBy: `cron:${new Date().toISOString()}`,
     write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
   });
+  // Surface per-profile errors to Vercel's cron health view by
+  // returning 500 when any profile failed. Vercel doesn't retry
+  // failed crons, so this is signal-only: the cron dashboard lights
+  // up and the existing Sentry capture in the runner pages someone.
+  // Skipped runs (api-key-missing, lock-held) stay 200 since they
+  // aren't failures from the cron's point of view.
+  if (result.status === "ok" && result.summary.errors > 0) {
+    return c.json(result, 500);
+  }
   return c.json(result);
 });
 

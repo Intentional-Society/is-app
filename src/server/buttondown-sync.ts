@@ -17,6 +17,7 @@ import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import {
   type ButtondownClient,
+  ButtondownApiError,
   type ButtondownSubscriber,
   isDryRunOutcome,
   type UpdateSubscriberInput,
@@ -118,6 +119,25 @@ export const runFirstProfileSaveSync = async (params: {
   });
 };
 
+/**
+ * Coarse category for a thrown error, attached to `error` events so
+ * Axiom alerts can split "Buttondown is having a bad day" (server)
+ * from "our key is wrong" (auth) from "we're hammering the API"
+ * (rate-limit). Anything we can't classify falls into `other` —
+ * downstream alerts should still react to that bucket.
+ */
+export type SyncErrorKind = "auth" | "rate-limit" | "not-found" | "server" | "other";
+
+export const classifyError = (err: unknown): SyncErrorKind => {
+  if (err instanceof ButtondownApiError) {
+    if (err.status === 401 || err.status === 403) return "auth";
+    if (err.status === 429) return "rate-limit";
+    if (err.status === 404) return "not-found";
+    if (err.status >= 500) return "server";
+  }
+  return "other";
+};
+
 /** Structured event the sync emits to the caller's logger. */
 export type SyncLogEvent =
   | { action: "summary"; runId: string } & Omit<SyncRunSummary, "runId" | "write">
@@ -135,7 +155,7 @@ export type SyncLogEvent =
   | { action: "unsubscribe-alert"; runId: string; profileId: string; email: string; programSlugsHeld: string[] }
   | { action: "skipped-missing-email"; runId: string; profileId: string }
   | { action: "skipped-already-current"; runId: string; profileId: string; subscriberId: string }
-  | { action: "error"; runId: string; profileId: string; message: string };
+  | { action: "error"; runId: string; profileId: string; message: string; errorKind: SyncErrorKind };
 
 export type SyncLogger = (event: SyncLogEvent) => void;
 
@@ -157,6 +177,9 @@ export type SyncRunSummary = {
   unsubscribeAlerts: number;
   missingProfileEmail: number;
   errors: number;
+  // Wall-clock duration of the run, from entry to summary emission.
+  // Use for the "is this cron getting slower?" trend in Axiom.
+  durationMs: number;
 };
 
 export type SyncDeps = {
@@ -306,6 +329,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
   const { client, runId, write } = deps;
   const log: SyncLogger = deps.log ?? (() => {});
   const raise = deps.raiseUnsubscribeAlert ?? (() => {});
+  const startedAt = Date.now();
 
   const summary: SyncRunSummary = {
     runId,
@@ -318,6 +342,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
     unsubscribeAlerts: 0,
     missingProfileEmail: 0,
     errors: 0,
+    durationMs: 0,
   };
 
   const [managedUniverse, profileRows, memberships] = await Promise.all([
@@ -355,10 +380,12 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
         runId,
         profileId: profile.profileId,
         message: err instanceof Error ? err.message : String(err),
+        errorKind: classifyError(err),
       });
     }
   }
 
+  summary.durationMs = Date.now() - startedAt;
   log({ action: "summary", runId, ...summaryWithoutMeta(summary) });
   return summary;
 };

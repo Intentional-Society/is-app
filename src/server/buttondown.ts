@@ -161,18 +161,64 @@ export interface ButtondownClient {
   deleteSubscriber(id: string): Promise<undefined | DryRunOutcome<"delete">>;
 }
 
+/**
+ * One log line per HTTP call. Emitted from the client whenever a
+ * `logger` is provided in the config — that gives the runner a place
+ * to forward this into Axiom without coupling the client to next-axiom.
+ * `path` is the path portion only (no query string, no host), so an
+ * Axiom panel can group by it.
+ */
+export type ButtondownHttpLogEvent = {
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+  // Present on 429s when Buttondown returns the standard hint.
+  retryAfter?: string;
+};
+
 export type ButtondownClientConfig = {
   apiKey: string;
   write: boolean;
   // Override fetch for testing; defaults to the global fetch.
   fetcher?: typeof fetch;
+  // Optional per-request telemetry sink. Constructed by the runner
+  // for prod paths; tests typically leave it unset.
+  logger?: (event: ButtondownHttpLogEvent) => void;
 };
 
 export const createButtondownClient = (config: ButtondownClientConfig): ButtondownClient => {
-  const fetcher = config.fetcher ?? fetch;
+  const rawFetcher = config.fetcher ?? fetch;
   // Per https://docs.buttondown.com/api-introduction the auth scheme is
   // literally the word "Token", not "Bearer".
   const authHeader = `Token ${config.apiKey}`;
+  const logger = config.logger;
+
+  // Wrap every outbound call with timing + status logging. The base
+  // URL is constant, so logging the path alone is enough to group by
+  // endpoint in Axiom. `next` URLs from pagination are absolute, so
+  // we strip the base before logging when we can.
+  const fetcher: typeof fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET");
+    const path = url.startsWith(BUTTONDOWN_BASE_URL) ? url.slice(BUTTONDOWN_BASE_URL.length) : url;
+    const start = Date.now();
+    const res = await rawFetcher(input, init);
+    if (logger) {
+      const event: ButtondownHttpLogEvent = {
+        method,
+        path,
+        status: res.status,
+        durationMs: Date.now() - start,
+      };
+      if (res.status === 429) {
+        const retryAfter = res.headers.get("retry-after");
+        if (retryAfter !== null) event.retryAfter = retryAfter;
+      }
+      logger(event);
+    }
+    return res;
+  };
 
   const request = async (method: string, path: string, body?: unknown): Promise<Response> => {
     return fetcher(`${BUTTONDOWN_BASE_URL}${path}`, {
