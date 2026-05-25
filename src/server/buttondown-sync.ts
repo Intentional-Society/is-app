@@ -52,6 +52,16 @@ export const runFirstProfileSaveSync = async (params: {
 }): Promise<void> => {
   const { profileId, email, client } = params;
 
+  // Pull the profile's hidden flag — hidden profiles never get a
+  // Buttondown row spun up on their behalf, even if they exist in
+  // the app. (Tag updates for already-existing subscribers still run
+  // below.) One row read, fine on the first-save fast path.
+  const [profileRow] = await db
+    .select({ hidden: profiles.hidden })
+    .from(profiles)
+    .where(eq(profiles.id, profileId));
+  const hidden = profileRow?.hidden ?? false;
+
   // This profile's current tagged-program memberships — same shape
   // the daily reconciler computes but for one profile only.
   const memberships = await db
@@ -77,6 +87,7 @@ export const runFirstProfileSaveSync = async (params: {
   const subscriber = await client.getSubscriber(email);
 
   if (!subscriber) {
+    if (hidden) return;
     const result = await client.createSubscriber({
       email_address: email,
       tags: [...desiredTags, "isweb-member", "new"],
@@ -155,6 +166,7 @@ export type SyncLogEvent =
   | { action: "unsubscribe-alert"; runId: string; profileId: string; email: string; programSlugsHeld: string[] }
   | { action: "skipped-missing-email"; runId: string; profileId: string }
   | { action: "skipped-already-current"; runId: string; profileId: string; subscriberId: string }
+  | { action: "skipped-hidden-create"; runId: string; profileId: string }
   | { action: "error"; runId: string; profileId: string; message: string; errorKind: SyncErrorKind };
 
 export type SyncLogger = (event: SyncLogEvent) => void;
@@ -176,6 +188,10 @@ export type SyncRunSummary = {
   unchanged: number;
   unsubscribeAlerts: number;
   missingProfileEmail: number;
+  // Hidden profiles with no existing Buttondown subscriber that the
+  // sync would otherwise have created. Tag updates still flow for
+  // hidden profiles that already have a subscriber row.
+  skippedHiddenCreate: number;
   errors: number;
   // Wall-clock duration of the run, from entry to summary emission.
   // Use for the "is this cron getting slower?" trend in Axiom.
@@ -201,6 +217,10 @@ type ProfileRow = {
   profileId: string;
   email: string | null;
   buttondownSubscriberId: string | null;
+  // Hidden profiles are app-only — test accounts, scrubbed members.
+  // The sync suppresses CREATE for them (no new Buttondown row), but
+  // still reconciles tags if a subscriber already exists.
+  hidden: boolean;
 };
 
 type ProfileMembership = {
@@ -275,6 +295,7 @@ const loadEligibleProfiles = async (scopeProfileIds?: string[]): Promise<Profile
       profileId: profiles.id,
       email: authUsers.email,
       buttondownSubscriberId: profiles.buttondownSubscriberId,
+      hidden: profiles.hidden,
     })
     .from(profiles)
     .innerJoin(authUsers, eq(authUsers.id, profiles.id))
@@ -400,6 +421,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
     unchanged: 0,
     unsubscribeAlerts: 0,
     missingProfileEmail: 0,
+    skippedHiddenCreate: 0,
     errors: 0,
     durationMs: 0,
   };
@@ -506,6 +528,14 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
   const subscriber = await lookup(profile);
 
   if (!subscriber) {
+    if (profile.hidden) {
+      // Hidden profiles are app-only (test accounts, scrubbed
+      // members). Don't seed Buttondown with them. If a subscriber
+      // ever exists for one, the update branches below still run.
+      summary.skippedHiddenCreate++;
+      log({ action: "skipped-hidden-create", runId, profileId });
+      return;
+    }
     // Catch-up create: this is the path that runs when the inline
     // first-save hook failed (or hasn't shipped yet). Tag with the
     // managed set + isweb-member + new.

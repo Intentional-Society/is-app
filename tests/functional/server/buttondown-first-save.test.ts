@@ -11,7 +11,7 @@ import { createFakeButtondownClient } from "./buttondown-fake";
 
 const insertUserAndProfile = async (
   id: string,
-  opts: { email?: string; buttondownSubscriberId?: string | null; saved?: boolean } = {},
+  opts: { email?: string; buttondownSubscriberId?: string | null; saved?: boolean; hidden?: boolean } = {},
 ) => {
   const email = opts.email ?? `${id}@testfake.local`;
   await db.execute(
@@ -21,6 +21,7 @@ const insertUserAndProfile = async (
     id,
     lastUpdatedProfile: opts.saved === false ? null : new Date(),
     buttondownSubscriberId: opts.buttondownSubscriberId ?? null,
+    hidden: opts.hidden ?? false,
   });
 };
 
@@ -192,5 +193,41 @@ describe("runFirstProfileSaveSync (inline hook)", () => {
       .from(profiles)
       .where(eq(profiles.id, profileId));
     expect(row.buttondownSubscriberId).toBeNull();
+  });
+
+  it("skips the create entirely for a hidden profile with no existing subscriber", async () => {
+    const profileId = await makeProfile({ email: "fs-frank@example.com", hidden: true });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await db.insert(profilePrograms).values({ profileId, programId });
+
+    const client = createFakeButtondownClient({ write: true });
+
+    await runFirstProfileSaveSync({ profileId, email: "fs-frank@example.com", client });
+
+    expect(client.effects).toHaveLength(0);
+    const [row] = await db
+      .select({ buttondownSubscriberId: profiles.buttondownSubscriberId })
+      .from(profiles)
+      .where(eq(profiles.id, profileId));
+    expect(row.buttondownSubscriberId).toBeNull();
+  });
+
+  it("still PATCHes tags for a hidden profile whose subscriber already exists", async () => {
+    const profileId = await makeProfile({ email: "fs-gina@example.com", hidden: true });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await db.insert(profilePrograms).values({ profileId, programId });
+
+    const initial: ButtondownSubscriber = {
+      id: "sub_gina",
+      email_address: "fs-gina@example.com",
+      type: "regular",
+      tags: ["legacy-active"],
+    };
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    await runFirstProfileSaveSync({ profileId, email: "fs-gina@example.com", client });
+
+    const after = await client.getSubscriber("sub_gina");
+    expect(after?.tags).toEqual(["isweb-member", "returning", "weekly"]);
   });
 });
