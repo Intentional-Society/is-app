@@ -1,9 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ButtondownSubscriber } from "@/server/buttondown";
-import { runButtondownSync, type SyncLogEvent, type UnsubscribeAlert } from "@/server/buttondown-sync";
+import {
+  buildSubscriberLookup,
+  runButtondownSync,
+  type SyncLogEvent,
+  type UnsubscribeAlert,
+} from "@/server/buttondown-sync";
 import { db } from "@/server/db";
 import { profilePrograms, profiles, programs } from "@/server/schema";
 
@@ -331,5 +336,91 @@ describe("runButtondownSync (daily reconciler)", () => {
       input: { tags: ["isweb-member", "new"] },
     });
     expect(profileId).toBeTruthy();
+  });
+});
+
+// buildSubscriberLookup picks the right strategy based on whether
+// the caller passed a profile scope. The broad daily reconciler
+// gets a single listSubscribers preload (cheap when the audience is
+// mostly correct); the inline per-profile resync gets the legacy
+// per-profile getSubscriber path (cheap when only one row matters).
+//
+// These are pure-function tests against a stub client — no DB —
+// because the broad path is impossible to exercise hermetically
+// through runButtondownSync under parallel-file vitest: an
+// unscoped run reads every profile in the shared dev DB and races
+// other workers. Asserting the strategy at the helper level keeps
+// the test deterministic.
+describe("buildSubscriberLookup", () => {
+  const sub = (over: Partial<ButtondownSubscriber> & { id: string; email_address: string }): ButtondownSubscriber => ({
+    type: "regular",
+    tags: [],
+    ...over,
+  });
+
+  type SpyClient = {
+    listSubscribers: ReturnType<typeof vi.fn>;
+    getSubscriber: ReturnType<typeof vi.fn>;
+  };
+
+  const makeSpyClient = (subscribers: ButtondownSubscriber[]): SpyClient => ({
+    listSubscribers: vi.fn(async () => subscribers),
+    getSubscriber: vi.fn(async (idOrEmail: string) => {
+      for (const s of subscribers) {
+        if (s.id === idOrEmail) return s;
+        if (s.email_address.toLowerCase() === idOrEmail.toLowerCase()) return s;
+      }
+      return null;
+    }),
+  });
+
+  it("broad path: lists subscribers once and serves all lookups from the in-memory map", async () => {
+    const subs = [
+      sub({ id: "sub_a", email_address: "alpha@example.com" }),
+      sub({ id: "sub_b", email_address: "beta@example.com" }),
+    ];
+    const client = makeSpyClient(subs);
+    const lookup = await buildSubscriberLookup(client as never, undefined);
+
+    expect(client.listSubscribers).toHaveBeenCalledTimes(1);
+    expect(client.getSubscriber).not.toHaveBeenCalled();
+
+    // Lookups consult the cached map — no further HTTP.
+    const byId = await lookup({ profileId: "p1", email: "irrelevant@example.com", buttondownSubscriberId: "sub_a" });
+    expect(byId?.id).toBe("sub_a");
+    const byEmail = await lookup({ profileId: "p2", email: "beta@example.com", buttondownSubscriberId: null });
+    expect(byEmail?.id).toBe("sub_b");
+    const missing = await lookup({ profileId: "p3", email: "nobody@example.com", buttondownSubscriberId: null });
+    expect(missing).toBeNull();
+
+    expect(client.getSubscriber).not.toHaveBeenCalled();
+    expect(client.listSubscribers).toHaveBeenCalledTimes(1);
+  });
+
+  it("broad path: stale stored subscriberId falls back to the email index", async () => {
+    const subs = [sub({ id: "sub_real", email_address: "carla@example.com" })];
+    const client = makeSpyClient(subs);
+    const lookup = await buildSubscriberLookup(client as never, undefined);
+
+    const found = await lookup({
+      profileId: "p1",
+      email: "carla@example.com",
+      buttondownSubscriberId: "sub_stale_that_no_longer_exists",
+    });
+    expect(found?.id).toBe("sub_real");
+  });
+
+  it("scoped path: never calls listSubscribers; does per-profile getSubscriber", async () => {
+    const subs = [sub({ id: "sub_only", email_address: "solo@example.com" })];
+    const client = makeSpyClient(subs);
+    const lookup = await buildSubscriberLookup(client as never, ["p1"]);
+
+    expect(client.listSubscribers).not.toHaveBeenCalled();
+
+    const found = await lookup({ profileId: "p1", email: "solo@example.com", buttondownSubscriberId: "sub_only" });
+    expect(found?.id).toBe("sub_only");
+    // id-first, no email fallback when id resolves.
+    expect(client.getSubscriber).toHaveBeenCalledTimes(1);
+    expect(client.getSubscriber).toHaveBeenCalledWith("sub_only");
   });
 });

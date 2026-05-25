@@ -325,6 +325,57 @@ const recordSubscriberId = async (profileId: string, subscriberId: string): Prom
     .where(eq(profiles.id, profileId));
 };
 
+/**
+ * Resolves a profile's Buttondown subscriber. Two strategies share
+ * the signature so syncOneProfile is agnostic to which is in play:
+ *
+ *  - Broad reconciler (cron, admin "Sync now"): one listSubscribers
+ *    call up front, indexed in memory; per-profile lookups are
+ *    free. Cheaper than O(N) per-profile GETs against an audience
+ *    that is mostly already correct.
+ *  - Per-profile resync (inline join/leave hooks): one or two
+ *    getSubscriber calls. Fetching the whole audience to act on a
+ *    single row would be the wrong trade.
+ *
+ * Selected by the presence of `deps.scopeProfileIds`.
+ */
+export type SubscriberLookup = (profile: ProfileRow) => Promise<ButtondownSubscriber | null>;
+
+// Exported for unit testing. The runner shouldn't call this
+// directly — runButtondownSync wires it up internally.
+export const buildSubscriberLookup = async (
+  client: ButtondownClient,
+  scope: string[] | undefined,
+): Promise<SubscriberLookup> => {
+  if (scope) {
+    return async (profile) => {
+      if (!profile.email) return null;
+      let sub: ButtondownSubscriber | null = null;
+      if (profile.buttondownSubscriberId) {
+        sub = await client.getSubscriber(profile.buttondownSubscriberId);
+      }
+      if (!sub) sub = await client.getSubscriber(profile.email);
+      return sub;
+    };
+  }
+
+  const all = await client.listSubscribers();
+  const byId = new Map<string, ButtondownSubscriber>();
+  const byEmail = new Map<string, ButtondownSubscriber>();
+  for (const sub of all) {
+    byId.set(sub.id, sub);
+    byEmail.set(sub.email_address.toLowerCase(), sub);
+  }
+  return async (profile) => {
+    if (profile.buttondownSubscriberId) {
+      const found = byId.get(profile.buttondownSubscriberId);
+      if (found) return found;
+    }
+    if (!profile.email) return null;
+    return byEmail.get(profile.email.toLowerCase()) ?? null;
+  };
+};
+
 export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary> => {
   const { client, runId, write } = deps;
   const log: SyncLogger = deps.log ?? (() => {});
@@ -360,6 +411,27 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
     desiredByProfile.set(m.profileId, entry);
   }
 
+  // Build the subscriber lookup before the per-profile loop. If the
+  // broad-path listSubscribers fails we can't trust any "subscriber
+  // missing" decision (mass-creating would be catastrophic), so bail
+  // out with an explicit fatal error rather than continuing.
+  let lookup: SubscriberLookup;
+  try {
+    lookup = await buildSubscriberLookup(client, deps.scopeProfileIds);
+  } catch (err) {
+    summary.errors++;
+    summary.durationMs = Date.now() - startedAt;
+    log({
+      action: "error",
+      runId,
+      profileId: "(audience-preload)",
+      message: err instanceof Error ? err.message : String(err),
+      errorKind: classifyError(err),
+    });
+    log({ action: "summary", runId, ...summaryWithoutMeta(summary) });
+    return summary;
+  }
+
   for (const profile of profileRows) {
     summary.scanned++;
     try {
@@ -367,6 +439,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
         profile,
         desired: desiredByProfile.get(profile.profileId) ?? { tags: [], slugs: [] },
         managedUniverse,
+        lookup,
         client,
         runId,
         log,
@@ -399,6 +472,7 @@ type SyncOneProfileArgs = {
   profile: ProfileRow;
   desired: { tags: string[]; slugs: string[] };
   managedUniverse: Set<string>;
+  lookup: SubscriberLookup;
   client: ButtondownClient;
   runId: string;
   log: SyncLogger;
@@ -407,7 +481,7 @@ type SyncOneProfileArgs = {
 };
 
 const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
-  const { profile, desired, managedUniverse, client, runId, log, raise, summary } = args;
+  const { profile, desired, managedUniverse, lookup, client, runId, log, raise, summary } = args;
   const profileId = profile.profileId;
 
   if (!profile.email) {
@@ -417,15 +491,11 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
   }
   const email = profile.email;
 
-  // Prefer id-based lookup (stable across email changes). Fall back to
-  // email for profiles we haven't seen before.
-  let subscriber: ButtondownSubscriber | null = null;
-  if (profile.buttondownSubscriberId) {
-    subscriber = await client.getSubscriber(profile.buttondownSubscriberId);
-  }
-  if (!subscriber) {
-    subscriber = await client.getSubscriber(email);
-  }
+  // Prefer id-based lookup (stable across email changes); falls back
+  // to email for profiles we haven't seen before. In the broad path
+  // both indexes are pre-built in memory; in the scoped path each
+  // miss is a real getSubscriber call.
+  const subscriber = await lookup(profile);
 
   if (!subscriber) {
     // Catch-up create: this is the path that runs when the inline
