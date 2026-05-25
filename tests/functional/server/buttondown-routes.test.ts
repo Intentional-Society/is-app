@@ -249,5 +249,29 @@ describe("Buttondown sync routes", () => {
       });
       expect(created).toBeDefined();
     });
+
+    it("inline resync retries the lock after a 500ms delay when briefly held", async () => {
+      // Pre-seed a held lock that expires in 200ms — shorter than the
+      // 500ms retry delay — so the first acquireLock fails and the
+      // second succeeds via the lease-expired steal path. Proves the
+      // retry runs end-to-end instead of bailing on the first miss.
+      await db.execute(
+        sql`INSERT INTO sync_locks (name, locked_until, acquired_by)
+            VALUES ('buttondown', now() + interval '200 milliseconds', 'test:hold-briefly')`,
+      );
+
+      authAs(memberId);
+      const res = await app.request(`/api/programs/${programId}/join`, { method: "POST" });
+      expect(res.status).toBe(200);
+
+      // Retry succeeded: a POST /v1/subscribers fired, meaning the
+      // sync ran rather than skipping on lock_held.
+      const created = fetchSpy.mock.calls.find((args) => {
+        const url = typeof args[0] === "string" ? args[0] : (args[0] as URL | Request).toString();
+        const method = (args[1] as RequestInit | undefined)?.method ?? "GET";
+        return url.endsWith("/v1/subscribers") && method === "POST";
+      });
+      expect(created).toBeDefined();
+    });
   });
 });
