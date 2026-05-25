@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { Menu, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/auth-provider";
@@ -22,6 +22,12 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
           <SheetHeader>
             <SheetTitle>Menu</SheetTitle>
             {displayName ? <p className="font-serif italic text-sm text-muted-foreground">{displayName}</p> : null}
+            {isAdmin ? (
+              <span className="inline-flex w-fit items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                <ShieldCheck className="h-3 w-3" />
+                Admin
+              </span>
+            ) : null}
           </SheetHeader>
           <nav className="flex flex-col gap-1 px-4 pb-4">
             <SheetClose
@@ -84,7 +90,8 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
               <SheetClose
                 nativeButton={false}
                 render={
-                  <Link href="/admin" className="rounded px-2 py-2 hover:bg-muted">
+                  <Link href="/admin" className="flex items-center gap-2 rounded px-2 py-2 hover:bg-muted">
+                    <ShieldCheck className="h-4 w-4 shrink-0" />
                     Admin
                   </Link>
                 }
