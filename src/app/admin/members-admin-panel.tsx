@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { ShieldCheck } from "lucide-react";
+
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
@@ -81,6 +83,9 @@ export function MembersAdminPanel({ currentUserId }: { currentUserId: string }) 
                     <span className="text-sm text-muted-foreground">{member.location}</span>
                   )}
                 </div>
+                {member.isAdmin && (
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-green-700" aria-label="Admin" />
+                )}
                 <div className="flex flex-col items-end gap-1">
                   {isSelf ? (
                     <Button size="sm" disabled title="You cannot remove your own admin access">
