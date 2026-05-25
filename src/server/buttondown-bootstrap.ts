@@ -16,7 +16,7 @@
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { type ButtondownClient, type ButtondownSubscriber, isDryRunOutcome } from "./buttondown";
-import { type SubscriberLookup } from "./buttondown-sync";
+import type { SubscriberLookup } from "./buttondown-sync";
 import { db } from "./db";
 import { authUsers, profilePrograms, profiles, programs } from "./schema";
 import { leaveProgram } from "./programs";
