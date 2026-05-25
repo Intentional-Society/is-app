@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, note }: { label: string; children: React.ReactNode; note?: string }) {
   return (
     <div className="flex flex-col gap-1">
       <dt className="text-sm uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className="font-serif text-base">{children || <span className="text-muted-foreground">—</span>}</dd>
+      {note && <p className="text-xs text-muted-foreground">{note}</p>}
     </div>
   );
 }
@@ -49,7 +50,7 @@ export default async function ProfilePage() {
         <Field label="Location">{profile.location}</Field>
         <Field label="Live desire">{profile.liveDesire}</Field>
         <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
-        <Field label="Emergency contact">{profile.emergencyContact}</Field>
+        <Field label="Emergency contact" note="Only visible to you and admins.">{profile.emergencyContact}</Field>
       </dl>
 
       <Button render={<Link href="/profile/edit" />}>Edit profile</Button>
