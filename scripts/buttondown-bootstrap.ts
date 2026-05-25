@@ -22,21 +22,20 @@
  *     npx tsx scripts/buttondown-bootstrap.ts --write
  *
  * ENV (from .env.local in dev, .env.prod via --prod in production):
- *   BUTTONDOWN_API_KEY   required to talk to Buttondown
- *   DATABASE_URL         the app DB
+ *   BUTTONDOWN_API_KEY                              required to talk to Buttondown
+ *   DATABASE_URL                                    the app DB
+ *   NEXT_PUBLIC_SUPABASE_URL                        loaded via transitive imports
+ *   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY    loaded via transitive imports
+ *
+ * Note on the dynamic imports inside main(): src/server modules
+ * transitively pull src/lib/supabase/env.ts, which throws at module
+ * load if Supabase env vars are unset. Loading dotenv first and
+ * dynamic-importing the app modules afterward keeps the import-time
+ * env check happening AFTER .env.* is in place.
  */
 
 import { createInterface } from "node:readline/promises";
 import { config } from "dotenv";
-
-import { createButtondownClient } from "../src/server/buttondown";
-import {
-  applyBootstrapForMember,
-  loadBootstrapMembers,
-  loadJoinedTaggedPrograms,
-  loadManagedUniverse,
-} from "../src/server/buttondown-bootstrap";
-import { buildSubscriberLookup } from "../src/server/buttondown-sync";
 
 const argv = process.argv.slice(2);
 const useProd = argv.includes("--prod");
@@ -63,6 +62,18 @@ async function main() {
   }
 
   await confirmIfWrite();
+
+  // Dynamic imports: see header note. Static imports would evaluate
+  // src/lib/supabase/env.ts before config() loaded .env, throwing
+  // before this script could even check its own env precondition.
+  const { createButtondownClient } = await import("../src/server/buttondown");
+  const {
+    applyBootstrapForMember,
+    loadBootstrapMembers,
+    loadJoinedTaggedPrograms,
+    loadManagedUniverse,
+  } = await import("../src/server/buttondown-bootstrap");
+  const { buildSubscriberLookup } = await import("../src/server/buttondown-sync");
 
   const client = createButtondownClient({
     apiKey: process.env.BUTTONDOWN_API_KEY,
