@@ -150,11 +150,12 @@ export function SigninForm() {
         id="password"
         type="password"
         autoComplete="current-password"
-        placeholder="Leave blank to use a sign-in link"
+        placeholder="Leave blank to receive a sign-in link by email"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         disabled={state.status === "submitting"}
       />
+      <p className="text-sm text-muted-foreground">Only needed if you've previously set one.</p>
       <Button type="submit" disabled={state.status === "submitting"}>
         {state.status === "submitting"
           ? password.length > 0
