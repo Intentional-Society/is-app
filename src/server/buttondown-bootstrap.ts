@@ -2,20 +2,19 @@
 // Script flow to the app-driven Buttondown sync.
 //
 // See docs/design-buttondown.md → "Initial bootstrap reconciliation".
-// The key difference from the daily reconciler: at the bootstrap
-// moment, Buttondown is authoritative for tag state. If the app says
-// Alice is currently in `weekly-updates` but Buttondown's subscriber
-// lacks that tag, the app side gets corrected (leaveProgram), not
-// Buttondown. Then we do a single full-overwrite PATCH to clear any
-// legacy tags (e.g. the pre-cutover `active` marker) and lock in the
-// canonical state.
+// The bootstrap is app-side-only: Buttondown is authoritative for tag
+// state, so where the two systems disagree on a member's program
+// memberships we call `leaveProgram` to bring the app into alignment.
+// The bootstrap never writes to Buttondown — the inline first-profile-
+// save path is the one authoritative overwrite moment, and the daily
+// cron handles steady-state Buttondown writes thereafter.
 //
 // This module is invoked by `scripts/buttondown-bootstrap.ts`, never
 // by request paths. The script is the only intended caller.
 
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
-import { type ButtondownClient, type ButtondownSubscriber, isDryRunOutcome } from "./buttondown";
+import type { ButtondownSubscriber } from "./buttondown";
 import type { SubscriberLookup } from "./buttondown-sync";
 import { db } from "./db";
 import { authUsers, profilePrograms, profiles, programs } from "./schema";
@@ -34,81 +33,93 @@ export type ProgramByTag = {
   buttondownTag: string;
 };
 
+export type ProgramRef = { programId: string; programSlug: string };
+
 export type BootstrapPlan =
   | { kind: "skip-missing-email" }
   | { kind: "skip-missing-subscriber"; tried: string[] }
   | { kind: "skip-unsubscribed"; subscriberId: string }
+  | { kind: "skip-no-isweb-member"; subscriberId: string; currentTags: string[] }
+  | { kind: "skip-no-changes"; subscriberId: string }
   | {
       kind: "reconcile";
       subscriberId: string;
-      programsToLeave: { programId: string; programSlug: string }[];
-      finalTags: string[];
+      programsToLeave: ProgramRef[];
+      // Observation-only at this revision: the cron's diff-only path
+      // would actively REMOVE these tags from Buttondown the morning
+      // after the bootstrap (its formula treats the app's empty side
+      // as authoritative), so leaving them as "do nothing" silently
+      // destroys Apps-Script-era memberships. We surface them in the
+      // dry-run output so the operator can size the problem; whether
+      // applyBootstrapForMember should call joinProgram is the next
+      // decision after eyeballing the data.
+      programsToJoin: ProgramRef[];
     };
 
 // Pure decision function. Given the member's app-side state, the set
-// of tag-bearing programs they're currently joined to, and what
-// Buttondown shows, decide what to do. No I/O.
+// of tag-bearing programs they're currently joined to, the universe
+// of tag-bearing programs in the app, and what Buttondown shows,
+// decide what to do. No I/O.
 export const planBootstrap = (params: {
   subscriber: ButtondownSubscriber | null;
   appJoinedTaggedPrograms: ProgramByTag[];
-  managedUniverse: Set<string>;
+  programsByTag: Map<string, ProgramRef>;
 }): BootstrapPlan => {
-  const { subscriber, appJoinedTaggedPrograms, managedUniverse } = params;
+  const { subscriber, appJoinedTaggedPrograms, programsByTag } = params;
 
   if (!subscriber) {
-    return {
-      kind: "skip-missing-subscriber",
-      tried: [],
-    };
+    return { kind: "skip-missing-subscriber", tried: [] };
   }
   if (subscriber.type === "unsubscribed") {
     return { kind: "skip-unsubscribed", subscriberId: subscriber.id };
+  }
+  // The bootstrap matches CSV-imported app rows against an audience
+  // that also contains non-member newsletter subscribers. A missing
+  // `isweb-member` tag means the email landed on a subscriber the app
+  // never claimed — likely a non-member newsletter collision rather
+  // than this IS Web member. Flag for human review rather than silently
+  // adopt; the inline first-profile-save path is the right place to
+  // claim a subscriber, not this one.
+  if (!subscriber.tags.includes("isweb-member")) {
+    return { kind: "skip-no-isweb-member", subscriberId: subscriber.id, currentTags: subscriber.tags };
   }
 
   // Buttondown's view of the managed-tag intersection — the source of
   // truth for what programs the member is "really" in for this
   // bootstrap moment.
-  const buttondownManagedTags = new Set(subscriber.tags.filter((t) => managedUniverse.has(t)));
+  const buttondownManagedTags = new Set(subscriber.tags.filter((t) => programsByTag.has(t)));
+  const appJoinedTags = new Set(appJoinedTaggedPrograms.map((p) => p.buttondownTag));
 
-  // For each app-side joined-tagged program, decide whether Buttondown
-  // confirms the membership. If not, plan a leaveProgram.
-  const programsToLeave: { programId: string; programSlug: string }[] = [];
+  // Two directions to reconcile, both with Buttondown authoritative:
+  //   - app says joined, Buttondown disagrees → leaveProgram.
+  //   - Buttondown says joined, app disagrees → would be joinProgram.
+  const programsToLeave: ProgramRef[] = [];
   for (const p of appJoinedTaggedPrograms) {
     if (!buttondownManagedTags.has(p.buttondownTag)) {
       programsToLeave.push({ programId: p.programId, programSlug: p.programSlug });
     }
   }
+  const programsToJoin: ProgramRef[] = [];
+  for (const tag of buttondownManagedTags) {
+    if (!appJoinedTags.has(tag)) {
+      const program = programsByTag.get(tag);
+      if (program) programsToJoin.push(program);
+    }
+  }
 
-  // After app-side reconcile, the final managed tag set on the
-  // subscriber is exactly what Buttondown already says it is for the
-  // managed universe (since Buttondown is authoritative). We pair that
-  // with the standing markers: keep `isweb-member` if already there,
-  // otherwise add it; same for `returning` (this member predated us).
-  const finalTags = [
-    ...buttondownManagedTags,
-    "isweb-member",
-    "returning",
-  ];
-  // Dedupe in case isweb-member or returning is already in the
-  // managed intersection somehow (shouldn't happen — those are
-  // standing markers, not managed — but cheap defensive uniquing).
-  const seen = new Set<string>();
-  const uniqueFinalTags = finalTags.filter((t) => {
-    if (seen.has(t)) return false;
-    seen.add(t);
-    return true;
-  });
+  if (programsToLeave.length === 0 && programsToJoin.length === 0) {
+    return { kind: "skip-no-changes", subscriberId: subscriber.id };
+  }
 
-  return {
-    kind: "reconcile",
-    subscriberId: subscriber.id,
-    programsToLeave,
-    finalTags: uniqueFinalTags,
-  };
+  return { kind: "reconcile", subscriberId: subscriber.id, programsToLeave, programsToJoin };
 };
 
-// Load all profiles with a saved profile (lastUpdatedProfile non-null),
-// paired with their auth.users email.
+// Load every app member, including CSV-imported stubs who haven't
+// completed onboarding yet. Those stubs already carry program
+// memberships from the import, so they belong in the bootstrap pass
+// even though `lastUpdatedProfile` is still null — without them the
+// app-side reconcile waits until each member's first sign-in, which
+// could be never.
 export const loadBootstrapMembers = async (): Promise<BootstrapMemberRecord[]> => {
   return db
     .select({
@@ -118,8 +129,7 @@ export const loadBootstrapMembers = async (): Promise<BootstrapMemberRecord[]> =
       buttondownSubscriberId: profiles.buttondownSubscriberId,
     })
     .from(profiles)
-    .innerJoin(authUsers, eq(authUsers.id, profiles.id))
-    .where(isNotNull(profiles.lastUpdatedProfile));
+    .innerJoin(authUsers, eq(authUsers.id, profiles.id));
 };
 
 // Load the current (leftAt IS NULL) memberships for non-archived
@@ -157,26 +167,34 @@ export const loadJoinedTaggedPrograms = async (): Promise<Map<string, ProgramByT
   return grouped;
 };
 
-export const loadManagedUniverse = async (): Promise<Set<string>> => {
+// All non-archived tag-bearing programs, indexed by buttondownTag.
+// Archived programs are excluded: a bootstrap join into an archived
+// program would be nonsensical, and the symmetric leave direction
+// already operates only on non-archived rows (see
+// loadJoinedTaggedPrograms).
+export const loadProgramsByTag = async (): Promise<Map<string, ProgramRef>> => {
   const rows = await db
-    .select({ buttondownTag: programs.buttondownTag })
+    .select({
+      programId: programs.id,
+      programSlug: programs.slug,
+      buttondownTag: programs.buttondownTag,
+    })
     .from(programs)
-    .where(isNotNull(programs.buttondownTag));
-  const out = new Set<string>();
+    .where(and(isNotNull(programs.buttondownTag), isNull(programs.archivedAt)));
+  const out = new Map<string, ProgramRef>();
   for (const r of rows) {
-    if (r.buttondownTag) out.add(r.buttondownTag);
+    if (r.buttondownTag) out.set(r.buttondownTag, { programId: r.programId, programSlug: r.programSlug });
   }
   return out;
 };
 
 // Orchestrates one member's bootstrap: looks up Buttondown, decides,
-// applies. Honors the client's `write` flag for Buttondown writes and
-// the `write` arg for app-side mutations. Subscriber resolution goes
-// through a shared `lookup` so the script can preload the audience
-// once via listSubscribers (one paginated call) instead of doing
-// 1-2 GETs per member.
+// applies app-side writes. The bootstrap never writes to Buttondown
+// (see the module header), so `deps` only needs a subscriber lookup.
+// Subscriber resolution goes through a shared `lookup` so the script
+// can preload the audience once via listSubscribers (one paginated
+// call) instead of doing 1-2 GETs per member.
 export type ApplyBootstrapDeps = {
-  client: ButtondownClient;
   lookup: SubscriberLookup;
   write: boolean;
 };
@@ -184,7 +202,7 @@ export type ApplyBootstrapDeps = {
 export const applyBootstrapForMember = async (
   member: BootstrapMemberRecord,
   appJoinedTaggedPrograms: ProgramByTag[],
-  managedUniverse: Set<string>,
+  programsByTag: Map<string, ProgramRef>,
   deps: ApplyBootstrapDeps,
 ): Promise<{ plan: BootstrapPlan; applied: boolean }> => {
   if (!member.email) {
@@ -196,7 +214,7 @@ export const applyBootstrapForMember = async (
   const plan = planBootstrap({
     subscriber,
     appJoinedTaggedPrograms,
-    managedUniverse,
+    programsByTag,
   });
 
   if (plan.kind === "skip-missing-subscriber") {
@@ -212,34 +230,33 @@ export const applyBootstrapForMember = async (
   if (!deps.write) {
     return { plan, applied: false };
   }
-  if (plan.kind !== "reconcile") {
-    return { plan, applied: false };
-  }
 
-  // Apply app-side leaves first so the next sync (or another
-  // bootstrap run) sees consistent app state.
-  for (const p of plan.programsToLeave) {
-    await leaveProgram(member.profileId, p.programId);
-  }
-
-  // Persist the subscriber id if we discovered it via email lookup.
-  if (member.buttondownSubscriberId !== plan.subscriberId) {
+  // Persist a discovered subscriber id for any plan that resolved a
+  // healthy IS Web subscriber, so the daily cron's first run after
+  // the bootstrap doesn't have to repeat the email lookup. Anomaly
+  // plans (unsubscribed, no-isweb-member) are gated behind human
+  // review; defer their id persistence until the cron sees them in a
+  // healthy state.
+  if (
+    (plan.kind === "reconcile" || plan.kind === "skip-no-changes") &&
+    member.buttondownSubscriberId !== plan.subscriberId
+  ) {
     await db
       .update(profiles)
       .set({ buttondownSubscriberId: plan.subscriberId })
       .where(eq(profiles.id, member.profileId));
   }
 
-  // Single full-overwrite PATCH locks in the canonical state. The
-  // client's write flag still applies — passing write=true on the
-  // bootstrap client means this actually goes out; write=false would
-  // make this a Buttondown-side dry run while the DB updates above
-  // still ran (because the script controls those separately via its
-  // own --write flag, which sets both).
-  const patchResult = await deps.client.updateSubscriber(plan.subscriberId, { tags: plan.finalTags });
-  // isDryRunOutcome is fine to consult; we don't actually need to
-  // branch on it since the client's gate already handled the choice.
-  void isDryRunOutcome(patchResult);
+  if (plan.kind !== "reconcile") {
+    return { plan, applied: false };
+  }
+
+  // App-side leaves bring the app into alignment with Buttondown,
+  // which is authoritative at the bootstrap moment. No Buttondown
+  // writes — the daily cron takes over from here.
+  for (const p of plan.programsToLeave) {
+    await leaveProgram(member.profileId, p.programId);
+  }
 
   return { plan, applied: true };
 };

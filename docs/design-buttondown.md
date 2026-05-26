@@ -220,21 +220,24 @@ Both call the same internal function with `acquired_by = "admin:<profileId>"` on
 
 ## Initial bootstrap reconciliation
 
-There's a wrinkle from the pre-app era: ~46 members were imported into `profile_programs` via `scripts/import-members-csv.ts`, but Buttondown's tag state for those same members is **newer and more authoritative** — it reflects every Apps-Script-era opt-out / opt-in the CSV import didn't capture. If the CSV says "Alice is in `weekly-web-updates`" but her Buttondown subscriber lacks that tag (or carries `unsubscribed`), the app-side record needs to be corrected to match Buttondown, not the other way around.
+There's a wrinkle from the pre-app era: members were imported into `profile_programs` via `scripts/import-members-csv.ts`, but Buttondown's tag state for those same members is **newer and more authoritative** — it reflects every Apps-Script-era opt-out / opt-in the CSV import didn't capture. If the CSV says "Alice is in `weekly-web-updates`" but her Buttondown subscriber lacks that tag, the app-side record needs to be corrected to match Buttondown, not the other way around.
 
-This is a **one-time** reconciliation, not the cron's steady-state behavior. Implemented as `scripts/buttondown-bootstrap.ts` (an ops script in the same vein as `scripts/import-members-csv.ts`):
+This is a **one-time, app-side-only** reconciliation: the bootstrap calls `leaveProgram` to align the app with Buttondown's authoritative tag state and writes nothing to Buttondown. The inline first-profile-save path is the one moment we authoritatively claim a subscriber; the daily cron handles steady-state Buttondown writes. The bootstrap fits between them as a backfill that updates the app's view of who's still in what.
 
-1. For each profile with `lastUpdatedProfile IS NOT NULL` (i.e., a real member, not a stub):
-   - GET Buttondown subscriber by email.
-   - **Missing** → log a warning and continue. (Unexpected: a CSV-imported member should already exist in Buttondown.)
-   - **Unsubscribed** → log for human review, do nothing.
-   - **Active** → diff `(buttondown.managed_tags) Δ (app.current_program_tags)`. For any tag present on Buttondown but the matching program-membership ended in the app, do nothing (Buttondown gained the tag after the app lost it — fine). For any tag the app says is current but Buttondown lacks, **call `leaveProgram`** for that program — Buttondown is authoritative for the bootstrap moment.
-2. After all app-side adjustments, do a single full-overwrite PATCH per active subscriber: tags = `[…now-correct-program-tags, "isweb-member", "returning"]`. This clears the legacy `active` tag and brings everyone to the same canonical state.
-3. Output a final report to stdout (per-member changes) and to Sentry (a single summary breadcrumb).
+Implemented as `scripts/buttondown-bootstrap.ts` (an ops script in the same vein as `scripts/import-members-csv.ts`). For every app member, including CSV-imported stubs who haven't completed onboarding yet, look up the Buttondown subscriber and emit one outcome:
+
+- **No email on `auth.users`** → `skip-missing-email`.
+- **No Buttondown subscriber found by id or email** → `skip-missing-subscriber`. Logged with the lookup attempts; expected for test fixtures and the rare CSV row Buttondown never saw.
+- **Subscriber `type: "unsubscribed"`** → `skip-unsubscribed`. Real-world opt-out signal — see [Unsubscribe handling](#unsubscribe-handling).
+- **Subscriber found but missing `isweb-member`** → `skip-no-isweb-member`, surfaced as an `ERROR` line for human review. The email landed on a subscriber the app never claimed — most plausibly a non-member newsletter subscriber whose email collides with this app member. Adopting them silently would PATCH a stranger into IS Web's tag scheme; the inline first-profile-save path is the right place to claim, not this one.
+- **Subscriber matches and managed-tag set is fully aligned in both directions** → `skip-no-changes`. Nothing to do; common steady-state outcome.
+- **Subscriber matches and the two systems disagree on managed-tag memberships** → `reconcile`. The plan emits two lists: `programsToLeave` (app says joined, Buttondown disagrees → call `leaveProgram`) and `programsToJoin` (Buttondown says joined, app disagrees → would be a `joinProgram` to preserve Apps-Script-era memberships the CSV import missed). The reverse direction matters because the cron's diff-only formula treats the app's empty side as authoritative — without a join here, the next morning's cron would silently strip those tags from Buttondown.
+
+`programsToJoin` is currently observation-only — the dry-run logs it so the operator can size the case before deciding whether to wire up an actual join path (and how to bypass `joinProgram`'s `signupsOpen` gate, which is designed for member-initiated joins rather than historical reconciliation). `active` and other tags outside the managed universe are left alone — they're the Apps Script's record and the cron's diff-only path preserves them. The bootstrap never PATCHes Buttondown.
 
 The script honors `--dry-run` (default — no writes anywhere) so we can review what it would change before flipping. Run once during rollout (step 6 below); the daily cron takes over from there.
 
-Why not embed this in the cron: the bootstrap modifies app state (calls `leaveProgram`) where the steady-state cron does not. Keeping it a separate one-shot script means the cron's contract stays narrow ("write Buttondown from app state"), and the bootstrap's destructive-against-app behavior is gated behind an explicit ops invocation.
+Why not embed this in the cron: the bootstrap modifies app state (calls `leaveProgram`) where the steady-state cron does not. Keeping it a separate one-shot script means the cron's contract stays narrow ("write Buttondown from app state"), and the bootstrap's app-side mutations are gated behind an explicit ops invocation.
 
 ## Rollout sequence
 

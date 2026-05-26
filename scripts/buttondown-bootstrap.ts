@@ -26,6 +26,9 @@
  *   DATABASE_URL                                    the app DB
  *   NEXT_PUBLIC_SUPABASE_URL                        loaded via transitive imports
  *   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY    loaded via transitive imports
+ *   SUPABASE_SECRET_KEY                             loaded via transitive imports
+ *                                                   (src/lib/supabase/admin.ts throws at
+ *                                                   module load if unset)
  *
  * Note on the dynamic imports inside main(): src/server modules
  * transitively pull src/lib/supabase/env.ts, which throws at module
@@ -71,21 +74,24 @@ async function main() {
     applyBootstrapForMember,
     loadBootstrapMembers,
     loadJoinedTaggedPrograms,
-    loadManagedUniverse,
+    loadProgramsByTag,
   } = await import("../src/server/buttondown-bootstrap");
   const { buildSubscriberLookup } = await import("../src/server/buttondown-sync");
 
+  // The bootstrap never writes to Buttondown — the client is only
+  // used to read the audience for the subscriber lookup, so the
+  // write flag stays false regardless of the script's --write mode.
   const client = createButtondownClient({
     apiKey: process.env.BUTTONDOWN_API_KEY,
-    write,
+    write: false,
   });
 
   console.log(`# Buttondown bootstrap — ${write ? "WRITE" : "dry-run"} mode (${useProd ? "prod" : "local"})`);
 
-  const [members, byProfile, managedUniverse] = await Promise.all([
+  const [members, byProfile, programsByTag] = await Promise.all([
     loadBootstrapMembers(),
     loadJoinedTaggedPrograms(),
-    loadManagedUniverse(),
+    loadProgramsByTag(),
   ]);
 
   // Preload the audience once via listSubscribers and index it. The
@@ -95,13 +101,15 @@ async function main() {
   console.log(`# Preloading Buttondown audience…`);
   const lookup = await buildSubscriberLookup(client, undefined);
 
-  console.log(`# ${members.length} saved profiles; managed tag universe: [${[...managedUniverse].join(", ")}]\n`);
+  console.log(`# ${members.length} app members; managed tag universe: [${[...programsByTag.keys()].join(", ")}]\n`);
 
   const counts = {
     reconciled: 0,
     skippedMissingEmail: 0,
     skippedMissingSubscriber: 0,
     skippedUnsubscribed: 0,
+    skippedNoChanges: 0,
+    noIswebMember: 0,
     errors: 0,
   };
 
@@ -109,36 +117,55 @@ async function main() {
     const label = `${member.displayName ?? "(no name)"} <${member.email ?? "(no email)"}>`;
     try {
       const joined = byProfile.get(member.profileId) ?? [];
-      const { plan, applied } = await applyBootstrapForMember(member, joined, managedUniverse, { client, lookup, write });
+      const { plan, applied } = await applyBootstrapForMember(member, joined, programsByTag, { lookup, write });
 
       switch (plan.kind) {
         case "skip-missing-email":
           counts.skippedMissingEmail++;
-          console.log(`SKIP missing-email   ${label}`);
+          console.log(`SKIP  missing-email     ${label}`);
           break;
         case "skip-missing-subscriber":
           counts.skippedMissingSubscriber++;
-          console.log(`SKIP missing-sub     ${label}  (tried: ${plan.tried.join(", ")})`);
+          console.log(`SKIP  missing-sub       ${label}  (tried: ${plan.tried.join(", ")})`);
           break;
         case "skip-unsubscribed":
           counts.skippedUnsubscribed++;
-          console.log(`SKIP unsubscribed    ${label}  (subscriber ${plan.subscriberId})`);
+          console.log(`SKIP  unsubscribed      ${label}  (subscriber ${plan.subscriberId})`);
+          break;
+        case "skip-no-isweb-member":
+          // Counted separately from `errors` (which is reserved for
+          // thrown exceptions) but logged with an ERROR prefix so it
+          // stands out for human review. Subscriber exists but doesn't
+          // carry our `isweb-member` marker — likely an email collision
+          // with a non-member newsletter subscriber.
+          counts.noIswebMember++;
+          console.log(
+            `ERROR no-isweb-member   ${label}  (subscriber ${plan.subscriberId}; current tags: [${plan.currentTags.join(", ")}])`,
+          );
+          break;
+        case "skip-no-changes":
+          counts.skippedNoChanges++;
+          console.log(`SKIP  no-changes        ${label}  (subscriber ${plan.subscriberId})`);
           break;
         case "reconcile": {
           counts.reconciled++;
           const leaveSummary =
-            plan.programsToLeave.length === 0
-              ? "no app-side leaves"
-              : `leaveProgram: ${plan.programsToLeave.map((p) => p.programSlug).join(", ")}`;
+            plan.programsToLeave.length === 0 ? "none" : plan.programsToLeave.map((p) => p.programSlug).join(", ");
+          const joinSummary =
+            plan.programsToJoin.length === 0 ? "none" : plan.programsToJoin.map((p) => p.programSlug).join(", ");
+          // joinProgram is currently observation-only: planBootstrap
+          // emits programsToJoin so the operator can size the
+          // Apps-Script-era-tags-the-app-missed case before deciding
+          // whether to wire up an actual join path.
           console.log(
-            `${applied ? "APPLY" : "PLAN "} reconcile        ${label}  (${leaveSummary}; final tags: [${plan.finalTags.join(", ")}])`,
+            `${applied ? "APPLY" : "PLAN "} reconcile         ${label}  (leave: ${leaveSummary}; join (obs only): ${joinSummary})`,
           );
           break;
         }
       }
     } catch (err) {
       counts.errors++;
-      console.log(`ERROR                ${label}  ${err instanceof Error ? err.message : String(err)}`);
+      console.log(`ERROR                   ${label}  ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -146,7 +173,13 @@ async function main() {
   console.log(write ? "# Wrote changes." : "# Dry-run only — no changes made. Re-run with --write to apply.");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// process.exit forces termination: the script imports src/server/db,
+// which opens a postgres-js pool at module load. Without an explicit
+// exit, Node won't terminate until the pool's idle TCP sockets time
+// out, which leaves the script hanging long after the summary prints.
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
