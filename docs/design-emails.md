@@ -185,7 +185,7 @@ Supabase substitutes Go-template variables before sending. The ones in use:
   in the action URL so `/auth/callback` can call
   `supabase.auth.verifyOtp({ token_hash, type })` server-side. Works
   cross-browser; see
-  [`plan-cross-browser-magic-link.md`](./plan-cross-browser-magic-link.md).
+  [`plan-cross-browser-magic-link.md`](./old-archive/plan-cross-browser-magic-link.md).
 - `{{ .RedirectTo }}` — the `emailRedirectTo` URL the client passed.
   Carried through the action URL as `&next={{ .RedirectTo }}` so the
   confirm route can land the user at the right destination

@@ -8,7 +8,7 @@ Covers both the hosted production project (configured via the Supabase dashboard
 
 The magic-link and password-reset emails embed `{{ .TokenHash }}` directly in a URL pointing at `/auth/callback?token_hash=…&type=…&next=…`. The route calls `supabase.auth.verifyOtp({ token_hash, type })` server-side, so the link works regardless of which browser opens it. The `next` query param carries the `emailRedirectTo` URL the form passed and tells the route where to land the user post-verification.
 
-PKCE is still the configured client `flowType` and still governs session cookies / refresh-token rotation. Only the email-verification step is bypassed by the token-hash flow. See `docs/plan-cross-browser-magic-link.md` for the migration rationale.
+PKCE is still the configured client `flowType` and still governs session cookies / refresh-token rotation. Only the email-verification step is bypassed by the token-hash flow. See `docs/old-archive/plan-cross-browser-magic-link.md` for the migration rationale.
 
 ---
 
