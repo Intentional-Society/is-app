@@ -218,6 +218,10 @@ Two parallel admin-triggered routes, both gated by admin auth instead of `CRON_S
 
 Both call the same internal function with `acquired_by = "admin:<profileId>"` on the lock and an explicit `write` flag (false for dry-run, true for write). The env var is not consulted on either admin path — the admin's button choice is the source of truth. During the rollout dry-run window, the write button is the admin's deliberate override; after rollout it's just a manual on-demand sync.
 
+## Initial bootstrap reconciliation (completed and deleted 2026-05-25)
+
+A one-shot script reconciled the app's CSV-imported memberships against Buttondown's authoritative pre-cutover tag state, calling `leaveProgram` where the two disagreed and writing nothing to Buttondown. Ran in `--write` mode against prod on 2026-05-25 — two app-side corrections, zero `programsToJoin` cases — and was removed in the same commit set. See git history at `scripts/buttondown-bootstrap.ts` and `src/server/buttondown-bootstrap.ts` for the implementation.
+
 ## Rollout sequence
 
 1. **Land the schema** (`programs.buttondownTag`, `profiles.buttondownSubscriberId`, `sync_locks` table) via expand-step. Add the `buttondownTag` field to the `/admin/programs` edit UI but leave every program's value null.
@@ -225,8 +229,9 @@ Both call the same internal function with `acquired_by = "admin:<profileId>"` on
 3. **Set `BUTTONDOWN_API_KEY` and `CRON_SECRET`** in the prod env scope only.
 4. **Set `buttondownTag` on the relevant programs** (e.g., `weekly-web-updates` → the same string the Apps Script writes today) via `/admin/programs`. The dry-run cron now produces a realistic diff against real data.
 5. **Verify the dry-run output** over one or two daily cycles in Axiom: numbers look plausible, the diff doesn't propose touching the non-member newsletter audience, no surprises.
-6. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** in the same window. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. Retire the Form itself in the same step if its only purpose was newsletter signup.
-7. **Wire the inline first-profile-save hook.** Lowest priority — purely latency. The cron has covered correctness since step 6.
+6. **One-shot bootstrap reconciliation** *(completed and deleted 2026-05-25)*. See the dedicated section above.
+7. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** in the same window. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. Retire the Form itself in the same step if its only purpose was newsletter signup.
+8. **Wire the inline first-profile-save hook** *(completed 2026-05-25 in PR #280)*. Lowest priority — purely latency. The cron covers correctness once step 7 lands.
 
 ## Future work
 
