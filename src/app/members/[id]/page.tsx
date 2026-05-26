@@ -74,7 +74,6 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
           <Field label="Bio">{profile.bio}</Field>
           <Field label="Keywords">{profile.keywords.length > 0 ? profile.keywords.join(", ") : null}</Field>
           <Field label="Location">{profile.location}</Field>
-          <Field label="Live desire">{profile.liveDesire}</Field>
           {profile.currentIntention && (
             <Field label="Current intention">
               <span>{profile.currentIntention}</span>

@@ -54,7 +54,6 @@ export default async function ProfilePage() {
           <KeywordChips keywords={profile.keywords} max={20} className="flex flex-wrap gap-1" />
         </Field>
         <Field label="Location">{profile.location}</Field>
-        <Field label="Live desire">{profile.liveDesire}</Field>
         <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
         <Field label="Emergency contact" badge="Only visible to you and admins">{profile.emergencyContact}</Field>
       </dl>
