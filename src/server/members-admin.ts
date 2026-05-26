@@ -14,7 +14,7 @@ export type AdminMember = {
   createdAt: string;
 };
 
-export const listAdminMembers = async (): Promise<AdminMember[]> => {
+export const listMembersAdmin = async (): Promise<AdminMember[]> => {
   const rows = await db
     .select({
       id: profiles.id,

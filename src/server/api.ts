@@ -56,7 +56,7 @@ import {
   parseOptionalRelationValue,
   updateRelationValue,
 } from "./relations";
-import { listAdminMembers, setAdminStatus } from "./members-admin";
+import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import { profiles } from "./schema";
 import { resetE2EUsers } from "./test-reset";
 
@@ -214,7 +214,7 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
     return c.json(result);
   })
   .get("/members", async (c) => {
-    const members = await listAdminMembers();
+    const members = await listMembersAdmin();
     return c.json({ members });
   })
   .patch(
