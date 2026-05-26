@@ -16,14 +16,14 @@
             <td style="padding:32px;">
               <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;mso-line-height-rule:exactly;font-weight:bold;color:#1a1a1a;">Sign in to the Intentional Society Web App</h1>
               {{ if .Data.displayName }}<p style="margin:0 0 16px;font-size:16px;line-height:1.5;mso-line-height-rule:exactly;color:#1a1a1a;">Hi {{ .Data.displayName }},</p>{{ end }}
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.5;mso-line-height-rule:exactly;color:#1a1a1a;">Use the button below to sign in. Open the link in the browser where you requested it — it expires in 1 hour.</p>
+              <p style="margin:0 0 24px;font-size:16px;line-height:1.5;mso-line-height-rule:exactly;color:#1a1a1a;">Use the button below to sign in. This link expires in 1 hour.</p>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
                 <td bgcolor="#1a1a1a" style="border-radius:6px;">
-                  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px;">Sign in</a>
+                  <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}" style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px;">Sign in</a>
                 </td>
               </tr></table>
               <p style="margin:24px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;">Or paste this URL into your browser:</p>
-              <p style="margin:4px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;"><a href="{{ .ConfirmationURL }}" style="color:#555;">{{ .ConfirmationURL }}</a></p>
+              <p style="margin:4px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;"><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}" style="color:#555;">{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}</a></p>
               <p style="margin:24px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;">We sent this to {{ .Email }}. If you didn't ask to sign in, you can safely ignore it.</p>
             </td>
           </tr>

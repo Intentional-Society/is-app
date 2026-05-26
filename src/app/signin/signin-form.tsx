@@ -36,7 +36,7 @@ function SentView({ email, origin }: { email: string; origin: string }) {
     await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${origin}/auth/callback`,
+        emailRedirectTo: `${origin}/`,
         shouldCreateUser: false,
       },
     });
@@ -109,7 +109,7 @@ export function SigninForm() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/`,
         // Block auto-creation of users via this form. Keeps auth.users
         // from accumulating rows when a bot (or a typo) submits unknown
         // emails, and closes the loophole where a pre-existing row with

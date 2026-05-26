@@ -39,7 +39,7 @@ we want. We swap out only the *email-verification* step.
 Template URLs follow the Supabase docs' canonical token-hash pattern:
 
 - `supabase/templates/magic-link.html` (button `href` and plain-text URL)
-  → `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}`
+  → `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}`
 - `supabase/templates/recovery.html` → same shape with `type=recovery`
 - Both: drop the "Open the link in the browser where you requested it"
   copy. Keep just "it expires in 1 hour." Phrase in the positive frame.
@@ -52,30 +52,37 @@ existing members. `type=recovery` is the recovery-flow value.
 `flowType`; `{{ .RedirectTo }}` substitutes to whatever `emailRedirectTo`
 the client passed (or the Site URL if absent).
 
-### New `/auth/confirm` route, old `/auth/callback` deleted
+### `/auth/callback` route rewritten
 
-Add `src/app/auth/confirm/route.ts`:
+Rewrite `src/app/auth/callback/route.ts` (keeping the path — Supabase's
+docs call this route `/auth/confirm`, but reusing the existing path
+sidesteps a route move and a biome-override rename for zero
+user-visible difference):
 
 1. Read `token_hash`, `type`, `next` from query.
-2. Missing `token_hash` → redirect `/signin?error=missing_token`.
+2. Missing `token_hash`, or `type` not in the small set we actually
+   handle (`email`, `recovery`) → redirect `/signin?error=missing_token`.
+   The narrow allow-list also gives us a typed `type` value to hand to
+   `verifyOtp` without a `as EmailOtpType` assertion.
 3. `supabase.auth.verifyOtp({ token_hash, type })`. Failure →
    `/signin?error=verify_failed`.
 4. `type === "recovery"` → redirect `/auth/reset-password`.
 5. Otherwise parse `next` as a URL, pull `invite` from its query, and
    run the existing post-verification logic — profile upsert (no
    invite) or transactional invite redemption (with invite). Final
-   redirect goes to `next.pathname` (dropping `?invite=…` so it
-   doesn't linger in the address bar).
+   redirect is the bare `/`. `next` is consulted only for the
+   `invite` query param; its path component is intentionally ignored
+   because every form-side caller passes `/` or `/?invite=…` and
+   landing at root is the desired outcome for both.
 
-Delete `src/app/auth/callback/route.ts` in the same PR. Lift the
-shared post-verification block (profile upsert, invite redemption,
-auto-subscribe) into a helper module — both the recovery and magic
-branches share it.
+The post-verification block (profile upsert, invite redemption,
+auto-subscribe) carries over byte-for-byte from the old route — the
+swap is at the verification entry point only.
 
 ### Forms repointed
 
-`{{ .RedirectTo }}` flows into `next`, and the confirmer treats `next`
-as "where to land the user post-verification." Today the forms point
+`{{ .RedirectTo }}` flows into `next`, and the callback route treats
+`next` as "where to land the user post-verification." Today the forms point
 `emailRedirectTo` at `/auth/callback?…`, which this PR deletes. Update
 to real destinations:
 
@@ -87,15 +94,15 @@ to real destinations:
 - `src/app/forgot-password/forgot-password-form.tsx`:
   `${origin}/auth/callback?type=recovery` → `${origin}/auth/reset-password`.
   The template's `type=recovery` already drives both `verifyOtp`'s
-  recovery branch and the confirmer's redirect, so the form-side
+  recovery branch and the callback route's redirect, so the form-side
   `?type=recovery` is redundant.
 
 ### Tests
 
-Move `tests/functional/server/auth-callback.test.ts` →
-`auth-confirm.test.ts`. Swap the `exchangeCodeForSession` mock for
-`verifyOtp`; rewrite request URLs to
-`/auth/confirm?token_hash=…&type=email&next=/?invite=…`. Existing
+Rewrite `tests/functional/server/auth-callback.test.ts` (keep the
+filename). Swap the `exchangeCodeForSession` mock for `verifyOtp`;
+update request URLs to
+`/auth/callback?token_hash=…&type=email&next=/?invite=…`. Existing
 assertions (profile upsert, invite redemption, recovery redirect) stay.
 
 `tests/e2e/password-reset.spec.ts`: keep working as-is unless it
@@ -109,23 +116,36 @@ hot-reloaded).
 
 ## Cut-over (hard)
 
-1. Merge PR → Vercel auto-deploys. `/auth/confirm` is live; old
-   `/auth/callback` is gone.
-2. Immediately run `npm run download_email_templates` (snapshot for
-   diff/rollback) then `npm run update_email_templates -- --dry-run`
+The forms repoint `emailRedirectTo` from `/auth/callback?…` to `/`,
+`/?invite=…`, and `/auth/reset-password`. Supabase's redirect-URL
+allowlist currently only matches `/auth/callback*`, so the allowlist
+must accept the new patterns before the deploy lands — otherwise
+Supabase silently falls back to Site URL and strands users with no
+session.
+
+1. **Prod dashboard, additive allowlist update** (no code changes):
+   add `https://app.intentionalsociety.org/*` and
+   `https://is-app-vercel-*-intentional-society-vercel.vercel.app/*`
+   to the Authentication → URL Configuration → Redirect URLs list.
+   Keep the existing `/auth/callback*` entries until step 3 — they
+   stop being needed but cost nothing to leave.
+2. Merge PR → Vercel auto-deploys. The rewritten `/auth/callback`
+   recognizes `?token_hash=…` and no longer handles `?code=…`. Email
+   templates *in prod* are still the old `{{ .ConfirmationURL }}`
+   ones until step 3, so emails sent in this window arrive as
+   `/auth/callback?code=…` and now hit `error=missing_token`. Users
+   click "Resend" on the SentView to get a working link.
+3. Immediately run `npm run download_email_templates` (snapshot for
+   diff/rollback), then `npm run update_email_templates -- --dry-run`,
    then `npm run update_email_templates`. Prod templates now issue
-   `/auth/confirm?token_hash=…` URLs.
-3. Between (1) and (2) — a few minutes — Supabase is still sending
-   emails built from the *old* prod template that point at
-   `/auth/callback?code=…`, which is now 404. Users in that window
-   can click "Resend" on the SentView to get a working link. Not a
-   regression vs the prior failure mode (wrong-browser click), just
-   different.
+   `/auth/callback?token_hash=…` URLs.
+4. **Cleanup (optional):** once step 3 has settled, remove the old
+   `/auth/callback*` entries from the prod allowlist.
 
 ## Verification
 
-- **Functional**: `npm run test:functional` — `auth-confirm` suite plus
-  the rest.
+- **Functional**: `npm run test:functional` — the rewritten
+  `auth-callback` suite plus the rest.
 - **Local cross-browser smoke**: `npm run dev:db:stop && npm run dev`,
   send a magic link from Chrome, copy the URL out of Inbucket
   (`http://localhost:54324`), paste it into Firefox or a private

@@ -182,7 +182,7 @@ dashboard. That's the intended behaviour: repo wins.
 Supabase substitutes Go-template variables before sending. The ones in use:
 
 - `{{ .TokenHash }}` — single-use hash for the email's OTP. Embedded
-  in the action URL so `/auth/confirm` can call
+  in the action URL so `/auth/callback` can call
   `supabase.auth.verifyOtp({ token_hash, type })` server-side. Works
   cross-browser; see
   [`plan-cross-browser-magic-link.md`](./plan-cross-browser-magic-link.md).
@@ -203,7 +203,7 @@ Supabase substitutes Go-template variables before sending. The ones in use:
 The action-URL pattern both reachable templates use:
 
 ```
-{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<email|recovery>&next={{ .RedirectTo }}
+{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=<email|recovery>&next={{ .RedirectTo }}
 ```
 
 Templates are HTML; Supabase wraps them in a minimal MIME envelope. Email
