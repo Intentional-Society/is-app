@@ -31,7 +31,7 @@ No Axiom-specific env vars are needed in the app. The Vercel Log Drain integrati
 The sync emits two message families: `"buttondown sync"` (structured events with an action) and `"buttondown http"` (one per outbound Buttondown API call). The `next-axiom` package nests every structured key under a top-level `fields` object, and Axiom indexes the nested JSON as flattened column names — so the canonical queries below access them as `['fields.x']` (the whole dotted path inside one bracketed string). Every event carries `['fields.runId']`, which for cron runs is `cron:<iso-timestamp>`, for admin runs is `admin:<profileId>:(dry-run|write)`, and for inline first-save is `first-save:<profileId>`.
 
 - **Cron summary trend (run duration, counts):**
-  `["vercel"] | where ['service.name'] == "is-app" | where message == "buttondown sync" and ['fields.action'] == "summary" | summarize avg(['fields.durationMs']), sum(['fields.errors']), sum(['fields.tagsUpdated']) by bin_auto(_time)`
+  `["vercel"] | where message == "buttondown sync" and ['fields.action'] == "summary" | summarize avg(['fields.durationMs']), sum(['fields.errors']), sum(['fields.tagsUpdated']) by bin_auto(_time)`
 - **Per-profile errors by kind:**
   `["vercel"] | where message == "buttondown sync" and ['fields.action'] == "error" | summarize count() by ['fields.errorKind'], bin_auto(_time)`
 - **Unsubscribe alerts (operator follow-up queue):**
