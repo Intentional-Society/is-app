@@ -20,6 +20,7 @@ import {
   ButtondownApiError,
   type ButtondownSubscriber,
   isDryRunOutcome,
+  isReservedTestEmail,
   type UpdateSubscriberInput,
 } from "./buttondown";
 import { db } from "./db";
@@ -51,6 +52,12 @@ export const runFirstProfileSaveSync = async (params: {
   raiseUnsubscribeAlert?: (alert: UnsubscribeAlert) => void;
 }): Promise<void> => {
   const { profileId, email, client } = params;
+
+  // RFC-reserved TLDs (.local, .test, etc.) can never be real email
+  // addresses — see isReservedTestEmail. Bail before any client call
+  // so test users that somehow reach a prod-keyed runner are silently
+  // dropped instead of generating Buttondown 404s.
+  if (isReservedTestEmail(email)) return;
 
   // Pull the profile's hidden flag — hidden profiles never get a
   // Buttondown row spun up on their behalf, even if they exist in
@@ -167,6 +174,7 @@ export type SyncLogEvent =
   | { action: "skipped-missing-email"; runId: string; profileId: string }
   | { action: "skipped-already-current"; runId: string; profileId: string; subscriberId: string }
   | { action: "skipped-hidden-create"; runId: string; profileId: string }
+  | { action: "skipped-reserved-email"; runId: string; profileId: string; email: string }
   | { action: "error"; runId: string; profileId: string; message: string; errorKind: SyncErrorKind };
 
 export type SyncLogger = (event: SyncLogEvent) => void;
@@ -192,6 +200,11 @@ export type SyncRunSummary = {
   // sync would otherwise have created. Tag updates still flow for
   // hidden profiles that already have a subscriber row.
   skippedHiddenCreate: number;
+  // Profiles whose email ends in an RFC-reserved TLD (.local, .test,
+  // .invalid, .example, .localhost). These can't be real members; the
+  // sync drops them before any client call. Should normally be 0 — a
+  // non-zero count in prod means a test user reached prod somehow.
+  skippedReservedEmail: number;
   errors: number;
   // Wall-clock duration of the run, from entry to summary emission.
   // Use for the "is this cron getting slower?" trend in Axiom.
@@ -422,6 +435,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
     unsubscribeAlerts: 0,
     missingProfileEmail: 0,
     skippedHiddenCreate: 0,
+    skippedReservedEmail: 0,
     errors: 0,
     durationMs: 0,
   };
@@ -520,6 +534,15 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
     return;
   }
   const email = profile.email;
+
+  // Reserved-TLD guard: skip before any client call. The client also
+  // refuses these at the wire, so this layer is mainly so the summary
+  // surfaces "we saw N test users" instead of N thrown errors.
+  if (isReservedTestEmail(email)) {
+    summary.skippedReservedEmail++;
+    log({ action: "skipped-reserved-email", runId, profileId, email });
+    return;
+  }
 
   // Prefer id-based lookup (stable across email changes); falls back
   // to email for profiles we haven't seen before. In the broad path

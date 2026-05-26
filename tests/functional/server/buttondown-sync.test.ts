@@ -369,6 +369,36 @@ describe("runButtondownSync (daily reconciler)", () => {
     ).toBeDefined();
   });
 
+  // Defense in depth against an E2E or fixture user that somehow has
+  // a saved profile in prod. The reconciler must skip these before
+  // any client call and surface them in the summary.
+  it("skips a profile whose email ends in a reserved TLD", async () => {
+    const profileId = await makeProfile({ email: "sweep-test@testfake.local" });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    const client = createFakeButtondownClient({ write: true });
+    const { events, log } = collectingLogger();
+
+    const summary = await runButtondownSync({
+      client,
+      runId: "r-reserved",
+      write: true,
+      scopeProfileIds: [profileId],
+      log,
+    });
+
+    expect(client.effects).toHaveLength(0);
+    expect(summary.skippedReservedEmail).toBe(1);
+    expect(summary.created).toBe(0);
+    expect(events).toContainEqual({
+      action: "skipped-reserved-email",
+      runId: "r-reserved",
+      profileId,
+      email: "sweep-test@testfake.local",
+    });
+  });
+
   it("still PATCHes tags for a hidden profile that already has a Buttondown subscriber", async () => {
     const profileId = await makeProfile({
       email: "leo@example.com",
