@@ -72,6 +72,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - `docs/design-emails.md` — auth email template authoring and prod sync
 - `docs/design-profile-pictures.md` — avatar uploads, storage bucket, signed URLs
 - `docs/design-relations.md` — the relationship web (schema, flows, rationale)
+- `docs/design-buttondown.md` — Buttondown sync (program tag mirror, cron, write policy)
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-supabase.md` — Supabase dashboard settings (auth URLs, API keys)
 - `docs/doc-resend.md` — Resend transactional email (sending domain, DMARC, alternatives)

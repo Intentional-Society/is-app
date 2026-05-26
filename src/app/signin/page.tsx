@@ -36,7 +36,7 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <AppWordmark asLink />
       <p className="max-w-sm text-center text-base text-muted-foreground">
-        Receive a sign-in link by email, or sign in with your password if you've set one.
+        Enter your email and we'll send you a sign-in link.
       </p>
       {process.env.NODE_ENV === "development" && (
         <p className="max-w-sm rounded border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
@@ -57,11 +57,6 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
         </p>
       )}
       <SigninForm />
-      <p className="text-base text-muted-foreground">
-        <Link href="/forgot-password" className="underline text-muted-foreground hover:text-foreground">
-          Forgot your password?
-        </Link>
-      </p>
       <p className="text-base text-muted-foreground">
         Have an invite code?{" "}
         <Link href="/signup" className="underline text-muted-foreground hover:text-foreground">

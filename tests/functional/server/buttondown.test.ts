@@ -7,6 +7,7 @@ import {
   type ButtondownSubscriber,
   createButtondownClient,
   isDryRunOutcome,
+  isReservedTestEmail,
 } from "@/server/buttondown";
 
 import { createFakeButtondownClient } from "./buttondown-fake";
@@ -346,6 +347,93 @@ describe("createButtondownClient", () => {
       const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
       await expect(client.getAccount()).rejects.toBeInstanceOf(ButtondownApiError);
     });
+  });
+
+  // Wire-level guard against ever hitting Buttondown with a test
+  // fixture email. RFC 6761 reserves .test/.example/.invalid/.localhost
+  // and RFC 6762 reserves .local — none can be a real deliverable
+  // address. The sync layer also filters these before reaching the
+  // client; this is the belt-and-suspenders layer for a future caller
+  // that bypasses the sync.
+  describe("reserved-TLD wire guard", () => {
+    it("getSubscriber refuses an email ending in .local without calling fetch", async () => {
+      const fetcher = mockFetch(200, sampleSubscriber);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+      await expect(client.getSubscriber("e2e-regular@testfake.local")).rejects.toBeInstanceOf(ButtondownApiError);
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it("createSubscriber refuses a reserved-TLD email without calling fetch", async () => {
+      const fetcher = mockFetch(201, sampleSubscriber);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+      await expect(
+        client.createSubscriber({ email_address: "x@example.test", tags: [] }),
+      ).rejects.toBeInstanceOf(ButtondownApiError);
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it("updateSubscriber refuses an email patch with a reserved TLD without calling fetch", async () => {
+      const fetcher = mockFetch(200, sampleSubscriber);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+      await expect(
+        client.updateSubscriber("sub_abc123", { email_address: "x@some.invalid" }),
+      ).rejects.toBeInstanceOf(ButtondownApiError);
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it("updateSubscriber with a tags-only patch is unaffected by the guard", async () => {
+      const fetcher = mockFetch(200, sampleSubscriber);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+      await client.updateSubscriber("sub_abc123", { tags: ["weekly"] });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+
+    it("getSubscriber with a bare subscriber id passes the guard", async () => {
+      // Real subscriber ids contain no `@`, so the helper bails out
+      // before checking the TLD. Verifies we don't accidentally block
+      // id-keyed lookups.
+      const fetcher = mockFetch(200, sampleSubscriber);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+      await client.getSubscriber("sub_abc123");
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("isReservedTestEmail", () => {
+  it("returns true for each RFC-reserved TLD", () => {
+    expect(isReservedTestEmail("a@b.local")).toBe(true);
+    expect(isReservedTestEmail("a@b.test")).toBe(true);
+    expect(isReservedTestEmail("a@b.invalid")).toBe(true);
+    expect(isReservedTestEmail("a@b.example")).toBe(true);
+    expect(isReservedTestEmail("a@localhost")).toBe(true);
+  });
+
+  it("is case-insensitive on the host portion", () => {
+    expect(isReservedTestEmail("a@FOO.LOCAL")).toBe(true);
+    expect(isReservedTestEmail("a@foo.Test")).toBe(true);
+  });
+
+  it("matches multi-label hosts that end in a reserved TLD", () => {
+    expect(isReservedTestEmail("a@deep.sub.testfake.local")).toBe(true);
+  });
+
+  it("returns false for production-shaped addresses", () => {
+    expect(isReservedTestEmail("alice@example.com")).toBe(false);
+    expect(isReservedTestEmail("alice@gmail.com")).toBe(false);
+    expect(isReservedTestEmail("alice@intentionalsociety.org")).toBe(false);
+  });
+
+  it("does not match when the reserved TLD appears mid-label", () => {
+    // The host is `not-local.com`, which ends in `.com`, not `.local`.
+    expect(isReservedTestEmail("a@not-local.com")).toBe(false);
+  });
+
+  it("returns false for inputs with no `@` (subscriber ids)", () => {
+    expect(isReservedTestEmail("sub_abc123")).toBe(false);
+    // Even an id that contains a reserved-TLD-like substring stays a
+    // passthrough — the helper only looks past the last `@`.
+    expect(isReservedTestEmail("sub-test")).toBe(false);
   });
 });
 

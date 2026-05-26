@@ -18,10 +18,12 @@ import { profiles } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 
+const TEST_EMAIL = "avatar-test@testfake.local";
+
 const makeUser = (id: string): User =>
   ({
     id,
-    email: "avatar-test@testfake.local",
+    email: TEST_EMAIL,
     user_metadata: { displayName: "Avatar Tester" },
     app_metadata: {},
     aud: "authenticated",
@@ -70,8 +72,17 @@ describe("POST/DELETE /api/me/avatar", () => {
 
   beforeEach(async () => {
     userId = randomUUID();
+    // This suite owns the TEST_EMAIL namespace in auth.users. Clear
+    // any residue from a prior run that didn't fully clean up (e.g.,
+    // the runner was killed mid-test) so the unique-email constraint
+    // doesn't poison this run. profiles → auth.users FK is RESTRICT,
+    // so drop the profile row first.
     await db.execute(
-      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${userId}::uuid, 'avatar-test@testfake.local', false, false)`,
+      sql`DELETE FROM public.profiles WHERE id IN (SELECT id FROM auth.users WHERE email = ${TEST_EMAIL})`,
+    );
+    await db.execute(sql`DELETE FROM auth.users WHERE email = ${TEST_EMAIL}`);
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${userId}::uuid, ${TEST_EMAIL}, false, false)`,
     );
     await db.insert(profiles).values({ id: userId, displayName: "Avatar Tester" });
     mockAuth(makeUser(userId));

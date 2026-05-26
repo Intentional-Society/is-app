@@ -20,23 +20,50 @@ const tryAutoSubscribe = async (userId: string): Promise<void> => {
   }
 };
 
+// Pull the `invite` query param out of the `next` URL the email
+// carried through from `emailRedirectTo`. The value may be a full URL
+// (signup form sends `${origin}/?invite=XYZ`) or a path-only string;
+// `new URL(next, request.url)` handles both.
+const extractInvite = (next: string | null, base: string): string | null => {
+  if (!next) return null;
+  try {
+    return new URL(next, base).searchParams.get("invite");
+  } catch {
+    return null;
+  }
+};
+
+// The two `type` values our templates emit. Supabase's EmailOtpType is
+// wider ("signup" | "invite" | "magiclink" | "email_change" | …) but
+// we don't route any of those, so we narrow at the boundary instead of
+// trusting the query string with an `as EmailOtpType` cast.
+const ALLOWED_TYPES = ["email", "recovery"] as const;
+type AllowedType = (typeof ALLOWED_TYPES)[number];
+
+const isAllowedType = (v: string | null): v is AllowedType =>
+  v !== null && (ALLOWED_TYPES as readonly string[]).includes(v);
+
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
-  const invite = request.nextUrl.searchParams.get("invite");
-  if (!code) {
-    return NextResponse.redirect(new URL("/signin?error=missing_code", request.url));
+  const tokenHash = request.nextUrl.searchParams.get("token_hash");
+  const type = request.nextUrl.searchParams.get("type");
+  const next = request.nextUrl.searchParams.get("next");
+
+  if (!tokenHash || !isAllowedType(type)) {
+    return NextResponse.redirect(new URL("/signin?error=missing_token", request.url));
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
   if (error || !data.user) {
-    return NextResponse.redirect(new URL("/signin?error=exchange_failed", request.url));
+    return NextResponse.redirect(new URL("/signin?error=verify_failed", request.url));
   }
 
   // Password reset — skip profile upsert, redirect to set-password page.
-  if (request.nextUrl.searchParams.get("type") === "recovery") {
+  if (type === "recovery") {
     return NextResponse.redirect(new URL("/auth/reset-password", request.url));
   }
+
+  const invite = extractInvite(next, request.url);
 
   // Ordinary sign-in — Phase 1 upsert, referredBy stays null.
   if (!invite) {

@@ -18,6 +18,25 @@
 
 const BUTTONDOWN_BASE_URL = "https://api.buttondown.com/v1";
 
+// RFC 6761 reserves `.test`, `.example`, `.invalid`, `.localhost` for
+// non-routable use; RFC 6762 reserves `.local` for multicast DNS. None
+// of these can be the right-hand side of a real, deliverable email
+// address — so an input matching them is, by construction, a test
+// fixture that must never reach Buttondown. Defense in depth on top
+// of the env-key + workflow-trigger gates: the client refuses these
+// at the wire, and the sync skips them per-profile.
+const RESERVED_EMAIL_TLDS = [".local", ".test", ".invalid", ".example", ".localhost"];
+
+export const isReservedTestEmail = (input: string): boolean => {
+  const at = input.lastIndexOf("@");
+  // No `@` means the input is a subscriber id, not an email — the
+  // getSubscriber overload accepts both. Real Buttondown ids never
+  // end in a reserved TLD, so passthrough is safe.
+  if (at < 0) return false;
+  const host = input.slice(at + 1).toLowerCase();
+  return RESERVED_EMAIL_TLDS.some((tld) => host === tld.slice(1) || host.endsWith(tld));
+};
+
 // Lifecycle state of a Buttondown subscriber: regular (active),
 // premium (paid), unactivated (pending confirmation), unsubscribed,
 // removed.
@@ -161,18 +180,75 @@ export interface ButtondownClient {
   deleteSubscriber(id: string): Promise<undefined | DryRunOutcome<"delete">>;
 }
 
+/**
+ * One log line per HTTP call. Emitted from the client whenever a
+ * `logger` is provided in the config — that gives the runner a place
+ * to forward this into Axiom without coupling the client to next-axiom.
+ * `path` is the path portion only (no query string, no host), so an
+ * Axiom panel can group by it.
+ */
+export type ButtondownHttpLogEvent = {
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+  // Present on 429s when Buttondown returns the standard hint.
+  retryAfter?: string;
+};
+
 export type ButtondownClientConfig = {
   apiKey: string;
   write: boolean;
   // Override fetch for testing; defaults to the global fetch.
   fetcher?: typeof fetch;
+  // Optional per-request telemetry sink. Constructed by the runner
+  // for prod paths; tests typically leave it unset.
+  logger?: (event: ButtondownHttpLogEvent) => void;
 };
 
 export const createButtondownClient = (config: ButtondownClientConfig): ButtondownClient => {
-  const fetcher = config.fetcher ?? fetch;
+  const rawFetcher = config.fetcher ?? fetch;
   // Per https://docs.buttondown.com/api-introduction the auth scheme is
   // literally the word "Token", not "Bearer".
   const authHeader = `Token ${config.apiKey}`;
+  const logger = config.logger;
+
+  // Wrap every outbound call with timing + status logging. The base
+  // URL is constant, so logging the path alone is enough to group by
+  // endpoint in Axiom. `next` URLs from pagination are absolute, so
+  // we strip the base before logging when we can.
+  const fetcher: typeof fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET");
+    // Defense-in-depth: pagination follows `next` URLs returned by
+    // Buttondown's response body. Refuse to forward our Authorization
+    // header to anything outside Buttondown's API in case that field
+    // ever points elsewhere. Trailing slash anchors the hostname
+    // boundary so a lookalike host (api.buttondown.com.evil.com)
+    // can't match.
+    if (!url.startsWith(`${BUTTONDOWN_BASE_URL}/`)) {
+      throw new ButtondownApiError(0, `Refusing to fetch URL outside Buttondown: ${url}`);
+    }
+    const path = url.slice(BUTTONDOWN_BASE_URL.length);
+    const start = Date.now();
+    // Pass the validated `url` (not the original `input`) so the host
+    // check above also acts as a taint sanitizer for static analysis.
+    const res = await rawFetcher(url, init);
+    if (logger) {
+      const event: ButtondownHttpLogEvent = {
+        method,
+        path,
+        status: res.status,
+        durationMs: Date.now() - start,
+      };
+      if (res.status === 429) {
+        const retryAfter = res.headers.get("retry-after");
+        if (retryAfter !== null) event.retryAfter = retryAfter;
+      }
+      logger(event);
+    }
+    return res;
+  };
 
   const request = async (method: string, path: string, body?: unknown): Promise<Response> => {
     return fetcher(`${BUTTONDOWN_BASE_URL}${path}`, {
@@ -228,6 +304,9 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async getSubscriber(idOrEmail) {
+      if (isReservedTestEmail(idOrEmail)) {
+        throw new ButtondownApiError(0, `Refusing to query reserved-TLD email: ${idOrEmail}`);
+      }
       // The endpoint accepts either id or email at the same slot; we
       // URL-encode either way so the "+" and "/" that can appear in
       // emails don't break routing.
@@ -241,6 +320,9 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async createSubscriber(input) {
+      if (isReservedTestEmail(input.email_address)) {
+        throw new ButtondownApiError(0, `Refusing to create reserved-TLD email: ${input.email_address}`);
+      }
       if (!config.write) {
         return { dryRun: true, intent: "create", payload: input };
       }
@@ -254,6 +336,9 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async updateSubscriber(id, patch) {
+      if (patch.email_address !== undefined && isReservedTestEmail(patch.email_address)) {
+        throw new ButtondownApiError(0, `Refusing to set reserved-TLD email: ${patch.email_address}`);
+      }
       if (!config.write) {
         return { dryRun: true, intent: "update", payload: { id, patch } };
       }

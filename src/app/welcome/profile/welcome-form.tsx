@@ -48,12 +48,14 @@ export function WelcomeForm({ initial }: { initial: ProfileFormValues }) {
         id="password"
         type="password"
         autoComplete="new-password"
-        placeholder="Leave blank to continue using sign-in links"
+        placeholder="Leave blank to skip"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         disabled={disabled}
       />
-      <p className="text-sm text-muted-foreground">You can always use a sign-in link instead.</p>
+      <p className="text-sm text-muted-foreground">
+        You don't need a password — signing in by email link always works. A password is only useful if you'd prefer to sign in without waiting for an email.
+      </p>
 
       <Button type="submit" className="mt-3" disabled={disabled}>
         {disabled ? "Saving…" : "Save"}

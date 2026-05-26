@@ -41,6 +41,9 @@ test-results/
 .claude/
 .vercel
 
+# agent scratch notes — emergent design decisions, working memory
+.scratch/
+
 # member-import source data — contains member PII, never commit
 scripts/*.csv
 scripts/.import-cache/

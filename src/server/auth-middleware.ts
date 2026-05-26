@@ -51,6 +51,10 @@ export const PUBLIC_PATHS: readonly (string | RegExp)[] = [
   // CI-only test-reset endpoint. Gated by a shared-secret header — the
   // CI token is the auth here, not a Supabase session.
   "/api/_test/reset",
+  // Vercel cron endpoint. Gated by the CRON_SECRET bearer check that
+  // Vercel attaches when invoking scheduled crons; no Supabase
+  // session is present.
+  "/api/cron/buttondown-sync",
 ];
 
 const isPublicPath = (path: string): boolean =>

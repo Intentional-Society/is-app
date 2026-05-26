@@ -55,6 +55,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const [name, setName] = useState(program.name);
   const [slug, setSlug] = useState(program.slug);
   const [description, setDescription] = useState(program.description ?? "");
+  const [buttondownTag, setButtondownTag] = useState(program.buttondownTag ?? "");
   const [editError, setEditError] = useState<string | null>(null);
   const [participantError, setParticipantError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -69,6 +70,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
       description?: string | null;
       archived?: boolean;
       signupsOpen?: boolean;
+      buttondownTag?: string | null;
     }) => {
       const res = await apiClient.api.admin.programs[":id"].$patch({
         param: { id: program.id },
@@ -167,10 +169,12 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
 
   const trimmedName = name.trim();
   const trimmedSlug = slug.trim();
+  const trimmedButtondownTag = buttondownTag.trim();
   const dirty =
     trimmedName !== program.name ||
     trimmedSlug !== program.slug ||
-    description.trim() !== (program.description ?? "");
+    description.trim() !== (program.description ?? "") ||
+    trimmedButtondownTag !== (program.buttondownTag ?? "");
 
   const save = () => {
     if (!trimmedName) {
@@ -185,6 +189,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
       name: trimmedName,
       slug: trimmedSlug,
       description: description.trim() || null,
+      buttondownTag: trimmedButtondownTag || null,
     });
   };
 
@@ -222,6 +227,20 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
             onChange={(e) => setDescription(e.target.value)}
             disabled={updateMutation.isPending}
           />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-buttondown-tag">Buttondown tag</Label>
+          <Input
+            id="program-buttondown-tag"
+            value={buttondownTag}
+            onChange={(e) => setButtondownTag(e.target.value)}
+            disabled={updateMutation.isPending}
+            placeholder="(leave blank to opt out of Buttondown sync)"
+          />
+          <p className="text-xs text-muted-foreground">
+            When set, members joining this program get tagged with this exact string in Buttondown. Leave blank to opt
+            out entirely.
+          </p>
         </div>
         <Button
           type="button"

@@ -5,11 +5,14 @@ import { requireUser, serverApiClient } from "@/lib/api-server";
 
 import { AdminHidden } from "./admin-hidden";
 import { AdminHints } from "./admin-hints";
+import { ButtondownSyncButtons } from "./buttondown-sync-buttons";
+import { MembersAdminPanel } from "./members-admin-panel";
 
 export default async function AdminPage() {
   const me = await requireUser();
+  const profile = me.profile;
   // Generic 404 for non-admins so the page doesn't advertise itself.
-  if (!me.profile?.isAdmin) notFound();
+  if (!profile?.isAdmin) notFound();
 
   const res = await serverApiClient.api.admin.appsettings.$get();
   if (!res.ok) throw new Error(`Failed to load app settings: ${res.status}`);
@@ -53,6 +56,16 @@ export default async function AdminPage() {
       <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">Hidden accounts</h2>
         <AdminHidden />
+      </section>
+
+      <section className="flex w-full max-w-xl flex-col gap-2">
+        <h2 className="text-lg font-semibold">Buttondown sync</h2>
+        <ButtondownSyncButtons />
+      </section>
+
+      <section className="flex w-full max-w-xl flex-col gap-2">
+        <h2 className="text-lg font-semibold">Members</h2>
+        <MembersAdminPanel currentUserId={profile.id} />
       </section>
     </main>
   );
