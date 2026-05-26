@@ -163,11 +163,11 @@ site_url = "http://127.0.0.1:3000"
 # A list of URLs that auth providers are permitted to redirect to post authentication. Supabase
 # matches these with trailing-`*` wildcard support. Cover both 127.0.0.1 and localhost because
 # window.location.origin on the client depends on which host the dev server was opened with.
-# The `/auth/callback*` pattern (instead of bare `/auth/callback`) lets the invite-signup flow
-# append `?invite=<code>` without falling off the allowlist and silently redirecting to site_url.
+# Bare `/*` covers the three `emailRedirectTo` targets the forms pass: `/` (signin),
+# `/?invite=<code>` (signup), and `/auth/reset-password` (forgot-password).
 additional_redirect_urls = [
-  "http://127.0.0.1:3000/auth/callback*",
-  "http://localhost:3000/auth/callback*",
+  "http://127.0.0.1:3000/*",
+  "http://localhost:3000/*",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

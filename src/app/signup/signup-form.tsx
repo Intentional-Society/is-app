@@ -74,7 +74,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?invite=${code}`,
+          emailRedirectTo: `${window.location.origin}/?invite=${code}`,
           data: { displayName: displayName.trim() || null },
         },
       });
@@ -96,8 +96,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
   if (step.kind === "sent") {
     return (
       <p className="max-w-sm text-center text-base text-foreground">
-        Check <span className="font-semibold">{step.email}</span> for a sign-in link. Open it in this same browser
-        within 15 minutes.
+        Check <span className="font-semibold">{step.email}</span> for a sign-in link. It expires in 15 minutes.
       </p>
     );
   }
