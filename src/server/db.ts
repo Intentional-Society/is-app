@@ -20,7 +20,13 @@ declare global {
   var __pgClient: ReturnType<typeof postgres> | undefined;
 }
 
-const client = globalThis.__pgClient ?? postgres(connectionString);
+// `prepare: false` — Variable reduction for #149. Supavisor's
+// transaction-pooler prepared-statement support is "partial" (see the
+// FAQ + supavisor#239). If a per-connection prepared-statement cache
+// in postgres-js is interacting badly with Supavisor re-preparing
+// against fresh backends, dropping prepared statements could eliminate
+// the issue. May revert if no difference.
+const client = globalThis.__pgClient ?? postgres(connectionString, { prepare: false });
 if (process.env.NODE_ENV !== "production") {
   globalThis.__pgClient = client;
 }
