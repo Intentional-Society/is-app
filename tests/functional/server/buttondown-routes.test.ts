@@ -185,7 +185,7 @@ describe("Buttondown sync routes", () => {
       programId = randomUUID();
       await db.execute(
         sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous)
-            VALUES (${memberId}::uuid, ${`${memberId}@testfake.local`}, false, false)`,
+            VALUES (${memberId}::uuid, ${`${memberId}@example.com`}, false, false)`,
       );
       // lastUpdatedProfile is what the sync's loadEligibleProfiles
       // filters on — without it the resync is a no-op.
@@ -210,7 +210,7 @@ describe("Buttondown sync routes", () => {
         if (url.endsWith("/v1/subscribers")) {
           return buttondownResponse(201, {
             id: "sub_test",
-            email_address: `${memberId}@testfake.local`,
+            email_address: `${memberId}@example.com`,
             type: "regular",
             tags: ["weekly", "isweb-member", "new"],
           });

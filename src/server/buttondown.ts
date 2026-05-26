@@ -18,6 +18,25 @@
 
 const BUTTONDOWN_BASE_URL = "https://api.buttondown.com/v1";
 
+// RFC 6761 reserves `.test`, `.example`, `.invalid`, `.localhost` for
+// non-routable use; RFC 6762 reserves `.local` for multicast DNS. None
+// of these can be the right-hand side of a real, deliverable email
+// address — so an input matching them is, by construction, a test
+// fixture that must never reach Buttondown. Defense in depth on top
+// of the env-key + workflow-trigger gates: the client refuses these
+// at the wire, and the sync skips them per-profile.
+const RESERVED_EMAIL_TLDS = [".local", ".test", ".invalid", ".example", ".localhost"];
+
+export const isReservedTestEmail = (input: string): boolean => {
+  const at = input.lastIndexOf("@");
+  // No `@` means the input is a subscriber id, not an email — the
+  // getSubscriber overload accepts both. Real Buttondown ids never
+  // end in a reserved TLD, so passthrough is safe.
+  if (at < 0) return false;
+  const host = input.slice(at + 1).toLowerCase();
+  return RESERVED_EMAIL_TLDS.some((tld) => host === tld.slice(1) || host.endsWith(tld));
+};
+
 // Lifecycle state of a Buttondown subscriber: regular (active),
 // premium (paid), unactivated (pending confirmation), unsubscribed,
 // removed.
@@ -285,6 +304,9 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async getSubscriber(idOrEmail) {
+      if (isReservedTestEmail(idOrEmail)) {
+        throw new ButtondownApiError(0, `Refusing to query reserved-TLD email: ${idOrEmail}`);
+      }
       // The endpoint accepts either id or email at the same slot; we
       // URL-encode either way so the "+" and "/" that can appear in
       // emails don't break routing.
@@ -298,6 +320,9 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async createSubscriber(input) {
+      if (isReservedTestEmail(input.email_address)) {
+        throw new ButtondownApiError(0, `Refusing to create reserved-TLD email: ${input.email_address}`);
+      }
       if (!config.write) {
         return { dryRun: true, intent: "create", payload: input };
       }
@@ -311,6 +336,9 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async updateSubscriber(id, patch) {
+      if (patch.email_address !== undefined && isReservedTestEmail(patch.email_address)) {
+        throw new ButtondownApiError(0, `Refusing to set reserved-TLD email: ${patch.email_address}`);
+      }
       if (!config.write) {
         return { dryRun: true, intent: "update", payload: { id, patch } };
       }

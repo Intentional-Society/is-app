@@ -230,4 +230,25 @@ describe("runFirstProfileSaveSync (inline hook)", () => {
     const after = await client.getSubscriber("sub_gina");
     expect(after?.tags).toEqual(["isweb-member", "returning", "weekly"]);
   });
+
+  // Defense in depth against an E2E or fixture user reaching this
+  // hook in a prod-keyed environment. The hook must not call into the
+  // client for a reserved-TLD email — no mutations, no recorded id.
+  it("skips entirely when the email ends in a reserved TLD", async () => {
+    const profileId = await makeProfile({ email: "fs-test@testfake.local" });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await db.insert(profilePrograms).values({ profileId, programId });
+
+    const client = createFakeButtondownClient({ write: true });
+
+    await runFirstProfileSaveSync({ profileId, email: "fs-test@testfake.local", client });
+
+    expect(client.effects).toHaveLength(0);
+    expect(client.subscribers.size).toBe(0);
+    const [row] = await db
+      .select({ buttondownSubscriberId: profiles.buttondownSubscriberId })
+      .from(profiles)
+      .where(eq(profiles.id, profileId));
+    expect(row.buttondownSubscriberId).toBeNull();
+  });
 });
