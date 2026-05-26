@@ -39,8 +39,11 @@ export const signInAs = async (page: Page, role: TestRole): Promise<TestUser> =>
   const email = EMAILS[role];
   await page.goto("/signin");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password (optional)").fill(passwordFor(role));
-  await page.getByRole("button", { name: "Sign in" }).click();
+  // Signin form defaults to email-link mode; switch to password mode
+  // before the seeded password field is rendered.
+  await page.getByRole("button", { name: "Sign in with password instead" }).click();
+  await page.getByLabel("Password", { exact: true }).fill(passwordFor(role));
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/signin"), {
     timeout: TIMEOUT_MS,
   });

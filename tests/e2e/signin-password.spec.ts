@@ -35,8 +35,9 @@ test("password provided → signInWithPassword is called", async ({ page }) => {
 
   await page.goto("/signin");
   await page.getByLabel("Email").fill("member@example.test");
-  await page.getByLabel("Password (optional)").fill("hunter2");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in with password instead" }).click();
+  await page.getByLabel("Password", { exact: true }).fill("hunter2");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // Next.js renders a hidden route-announcer with role="alert" too, so
   // we target our error message by text rather than by role.

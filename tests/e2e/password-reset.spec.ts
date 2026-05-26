@@ -12,6 +12,9 @@ const SUPABASE_AUTH = "**/auth/v1/**";
 
 test('"Forgot your password?" navigates to /forgot-password and back', async ({ page }) => {
   await page.goto("/signin");
+  // The forgot-password link only renders in the password mode of the
+  // sign-in form; default mode is email-link with no link visible.
+  await page.getByRole("button", { name: "Sign in with password instead" }).click();
   await page.getByRole("link", { name: "Forgot your password?" }).click();
 
   await expect(page).toHaveURL(/\/forgot-password$/);
