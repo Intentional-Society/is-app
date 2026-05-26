@@ -218,27 +218,6 @@ Two parallel admin-triggered routes, both gated by admin auth instead of `CRON_S
 
 Both call the same internal function with `acquired_by = "admin:<profileId>"` on the lock and an explicit `write` flag (false for dry-run, true for write). The env var is not consulted on either admin path — the admin's button choice is the source of truth. During the rollout dry-run window, the write button is the admin's deliberate override; after rollout it's just a manual on-demand sync.
 
-## Initial bootstrap reconciliation
-
-There's a wrinkle from the pre-app era: members were imported into `profile_programs` via `scripts/import-members-csv.ts`, but Buttondown's tag state for those same members is **newer and more authoritative** — it reflects every Apps-Script-era opt-out / opt-in the CSV import didn't capture. If the CSV says "Alice is in `weekly-web-updates`" but her Buttondown subscriber lacks that tag, the app-side record needs to be corrected to match Buttondown, not the other way around.
-
-This is a **one-time, app-side-only** reconciliation: the bootstrap calls `leaveProgram` to align the app with Buttondown's authoritative tag state and writes nothing to Buttondown. The inline first-profile-save path is the one moment we authoritatively claim a subscriber; the daily cron handles steady-state Buttondown writes. The bootstrap fits between them as a backfill that updates the app's view of who's still in what.
-
-Implemented as `scripts/buttondown-bootstrap.ts` (an ops script in the same vein as `scripts/import-members-csv.ts`). For every app member, including CSV-imported stubs who haven't completed onboarding yet, look up the Buttondown subscriber and emit one outcome:
-
-- **No email on `auth.users`** → `skip-missing-email`.
-- **No Buttondown subscriber found by id or email** → `skip-missing-subscriber`. Logged with the lookup attempts; expected for test fixtures and the rare CSV row Buttondown never saw.
-- **Subscriber `type: "unsubscribed"`** → `skip-unsubscribed`. Real-world opt-out signal — see [Unsubscribe handling](#unsubscribe-handling).
-- **Subscriber found but missing `isweb-member`** → `skip-no-isweb-member`, surfaced as an `ERROR` line for human review. The email landed on a subscriber the app never claimed — most plausibly a non-member newsletter subscriber whose email collides with this app member. Adopting them silently would PATCH a stranger into IS Web's tag scheme; the inline first-profile-save path is the right place to claim, not this one.
-- **Subscriber matches and managed-tag set is fully aligned in both directions** → `skip-no-changes`. Nothing to do; common steady-state outcome.
-- **Subscriber matches and the two systems disagree on managed-tag memberships** → `reconcile`. The plan emits two lists: `programsToLeave` (app says joined, Buttondown disagrees → call `leaveProgram`) and `programsToJoin` (Buttondown says joined, app disagrees → would be a `joinProgram` to preserve Apps-Script-era memberships the CSV import missed). The reverse direction matters because the cron's diff-only formula treats the app's empty side as authoritative — without a join here, the next morning's cron would silently strip those tags from Buttondown.
-
-`programsToJoin` is currently observation-only — the dry-run logs it so the operator can size the case before deciding whether to wire up an actual join path (and how to bypass `joinProgram`'s `signupsOpen` gate, which is designed for member-initiated joins rather than historical reconciliation). `active` and other tags outside the managed universe are left alone — they're the Apps Script's record and the cron's diff-only path preserves them. The bootstrap never PATCHes Buttondown.
-
-The script honors `--dry-run` (default — no writes anywhere) so we can review what it would change before flipping. Run once during rollout (step 6 below); the daily cron takes over from there.
-
-Why not embed this in the cron: the bootstrap modifies app state (calls `leaveProgram`) where the steady-state cron does not. Keeping it a separate one-shot script means the cron's contract stays narrow ("write Buttondown from app state"), and the bootstrap's app-side mutations are gated behind an explicit ops invocation.
-
 ## Rollout sequence
 
 1. **Land the schema** (`programs.buttondownTag`, `profiles.buttondownSubscriberId`, `sync_locks` table) via expand-step. Add the `buttondownTag` field to the `/admin/programs` edit UI but leave every program's value null.
@@ -246,9 +225,8 @@ Why not embed this in the cron: the bootstrap modifies app state (calls `leavePr
 3. **Set `BUTTONDOWN_API_KEY` and `CRON_SECRET`** in the prod env scope only.
 4. **Set `buttondownTag` on the relevant programs** (e.g., `weekly-web-updates` → the same string the Apps Script writes today) via `/admin/programs`. The dry-run cron now produces a realistic diff against real data.
 5. **Verify the dry-run output** over one or two daily cycles in Axiom: numbers look plausible, the diff doesn't propose touching the non-member newsletter audience, no surprises.
-6. **Run `scripts/buttondown-bootstrap.ts --dry-run`**, eyeball the report, then run it for real. Brings the ~46 CSV-imported members to a canonical state (corrects app-side memberships to match Buttondown, clears the legacy `active` tag).
-7. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** in the same window. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. Retire the Form itself in the same step if its only purpose was newsletter signup.
-8. **Wire the inline first-profile-save hook.** Lowest priority — purely latency. The cron has covered correctness since step 7.
+6. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** in the same window. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. Retire the Form itself in the same step if its only purpose was newsletter signup.
+7. **Wire the inline first-profile-save hook.** Lowest priority — purely latency. The cron has covered correctness since step 6.
 
 ## Future work
 
