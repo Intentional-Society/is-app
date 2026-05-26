@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +11,12 @@ import { createClient } from "@/lib/supabase/client";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
+type Mode = "email" | "password";
+
 type FormState =
   | { status: "idle" }
   | { status: "submitting" }
   | { status: "sent"; email: string }
-  | { status: "resending" }
   | { status: "error"; message: string };
 
 function SentView({ email, origin }: { email: string; origin: string }) {
@@ -70,7 +72,20 @@ export function SigninForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<Mode>("email");
   const [state, setState] = useState<FormState>({ status: "idle" });
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  const switchToPassword = () => {
+    setMode("password");
+    setTimeout(() => passwordRef.current?.focus(), 0);
+  };
+
+  const switchToEmail = () => {
+    setMode("email");
+    setPassword("");
+    setState({ status: "idle" });
+  };
 
   const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -78,15 +93,11 @@ export function SigninForm() {
 
     const supabase = createClient();
 
-    if (password.length > 0) {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    if (mode === "password") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         // No fallback to the email sign-in link — a failed password means the
-        // member mistyped it; falling through silently would be
-        // confusing. They can clear the field and resubmit.
+        // member mistyped it; falling through silently would be confusing.
         setState({ status: "error", message: error.message });
         return;
       }
@@ -145,26 +156,43 @@ export function SigninForm() {
         onChange={(event) => setEmail(event.target.value)}
         disabled={state.status === "submitting"}
       />
-      <Label htmlFor="password">Password (optional)</Label>
-      <Input
-        id="password"
-        type="password"
-        autoComplete="current-password"
-        placeholder="Leave blank to receive a sign-in link by email"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        disabled={state.status === "submitting"}
-      />
-      <p className="text-sm text-muted-foreground">Only needed if you've previously set one.</p>
-      <Button type="submit" disabled={state.status === "submitting"}>
+
+      {mode === "password" && (
+        <>
+          <Label htmlFor="password">Password</Label>
+          <Input
+            ref={passwordRef}
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            disabled={state.status === "submitting"}
+          />
+          <p className="text-sm text-muted-foreground">
+            <Link href="/forgot-password" className="underline hover:text-foreground">
+              Forgot your password?
+            </Link>
+          </p>
+        </>
+      )}
+
+      <Button type="submit" variant="secondary" disabled={state.status === "submitting"}>
         {state.status === "submitting"
-          ? password.length > 0
-            ? "Signing in…"
-            : "Sending…"
-          : password.length > 0
-            ? "Sign in"
-            : "Send sign-in link"}
+          ? mode === "password" ? "Signing in…" : "Sending…"
+          : mode === "password" ? "Sign in" : "Send sign-in link"}
       </Button>
+
+      {mode === "email" ? (
+        <Button type="button" variant="ghost" onClick={switchToPassword}>
+          Sign in with password instead
+        </Button>
+      ) : (
+        <Button type="button" variant="ghost" onClick={switchToEmail}>
+          Use email link instead
+        </Button>
+      )}
+
       {state.status === "error" && (
         <p role="alert" className="text-base text-destructive">
           {state.message}
