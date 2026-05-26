@@ -10,7 +10,6 @@ type Props = {
     bio: string;
     keywordsText: string;
     location: string;
-    liveDesire: string;
     currentIntention: string;
     supplementaryInfo: string;
     emergencyContact: string;
@@ -20,7 +19,6 @@ type Props = {
     setBio: (v: string) => void;
     setKeywordsText: (v: string) => void;
     setLocation: (v: string) => void;
-    setLiveDesire: (v: string) => void;
     setCurrentIntention: (v: string) => void;
     setSupplementaryInfo: (v: string) => void;
     setEmergencyContact: (v: string) => void;
@@ -69,15 +67,6 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
         value={fields.location}
         onChange={(e) => setters.setLocation(e.target.value)}
         disabled={disabled}
-      />
-
-      <Label htmlFor="liveDesire">Live desire</Label>
-      <Textarea
-        id="liveDesire"
-        value={fields.liveDesire}
-        onChange={(e) => setters.setLiveDesire(e.target.value)}
-        disabled={disabled}
-        rows={3}
       />
 
       <Label htmlFor="currentIntention">
