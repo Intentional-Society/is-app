@@ -56,6 +56,7 @@ import {
   parseOptionalRelationValue,
   updateRelationValue,
 } from "./relations";
+import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import { profiles } from "./schema";
 import { resetE2EUsers } from "./test-reset";
 
@@ -211,7 +212,36 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       lockRetryDelayMs: 500,
     });
     return c.json(result);
-  });
+  })
+  .get("/members", async (c) => {
+    const members = await listMembersAdmin();
+    return c.json({ members });
+  })
+  .patch(
+    "/members/:id/admin",
+    validator("json", (body, c) => {
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "body must be a JSON object" }, 400);
+      }
+      const isAdmin = (body as Record<string, unknown>).isAdmin;
+      if (typeof isAdmin !== "boolean") {
+        return c.json({ error: "isAdmin must be a boolean" }, 400);
+      }
+      return { isAdmin };
+    }),
+    async (c) => {
+      const id = c.req.param("id");
+      if (!isUuid(id)) return c.json({ error: "id must be a UUID" }, 400);
+      const user = c.get("user");
+      const result = await setAdminStatus(id, c.req.valid("json").isAdmin, user.id);
+      if ("error" in result) {
+        if (result.error === "self_demotion") return c.json({ error: "self_demotion" }, 403);
+        if (result.error === "last_admin") return c.json({ error: "last_admin" }, 409);
+        return c.json({ error: "not_found" }, 404);
+      }
+      return c.json({ ok: true });
+    },
+  );
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -663,7 +693,8 @@ api.post("/_test/reset", async (c) => {
 // else with 401. The write toggle is BUTTONDOWN_SYNC_WRITE=1 — the
 // design's "Prod-only by construction" lock #4. Unset (the default)
 // means dry-run; set means writes go through.
-api.post("/cron/buttondown-sync", async (c) => {
+// GET because Vercel cron invokes endpoints via HTTP GET.
+api.get("/cron/buttondown-sync", async (c) => {
   const provided = c.req.header("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || provided !== `Bearer ${cronSecret}`) {

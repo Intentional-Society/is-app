@@ -4,11 +4,11 @@ Covers both the hosted production project (configured via the Supabase dashboard
 
 ---
 
-## Magic-link flow (PKCE)
+## Magic-link flow (token-hash + verifyOtp)
 
-The magic-link sign-in flow uses PKCE. When a user requests a link, the client stores a `code_verifier` secret in a browser cookie (`sb-<ref>-auth-token-code-verifier`). The `/auth/callback` handler needs that cookie to exchange the `code` for a session.
+The magic-link and password-reset emails embed `{{ .TokenHash }}` directly in a URL pointing at `/auth/callback?token_hash=…&type=…&next=…`. The route calls `supabase.auth.verifyOtp({ token_hash, type })` server-side, so the link works regardless of which browser opens it. The `next` query param carries the `emailRedirectTo` URL the form passed and tells the route where to land the user post-verification.
 
-Consequence: **the magic link must be opened in the same browser that requested it.** Clicking the link from a phone when the request came from a desktop, or opening it in an incognito window, fails with "exchange failed". Applies equally to the hosted and local stacks.
+PKCE is still the configured client `flowType` and still governs session cookies / refresh-token rotation. Only the email-verification step is bypassed by the token-hash flow. See `docs/old-archive/plan-cross-browser-magic-link.md` for the migration rationale.
 
 ---
 
@@ -64,12 +64,12 @@ These settings control where Supabase redirects users after magic-link sign-in. 
 
 - **Site URL:** `https://app.intentionalsociety.org`
 - **Redirect URLs** (allowlist):
-  - `https://app.intentionalsociety.org/auth/callback*` — production
-  - `https://is-app-vercel-*-intentional-society-vercel.vercel.app/auth/callback*` — Vercel preview deploys (wildcard)
+  - `https://app.intentionalsociety.org/*` — production
+  - `https://is-app-vercel-*-intentional-society-vercel.vercel.app/*` — Vercel preview deploys (wildcard)
 
 Local dev does **not** need entries here — it hits the local Supabase stack, whose allowlist is in `supabase/config.toml`. Only add `localhost` / `127.0.0.1` to this prod allowlist if a developer intentionally points their local frontend at prod Supabase (rare, and sends real magic-link emails).
 
-The trailing `*` matters: the invite-signup flow from `/signup` passes `emailRedirectTo: \`${origin}/auth/callback?invite=<code>\``, and Supabase's allowlist matches URLs verbatim unless a wildcard is present. Without the `*`, Supabase would reject that URL and silently fall back to **Site URL** — stranding the prospective member at `/` with no session. The plain sign-in path (`signin-form.tsx`) passes the bare `/auth/callback`, which also matches `/auth/callback*`.
+The bare `/*` covers all three `emailRedirectTo` targets the forms pass: `/` (signin), `/?invite=<code>` (signup), and `/auth/reset-password` (forgot-password). Anything more specific would need a separate entry per target. Without a matching wildcard, Supabase rejects the URL and silently falls back to **Site URL**, stranding the user at `/` with no session.
 
 ### Auth providers
 
@@ -146,7 +146,7 @@ The local Supabase stack (spun up by `supabase start`, wrapped by `npm run dev:d
 Same silent-fallback semantics as prod: if `emailRedirectTo` from the client isn't in the allowlist, Supabase falls back to `site_url`.
 
 - **`site_url`** — `http://127.0.0.1:3000`
-- **`additional_redirect_urls`** — must include `/auth/callback` for both `127.0.0.1:3000` and `localhost:3000`, because `window.location.origin` depends on which host the dev server was opened with.
+- **`additional_redirect_urls`** — bare `/*` for both `127.0.0.1:3000` and `localhost:3000`, since `window.location.origin` depends on which host the dev server was opened with and the wildcard covers all three form redirect targets.
 
 ### Inbucket (local email catcher)
 

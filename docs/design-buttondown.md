@@ -89,7 +89,7 @@ This path exists only to shorten the new-member time-to-first-email. It is a lat
 
 ### 2. Daily reconciler (Vercel cron)
 
-`POST /api/cron/buttondown-sync`, scheduled daily at **08:00 UTC** via `vercel.json` `crons`, gated by a `CRON_SECRET` bearer check. Acquires the [sync concurrency lock](#concurrency-lock) before doing any work and releases it at the end.
+`GET /api/cron/buttondown-sync`, scheduled daily at **08:00 UTC** via `vercel.json` `crons`, gated by a `CRON_SECRET` bearer check. (Vercel cron invokes endpoints via HTTP GET.) Acquires the [sync concurrency lock](#concurrency-lock) before doing any work and releases it at the end.
 
 For each profile where `lastUpdatedProfile IS NOT NULL`:
 
@@ -205,7 +205,7 @@ All expand-step migrations (see `strategy-committing.md`): land the columns and 
 ## Endpoint shape
 
 ```
-POST /api/cron/buttondown-sync
+GET /api/cron/buttondown-sync
 Authorization: Bearer ${CRON_SECRET}
 
 → 200 { scanned: 47, created: 2, tagged: 5, untagged: 1, unsubscribe_alerts: 3, email_updates: 0, errors: [] }
@@ -218,23 +218,9 @@ Two parallel admin-triggered routes, both gated by admin auth instead of `CRON_S
 
 Both call the same internal function with `acquired_by = "admin:<profileId>"` on the lock and an explicit `write` flag (false for dry-run, true for write). The env var is not consulted on either admin path — the admin's button choice is the source of truth. During the rollout dry-run window, the write button is the admin's deliberate override; after rollout it's just a manual on-demand sync.
 
-## Initial bootstrap reconciliation
+## Initial bootstrap reconciliation (completed and deleted 2026-05-25)
 
-There's a wrinkle from the pre-app era: ~46 members were imported into `profile_programs` via `scripts/import-members-csv.ts`, but Buttondown's tag state for those same members is **newer and more authoritative** — it reflects every Apps-Script-era opt-out / opt-in the CSV import didn't capture. If the CSV says "Alice is in `weekly-web-updates`" but her Buttondown subscriber lacks that tag (or carries `unsubscribed`), the app-side record needs to be corrected to match Buttondown, not the other way around.
-
-This is a **one-time** reconciliation, not the cron's steady-state behavior. Implemented as `scripts/buttondown-bootstrap.ts` (an ops script in the same vein as `scripts/import-members-csv.ts`):
-
-1. For each profile with `lastUpdatedProfile IS NOT NULL` (i.e., a real member, not a stub):
-   - GET Buttondown subscriber by email.
-   - **Missing** → log a warning and continue. (Unexpected: a CSV-imported member should already exist in Buttondown.)
-   - **Unsubscribed** → log for human review, do nothing.
-   - **Active** → diff `(buttondown.managed_tags) Δ (app.current_program_tags)`. For any tag present on Buttondown but the matching program-membership ended in the app, do nothing (Buttondown gained the tag after the app lost it — fine). For any tag the app says is current but Buttondown lacks, **call `leaveProgram`** for that program — Buttondown is authoritative for the bootstrap moment.
-2. After all app-side adjustments, do a single full-overwrite PATCH per active subscriber: tags = `[…now-correct-program-tags, "isweb-member", "returning"]`. This clears the legacy `active` tag and brings everyone to the same canonical state.
-3. Output a final report to stdout (per-member changes) and to Sentry (a single summary breadcrumb).
-
-The script honors `--dry-run` (default — no writes anywhere) so we can review what it would change before flipping. Run once during rollout (step 6 below); the daily cron takes over from there.
-
-Why not embed this in the cron: the bootstrap modifies app state (calls `leaveProgram`) where the steady-state cron does not. Keeping it a separate one-shot script means the cron's contract stays narrow ("write Buttondown from app state"), and the bootstrap's destructive-against-app behavior is gated behind an explicit ops invocation.
+A one-shot script reconciled the app's CSV-imported memberships against Buttondown's authoritative pre-cutover tag state, calling `leaveProgram` where the two disagreed and writing nothing to Buttondown. Ran in `--write` mode against prod on 2026-05-25 — two app-side corrections, zero `programsToJoin` cases — and was removed in the same commit set. See git history at `scripts/buttondown-bootstrap.ts` and `src/server/buttondown-bootstrap.ts` for the implementation.
 
 ## Rollout sequence
 
@@ -243,9 +229,9 @@ Why not embed this in the cron: the bootstrap modifies app state (calls `leavePr
 3. **Set `BUTTONDOWN_API_KEY` and `CRON_SECRET`** in the prod env scope only.
 4. **Set `buttondownTag` on the relevant programs** (e.g., `weekly-web-updates` → the same string the Apps Script writes today) via `/admin/programs`. The dry-run cron now produces a realistic diff against real data.
 5. **Verify the dry-run output** over one or two daily cycles in Axiom: numbers look plausible, the diff doesn't propose touching the non-member newsletter audience, no surprises.
-6. **Run `scripts/buttondown-bootstrap.ts --dry-run`**, eyeball the report, then run it for real. Brings the ~46 CSV-imported members to a canonical state (corrects app-side memberships to match Buttondown, clears the legacy `active` tag).
+6. **One-shot bootstrap reconciliation** *(completed and deleted 2026-05-25)*. See the dedicated section above.
 7. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** in the same window. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. Retire the Form itself in the same step if its only purpose was newsletter signup.
-8. **Wire the inline first-profile-save hook.** Lowest priority — purely latency. The cron has covered correctness since step 7.
+8. **Wire the inline first-profile-save hook** *(completed 2026-05-25 in PR #280)*. Lowest priority — purely latency. The cron covers correctness once step 7 lands.
 
 ## Future work
 

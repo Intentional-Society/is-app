@@ -181,8 +181,15 @@ dashboard. That's the intended behaviour: repo wins.
 
 Supabase substitutes Go-template variables before sending. The ones in use:
 
-- `{{ .ConfirmationURL }}` — the full action link (must be present for
-  links to work). All three reachable templates need this.
+- `{{ .TokenHash }}` — single-use hash for the email's OTP. Embedded
+  in the action URL so `/auth/callback` can call
+  `supabase.auth.verifyOtp({ token_hash, type })` server-side. Works
+  cross-browser; see
+  [`plan-cross-browser-magic-link.md`](./old-archive/plan-cross-browser-magic-link.md).
+- `{{ .RedirectTo }}` — the `emailRedirectTo` URL the client passed.
+  Carried through the action URL as `&next={{ .RedirectTo }}` so the
+  confirm route can land the user at the right destination
+  post-verification.
 - `{{ .Email }}` — recipient address. Useful for clarity in body copy.
 - `{{ .SiteURL }}` — hosted site URL (`https://app.intentionalsociety.org`
   in prod). Useful for footer links.
@@ -192,6 +199,12 @@ Supabase substitutes Go-template variables before sending. The ones in use:
   `{{ if .Data.displayName }}…{{ end }}` so the missing case renders
   cleanly. Verified against Supabase docs: `{{ .Data }}` is
   user_metadata, not per-request options.data.
+
+The action-URL pattern both reachable templates use:
+
+```
+{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=<email|recovery>&next={{ .RedirectTo }}
+```
 
 Templates are HTML; Supabase wraps them in a minimal MIME envelope. Email
 clients vary wildly in CSS support — keep styling inline and conservative

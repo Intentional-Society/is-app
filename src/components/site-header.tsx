@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { Menu, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/auth-provider";
@@ -84,8 +84,9 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
               <SheetClose
                 nativeButton={false}
                 render={
-                  <Link href="/admin" className="rounded px-2 py-2 hover:bg-muted">
-                    Admin
+                  <Link href="/admin" className="flex items-center gap-2 rounded px-2 py-2 text-green-700 hover:bg-muted">
+                    <ShieldCheck className="h-4 w-4 shrink-0" />
+                    Admin dashboard
                   </Link>
                 }
               />
