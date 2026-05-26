@@ -1,10 +1,6 @@
 {
-<<<<<<< HEAD
-  "id": "d6cccdc6-c2c0-4513-ae51-eb09128f4230",
-=======
-  "id": "584c6f57-82e7-4f76-9ba1-95d436f0bbd0",
->>>>>>> 6841de6 (Add quarterly intentions field to profiles (#243))
-  "prevId": "c93124e3-ba67-497b-8424-c64c3f45056a",
+  "id": "a1a225c1-2f62-4edf-a8d6-038fd7198fc3",
+  "prevId": "2cee0e17-387c-4319-87d8-205ba2cde329",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -220,6 +216,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "left_at": {
+          "name": "left_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -349,7 +351,6 @@
           "notNull": true,
           "default": false
         },
-<<<<<<< HEAD
         "hidden": {
           "name": "hidden",
           "type": "boolean",
@@ -357,8 +358,6 @@
           "notNull": true,
           "default": false
         },
-=======
->>>>>>> 6841de6 (Add quarterly intentions field to profiles (#243))
         "last_signed_agreements": {
           "name": "last_signed_agreements",
           "type": "timestamp with time zone",
@@ -377,8 +376,18 @@
           "primaryKey": false,
           "notNull": false
         },
-<<<<<<< HEAD
-=======
+        "last_updated_web": {
+          "name": "last_updated_web",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "buttondown_subscriber_id": {
+          "name": "buttondown_subscriber_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "current_intention": {
           "name": "current_intention",
           "type": "text",
@@ -387,13 +396,6 @@
         },
         "intention_updated_at": {
           "name": "intention_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
->>>>>>> 6841de6 (Add quarterly intentions field to profiles (#243))
-        "last_updated_web": {
-          "name": "last_updated_web",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -482,6 +484,25 @@
         },
         "description": {
           "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signups_open": {
+          "name": "signups_open",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "buttondown_tag": {
+          "name": "buttondown_tag",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -627,6 +648,37 @@
           "value": "(NOT \"relations\".\"is_hint\" AND \"relations\".\"value\" IS NOT NULL)\n       OR (\"relations\".\"is_hint\" AND \"relations\".\"value\" IS NULL)"
         }
       },
+      "isRLSEnabled": true
+    },
+    "public.sync_locks": {
+      "name": "sync_locks",
+      "schema": "",
+      "columns": {
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acquired_by": {
+          "name": "acquired_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": true
     }
   },
