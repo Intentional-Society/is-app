@@ -86,17 +86,17 @@ describe("Buttondown sync routes", () => {
     await db.delete(syncLocks);
   });
 
-  describe("POST /api/cron/buttondown-sync", () => {
+  describe("GET /api/cron/buttondown-sync", () => {
     it("rejects with 401 when no Authorization header", async () => {
       process.env.CRON_SECRET = "secret-abc";
-      const res = await app.request("/api/cron/buttondown-sync", { method: "POST" });
+      const res = await app.request("/api/cron/buttondown-sync", { method: "GET" });
       expect(res.status).toBe(401);
     });
 
     it("rejects with 401 when the bearer does not match CRON_SECRET", async () => {
       process.env.CRON_SECRET = "secret-abc";
       const res = await app.request("/api/cron/buttondown-sync", {
-        method: "POST",
+        method: "GET",
         headers: { authorization: "Bearer wrong-token" },
       });
       expect(res.status).toBe(401);
@@ -107,7 +107,7 @@ describe("Buttondown sync routes", () => {
       // header should be rejected if the server has no secret set,
       // otherwise the cron is effectively public.
       const res = await app.request("/api/cron/buttondown-sync", {
-        method: "POST",
+        method: "GET",
         headers: { authorization: "Bearer anything" },
       });
       expect(res.status).toBe(401);
@@ -116,7 +116,7 @@ describe("Buttondown sync routes", () => {
     it("returns skipped:api_key_missing when CRON_SECRET matches but BUTTONDOWN_API_KEY is unset", async () => {
       process.env.CRON_SECRET = "secret-abc";
       const res = await app.request("/api/cron/buttondown-sync", {
-        method: "POST",
+        method: "GET",
         headers: { authorization: "Bearer secret-abc" },
       });
       expect(res.status).toBe(200);

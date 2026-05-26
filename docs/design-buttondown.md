@@ -89,7 +89,7 @@ This path exists only to shorten the new-member time-to-first-email. It is a lat
 
 ### 2. Daily reconciler (Vercel cron)
 
-`POST /api/cron/buttondown-sync`, scheduled daily at **08:00 UTC** via `vercel.json` `crons`, gated by a `CRON_SECRET` bearer check. Acquires the [sync concurrency lock](#concurrency-lock) before doing any work and releases it at the end.
+`GET /api/cron/buttondown-sync`, scheduled daily at **08:00 UTC** via `vercel.json` `crons`, gated by a `CRON_SECRET` bearer check. (Vercel cron invokes endpoints via HTTP GET.) Acquires the [sync concurrency lock](#concurrency-lock) before doing any work and releases it at the end.
 
 For each profile where `lastUpdatedProfile IS NOT NULL`:
 
@@ -205,7 +205,7 @@ All expand-step migrations (see `strategy-committing.md`): land the columns and 
 ## Endpoint shape
 
 ```
-POST /api/cron/buttondown-sync
+GET /api/cron/buttondown-sync
 Authorization: Bearer ${CRON_SECRET}
 
 → 200 { scanned: 47, created: 2, tagged: 5, untagged: 1, unsubscribe_alerts: 3, email_updates: 0, errors: [] }

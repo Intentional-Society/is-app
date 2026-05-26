@@ -693,7 +693,8 @@ api.post("/_test/reset", async (c) => {
 // else with 401. The write toggle is BUTTONDOWN_SYNC_WRITE=1 — the
 // design's "Prod-only by construction" lock #4. Unset (the default)
 // means dry-run; set means writes go through.
-api.post("/cron/buttondown-sync", async (c) => {
+// GET because Vercel cron invokes endpoints via HTTP GET.
+api.get("/cron/buttondown-sync", async (c) => {
   const provided = c.req.header("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || provided !== `Bearer ${cronSecret}`) {
