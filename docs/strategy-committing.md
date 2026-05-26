@@ -8,6 +8,8 @@ If you've done work your teammates should know about, add a `docs/devjournal.md`
 
 Run `npm test` (all suites) and confirm green before committing. Don't push code that you haven't tested locally. If you're changing frontend layout, check both phone and desktop rendering.
 
+**Watch out:** `git stash && <command>; git stash pop` is not a safe verification idiom against an apparently-clean tree. `git stash` is a no-op when there's nothing to stash — it does not push an empty marker — so the trailing `git stash pop` applies whatever entry was already on top of the stack, often leftover work from another branch. Use `git stash list` to inspect the stack without side effects.
+
 ## Branch discipline
 
 Always commit on a feature branch, never directly to `main`. PRs into `main` require CI to pass before merge.
