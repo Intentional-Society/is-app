@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 import { isRelationValue } from "@/lib/relation-value";
@@ -100,6 +101,7 @@ const nodeTypes = { member: MemberNode };
 export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
+  const [hintOpen, setHintOpen] = useState(false);
   // The view options become part of the query key so toggling refetches
   // automatically and the rating-mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
@@ -343,7 +345,35 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         {/* Built-in +/-/fit-view buttons for users who can't or don't
          * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
          * is hidden — selection and connection are already disabled. */}
-        <Controls showInteractive={false} />
+        <Controls position="top-left" showInteractive={false} />
+        <Panel position="bottom-right" className="flex items-end gap-2">
+          {/* Click-to-toggle (not hover) so the hints stay reachable on
+           * touch devices where hover doesn't exist. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+            aria-expanded={hintOpen}
+            aria-controls="web-graph-hints"
+            onClick={() => setHintOpen((h) => !h)}
+            className="rounded-full border border-border bg-background/90 font-bold"
+          >
+            ?
+          </Button>
+          {hintOpen && (
+            <ul
+              id="web-graph-hints"
+              className="flex max-w-[18rem] flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+            >
+              <li>Drag the background to pan.</li>
+              <li>Scroll or pinch to zoom.</li>
+              <li>
+                <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
+              </li>
+            </ul>
+          )}
+        </Panel>
         <Panel
           position="top-right"
           className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
