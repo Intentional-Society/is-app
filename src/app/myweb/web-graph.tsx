@@ -59,7 +59,6 @@ type EdgeData = {
 const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   const res = await apiClient.api.relations.subgraph.$get({
     query: {
-      in: opts.includeIncoming ? "true" : "false",
       hops: String(opts.hops),
     },
   });
@@ -387,14 +386,6 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           position="top-right"
           className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
         >
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={view.includeIncoming}
-              onChange={(e) => setView((v) => ({ ...v, includeIncoming: e.target.checked }))}
-            />
-            Show incoming
-          </label>
           <label className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
