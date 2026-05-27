@@ -51,6 +51,7 @@ type SimNode = {
 type SimEdge = {
   source: string | SimNode;
   target: string | SimNode;
+  value: number;
 };
 
 type EdgeData = {
@@ -73,6 +74,12 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
 // 1..4 → edge thickness; chosen so a 4-rated friend reads visually
 // distinct from a 1-rated acquaintance without dominating the canvas.
 const edgeStrokeWidth = (value: number) => 1.5 + value * 1.25;
+
+// 1..4 → spring rest-length for the d3-force link constraint. Stronger
+// relations want to sit closer (230 → 110 across the range). Charge,
+// collide, and other-link tensions still resolve the layout, so this
+// biases without ranking nodes strictly by edge weight.
+const linkDistance = (value: number) => 270 - value * 40;
 
 // 1..4 → linear ramp from 0.4 to 0.8 over the theme foreground (so
 // ≈0.4/0.53/0.67/0.8). Reinforces the thickness signal without letting
@@ -215,6 +222,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     const simEdges: SimEdge[] = data.edges.map((e) => ({
       source: e.relatorId,
       target: e.relateeId,
+      value: e.value,
     }));
 
     setNodes(
@@ -250,7 +258,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         "link",
         forceLink<SimNode, SimEdge>(simEdges)
           .id((d) => d.id)
-          .distance(180),
+          .distance((link) => linkDistance(link.value)),
       )
       .force("collide", forceCollide(60))
       .on("tick", () => {
