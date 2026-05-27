@@ -164,7 +164,11 @@ Argument is cached for `/pr` and `/ship` in the same session. Natural-language p
 9. If schema files changed (`src/server/schema.ts` or `drizzle/**`), identify expand vs contract phase per `docs/strategy-committing.md`. **Refuse combined expand+contract payloads** in a single commit — the two phases must ship as separate commits so the deploy ordering can be preserved. For an expand-phase change, note that `npm run prod:db:expand` dispatches the schema deploy after PR creation and that the post-deploy `e2e.yml` rerun must pass before `/ship` merges.
 10. If the parsed argument looks like an issue, `gh issue view <N>` to validate it exists and is open. Fail fast and hard if `gh` is unavailable or unauthenticated (suggest `gh auth login` / `gh auth status`).
 11. Run `npm test`. All must pass.
-12. Draft the commit message in the repo's recent style (use `git log --oneline -20 origin/main` for examples).
+12. Draft the commit message using a Conventional Commit-style subject and the repo's structured body convention. Inspect `git log --oneline -20 origin/main` for recent examples and follow the repo-observed style.
+    - Subject format: `<type>[(scope)]: <imperative summary>`, ≤70 chars. Reference: https://www.conventionalcommits.org/en/v1.0.0/
+    - Prefer repo-observed types such as `feat`, `fix`, `a11y`, `test`, `docs`, and `chore`; use common Conventional Commit types such as `refactor`, `perf`, `ci`, and `build` when they fit.
+    - If several types apply, choose the dominant intent; if unclear, surface the proposed type in the human approval block.
+    - For breaking changes, add `!` before the colon and include a `BREAKING CHANGE:` footer explaining the compatibility impact. Surface this explicitly in the human approval block.
     - Subject ≤70 chars.
     - Body sections in order: `Summary:` (one sentence), `Why:`, `Behavior:`, `Test Plan:`.
     - Append `Closes #N` for resolving references, `(#N)` for non-resolving.
