@@ -167,7 +167,13 @@ function parseStoredView(raw: string | null): SubgraphViewOptions | null {
   return null;
 }
 
-export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
+export function WebGraph({
+  onOpenRelating,
+  onReplayTour,
+}: {
+  onOpenRelating: (target: RelatingTarget) => void;
+  onReplayTour: () => void;
+}) {
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
   const [hintOpen, setHintOpen] = useState(false);
@@ -483,18 +489,27 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
             ?
           </Button>
           {hintOpen && (
-            <ul
+            <div
               id="web-graph-hints"
-              className="flex max-w-[18rem] flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+              className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
             >
-              <li>Drag the background to pan.</li>
-              <li>Scroll or pinch to zoom.</li>
-              <li>Single-click a node to center the view on it.</li>
-              <li>Double-click a node to open their profile.</li>
-              <li>
-                <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
-              </li>
-            </ul>
+              <ul className="flex flex-col gap-1">
+                <li>Drag the background to pan.</li>
+                <li>Scroll or pinch to zoom.</li>
+                <li>Single-click a node to center the view on it.</li>
+                <li>Double-click a node to open their profile.</li>
+                <li>
+                  <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
+                </li>
+              </ul>
+              <button
+                type="button"
+                onClick={onReplayTour}
+                className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+              >
+                Replay guided tour
+              </button>
+            </div>
           )}
         </Panel>
         <Panel
