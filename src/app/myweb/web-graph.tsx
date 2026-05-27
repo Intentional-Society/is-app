@@ -71,6 +71,13 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
 // distinct from a 1-rated acquaintance without dominating the canvas.
 const edgeStrokeWidth = (value: number) => 1.5 + value * 1.25;
 
+// 1..4 → linear ramp from 0.4 to 0.8 over the theme foreground (so
+// ≈0.4/0.53/0.67/0.8). Reinforces the thickness signal without letting
+// the strongest edges read as full-black ink. Both light and dark
+// themes ride foreground, so each stays readable against its own
+// background.
+const edgeStrokeOpacity = (value: number) => 0.4 + ((value - 1) / 3) * 0.4;
+
 // Handles are required for ReactFlow to anchor edges; rendering both at
 // the same vertically-centered position with opacity 0 makes edges read
 // as center-to-center lines without showing connector dots.
@@ -87,8 +94,8 @@ function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
       <Avatar
         name={data.displayName}
         url={data.avatarUrl}
-        className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 ${
-          data.isCenter ? "border-primary" : "border-border"
+        className={`flex items-center justify-center overflow-hidden rounded-full border-2 ${
+          data.isCenter ? "h-16 w-16 border-primary" : "h-12 w-12 border-border"
         } bg-muted text-base font-semibold text-muted-foreground`}
       />
       <div className="max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
@@ -140,6 +147,8 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         source: e.relatorId,
         target: e.relateeId,
         style: {
+          stroke: "var(--color-canvas-foreground)",
+          strokeOpacity: edgeStrokeOpacity(e.value),
           strokeWidth: edgeStrokeWidth(e.value),
           cursor: isOutgoing ? "pointer" : "default",
         },
@@ -301,7 +310,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
   }
 
   return (
-    <div className="h-[500px] w-full rounded border border-border bg-background">
+    <div className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]">
       <ReactFlow
         nodes={nodes}
         edges={edges}
