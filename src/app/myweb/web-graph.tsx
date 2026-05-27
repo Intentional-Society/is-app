@@ -392,7 +392,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
          * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
          * is hidden — selection and connection are already disabled. */}
         <Controls position="top-left" showInteractive={false} />
-        <Panel position="bottom-right" className="flex items-end gap-2">
+        <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
           {/* Click-to-toggle (not hover) so the hints stay reachable on
            * touch devices where hover doesn't exist. */}
           <Button
@@ -414,6 +414,8 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
             >
               <li>Drag the background to pan.</li>
               <li>Scroll or pinch to zoom.</li>
+              <li>Single-click a node to center the view on it.</li>
+              <li>Double-click a node to open their profile.</li>
               <li>
                 <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
               </li>
