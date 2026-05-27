@@ -44,6 +44,8 @@ type SimNode = {
   id: string;
   x: number;
   y: number;
+  vx?: number;
+  vy?: number;
   fx?: number | null;
   fy?: number | null;
 };
@@ -290,6 +292,40 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     // origin via fx/fy, so forceCenter would only pull the other nodes
     // toward the pinned center, fighting the link-distance equilibrium
     // and causing them to bunch on top of the center.
+    //
+    // Custom force: gently push nodes off the segments of edges they
+    // don't belong to. Stock forceCollide handles node-on-node overlap
+    // but doesn't know about edges, so without this a node can settle
+    // straight on top of someone else's line. Scaled by alpha (d3's
+    // simulation "heat") so it fades as the layout cools.
+    const AVOID_THRESHOLD = 70;
+    const AVOID_STRENGTH = 0.7;
+    const forceAvoidEdges = (alpha: number) => {
+      for (const n of simNodes) {
+        for (const e of simEdges) {
+          const a = e.source as SimNode;
+          const b = e.target as SimNode;
+          if (n === a || n === b) continue;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len2 = dx * dx + dy * dy;
+          if (len2 < 1) continue;
+          // t = projection of n onto the line through a,b, clamped to
+          // [0,1] so the closest point stays on the segment.
+          let t = ((n.x - a.x) * dx + (n.y - a.y) * dy) / len2;
+          if (t < 0) t = 0;
+          else if (t > 1) t = 1;
+          const rx = n.x - (a.x + t * dx);
+          const ry = n.y - (a.y + t * dy);
+          const dist = Math.sqrt(rx * rx + ry * ry);
+          if (dist >= AVOID_THRESHOLD || dist < 0.001) continue;
+          const push = ((AVOID_THRESHOLD - dist) / AVOID_THRESHOLD) * AVOID_STRENGTH * alpha;
+          n.vx = (n.vx ?? 0) + (rx / dist) * push;
+          n.vy = (n.vy ?? 0) + (ry / dist) * push;
+        }
+      }
+    };
+
     const sim = forceSimulation(simNodes)
       .force("charge", forceManyBody().strength(-800))
       .force(
@@ -299,6 +335,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           .distance((link) => linkDistance(link.value)),
       )
       .force("collide", forceCollide(60))
+      .force("avoid-edges", forceAvoidEdges)
       .on("tick", () => {
         const now = performance.now();
         if (now - lastUpdate < FRAME_MS) return;
