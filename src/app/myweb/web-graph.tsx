@@ -84,10 +84,7 @@ const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
 function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
   return (
-    <div
-      className="flex flex-col items-center gap-1"
-      title={data.isCenter ? undefined : (data.displayName ?? undefined)}
-    >
+    <div className="flex cursor-pointer flex-col items-center gap-1" title={data.displayName ?? undefined}>
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
       <Avatar
@@ -323,7 +320,6 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_event, node) => {
-          if (node.data.isCenter) return;
           // Re-center the viewport on the clicked node so members can
           // explore the graph without navigating away. Double-click
           // navigates to the member's profile page.
@@ -333,7 +329,6 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           });
         }}
         onNodeDoubleClick={(_event, node) => {
-          if (node.data.isCenter) return;
           const slug = node.data.slug ?? node.data.id;
           router.push(`/members/${slug}`);
         }}
