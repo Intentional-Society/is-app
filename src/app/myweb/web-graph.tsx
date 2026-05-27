@@ -141,10 +141,48 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
 
 const edgeTypes = { numbered: NumberedEdge };
 
+const VIEW_STORAGE_KEY = "isweb-graph-view";
+
+// Permissive parser — any malformed/legacy payload falls back to the
+// default. Strict validation matters because the parsed shape feeds the
+// useQuery key and would otherwise produce a failing API request on
+// every mount.
+function parseStoredView(raw: string | null): SubgraphViewOptions | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "hops" in parsed &&
+      (parsed.hops === 1 || parsed.hops === 2)
+    ) {
+      return { hops: parsed.hops };
+    }
+  } catch {
+    // fall through to null
+  }
+  return null;
+}
+
 export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
   const [hintOpen, setHintOpen] = useState(false);
+
+  // Restore the user's last filter choice across reloads. Done in an
+  // effect rather than the useState initializer so SSR-rendered markup
+  // matches the hydrated client tree; the prefetched cache covers only
+  // the default view, so this triggers a single client refetch when the
+  // stored shape differs (placeholderData below suppresses the flash).
+  useEffect(() => {
+    const stored = parseStoredView(window.localStorage.getItem(VIEW_STORAGE_KEY));
+    if (stored && stored.hops !== DEFAULT_SUBGRAPH_VIEW.hops) setView(stored);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
+  }, [view]);
   // The view options become part of the query key so toggling refetches
   // automatically and the rating-mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
