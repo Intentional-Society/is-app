@@ -10,9 +10,11 @@ import { SigninForm } from "./signin-form";
 // Public page — opt back in to indexing (root layout is noindex by default).
 export const metadata: Metadata = { robots: { index: true, follow: true } };
 
+// Keys must match the error codes emitted by /auth/callback —
+// unknown codes silently render no message.
 const ERROR_MESSAGES: Record<string, string> = {
-  missing_code: "That sign-in link was incomplete. Please request a new one.",
-  exchange_failed:
+  missing_token: "That sign-in link was incomplete. Please request a new one.",
+  verify_failed:
     "That sign-in link couldn't be verified. It must be opened in the same browser where you requested it, and before it expires. Please request a new one.",
   profile_error: "We signed you in but couldn't finish setting up your profile. Please try again.",
   invite_invalid:
