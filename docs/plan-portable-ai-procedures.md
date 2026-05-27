@@ -86,7 +86,7 @@
 | **Acceptance** | Passes all 3 evals; body ≤500 lines; `## Depends on` footer matches spec §3 Anti-drift example; self-host check passes (the Skill can be used to commit changes to its own SKILL.md) |
 | **Effort** | 1–4h |
 | **Dependencies** | 7a.0 (tooling confirmed) |
-| **Risks** | Payload-protection refusal logic has many branches (6+ blocker categories) — evals may require multiple iterations; combined expand+contract refusal needs an explicit eval prompt |
+| **Risks** | Payload-protection refusal logic has many branches (6+ blocker categories) — evals may require multiple iterations; combined expand+contract refusal needs an explicit eval prompt; stash-safety needs explicit coverage: `/commit` and downstream `/ship` behavior must never use `git stash && <command>; git stash pop` or otherwise mutate the stash stack during verification — use `git status --short` / `git status --porcelain` and explicit diffs instead, and refuse with a manual commit-or-stash suggestion when branch switching would cross a dirty tree |
 | **Durable output / resume checkpoint** | `.claude/skills/commit/SKILL.md` exists with content; 3 eval prompts in `evals/evals.json`; tracker note: "7a.1 /commit ✓ [date]" |
 
 ### 7a.2 — Build `/pr`
