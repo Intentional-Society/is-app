@@ -232,7 +232,7 @@ All 7b edits share the same per-substep fields:
 
 **What to add during Phase 7a.3:** A concrete "while-you-wait" narration in Step 7 so the human is not surprised by the gate's latency. Suggested framing:
 
-> "The `forward-migrate-prod-schema-expansion` workflow pauses on a manual approval gate in the `prod-db` GitHub Actions environment before injecting production credentials. This gate can take minutes to hours depending on team availability. While waiting: surface the workflow run URL, the migration SQL preview, and the PR link so the human can find the approval button on GitHub. You will remain in a wait loop here — this is expected and normal."
+> "The `forward-migrate-prod-schema-expansion` workflow pauses on a manual approval gate in the `prod-db` GitHub Actions environment before injecting production credentials. This gate can take hours depending on team availability. While waiting: surface the workflow run URL, the migration SQL preview, and the PR link so the human can find the approval button on GitHub. You will remain in a wait loop here — this is expected and normal."
 
 **Acceptance:** Step 7 in the `/ship` body includes language that (a) names the `prod-db` approval gate explicitly, (b) gives a realistic latency expectation (minutes to hours), and (c) tells the human where to look while waiting. The spec text in §4.3 Step 7 is not modified — the SKILL.md body is the place for this implementation detail.
 
