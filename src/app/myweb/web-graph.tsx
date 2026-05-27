@@ -4,8 +4,12 @@ import "@xyflow/react/dist/style.css";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  BaseEdge,
   Controls,
   type Edge,
+  EdgeLabelRenderer,
+  type EdgeProps,
+  getStraightPath,
   Handle,
   type Node,
   type NodeProps,
@@ -101,6 +105,35 @@ function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
 
 const nodeTypes = { member: MemberNode };
 
+// Straight-line edge with an HTML circle label at the geometric midpoint
+// of the line between source and target. ReactFlow's default bezier
+// edges arc upward (both ends are Position.Top), so their parametric
+// midpoint sits above the visual line — using a straight edge keeps the
+// label on the line, and HTML labels (via EdgeLabelRenderer) give us a
+// real circular pill that an SVG <rect> can't.
+function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: EdgeProps<Edge<EdgeData>>) {
+  const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: "none",
+          }}
+          className="flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground"
+        >
+          {data?.value}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const edgeTypes = { numbered: NumberedEdge };
+
 export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
@@ -142,6 +175,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         id: `${e.relatorId}->${e.relateeId}`,
         source: e.relatorId,
         target: e.relateeId,
+        type: "numbered",
         style: {
           stroke: "var(--color-canvas-foreground)",
           strokeOpacity: edgeStrokeOpacity(e.value),
@@ -311,6 +345,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.15 }}
         onInit={(instance) => {
