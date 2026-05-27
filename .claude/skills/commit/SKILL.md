@@ -1,0 +1,183 @@
+---
+name: commit
+description: Stage, commit, and push the current local changes for the Intentional Society repo. Invoke explicitly as `/commit [issue-or-context]` to draft a Conventional Commit-style message, run the local `npm test` gate, surface a single bundled human approval block (message + staged payload + optional devjournal draft), and push the branch. Auto-creates a feature branch when invoked on `main`. Refuses suspicious payloads, combined expand+contract schema changes, and missing `gh` auth. This Skill fires only on explicit `/commit` invocation; natural-language phrasings ("commit this") are guidance for the reader, not triggers.
+disable-model-invocation: true
+---
+
+# /commit
+
+The leaf Skill in the commit → PR → ship chain. `/commit` is the only place changes leave the working tree; both `/pr` and `/ship` delegate here when the tree is dirty or HEAD is `main`.
+
+## Invocation
+
+`/commit [issue-or-context]`
+
+| Argument shape | Interpretation |
+|---|---|
+| *(none)* | Infer context from branch name and diff. |
+| `#<N>` or bare `<N>` | Treat as a GitHub issue number; resolve with `gh issue view <N>`. |
+| Any other text | Use as plain-language context for branch naming, issue-lookup hints, and commit-message draft. |
+
+Cache the argument for `/pr` and `/ship` in this session so chained invocations reuse the same context.
+
+Natural-language phrasings ("commit this for issue 142", "go ahead and commit") are guidance for the human reading this Skill, **not** triggers. With `disable-model-invocation: true`, this Skill fires only when the user types `/commit` explicitly.
+
+## Steps
+
+Run these in order. Each step's failure mode is in the Failure modes section below.
+
+1. **Parse the argument** and cache it for downstream Skills (`/pr`, `/ship`) in the same session.
+
+2. **Inspect working state.** Run `git status --short`, `git diff --name-status`, and `git diff --cached --name-status`. Inspect `git log origin/main..HEAD` for branch-history context.
+
+3. **Refuse if there's nothing to commit.** If there are no staged, unstaged, or untracked payload files, say "nothing to commit" and stop.
+
+4. **Auto-branch if HEAD is `main`.** Generate a slug `<N>-<short-summary>` (from `gh issue view <N>` when the argument is an issue) or `<short-summary>` from the diff. `git switch -c <branch>`. Never commit directly to `main`.
+
+5. **Build the proposed payload** from the current task context and changed files. Do not use `git add .` or `git add -A` — those sweep in everything in the working tree and defeat the point of a deliberate payload.
+
+6. **Apply the suspicious-file blocker check.** Refuse and surface the file(s) if any of the following match:
+
+   - `.env*` files (any environment file)
+   - Files matching common secret patterns (keys, tokens, credentials)
+   - Generated or build artifacts: `.next/`, `out/`, `build/`, `playwright-report/`, `test-results/`
+   - Lockfile changes (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) when the commit doesn't intentionally bump dependencies
+   - Files unrelated to the apparent task area
+   - Unexpectedly large files
+
+   On match, refuse, name the file(s), and ask the human for direction (e.g., "remove from payload," "yes this is intentional, please include," or "split into a separate commit").
+
+7. **Stage explicit paths.** `git add -- <paths>` for the approved files only. Never `git add .` or `git add -A`.
+
+8. **Verify staging.** Run `git diff --cached --name-status`. If nothing is staged, refuse with the reason.
+
+9. **Schema-change handling.** If the staged payload includes `src/server/schema.ts` or anything under `drizzle/`, identify the expand vs contract phase per `docs/strategy-committing.md`.
+
+   - **Refuse combined expand+contract payloads.** The two phases must ship as separate commits so deploy ordering can be preserved. Ask the human to split.
+   - **Expand-phase change.** In the eventual approval block, note that `npm run prod:db:expand` will need to be dispatched after PR creation (the dispatcher pauses on a maintainer approval gate in the `prod-db` environment before injecting prod credentials), and that the post-deploy `e2e.yml` run must pass before `/ship` merges.
+   - **Contract-phase change.** No dispatch needed; the migration runs in Vercel's production build per `vercel.json`.
+
+10. **Validate issue argument if present.** If the parsed argument looks like an issue, `gh issue view <N>` to confirm it exists and is open. **Fail fast and hard if `gh` is unavailable or unauthenticated** — suggest `gh auth login` / `gh auth status` as the next command.
+
+11. **Run the local gate.** `npm test`. All suites must pass. This is the only local gate; if it's slow or flaky, the fix is to `npm test` itself, not to skip it here.
+
+12. **Draft the commit message.** Use a Conventional Commit-style subject and the repo's structured body. First inspect `git log --oneline -20 origin/main` to follow the repo-observed style. Reference: https://www.conventionalcommits.org/en/v1.0.0/
+
+    **Subject:** `<type>[(scope)]: <imperative summary>`, ≤70 chars.
+
+    - Prefer repo-observed types: `feat`, `fix`, `a11y`, `test`, `docs`, `chore`. Use common CC types (`refactor`, `perf`, `ci`, `build`) when they fit.
+    - If several types apply, pick the dominant intent. If unclear, surface the chosen type in the approval block so the human can correct it.
+    - For breaking changes, add `!` before the colon and include a `BREAKING CHANGE:` footer that explains the compatibility impact. Surface this explicitly in the approval block.
+
+    **Body sections, in order:**
+
+    - `Summary:` — one sentence describing what the commit does.
+    - `Why:` — the motivation; the constraint, bug, request, or hypothesis that drove the change.
+    - `Behavior:` — the observable change (UI, API, schema, build, log output, etc.).
+    - `Test Plan:` — evidence the change works.
+
+    **Trailers, in order:**
+
+    - `Closes #N` for issues this commit resolves. `(#N)` for non-resolving references.
+    - AI co-author trailer (see protocol below).
+
+    **Test-plan provenance.** Every line in `Test Plan:` is either (a) a command the agent actually ran with captured output, (b) a verbatim human attestation ("Blake checked the new modal on mobile Safari, no clipping"), or (c) the single collapsed line `ran \`npm test\` locally` when the full suite was run with no surprises. Never invent test results. Fabrication is the failure mode this provenance rule exists to prevent.
+
+    **Test-plan formatting.** Use plain bullets (`- ran ...`), **not** Markdown task-list checkboxes (`- [ ]` / `- [x]`). The PR body becomes the durable merge commit message in this repo (`merge_commit_message: PR_BODY`), and unchecked task-list boxes look like outstanding work. If human-only verification remains, surface it as a pending action or reviewer note, not as completed test evidence. Don't add task-list checkboxes to commit messages or PR bodies unless they already come from the repo's PR template.
+
+13. **Draft a devjournal entry if a trigger fires.** Triggers list below. Default length: **1–2 sentences.** Expand only on explicit human confirmation. Never auto-write more than three sentences.
+
+14. **Human approval checkpoint — one bundled block.** Present all three together:
+
+    - The full commit message (subject, body, trailers).
+    - The exact staged payload: `git diff --cached --name-status`, the diffstat, and a list of any unstaged or untracked leftovers in the working tree.
+    - The devjournal draft, if any.
+
+    Wait for Y/n. Do not proceed without an explicit yes. After approval, run to completion through step 19.
+
+15. **Re-verify staging after approval.** Run `git diff --cached --name-status` again. If the staged set has changed between approval and commit (race with another tool, edited a file, etc.), stop and re-show the approval block.
+
+16. **Commit.** `git commit` with the message passed via a heredoc so multi-line formatting is preserved exactly.
+
+17. **Verify post-commit working tree.** `git status --short`. If unexpected changes remain (a hook modified files, a generated artifact reappeared, etc.), report them.
+
+18. **Push.** `git push -u origin <branch>` so the upstream is set on first push.
+
+19. **Report.** Print the commit SHA and the remote-tracking info (e.g., `branch impl/portable-ai-procedures set up to track origin/impl/portable-ai-procedures`).
+
+## Devjournal trigger list
+
+A devjournal entry exists to change other teammates' behavior. Skip it for purely internal changes.
+
+**Hard triggers — always draft:**
+
+- New or removed dependency in `package.json`.
+- New or changed required environment variable.
+- New required local setup step (new Docker service, new daemon, new auth flow).
+- CI or branch-protection change.
+- New `.claude/skills/<name>/` Skill added.
+- AI co-author trailer or commit-convention change.
+- Schema migration requiring multi-deploy timing.
+
+**Soft triggers — offer to draft; default skip unless human accepts:**
+
+- Security-relevant change (auth, permission boundary, session handling) not covered above.
+- Architectural decision affecting future code in the area.
+- Convention-changing refactor visible to anyone editing the area.
+
+**Don't trigger:**
+
+- Bug fixes.
+- Internal refactors with no API surface change.
+- Performance optimizations.
+- Test additions.
+- Doc typo fixes.
+- Internal renames.
+
+## AI co-author trailer protocol
+
+Every commit `/commit` writes includes an AI co-author trailer. This is required, not optional.
+
+- **Detection path (preferred).** When the agent can read its own model identity from runtime context, emit the canonical form:
+
+  `Co-Authored-By: <Model Name> <Version> <noreply@anthropic.com>`
+
+  Example: `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`.
+
+- **Fallback path (when detection fails).** Ask the human **once** for the attribution string. Emit:
+
+  `Co-Authored-By: <human-provided string> <noreply@unspecified>`
+
+  And append a one-line caveat to the commit body: `Note: AI co-author identity provided by human; auto-detection failed.`
+
+- **No multi-vendor matrix.** v1 is Claude-only. Don't try to recognize or emit non-Claude attribution.
+
+## Stash safety
+
+Do not use `git stash && <command>; git stash pop` to "test against a clean slate." `git stash` is a no-op when the tree is already clean — it does not push an empty marker — so the trailing `git stash pop` falls through to whatever was already on the stack, potentially applying leftover work from another branch. Read the current tree with `git status --short` / `git status --porcelain` and explicit diffs instead. If a branch switch would cross a dirty tree, refuse with a manual commit-or-stash suggestion to the human.
+
+## Failure modes
+
+- **No diff or branch identical to `main`.** Refuse; suggest the next command.
+- **Suspicious-file match in the blocker list.** Refuse; surface the file; await human direction.
+- **Combined expand+contract schema payload.** Refuse; ask the human to split into two commits.
+- **`gh` unavailable or unauthenticated** when issue lookup is needed. Refuse; name the command to run (`gh auth login` / `gh auth status`).
+- **`npm test` fails.** Refuse; show the failing test output.
+- **Schema touch with unresolved expand-vs-contract phase.** Refuse; ask which phase.
+- **Human rejects message draft, devjournal draft, or staged payload** at the approval checkpoint. Return to staging with the rejection reason captured.
+- **Staged payload changes between approval and commit.** Stop and re-show the approval block.
+- **Commit hook fails.** Report the hook's exit; do not retry without human input.
+- **Push fails.** Report the error; do not retry blindly.
+- **Never** use `--no-verify`, `--amend` without explicit human approval, force-push, `git add -A` / `git add .`, admin bypass, or invented attribution.
+
+## Depends on
+
+- `CLAUDE.md`
+- `package.json` (for `npm test`)
+- `docs/strategy-committing.md` (commit format, expand-contract phase rules, AI-trailer subsection, stash-safety note)
+- `docs/strategy-branching.md` (feature-branch-from-main rule)
+- `docs/doc-github.md` (GitHub settings, merge-commit-only, `merge_commit_message: PR_BODY`)
+- `docs/strategy-project-management.md` (issue → board automation; closing-keyword behavior)
+- `.github/workflows/ci.yml` (the gate the local `npm test` mirrors)
+- `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/ship` dispatches for expand changes)
+- `gh` CLI (issue lookup, authentication state)
