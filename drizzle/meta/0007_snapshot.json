@@ -1,5 +1,5 @@
 {
-  "id": "584c6f57-82e7-4f76-9ba1-95d436f0bbd0",
+  "id": "d6cccdc6-c2c0-4513-ae51-eb09128f4230",
   "prevId": "c93124e3-ba67-497b-8424-c64c3f45056a",
   "version": "7",
   "dialect": "postgresql",
@@ -345,6 +345,13 @@
           "notNull": true,
           "default": false
         },
+        "hidden": {
+          "name": "hidden",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "last_signed_agreements": {
           "name": "last_signed_agreements",
           "type": "timestamp with time zone",
@@ -359,18 +366,6 @@
         },
         "last_reviewed_programs": {
           "name": "last_reviewed_programs",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "current_intention": {
-          "name": "current_intention",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "intention_updated_at": {
-          "name": "intention_updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
