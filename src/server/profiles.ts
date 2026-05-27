@@ -377,6 +377,16 @@ export const setProfileHidden = async (params: {
   return { ok: true };
 };
 
+export const deactivateProfile = async (userId: string): Promise<{ ok: true } | { error: "not_found" }> => {
+  const result = await db
+    .update(profiles)
+    .set({ deactivatedAt: new Date() })
+    .where(eq(profiles.id, userId))
+    .returning({ id: profiles.id });
+  if (result.length === 0) return { error: "not_found" };
+  return { ok: true };
+};
+
 // Placeholder. Same rationale as getProfileForMember — admin tooling
 // will choose its own shape when it lands.
 export const getProfileForAdmin = async (): Promise<never> => {

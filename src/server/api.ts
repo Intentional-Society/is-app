@@ -17,6 +17,7 @@ import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
 import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
+  deactivateProfile,
   getProfileForMember,
   getProfileForSelf,
   getProfileForSelfWithProbe,
@@ -375,6 +376,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .put("/me/last-reviewed-programs", async (c) => {
     const user = c.get("user");
     await markProgramsReviewed(user.id);
+    return c.json({ ok: true });
+  })
+  .post("/me/deactivate", async (c) => {
+    const user = c.get("user");
+    const result = await deactivateProfile(user.id);
+    if ("error" in result) return c.json({ error: "profile not found" }, 404);
     return c.json({ ok: true });
   })
   .post("/me/avatar", async (c) => {
