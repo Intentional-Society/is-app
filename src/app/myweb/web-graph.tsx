@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  Controls,
   type Edge,
   Handle,
   type Node,
@@ -339,6 +340,10 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           });
         }}
       >
+        {/* Built-in +/-/fit-view buttons for users who can't or don't
+         * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+         * is hidden — selection and connection are already disabled. */}
+        <Controls showInteractive={false} />
         <Panel
           position="top-right"
           className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
