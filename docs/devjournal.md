@@ -6,7 +6,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-05-26 | Blake | Stash-pop antipattern callout in committing strategy
 
-Added a short note to `docs/strategy-committing.md` ("Before committing") warning against `git stash && X; git stash pop` as a verification idiom on a clean tree: `git stash` is silently a no-op when there's nothing to stash, so the trailing pop falls through to whatever was already on the stack. Surfaced during RCA #284 (Gap 4); resolves #287, replacing the issue's original broader stash-hygiene framing with this narrower antipattern callout (corrected on the issue in place; original framing preserved for audit). Companion note on #284 records the Gap 4 5-Whys refinement.
+Added a callout to `docs/strategy-committing.md` warning against `git stash && X; git stash pop` as a verification idiom on a clean tree: `git stash` is a no-op when there's nothing to stash, so the trailing pop falls through to whatever was already on the stack. Surfaced from RCA #284 (Gap 4). (#287)
 
 ## 2026-05-25 | James | Buttondown sync
 
