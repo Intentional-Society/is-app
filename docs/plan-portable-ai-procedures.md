@@ -123,6 +123,7 @@
 All 7b edits share the same per-substep fields:
 - **Effort:** < 1h per file
 - **Dependencies:** Phase 7a complete (wording can reference Skill names and paths as they actually exist)
+- **Acceptance:** Policy-doc additions are brief, practical, and easy to follow for the intended audience; avoid verbosity unless the added detail materially improves correct use.
 - **Risks:** Target sections may have evolved since the spec was written — re-read each file before editing to find the right insertion point
 - **Resume checkpoint:** `git diff --stat` shows which files have been touched; the table below serves as a per-file checklist; mark each ✓ in tracker Resume notes as completed
 
