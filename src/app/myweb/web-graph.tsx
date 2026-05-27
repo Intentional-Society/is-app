@@ -4,7 +4,12 @@ import "@xyflow/react/dist/style.css";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  BaseEdge,
+  Controls,
   type Edge,
+  EdgeLabelRenderer,
+  type EdgeProps,
+  getStraightPath,
   Handle,
   type Node,
   type NodeProps,
@@ -18,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 import { isRelationValue } from "@/lib/relation-value";
@@ -38,6 +44,8 @@ type SimNode = {
   id: string;
   x: number;
   y: number;
+  vx?: number;
+  vy?: number;
   fx?: number | null;
   fy?: number | null;
 };
@@ -45,6 +53,7 @@ type SimNode = {
 type SimEdge = {
   source: string | SimNode;
   target: string | SimNode;
+  value: number;
 };
 
 type EdgeData = {
@@ -57,7 +66,6 @@ type EdgeData = {
 const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   const res = await apiClient.api.relations.subgraph.$get({
     query: {
-      in: opts.includeIncoming ? "true" : "false",
       hops: String(opts.hops),
     },
   });
@@ -69,6 +77,19 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
 // distinct from a 1-rated acquaintance without dominating the canvas.
 const edgeStrokeWidth = (value: number) => 1.5 + value * 1.25;
 
+// 1..4 → spring rest-length for the d3-force link constraint. Stronger
+// relations want to sit closer (230 → 110 across the range). Charge,
+// collide, and other-link tensions still resolve the layout, so this
+// biases without ranking nodes strictly by edge weight.
+const linkDistance = (value: number) => 270 - value * 40;
+
+// 1..4 → linear ramp from 0.4 to 0.8 over the theme foreground (so
+// ≈0.4/0.53/0.67/0.8). Reinforces the thickness signal without letting
+// the strongest edges read as full-black ink. Both light and dark
+// themes ride foreground, so each stays readable against its own
+// background.
+const edgeStrokeOpacity = (value: number) => 0.4 + ((value - 1) / 3) * 0.4;
+
 // Handles are required for ReactFlow to anchor edges; rendering both at
 // the same vertically-centered position with opacity 0 makes edges read
 // as center-to-center lines without showing connector dots.
@@ -76,17 +97,14 @@ const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
 function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
   return (
-    <div
-      className="flex flex-col items-center gap-1"
-      title={data.isCenter ? undefined : (data.displayName ?? undefined)}
-    >
+    <div className="flex cursor-pointer flex-col items-center gap-1" title={data.displayName ?? undefined}>
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
       <Avatar
         name={data.displayName}
         url={data.avatarUrl}
-        className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 ${
-          data.isCenter ? "border-primary" : "border-border"
+        className={`flex items-center justify-center overflow-hidden rounded-full border-2 ${
+          data.isCenter ? "h-16 w-16 border-primary" : "h-12 w-12 border-border"
         } bg-muted text-base font-semibold text-muted-foreground`}
       />
       <div className="max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
@@ -96,9 +114,77 @@ function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
 
 const nodeTypes = { member: MemberNode };
 
+// Straight-line edge with an HTML circle label at the geometric midpoint
+// of the line between source and target. ReactFlow's default bezier
+// edges arc upward (both ends are Position.Top), so their parametric
+// midpoint sits above the visual line — using a straight edge keeps the
+// label on the line, and HTML labels (via EdgeLabelRenderer) give us a
+// real circular pill that an SVG <rect> can't.
+function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: EdgeProps<Edge<EdgeData>>) {
+  const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: "none",
+          }}
+          className="flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground"
+        >
+          {data?.value}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const edgeTypes = { numbered: NumberedEdge };
+
+const VIEW_STORAGE_KEY = "isweb-graph-view";
+
+// Permissive parser — any malformed/legacy payload falls back to the
+// default. Strict validation matters because the parsed shape feeds the
+// useQuery key and would otherwise produce a failing API request on
+// every mount.
+function parseStoredView(raw: string | null): SubgraphViewOptions | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "hops" in parsed &&
+      (parsed.hops === 1 || parsed.hops === 2)
+    ) {
+      return { hops: parsed.hops };
+    }
+  } catch {
+    // fall through to null
+  }
+  return null;
+}
+
 export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
+  const [hintOpen, setHintOpen] = useState(false);
+
+  // Restore the user's last filter choice across reloads. Done in an
+  // effect rather than the useState initializer so SSR-rendered markup
+  // matches the hydrated client tree; the prefetched cache covers only
+  // the default view, so this triggers a single client refetch when the
+  // stored shape differs (placeholderData below suppresses the flash).
+  useEffect(() => {
+    const stored = parseStoredView(window.localStorage.getItem(VIEW_STORAGE_KEY));
+    if (stored && stored.hops !== DEFAULT_SUBGRAPH_VIEW.hops) setView(stored);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
+  }, [view]);
   // The view options become part of the query key so toggling refetches
   // automatically and the rating-mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
@@ -136,7 +222,10 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         id: `${e.relatorId}->${e.relateeId}`,
         source: e.relatorId,
         target: e.relateeId,
+        type: "numbered",
         style: {
+          stroke: "var(--color-canvas-foreground)",
+          strokeOpacity: edgeStrokeOpacity(e.value),
           strokeWidth: edgeStrokeWidth(e.value),
           cursor: isOutgoing ? "pointer" : "default",
         },
@@ -173,6 +262,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     const simEdges: SimEdge[] = data.edges.map((e) => ({
       source: e.relatorId,
       target: e.relateeId,
+      value: e.value,
     }));
 
     setNodes(
@@ -202,15 +292,50 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     // origin via fx/fy, so forceCenter would only pull the other nodes
     // toward the pinned center, fighting the link-distance equilibrium
     // and causing them to bunch on top of the center.
+    //
+    // Custom force: gently push nodes off the segments of edges they
+    // don't belong to. Stock forceCollide handles node-on-node overlap
+    // but doesn't know about edges, so without this a node can settle
+    // straight on top of someone else's line. Scaled by alpha (d3's
+    // simulation "heat") so it fades as the layout cools.
+    const AVOID_THRESHOLD = 70;
+    const AVOID_STRENGTH = 0.7;
+    const forceAvoidEdges = (alpha: number) => {
+      for (const n of simNodes) {
+        for (const e of simEdges) {
+          const a = e.source as SimNode;
+          const b = e.target as SimNode;
+          if (n === a || n === b) continue;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len2 = dx * dx + dy * dy;
+          if (len2 < 1) continue;
+          // t = projection of n onto the line through a,b, clamped to
+          // [0,1] so the closest point stays on the segment.
+          let t = ((n.x - a.x) * dx + (n.y - a.y) * dy) / len2;
+          if (t < 0) t = 0;
+          else if (t > 1) t = 1;
+          const rx = n.x - (a.x + t * dx);
+          const ry = n.y - (a.y + t * dy);
+          const dist = Math.sqrt(rx * rx + ry * ry);
+          if (dist >= AVOID_THRESHOLD || dist < 0.001) continue;
+          const push = ((AVOID_THRESHOLD - dist) / AVOID_THRESHOLD) * AVOID_STRENGTH * alpha;
+          n.vx = (n.vx ?? 0) + (rx / dist) * push;
+          n.vy = (n.vy ?? 0) + (ry / dist) * push;
+        }
+      }
+    };
+
     const sim = forceSimulation(simNodes)
       .force("charge", forceManyBody().strength(-800))
       .force(
         "link",
         forceLink<SimNode, SimEdge>(simEdges)
           .id((d) => d.id)
-          .distance(180),
+          .distance((link) => linkDistance(link.value)),
       )
       .force("collide", forceCollide(60))
+      .force("avoid-edges", forceAvoidEdges)
       .on("tick", () => {
         const now = performance.now();
         if (now - lastUpdate < FRAME_MS) return;
@@ -298,11 +423,12 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
   }
 
   return (
-    <div className="h-[500px] w-full rounded border border-border bg-background">
+    <div className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.15 }}
         onInit={(instance) => {
@@ -312,7 +438,6 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_event, node) => {
-          if (node.data.isCenter) return;
           // Re-center the viewport on the clicked node so members can
           // explore the graph without navigating away. Double-click
           // navigates to the member's profile page.
@@ -322,7 +447,6 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           });
         }}
         onNodeDoubleClick={(_event, node) => {
-          if (node.data.isCenter) return;
           const slug = node.data.slug ?? node.data.id;
           router.push(`/members/${slug}`);
         }}
@@ -339,18 +463,44 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           });
         }}
       >
+        {/* Built-in +/-/fit-view buttons for users who can't or don't
+         * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+         * is hidden — selection and connection are already disabled. */}
+        <Controls position="top-left" showInteractive={false} />
+        <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+          {/* Click-to-toggle (not hover) so the hints stay reachable on
+           * touch devices where hover doesn't exist. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+            aria-expanded={hintOpen}
+            aria-controls="web-graph-hints"
+            onClick={() => setHintOpen((h) => !h)}
+            className="rounded-full border border-border bg-background/90 font-bold"
+          >
+            ?
+          </Button>
+          {hintOpen && (
+            <ul
+              id="web-graph-hints"
+              className="flex max-w-[18rem] flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+            >
+              <li>Drag the background to pan.</li>
+              <li>Scroll or pinch to zoom.</li>
+              <li>Single-click a node to center the view on it.</li>
+              <li>Double-click a node to open their profile.</li>
+              <li>
+                <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
+              </li>
+            </ul>
+          )}
+        </Panel>
         <Panel
           position="top-right"
           className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
         >
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={view.includeIncoming}
-              onChange={(e) => setView((v) => ({ ...v, includeIncoming: e.target.checked }))}
-            />
-            Show incoming
-          </label>
           <label className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"

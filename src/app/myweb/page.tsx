@@ -16,15 +16,14 @@ export default async function MyWebPage() {
   // Prefetch the default-view subgraph and dehydrate it into the client
   // QueryClient via HydrationBoundary, so WebGraph's useQuery hits a
   // warm cache on mount instead of doing a post-hydration roundtrip.
-  // Toggling Show-incoming or 2-hops still falls through to a client
-  // fetch (those view variants aren't prefetched).
+  // Toggling 2-hops still falls through to a client fetch (that view
+  // variant isn't prefetched).
   const queryClient = new QueryClient();
   await queryClient.prefetchQuery({
     queryKey: [...RELATION_SUBGRAPH_QUERY_KEY, DEFAULT_SUBGRAPH_VIEW],
     queryFn: async () => {
       const res = await serverApiClient.api.relations.subgraph.$get({
         query: {
-          in: DEFAULT_SUBGRAPH_VIEW.includeIncoming ? "true" : "false",
           hops: String(DEFAULT_SUBGRAPH_VIEW.hops),
         },
       });
