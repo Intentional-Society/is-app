@@ -49,7 +49,7 @@ export function DeactivateAccountForm() {
         <Button variant="destructive" disabled={busy} onClick={handleDeactivate}>
           {busy ? "Deactivating…" : "Yes, deactivate my account"}
         </Button>
-        <Button variant="outline" disabled={busy} onClick={() => setConfirming(false)}>
+        <Button variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>
           Cancel
         </Button>
       </div>
