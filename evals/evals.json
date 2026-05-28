@@ -61,6 +61,27 @@
           "prompt": "/pr",
           "preconditions": "On a feature branch with no open PR; tree clean; the branch contains a single commit that removes a public API field (a breaking change); gh authenticated; `origin/main` has not advanced (rebase no-op).",
           "expected_output": "Skill runs `gh auth status`, confirms tree clean, fetch, no-op rebase, no-op re-test, push, then drafts a CC-format title with the breaking-change flag — e.g., `feat!: remove deprecated profile.legacyId field` (≤70 chars). Body includes the `Summary:` / `Why:` / `Behavior:` / `Test Plan:` sections and a `BREAKING CHANGE:` footer explaining the compatibility impact. Surfaces the breaking-change classification in the approval prompt so the human can confirm before `gh pr create`."
+        },
+        {
+          "id": "pr-5-reviewer-cold-cache-numeric-pick",
+          "eval_name": "reviewer-cold-cache-numeric-pick-happy-path",
+          "prompt": "/pr",
+          "preconditions": "On a feature branch with a single commit and no open PR; tree clean; `origin/main` not advanced (rebase no-op); gh authenticated; `.claude/skills/pr/.team-cache.json` does not exist (cold cache); the repo has 5 human collaborators after bot-filtering.",
+          "expected_output": "Skill runs Steps 1-8 normally. At Step 9, detects no cache and fires the three cold-cache fetches in parallel: `gh api repos/<owner>/<repo>/collaborators`, `gh api user`, and parallel `gh api users/<login>` for display names. Applies the bot filter to the collaborator list before writing `.claude/skills/pr/.team-cache.json` with `collaborators`, `displayNames`, `self`, `refreshedAt`. Renders the vertical picker sorted alphabetically by display name (case-insensitive), with `self` excluded and entries numbered in sort order. The rendered picker MUST NOT contain `[xN]` count markers, 'Frequent reviewers' or 'Other collaborators' tier headers, or any sort key derived from past review/author activity. Human types `1 3`; Skill resolves to the two corresponding logins, echoes `→ Requesting review from <login1>, <login3>. Proceeding.`, presents the bundled approval block (title + body + resolved reviewers), and on approval runs `gh pr create --reviewer <login1>,<login3>` (no `@`, no spaces inside the value)."
+        },
+        {
+          "id": "pr-6-reviewer-warm-cache-natural-language",
+          "eval_name": "reviewer-warm-cache-natural-language-resolution",
+          "prompt": "/pr",
+          "preconditions": "On a feature branch with a single commit and no open PR; tree clean; `origin/main` not advanced (rebase no-op); gh authenticated; `.claude/skills/pr/.team-cache.json` exists, `refreshedAt` is 3 days old (well within 15-day TTL), `collaborators` includes both `james-baker` (displayName: `James Baker`) and `benjifriedman` (displayName: `Benji Friedman`), `self` is the running human's login.",
+          "expected_output": "Skill reads the cache without firing any `gh api` calls. Renders the vertical picker sorted alphabetically by display name with `self` excluded. The rendered picker MUST NOT contain `[xN]` count markers, 'Frequent reviewers' or 'Other collaborators' tier headers, or any sort key derived from past review/author activity. Human types `james and benji`; Skill matches against the cached `displayNames` dictionary, resolves unambiguously to `[james-baker, benjifriedman]`, asks no clarifying question, echoes `→ Requesting review from james-baker, benjifriedman. Proceeding.`, and on approval runs `gh pr create --reviewer james-baker,benjifriedman`. No cache write occurs during this run."
+        },
+        {
+          "id": "pr-7-reviewer-rejection-refresh-and-reask",
+          "eval_name": "reviewer-gh-rejection-triggers-cache-refresh-and-reask",
+          "prompt": "/pr",
+          "preconditions": "On a feature branch with a single commit and no open PR; tree clean; `origin/main` not advanced (rebase no-op); gh authenticated; `.claude/skills/pr/.team-cache.json` exists with `refreshedAt` 5 days old (within TTL) and contains a login `formerteam` that has since been removed from the repo's collaborator list on GitHub.",
+          "expected_output": "Skill reads the cache, renders the picker including `formerteam`. Human picks the number corresponding to `formerteam`. Skill echoes `→ Requesting review from formerteam. Proceeding.` and calls `gh pr create --reviewer formerteam`. gh returns a reviewer-invalid error. Skill catches the error, surfaces the exact `gh` error text to the human, refreshes the team cache via the same three cold-cache fetches (after which `formerteam` no longer appears in `collaborators`), re-renders the picker with the refreshed list, and re-asks for a reviewer pick. Does NOT retry `gh pr create` with the same input. No PR is created until the re-asked picker resolves to a valid set; on the re-asked pick, `gh pr create --reviewer <valid-login>` runs and the PR opens."
         }
       ]
     },
