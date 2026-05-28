@@ -52,24 +52,33 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   // Bumped on replay so Joyride fully unmounts/remounts — toggling
   // `run` alone doesn't reliably reset stepIndex back to 0.
   const [tourKey, setTourKey] = useState(0);
+  // Bumped after a successful relation so the tour advances past the
+  // "click anyone here" step automatically.
+  const [tourAdvanceToken, setTourAdvanceToken] = useState(0);
   useEffect(() => {
     if (initialLastUpdatedWeb !== null) return;
     if (window.sessionStorage.getItem(TOUR_DISMISSED_KEY) === "1") return;
     setTourRun(true);
   }, [initialLastUpdatedWeb]);
   const markDone = useMarkDone(() => setMode("view"));
-  // If a user clicks the highlighted Done button mid-tour, hide the
-  // tour rather than leaving the tooltip floating over View mode.
-  useEffect(() => {
-    if (markDone.isSuccess) setTourRun(false);
-  }, [markDone.isSuccess]);
 
   const dismissTour = () => {
     setTourRun(false);
     window.sessionStorage.setItem(TOUR_DISMISSED_KEY, "1");
   };
 
+  // Done is the tour's intended finisher — close the tour synchronously
+  // on click so the tooltip doesn't linger while the mutation runs.
+  const handleDoneClick = () => {
+    dismissTour();
+    markDone.mutate();
+  };
+
   const replayTour = () => {
+    // The tour spotlights edit-mode UI (the suggestion feed, the Done
+    // button); ensure we're in edit mode before it starts, otherwise
+    // those targets don't exist on the page.
+    setMode("edit");
     window.sessionStorage.removeItem(TOUR_DISMISSED_KEY);
     setTourKey((k) => k + 1);
     setTourRun(true);
@@ -89,7 +98,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
               variant="secondary"
               data-tour="done-button"
               disabled={markDone.isPending}
-              onClick={() => markDone.mutate()}
+              onClick={handleDoneClick}
             >
               {markDone.isPending ? "Saving…" : "Done"}
             </Button>
@@ -110,8 +119,14 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
         )}
       </div>
 
-      <RelatingDialog target={relatingTarget} onClose={() => setRelatingTarget(null)} />
-      <WelcomeTour key={tourKey} run={tourRun} onClose={dismissTour} />
+      <RelatingDialog
+        target={relatingTarget}
+        onClose={() => setRelatingTarget(null)}
+        onRelated={() => {
+          if (tourRun) setTourAdvanceToken((t) => t + 1);
+        }}
+      />
+      <WelcomeTour key={tourKey} run={tourRun} advanceToken={tourAdvanceToken} onClose={dismissTour} />
     </div>
   );
 }

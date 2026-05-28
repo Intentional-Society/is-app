@@ -21,9 +21,13 @@ export type RelatingTarget = {
 type Props = {
   target: RelatingTarget | null;
   onClose: () => void;
+  // Fires only after a relation is successfully committed. Used by
+  // /myweb to advance the welcome tour once the user completes the
+  // "add people" step's action.
+  onRelated?: () => void;
 };
 
-export function RelatingDialog({ target, onClose }: Props) {
+export function RelatingDialog({ target, onClose, onRelated }: Props) {
   const queryClient = useQueryClient();
   const [pendingValue, setPendingValue] = useState<RelationValue | null>(null);
 
@@ -78,6 +82,7 @@ export function RelatingDialog({ target, onClose }: Props) {
         onSuccess: () => {
           setPendingValue(null);
           onClose();
+          onRelated?.();
         },
         onError: () => {
           setPendingValue(null);

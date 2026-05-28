@@ -429,7 +429,10 @@ export function WebGraph({
   }
 
   return (
-    <div className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]">
+    <div
+      data-tour="graph"
+      className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -504,7 +507,10 @@ export function WebGraph({
               </ul>
               <button
                 type="button"
-                onClick={onReplayTour}
+                onClick={() => {
+                  setHintOpen(false);
+                  onReplayTour();
+                }}
                 className="self-start text-foreground underline underline-offset-2 hover:text-primary"
               >
                 Replay guided tour
