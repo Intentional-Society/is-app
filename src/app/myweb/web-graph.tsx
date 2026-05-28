@@ -97,17 +97,23 @@ const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
 function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
   return (
-    <div className="flex cursor-pointer flex-col items-center gap-1" title={data.displayName ?? undefined}>
+    // pointer-events-none on the wrapper + the !pointer-events-none
+    // override on .react-flow__node (set per-node above) means only the
+    // Avatar (pointer-events-auto + clip-path:circle) is a click
+    // target. The name renders in flow below the avatar so the wrapper
+    // bounding box covers the full visible node, but its
+    // pointer-events-none keeps clicks on the name inert.
+    <div className="pointer-events-none flex flex-col items-center gap-1">
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
       <Avatar
         name={data.displayName}
         url={data.avatarUrl}
-        className={`flex items-center justify-center overflow-hidden rounded-full border-2 ${
+        className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] transition-transform duration-150 hover:scale-110 ${
           data.isCenter ? "h-16 w-16 border-primary" : "h-12 w-12 border-border"
         } bg-muted text-base font-semibold text-muted-foreground`}
       />
-      <div className="max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
+      <div className="pointer-events-none max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
     </div>
   );
 }
@@ -253,7 +259,6 @@ export function WebGraph({
           stroke: "var(--color-canvas-foreground)",
           strokeOpacity: edgeStrokeOpacity(e.value),
           strokeWidth: edgeStrokeWidth(e.value),
-          cursor: isOutgoing ? "pointer" : "default",
         },
         data: {
           isOutgoing,
@@ -300,6 +305,11 @@ export function WebGraph({
           position: { x: sn?.x ?? 0, y: sn?.y ?? 0 },
           data: { ...n, isCenter: n.id === centerId },
           draggable: true,
+          // Override ReactFlow's default ".react-flow__node{pointer-events: all}"
+          // so only the Avatar (pointer-events-auto + clip-path:circle) is a
+          // click target. The corners around the round avatar no longer count
+          // as the node, so clicking outside the circle doesn't fire onNodeClick.
+          className: "!pointer-events-none",
         };
       }),
     );
@@ -479,18 +489,6 @@ export function WebGraph({
           onNodeDoubleClick={(_event, node) => {
             const slug = node.data.slug ?? node.data.id;
             router.push(`/members/${slug}`);
-          }}
-          onEdgeClick={(_event, edge) => {
-            // Re-rate is only available on edges I authored. Incoming-only
-            // edges (someone else rated me, I haven't reciprocated) route
-            // through the suggestion feed instead.
-            const data = edge.data as EdgeData | undefined;
-            if (!data?.isOutgoing) return;
-            onOpenRelating({
-              id: data.relateeId,
-              displayName: data.relateeName,
-              currentValue: isRelationValue(data.value) ? data.value : null,
-            });
           }}
         >
           {/* Built-in +/-/fit-view buttons for users who can't or don't
