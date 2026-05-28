@@ -50,10 +50,7 @@ export const setAdminStatus = async (
   // docs/strategy-db-transactions.md), so two concurrent demotions could
   // theoretically both pass. Acceptable given IS's small, trusted admin set.
   if (!isAdmin && target.isAdmin) {
-    const [{ adminCount }] = await db
-      .select({ adminCount: count() })
-      .from(profiles)
-      .where(eq(profiles.isAdmin, true));
+    const [{ adminCount }] = await db.select({ adminCount: count() }).from(profiles).where(eq(profiles.isAdmin, true));
     if (adminCount <= 1) return { error: "last_admin" };
   }
 

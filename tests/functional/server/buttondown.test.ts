@@ -230,9 +230,7 @@ describe("createButtondownClient", () => {
   describe("deleteSubscriber", () => {
     it("DELETEs and returns void on success when write=true", async () => {
       // 204 No Content responses must have a null body; build directly.
-      const fetcher = vi.fn<typeof fetch>(async () =>
-        Promise.resolve(new Response(null, { status: 204 })),
-      );
+      const fetcher = vi.fn<typeof fetch>(async () => Promise.resolve(new Response(null, { status: 204 })));
       const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
 
       const result = await client.deleteSubscriber("sub_abc123");
@@ -244,9 +242,7 @@ describe("createButtondownClient", () => {
     });
 
     it("returns a DryRunOutcome and makes no network call when write=false", async () => {
-      const fetcher = vi.fn<typeof fetch>(async () =>
-        Promise.resolve(new Response(null, { status: 204 })),
-      );
+      const fetcher = vi.fn<typeof fetch>(async () => Promise.resolve(new Response(null, { status: 204 })));
       const client = createButtondownClient({ apiKey: "k", write: false, fetcher });
 
       const result = await client.deleteSubscriber("sub_abc123");
@@ -366,18 +362,18 @@ describe("createButtondownClient", () => {
     it("createSubscriber refuses a reserved-TLD email without calling fetch", async () => {
       const fetcher = mockFetch(201, sampleSubscriber);
       const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
-      await expect(
-        client.createSubscriber({ email_address: "x@example.test", tags: [] }),
-      ).rejects.toBeInstanceOf(ButtondownApiError);
+      await expect(client.createSubscriber({ email_address: "x@example.test", tags: [] })).rejects.toBeInstanceOf(
+        ButtondownApiError,
+      );
       expect(fetcher).not.toHaveBeenCalled();
     });
 
     it("updateSubscriber refuses an email patch with a reserved TLD without calling fetch", async () => {
       const fetcher = mockFetch(200, sampleSubscriber);
       const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
-      await expect(
-        client.updateSubscriber("sub_abc123", { email_address: "x@some.invalid" }),
-      ).rejects.toBeInstanceOf(ButtondownApiError);
+      await expect(client.updateSubscriber("sub_abc123", { email_address: "x@some.invalid" })).rejects.toBeInstanceOf(
+        ButtondownApiError,
+      );
       expect(fetcher).not.toHaveBeenCalled();
     });
 

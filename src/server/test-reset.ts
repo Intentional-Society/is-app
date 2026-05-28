@@ -121,7 +121,10 @@ export const resetE2EUsers = async (): Promise<{
   console.log(
     `[probe-149] route=reset users=${users.length} updatedIds=${JSON.stringify(updatedIds)} ` +
       profilesAfter
-        .map((p) => `${p.email}=${JSON.stringify(p.rows.map((r) => ({ ctid: r.ctid, xmin: r.xmin, bio: r.bio, inRecovery: r.inRecovery, serverAddr: r.serverAddr, backendPid: r.backendPid })))}`)
+        .map(
+          (p) =>
+            `${p.email}=${JSON.stringify(p.rows.map((r) => ({ ctid: r.ctid, xmin: r.xmin, bio: r.bio, inRecovery: r.inRecovery, serverAddr: r.serverAddr, backendPid: r.backendPid })))}`,
+        )
         .join(" "),
   );
 

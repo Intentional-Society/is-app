@@ -8,11 +8,7 @@
 // See docs/design-buttondown.md Appendix A for the canonical probe
 // table this module implements.
 
-import {
-  ButtondownApiError,
-  type ButtondownClient,
-  type ButtondownSubscriber,
-} from "@/server/buttondown";
+import { ButtondownApiError, type ButtondownClient, type ButtondownSubscriber } from "@/server/buttondown";
 
 // Username of the Buttondown newsletter every test-related
 // operator action must resolve to. `assertTestNewsletter` calls

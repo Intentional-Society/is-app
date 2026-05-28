@@ -16,8 +16,8 @@
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import {
-  type ButtondownClient,
   ButtondownApiError,
+  type ButtondownClient,
   type ButtondownSubscriber,
   isDryRunOutcome,
   isReservedTestEmail,
@@ -63,10 +63,7 @@ export const runFirstProfileSaveSync = async (params: {
   // Buttondown row spun up on their behalf, even if they exist in
   // the app. (Tag updates for already-existing subscribers still run
   // below.) One row read, fine on the first-save fast path.
-  const [profileRow] = await db
-    .select({ hidden: profiles.hidden })
-    .from(profiles)
-    .where(eq(profiles.id, profileId));
+  const [profileRow] = await db.select({ hidden: profiles.hidden }).from(profiles).where(eq(profiles.id, profileId));
   const hidden = profileRow?.hidden ?? false;
 
   // This profile's current tagged-program memberships — same shape
@@ -100,10 +97,7 @@ export const runFirstProfileSaveSync = async (params: {
       tags: [...desiredTags, "isweb-member", "new"],
     });
     if (!isDryRunOutcome(result)) {
-      await db
-        .update(profiles)
-        .set({ buttondownSubscriberId: result.id })
-        .where(eq(profiles.id, profileId));
+      await db.update(profiles).set({ buttondownSubscriberId: result.id }).where(eq(profiles.id, profileId));
     }
     return;
   }
@@ -111,10 +105,7 @@ export const runFirstProfileSaveSync = async (params: {
   // Record the discovered id immediately — every "found subscriber"
   // branch below benefits from future runs using id-based lookup,
   // even the no-op "already has isweb-member" case.
-  await db
-    .update(profiles)
-    .set({ buttondownSubscriberId: subscriber.id })
-    .where(eq(profiles.id, profileId));
+  await db.update(profiles).set({ buttondownSubscriberId: subscriber.id }).where(eq(profiles.id, profileId));
 
   if (subscriber.type === "unsubscribed") {
     params.raiseUnsubscribeAlert?.({
@@ -158,7 +149,7 @@ export const classifyError = (err: unknown): SyncErrorKind => {
 
 /** Structured event the sync emits to the caller's logger. */
 export type SyncLogEvent =
-  | { action: "summary"; runId: string } & Omit<SyncRunSummary, "runId" | "write">
+  | ({ action: "summary"; runId: string } & Omit<SyncRunSummary, "runId" | "write">)
   | { action: "subscriber-created"; runId: string; profileId: string; subscriberId: string | null; dryRun: boolean }
   | {
       action: "tags-updated";
@@ -169,7 +160,15 @@ export type SyncLogEvent =
       removed: string[];
       dryRun: boolean;
     }
-  | { action: "email-updated"; runId: string; profileId: string; subscriberId: string; from: string; to: string; dryRun: boolean }
+  | {
+      action: "email-updated";
+      runId: string;
+      profileId: string;
+      subscriberId: string;
+      from: string;
+      to: string;
+      dryRun: boolean;
+    }
   | { action: "unsubscribe-alert"; runId: string; profileId: string; email: string; programSlugsHeld: string[] }
   | { action: "skipped-missing-email"; runId: string; profileId: string }
   | { action: "skipped-already-current"; runId: string; profileId: string; subscriberId: string }
@@ -266,14 +265,8 @@ const buildManagedUniverse = async (): Promise<Set<string>> => {
 // Used by per-member resync paths (future admin "sync this member"
 // button) and by tests, so the broad reconciler doesn't act outside
 // its caller's intended blast radius.
-const loadCurrentTaggedMemberships = async (
-  scopeProfileIds?: string[],
-): Promise<ProfileMembership[]> => {
-  const conditions = [
-    isNull(profilePrograms.leftAt),
-    isNull(programs.archivedAt),
-    isNotNull(programs.buttondownTag),
-  ];
+const loadCurrentTaggedMemberships = async (scopeProfileIds?: string[]): Promise<ProfileMembership[]> => {
+  const conditions = [isNull(profilePrograms.leftAt), isNull(programs.archivedAt), isNotNull(programs.buttondownTag)];
   if (scopeProfileIds) {
     if (scopeProfileIds.length === 0) return [];
     conditions.push(inArray(profilePrograms.profileId, scopeProfileIds));
@@ -288,8 +281,9 @@ const loadCurrentTaggedMemberships = async (
     .innerJoin(programs, eq(programs.id, profilePrograms.programId))
     .where(and(...conditions))
     .then((rows) =>
-      rows
-        .filter((r): r is { profileId: string; programSlug: string; buttondownTag: string } => r.buttondownTag !== null),
+      rows.filter(
+        (r): r is { profileId: string; programSlug: string; buttondownTag: string } => r.buttondownTag !== null,
+      ),
     );
 };
 
@@ -353,10 +347,7 @@ const reconcileTags = (
 };
 
 const recordSubscriberId = async (profileId: string, subscriberId: string): Promise<void> => {
-  await db
-    .update(profiles)
-    .set({ buttondownSubscriberId: subscriberId })
-    .where(eq(profiles.id, profileId));
+  await db.update(profiles).set({ buttondownSubscriberId: subscriberId }).where(eq(profiles.id, profileId));
 };
 
 /**
@@ -603,11 +594,7 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
     return;
   }
 
-  const { finalTags, added, removed, changed } = reconcileTags(
-    subscriber.tags,
-    desired.tags,
-    managedUniverse,
-  );
+  const { finalTags, added, removed, changed } = reconcileTags(subscriber.tags, desired.tags, managedUniverse);
   const emailMismatch = subscriber.email_address.toLowerCase() !== email.toLowerCase();
 
   if (!changed && !emailMismatch) {

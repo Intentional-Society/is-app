@@ -99,7 +99,6 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
         disabled={disabled}
         rows={3}
       />
-
     </>
   );
 }

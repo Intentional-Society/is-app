@@ -74,15 +74,68 @@ const SEED_PATH = resolve(
 // retired Atlantic hurricane names.
 const NAMES: readonly string[] = [
   // Alphabet 1 (1..26)
-  "alice", "bob", "carol", "dave", "eve", "frank", "gina", "henry", "ivy", "jack",
-  "kate", "leo", "mary", "nick", "olivia", "paul", "quinn", "rachel", "steve", "tara",
-  "uma", "victor", "wendy", "xavier", "yara", "zach",
+  "alice",
+  "bob",
+  "carol",
+  "dave",
+  "eve",
+  "frank",
+  "gina",
+  "henry",
+  "ivy",
+  "jack",
+  "kate",
+  "leo",
+  "mary",
+  "nick",
+  "olivia",
+  "paul",
+  "quinn",
+  "rachel",
+  "steve",
+  "tara",
+  "uma",
+  "victor",
+  "wendy",
+  "xavier",
+  "yara",
+  "zach",
   // Alphabet 2 (27..52)
-  "alex", "ben", "claire", "dan", "ella", "fred", "grace", "harry", "irene", "james",
-  "kelly", "liam", "maya", "noah", "oscar", "penny", "quentin", "riley", "sam", "tina",
-  "ulysses", "vera", "will", "xena", "yvonne", "zoe",
+  "alex",
+  "ben",
+  "claire",
+  "dan",
+  "ella",
+  "fred",
+  "grace",
+  "harry",
+  "irene",
+  "james",
+  "kelly",
+  "liam",
+  "maya",
+  "noah",
+  "oscar",
+  "penny",
+  "quentin",
+  "riley",
+  "sam",
+  "tina",
+  "ulysses",
+  "vera",
+  "will",
+  "xena",
+  "yvonne",
+  "zoe",
   // Hurricanes (53..60)
-  "andrew", "camille", "floyd", "hugo", "ian", "katrina", "maria", "sandy",
+  "andrew",
+  "camille",
+  "floyd",
+  "hugo",
+  "ian",
+  "katrina",
+  "maria",
+  "sandy",
 ];
 
 // Every position 1..60 belongs to exactly one role. The role
@@ -91,26 +144,26 @@ const NAMES: readonly string[] = [
 // arrays and rerunning.
 
 // Members (48 total)
-const LURKER_POSITIONS = new Set([3, 10, 25, 35, 43, 49, 59]);                              // 7
-const TWO_TAG_POSITIONS = new Set([2, 7, 15, 20, 29, 37, 47, 55]);                          // 8
-const THREE_TAG_C_POSITIONS = new Set([1, 5, 14, 18, 22, 27, 34, 40, 44, 51, 58]);          // 11
-const THREE_TAG_A_POSITIONS = new Set([12]);                                                // 1
-const THREE_TAG_P_POSITIONS = new Set([9, 16, 32, 46, 52]);                                 // 5
-const FOUR_TAG_CA_POSITIONS = new Set([8, 24, 36, 48]);                                     // 4
-const FOUR_TAG_CP_POSITIONS = new Set([13, 21, 30, 41, 53]);                                // 5
-const FOUR_TAG_AP_POSITIONS = new Set([26, 38]);                                            // 2
-const SUPER_POSITIONS = new Set([6, 19, 31, 42, 56]);                                       // 5
+const LURKER_POSITIONS = new Set([3, 10, 25, 35, 43, 49, 59]); // 7
+const TWO_TAG_POSITIONS = new Set([2, 7, 15, 20, 29, 37, 47, 55]); // 8
+const THREE_TAG_C_POSITIONS = new Set([1, 5, 14, 18, 22, 27, 34, 40, 44, 51, 58]); // 11
+const THREE_TAG_A_POSITIONS = new Set([12]); // 1
+const THREE_TAG_P_POSITIONS = new Set([9, 16, 32, 46, 52]); // 5
+const FOUR_TAG_CA_POSITIONS = new Set([8, 24, 36, 48]); // 4
+const FOUR_TAG_CP_POSITIONS = new Set([13, 21, 30, 41, 53]); // 5
+const FOUR_TAG_AP_POSITIONS = new Set([26, 38]); // 2
+const SUPER_POSITIONS = new Set([6, 19, 31, 42, 56]); // 5
 
 // Non-members (12 total) — sprinkled, not bunched at the end.
-const NONMEMBER_ACTIVE_POSITIONS = new Set([11, 23, 28, 39, 50, 57]);                       // 6
-const NONMEMBER_UNTAGGED_POSITIONS = new Set([4, 17, 33, 45, 54, 60]);                      // 6
+const NONMEMBER_ACTIVE_POSITIONS = new Set([11, 23, 28, 39, 50, 57]); // 6
+const NONMEMBER_UNTAGGED_POSITIONS = new Set([4, 17, 33, 45, 54, 60]); // 6
 
 // Positions that the seed-fixtures script should PATCH to
 // type:"unsubscribed" after creation. Chosen for sync-branch
 // coverage: a heavily-tagged member and an untagged non-member.
 const UNSUBSCRIBED_POSITIONS = new Set([
-  6,  // frank.06 — super (all 5 tags)
-  4,  // dave.04  — untagged non-member
+  6, // frank.06 — super (all 5 tags)
+  4, // dave.04  — untagged non-member
 ]);
 
 const ALL_ROLE_SETS: { name: string; positions: Set<number> }[] = [
@@ -137,8 +190,7 @@ const tagsForPosition = (pos: number): string[] => {
     return ["tisweb-member", "tweekly-web-updates", "tcommunity-calls", "tarts-in-is"];
   if (FOUR_TAG_CP_POSITIONS.has(pos))
     return ["tisweb-member", "tweekly-web-updates", "tcommunity-calls", "tpod-program"];
-  if (FOUR_TAG_AP_POSITIONS.has(pos))
-    return ["tisweb-member", "tweekly-web-updates", "tarts-in-is", "tpod-program"];
+  if (FOUR_TAG_AP_POSITIONS.has(pos)) return ["tisweb-member", "tweekly-web-updates", "tarts-in-is", "tpod-program"];
   if (SUPER_POSITIONS.has(pos))
     return ["tisweb-member", "tweekly-web-updates", "tcommunity-calls", "tarts-in-is", "tpod-program"];
   if (NONMEMBER_ACTIVE_POSITIONS.has(pos)) return ["tactive"];

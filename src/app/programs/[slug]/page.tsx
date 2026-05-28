@@ -3,11 +3,7 @@ import { requireUser } from "@/lib/api-server";
 
 import { ProgramSlugDetail } from "./program-slug-detail";
 
-export default async function ProgramDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function ProgramDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   await requireUser();
   const { slug } = await params;
 

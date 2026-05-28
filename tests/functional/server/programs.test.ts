@@ -319,9 +319,7 @@ describe("Programs API", () => {
     });
 
     it("excludes members who have left from the members array", async () => {
-      await db
-        .insert(profilePrograms)
-        .values({ profileId: userId, programId, leftAt: new Date() });
+      await db.insert(profilePrograms).values({ profileId: userId, programId, leftAt: new Date() });
 
       const slug = `test-program-${programId.slice(0, 8)}`;
       const res = await app.request(`/api/programs/by-slug/${slug}`);
@@ -358,10 +356,7 @@ const ensureWeeklyProgram = async (): Promise<string> => {
       description: "Auto-subscribe target (test-managed).",
     })
     .onConflictDoNothing({ target: programs.slug });
-  const [row] = await db
-    .select({ id: programs.id })
-    .from(programs)
-    .where(eq(programs.slug, "weekly-web-updates"));
+  const [row] = await db.select({ id: programs.id }).from(programs).where(eq(programs.slug, "weekly-web-updates"));
   return row.id;
 };
 

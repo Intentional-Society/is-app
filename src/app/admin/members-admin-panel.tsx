@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
 import { ShieldCheck } from "lucide-react";
 
 import { Avatar } from "@/components/avatar";
@@ -67,10 +66,7 @@ export function MembersAdminPanel({ currentUserId }: { currentUserId: string }) 
               mutation.isError && mutation.error.memberId === member.id ? mutation.error.message : null;
 
             return (
-              <li
-                key={member.id}
-                className="flex items-center gap-3 rounded border border-border p-3"
-              >
+              <li key={member.id} className="flex items-center gap-3 rounded border border-border p-3">
                 <Avatar
                   name={member.displayName}
                   url={member.avatarUrl}
@@ -79,13 +75,9 @@ export function MembersAdminPanel({ currentUserId }: { currentUserId: string }) 
                 />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="font-medium">{member.displayName ?? "(unnamed)"}</span>
-                  {member.location && (
-                    <span className="text-sm text-muted-foreground">{member.location}</span>
-                  )}
+                  {member.location && <span className="text-sm text-muted-foreground">{member.location}</span>}
                 </div>
-                {member.isAdmin && (
-                  <ShieldCheck className="h-4 w-4 shrink-0 text-green-700" aria-label="Admin" />
-                )}
+                {member.isAdmin && <ShieldCheck className="h-4 w-4 shrink-0 text-green-700" aria-label="Admin" />}
                 <div className="flex flex-col items-end gap-1">
                   {isSelf ? (
                     <Button size="sm" disabled title="You cannot remove your own admin access">
@@ -101,11 +93,7 @@ export function MembersAdminPanel({ currentUserId }: { currentUserId: string }) 
                       {isSaving ? "Saving…" : "Remove admin"}
                     </Button>
                   ) : (
-                    <Button
-                      size="sm"
-                      disabled={isSaving}
-                      onClick={() => mutation.mutate({ member, isAdmin: true })}
-                    >
+                    <Button size="sm" disabled={isSaving} onClick={() => mutation.mutate({ member, isAdmin: true })}>
                       {isSaving ? "Saving…" : "Make admin"}
                     </Button>
                   )}

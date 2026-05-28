@@ -19,9 +19,7 @@ import { apiClient } from "@/lib/api";
 // in Axiom (filter by message == "buttondown sync"). What's shown
 // here is just enough to confirm the call landed.
 
-type RunResult =
-  | { status: "ok"; summary: Record<string, unknown> }
-  | { status: "skipped"; reason: string };
+type RunResult = { status: "ok"; summary: Record<string, unknown> } | { status: "skipped"; reason: string };
 
 export function ButtondownSyncButtons() {
   const [pending, setPending] = useState<null | "dry-run" | "write">(null);

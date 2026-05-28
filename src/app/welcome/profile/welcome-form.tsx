@@ -54,7 +54,8 @@ export function WelcomeForm({ initial }: { initial: ProfileFormValues }) {
         disabled={disabled}
       />
       <p className="text-sm text-muted-foreground">
-        You don't need a password — signing in by email link always works. A password is only useful if you'd prefer to sign in without waiting for an email.
+        You don't need a password — signing in by email link always works. A password is only useful if you'd prefer to
+        sign in without waiting for an email.
       </p>
 
       <Button type="submit" className="mt-3" disabled={disabled}>

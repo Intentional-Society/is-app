@@ -6,7 +6,15 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!.next", "!next-env.d.ts", "!supabase/templates/**/*.html", "!docs/_temp-*"]
+    "includes": [
+      "**",
+      "!.next",
+      "!next-env.d.ts",
+      "!supabase/templates/**/*.html",
+      "!docs/_temp-*",
+      "!drizzle/meta",
+      "!tests/functional/server/__data__"
+    ]
   },
   "formatter": {
     "enabled": true,

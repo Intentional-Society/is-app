@@ -27,9 +27,7 @@ export const autoSubscribeNewMember = async (userId: string): Promise<void> => {
   const found = new Set(rows.map((r) => r.slug));
   for (const slug of AUTO_SUBSCRIBE_SLUGS) {
     if (!found.has(slug)) {
-      Sentry.captureException(
-        new Error(`autoSubscribeNewMember: program slug "${slug}" not found in database`),
-      );
+      Sentry.captureException(new Error(`autoSubscribeNewMember: program slug "${slug}" not found in database`));
     }
   }
 
@@ -321,8 +319,7 @@ const MAX_BUTTONDOWN_TAG = 100;
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SLUG_RULE = "slug must be lowercase letters, numbers, and hyphens";
 
-const trimmedString = (value: unknown): string | null =>
-  typeof value === "string" ? value.trim() : null;
+const trimmedString = (value: unknown): string | null => (typeof value === "string" ? value.trim() : null);
 
 // Validates an admin-supplied slug. Returns the slug or an error string.
 const validateSlug = (slug: string): { slug: string } | { error: string } => {
@@ -336,9 +333,7 @@ const validateSlug = (slug: string): { slug: string } | { error: string } => {
 // buttondownTag is also optional; blank is normalized to null.
 export const parseProgramCreate = (
   body: unknown,
-):
-  | { name: string; slug: string; description: string | null; buttondownTag: string | null }
-  | { error: string } => {
+): { name: string; slug: string; description: string | null; buttondownTag: string | null } | { error: string } => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "body must be a JSON object" };
   }
@@ -596,9 +591,7 @@ export const getProgramDetail = async (
 export const addParticipant = async (
   programId: string,
   profileId: string,
-): Promise<
-  { ok: true } | { error: "program_not_found" | "profile_not_found" | "already_member" }
-> => {
+): Promise<{ ok: true } | { error: "program_not_found" | "profile_not_found" | "already_member" }> => {
   if (!isUuid(programId)) return { error: "program_not_found" };
   if (!isUuid(profileId)) return { error: "profile_not_found" };
 

@@ -15,6 +15,7 @@ import {
 } from "./buttondown-runner";
 import { db } from "./db";
 import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
+import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
   getProfileForMember,
   getProfileForSelf,
@@ -24,9 +25,9 @@ import {
   markAgreementsSigned,
   markProgramsReviewed,
   markWebUpdated,
-  parseEditableProfile,
   type ProfileForSelf,
   type ProfileReadProbe,
+  parseEditableProfile,
   setProfileHidden,
   toSlug,
   upsertProfile,
@@ -56,7 +57,6 @@ import {
   parseOptionalRelationValue,
   updateRelationValue,
 } from "./relations";
-import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import { profiles } from "./schema";
 import { resetE2EUsers } from "./test-reset";
 

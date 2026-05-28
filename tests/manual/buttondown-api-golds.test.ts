@@ -32,15 +32,7 @@ import { assertTestNewsletter, buildProbes, type ProbeContext, type ProbeResult 
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = resolve(HERE, "..", "..");
-const GOLDS_DIR = resolve(
-  PROJECT_ROOT,
-  "tests",
-  "functional",
-  "server",
-  "__data__",
-  "buttondown",
-  "golds",
-);
+const GOLDS_DIR = resolve(PROJECT_ROOT, "tests", "functional", "server", "__data__", "buttondown", "golds");
 const META_PATH = resolve(GOLDS_DIR, "meta.json");
 
 type RecordedHttp = {
@@ -61,12 +53,7 @@ const createRecordingFetcher = () => {
   };
 
   const recordingFetch: typeof fetch = async (input, init) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const method = init?.method ?? "GET";
     const reqBody = (() => {
       if (init?.body === undefined || init?.body === null) return undefined;

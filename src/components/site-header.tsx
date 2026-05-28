@@ -85,7 +85,11 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
               <SheetClose
                 nativeButton={false}
                 render={
-                  <Link href="/admin" onClick={clearNavHistory} className="flex items-center gap-2 rounded px-2 py-2 text-green-700 hover:bg-muted">
+                  <Link
+                    href="/admin"
+                    onClick={clearNavHistory}
+                    className="flex items-center gap-2 rounded px-2 py-2 text-green-700 hover:bg-muted"
+                  >
                     <ShieldCheck className="h-4 w-4 shrink-0" />
                     Admin dashboard
                   </Link>

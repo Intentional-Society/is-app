@@ -9,7 +9,9 @@ export default function NotFound() {
         404
         <span className="sr-only"> Page not found</span>
       </h1>
-      <p className="font-serif italic text-lg text-muted-foreground">This page doesn&apos;t exist — or maybe it wandered off.</p>
+      <p className="font-serif italic text-lg text-muted-foreground">
+        This page doesn&apos;t exist — or maybe it wandered off.
+      </p>
       <Button render={<Link href="/" />}>Go home</Button>
     </main>
   );

@@ -88,7 +88,11 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
         <NavCard href="/members" title="Member directory" description="Browse and find other members." />
         <NavCard href="/myweb" title="My web" description="Build your relational map by adding connections!" />
         <NavCard href="/profile" title="My profile" description="View and edit your profile information." />
-        <NavCard href="/invites" title="Invite a friend" description="Generate an invite code to bring someone into the network." />
+        <NavCard
+          href="/invites"
+          title="Invite a friend"
+          description="Generate an invite code to bring someone into the network."
+        />
       </div>
     </main>
   );

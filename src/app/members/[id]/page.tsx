@@ -60,12 +60,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
           className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
         />
 
-        {!isOwnProfile && (
-          <MemberRelationControl
-            memberId={profile.id}
-            memberName={profile.displayName}
-          />
-        )}
+        {!isOwnProfile && <MemberRelationControl memberId={profile.id} memberName={profile.displayName} />}
 
         <dl className="flex w-full max-w-md flex-col gap-4">
           <Field label="Bio">{profile.bio}</Field>

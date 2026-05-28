@@ -69,10 +69,7 @@ const ensureWeeklyProgram = async (): Promise<string> => {
       description: "Auto-subscribe target (test-managed).",
     })
     .onConflictDoNothing({ target: programs.slug });
-  const [row] = await db
-    .select({ id: programs.id })
-    .from(programs)
-    .where(eq(programs.slug, "weekly-web-updates"));
+  const [row] = await db.select({ id: programs.id }).from(programs).where(eq(programs.slug, "weekly-web-updates"));
   return row.id;
 };
 

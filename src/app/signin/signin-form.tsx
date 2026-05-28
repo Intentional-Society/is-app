@@ -185,8 +185,12 @@ export function SigninForm() {
 
       <Button type="submit" variant="secondary" disabled={state.status === "submitting"}>
         {state.status === "submitting"
-          ? mode === "password" ? "Signing in…" : "Sending…"
-          : mode === "password" ? "Sign in" : "Send sign-in link"}
+          ? mode === "password"
+            ? "Signing in…"
+            : "Sending…"
+          : mode === "password"
+            ? "Sign in"
+            : "Send sign-in link"}
       </Button>
 
       {mode === "email" ? (

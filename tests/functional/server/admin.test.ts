@@ -246,10 +246,7 @@ describe("GET /api/admin/profiles/hidden", () => {
     await insertUserAndProfile(admin, { isAdmin: true });
     await insertUserAndProfile(nonAdmin);
     await insertUserAndProfile(hidden);
-    await db
-      .update(profiles)
-      .set({ displayName: "Hidden Test", hidden: true })
-      .where(eq(profiles.id, hidden));
+    await db.update(profiles).set({ displayName: "Hidden Test", hidden: true }).where(eq(profiles.id, hidden));
   });
 
   afterEach(async () => {
