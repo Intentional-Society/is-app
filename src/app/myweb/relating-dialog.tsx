@@ -2,6 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,13 @@ export type RelatingTarget = {
 type Props = {
   target: RelatingTarget | null;
   onClose: () => void;
+  // Fires only after a relation is successfully committed. Used by
+  // /myweb to advance the welcome tour once the user completes the
+  // "add people" step's action.
+  onRelated?: () => void;
 };
 
-export function RelatingDialog({ target, onClose }: Props) {
+export function RelatingDialog({ target, onClose, onRelated }: Props) {
   const queryClient = useQueryClient();
   const [pendingValue, setPendingValue] = useState<RelationValue | null>(null);
 
@@ -78,6 +83,7 @@ export function RelatingDialog({ target, onClose }: Props) {
         onSuccess: () => {
           setPendingValue(null);
           onClose();
+          onRelated?.();
         },
         onError: () => {
           setPendingValue(null);
@@ -122,8 +128,15 @@ export function RelatingDialog({ target, onClose }: Props) {
           className="fixed top-1/2 left-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded border border-border bg-popover p-5 text-popover-foreground shadow-lg data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150"
           aria-describedby={target?.hintAttribution ? "relating-attribution" : undefined}
         >
-          <Dialog.Title className="font-heading text-base font-medium">
-            Describe your relationship with {target?.displayName ?? "this member"}
+          <Dialog.Close
+            disabled={mutation.isPending}
+            aria-label="Close"
+            className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            <X className="h-4 w-4" />
+          </Dialog.Close>
+          <Dialog.Title className="pr-8 font-heading text-base font-medium">
+            Who is <span className="font-semibold">{target?.displayName ?? "this member"}</span> to you?
           </Dialog.Title>
           {target?.hintAttribution && (
             <p id="relating-attribution" className="mt-1 text-sm text-muted-foreground">
@@ -131,7 +144,9 @@ export function RelatingDialog({ target, onClose }: Props) {
             </p>
           )}
 
-          <div className="mt-4 flex flex-col gap-2">
+          <p className="mt-3 text-xs text-muted-foreground">Keyboard shortcuts: Number keys 1 through 4, or Esc to cancel</p>
+
+          <div className="mt-2 flex flex-col gap-2">
             {RELATION_VALUES.map((value) => {
               const { headline, detail } = RELATION_VALUE_LABELS[value];
               const isCurrent = target?.currentValue === value;
@@ -162,7 +177,8 @@ export function RelatingDialog({ target, onClose }: Props) {
           )}
 
           <p className="mt-3 text-xs text-muted-foreground">
-            Click outside or press 1–4 to choose. Closing without choosing leaves the suggestion as-is.
+            Notes: Yes, these become visible to them and others. It&apos;s okay to pick a different relation value than they
+            do for you! Everyone will have their own slightly unique interpretation.
           </p>
         </Dialog.Popup>
       </Dialog.Portal>

@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  applyNodeChanges,
   BaseEdge,
   Controls,
   type Edge,
@@ -12,6 +13,7 @@ import {
   getStraightPath,
   Handle,
   type Node,
+  type NodeChange,
   type NodeProps,
   Panel,
   Position,
@@ -20,7 +22,7 @@ import {
 } from "@xyflow/react";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
@@ -97,22 +99,34 @@ const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
 function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
   return (
-    <div className="flex cursor-pointer flex-col items-center gap-1" title={data.displayName ?? undefined}>
+    // pointer-events-none on the wrapper + the !pointer-events-none
+    // override on .react-flow__node (set per-node above) means only the
+    // Avatar (pointer-events-auto + clip-path:circle) is a click
+    // target. The name renders in flow below the avatar so the wrapper
+    // bounding box covers the full visible node, but its
+    // pointer-events-none keeps clicks on the name inert.
+    <div className="pointer-events-none flex flex-col items-center gap-1">
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
       <Avatar
         name={data.displayName}
         url={data.avatarUrl}
-        className={`flex items-center justify-center overflow-hidden rounded-full border-2 ${
+        className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] transition-transform duration-150 hover:scale-110 ${
           data.isCenter ? "h-16 w-16 border-primary" : "h-12 w-12 border-border"
         } bg-muted text-base font-semibold text-muted-foreground`}
       />
-      <div className="max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
+      <div className="pointer-events-none max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
     </div>
   );
 }
 
 const nodeTypes = { member: MemberNode };
+
+// Lets the edge label pop the relating dialog without threading a
+// callback through the edge data object (which would defeat the edges
+// useMemo). NumberedEdge is registered via ReactFlow's edgeTypes prop;
+// the Provider wraps ReactFlow so context still propagates to it.
+const EdgeRelatingContext = createContext<((target: RelatingTarget) => void) | null>(null);
 
 // Straight-line edge with an HTML circle label at the geometric midpoint
 // of the line between source and target. ReactFlow's default bezier
@@ -120,22 +134,41 @@ const nodeTypes = { member: MemberNode };
 // midpoint sits above the visual line — using a straight edge keeps the
 // label on the line, and HTML labels (via EdgeLabelRenderer) give us a
 // real circular pill that an SVG <rect> can't.
+
 function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: EdgeProps<Edge<EdgeData>>) {
   const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
+  const openRelating = useContext(EdgeRelatingContext);
+  const isClickable = data?.isOutgoing === true && openRelating !== null;
+  const handleClick = isClickable
+    ? () =>
+        openRelating?.({
+          id: data.relateeId,
+          displayName: data.relateeName,
+          currentValue: isRelationValue(data.value) ? data.value : null,
+        })
+    : undefined;
   return (
     <>
       <BaseEdge id={id} path={edgePath} style={style} />
       <EdgeLabelRenderer>
-        <div
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={!isClickable}
+          aria-label={isClickable ? "Adjust your rating" : undefined}
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            pointerEvents: "none",
+            // Restore pointer events so the label catches clicks; the
+            // SVG edge path underneath only covers a few px of the line.
+            pointerEvents: "auto",
           }}
-          className="flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground"
+          className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground ${
+            isClickable ? "cursor-pointer hover:bg-canvas/90" : "cursor-default"
+          }`}
         >
           {data?.value}
-        </div>
+        </button>
       </EdgeLabelRenderer>
     </>
   );
@@ -153,12 +186,7 @@ function parseStoredView(raw: string | null): SubgraphViewOptions | null {
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "hops" in parsed &&
-      (parsed.hops === 1 || parsed.hops === 2)
-    ) {
+    if (typeof parsed === "object" && parsed !== null && "hops" in parsed && (parsed.hops === 1 || parsed.hops === 2)) {
       return { hops: parsed.hops };
     }
   } catch {
@@ -167,7 +195,13 @@ function parseStoredView(raw: string | null): SubgraphViewOptions | null {
   return null;
 }
 
-export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
+export function WebGraph({
+  onOpenRelating,
+  onReplayTour,
+}: {
+  onOpenRelating: (target: RelatingTarget) => void;
+  onReplayTour: () => void;
+}) {
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
   const [hintOpen, setHintOpen] = useState(false);
@@ -208,6 +242,21 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
   // mount, so a settling simulation would otherwise overflow whatever
   // scale the initial random positions happened to produce.
   const flowRef = useRef<ReactFlowInstance<Node<MemberNodeData>, Edge<EdgeData>> | null>(null);
+  // Shared between the d3-force sim and the drag handlers: drag needs
+  // to mutate fx/fy on the sim node directly, and drag-induced sim
+  // position changes shouldn't re-derive the render-coords scale (the
+  // dragged node would drift under your cursor as the bbox shifts).
+  const simNodesByIdRef = useRef<Map<string, SimNode>>(new Map());
+  const normRef = useRef<{ cx: number; cy: number; scale: number } | null>(null);
+  const draggedNodeIdRef = useRef<string | null>(null);
+  // True once the user pans/zooms — auto-fitView during sim ticks
+  // would otherwise yank the viewport back every ~250ms.
+  const userMovedViewportRef = useRef(false);
+  // True once paintFromSim has run a one-shot fit against the
+  // normalized layout. ReactFlow's `fitView` prop fires too early
+  // (before the first paint) and would otherwise leave the viewport
+  // sized for the unnormalized random positions.
+  const initialPaintFittedRef = useRef(false);
 
   // Edges never change after the subgraph loads — derive instead of
   // duplicating into React state.
@@ -227,7 +276,6 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           stroke: "var(--color-canvas-foreground)",
           strokeOpacity: edgeStrokeOpacity(e.value),
           strokeWidth: edgeStrokeWidth(e.value),
-          cursor: isOutgoing ? "pointer" : "default",
         },
         data: {
           isOutgoing,
@@ -257,8 +305,11 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
       };
     });
     // Lookup map kept around for paintFromSim — avoids an O(n²) .find
-    // scan on every tick.
+    // scan on every tick. Also exposed via simNodesByIdRef so the
+    // node-drag handlers (outside this effect) can mutate fx/fy on
+    // the dragged node.
     const simNodeById = new Map(simNodes.map((n) => [n.id, n]));
+    simNodesByIdRef.current = simNodeById;
     const simEdges: SimEdge[] = data.edges.map((e) => ({
       source: e.relatorId,
       target: e.relateeId,
@@ -273,7 +324,15 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
           type: "member",
           position: { x: sn?.x ?? 0, y: sn?.y ?? 0 },
           data: { ...n, isCenter: n.id === centerId },
-          draggable: true,
+          // Center node is fx/fy-pinned at the origin; letting the user
+          // drag it would either fight the pin or move "yourself" on
+          // your own web, neither of which is the intent.
+          draggable: n.id !== centerId,
+          // Override ReactFlow's default ".react-flow__node{pointer-events: all}"
+          // so only the Avatar (pointer-events-auto + clip-path:circle) is a
+          // click target. The corners around the round avatar no longer count
+          // as the node, so clicking outside the circle doesn't fire onNodeClick.
+          className: "!pointer-events-none",
         };
       }),
     );
@@ -284,10 +343,7 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     // Without this throttle a dev build can render-storm so hard the
     // browser never paints between frames and the simulation looks blank.
     const FRAME_MS = 50;
-    // fitView is not free; throttle to ~4×/sec instead of every paint.
-    const FIT_MS = 250;
     let lastUpdate = 0;
-    let lastFit = 0;
     // No forceCenter — the viewing member is already pinned at the
     // origin via fx/fy, so forceCenter would only pull the other nodes
     // toward the pinned center, fighting the link-distance equilibrium
@@ -327,6 +383,12 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     };
 
     const sim = forceSimulation(simNodes)
+      // Default alphaMin is 0.001, which combined with the default
+      // alphaDecay drags the sim out to ~5s with the last ~3.2s being
+      // sub-pixel motion no one can see. Bumping alphaMin cuts the
+      // trailing tail off (~1.8s end) without speeding up the
+      // perceptible early settling.
+      .alphaMin(0.08)
       .force("charge", forceManyBody().strength(-800))
       .force(
         "link",
@@ -342,7 +404,16 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         lastUpdate = now;
         paintFromSim();
       })
-      .on("end", () => paintFromSim());
+      .on("end", () => {
+        paintFromSim();
+        // One-shot refit once the layout has fully relaxed, unless the
+        // user has already taken over the viewport.
+        if (!userMovedViewportRef.current) {
+          requestAnimationFrame(() => {
+            flowRef.current?.fitView({ padding: 0.15, duration: 200 });
+          });
+        }
+      });
 
     // Paints React node positions from the live simNodes, normalized so
     // the layout's longer axis spans TARGET sim units and is centered
@@ -350,22 +421,33 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
     // the rendered graph fill the viewport regardless of node count.
     function paintFromSim() {
       if (simNodes.length === 0) return;
-      const TARGET = 600;
-      let minX = simNodes[0].x;
-      let maxX = minX;
-      let minY = simNodes[0].y;
-      let maxY = minY;
-      for (let i = 1; i < simNodes.length; i++) {
-        const sn = simNodes[i];
-        if (sn.x < minX) minX = sn.x;
-        else if (sn.x > maxX) maxX = sn.x;
-        if (sn.y < minY) minY = sn.y;
-        else if (sn.y > maxY) maxY = sn.y;
+      // During a drag, freeze the normalization. Recomputing it would
+      // shift cx/cy/scale based on the moving bbox, which makes the
+      // dragged node visually drift away from the cursor.
+      let cx: number;
+      let cy: number;
+      let scale: number;
+      if (draggedNodeIdRef.current && normRef.current) {
+        ({ cx, cy, scale } = normRef.current);
+      } else {
+        const TARGET = 600;
+        let minX = simNodes[0].x;
+        let maxX = minX;
+        let minY = simNodes[0].y;
+        let maxY = minY;
+        for (let i = 1; i < simNodes.length; i++) {
+          const sn = simNodes[i];
+          if (sn.x < minX) minX = sn.x;
+          else if (sn.x > maxX) maxX = sn.x;
+          if (sn.y < minY) minY = sn.y;
+          else if (sn.y > maxY) maxY = sn.y;
+        }
+        const longer = Math.max(maxX - minX, maxY - minY);
+        scale = longer > 1 ? TARGET / longer : 1;
+        cx = (maxX + minX) / 2;
+        cy = (maxY + minY) / 2;
+        normRef.current = { cx, cy, scale };
       }
-      const longer = Math.max(maxX - minX, maxY - minY);
-      const scale = longer > 1 ? TARGET / longer : 1;
-      const cx = (maxX + minX) / 2;
-      const cy = (maxY + minY) / 2;
 
       setNodes((prev) => {
         let changed = false;
@@ -385,9 +467,16 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
         return changed ? next : prev;
       });
 
-      const now = performance.now();
-      if (now - lastFit >= FIT_MS) {
-        lastFit = now;
+      // One-shot fit on the first normalized paint — ReactFlow's
+      // `fitView` prop fires before this runs, against the unnormalized
+      // 200-unit random layout, so without this the viewport stays
+      // zoomed in for the entire settling phase. After this initial
+      // fit, no periodic refits during settling (the normalization
+      // keeps the layout at a stable ~TARGET sim units). The sim's
+      // "end" handler does one more fit when the layout has fully
+      // relaxed.
+      if (!initialPaintFittedRef.current && !userMovedViewportRef.current) {
+        initialPaintFittedRef.current = true;
         requestAnimationFrame(() => {
           flowRef.current?.fitView({ padding: 0.15, duration: 0 });
         });
@@ -401,6 +490,59 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
       sim.stop();
     };
   }, [data]);
+
+  // Required for ReactFlow's drag to actually update positions in our
+  // controlled `nodes` state; without it, drag fires events that go
+  // nowhere and the node visually doesn't move.
+  const onNodesChange = useCallback((changes: NodeChange<Node<MemberNodeData>>[]) => {
+    setNodes((nds) => applyNodeChanges(changes, nds));
+  }, []);
+
+  // Drag handlers integrate the user with the d3-force sim: pinning
+  // the dragged node via fx/fy lets the rest of the graph relax
+  // around the new position. On release, fx/fy is cleared so the node
+  // re-enters the sim's normal physics.
+  const flowPositionToSim = useCallback((flow: { x: number; y: number }) => {
+    const norm = normRef.current;
+    if (!norm) return null;
+    return { x: flow.x / norm.scale + norm.cx, y: flow.y / norm.scale + norm.cy };
+  }, []);
+  const onNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: Node<MemberNodeData>) => {
+      const simNode = simNodesByIdRef.current.get(node.id);
+      const sim = flowPositionToSim(node.position);
+      if (!simNode || !sim) return;
+      draggedNodeIdRef.current = node.id;
+      simNode.fx = sim.x;
+      simNode.fy = sim.y;
+      // alphaTarget keeps the sim warm for the duration of the drag —
+      // without it, alpha decays past alphaMin (~5s on defaults) and
+      // ticks stop firing, freezing the layout mid-pull. alpha(0.3)
+      // gives an immediate burst, alphaTarget(0.3) keeps it there.
+      simRef.current?.alphaTarget(0.3).alpha(0.3).restart();
+    },
+    [flowPositionToSim],
+  );
+  const onNodeDrag = useCallback(
+    (_event: React.MouseEvent, node: Node<MemberNodeData>) => {
+      const simNode = simNodesByIdRef.current.get(node.id);
+      const sim = flowPositionToSim(node.position);
+      if (!simNode || !sim) return;
+      simNode.fx = sim.x;
+      simNode.fy = sim.y;
+    },
+    [flowPositionToSim],
+  );
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node<MemberNodeData>) => {
+    const simNode = simNodesByIdRef.current.get(node.id);
+    if (simNode) {
+      simNode.fx = null;
+      simNode.fy = null;
+    }
+    // Release the alpha target so the sim cools normally back to rest.
+    simRef.current?.alphaTarget(0);
+    draggedNodeIdRef.current = null;
+  }, []);
 
   const empty = !data || data.nodes.length === 0;
 
@@ -423,94 +565,109 @@ export function WebGraph({ onOpenRelating }: { onOpenRelating: (target: Relating
   }
 
   return (
-    <div className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
-        onInit={(instance) => {
-          flowRef.current = instance;
-        }}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        proOptions={{ hideAttribution: true }}
-        onNodeClick={(_event, node) => {
-          // Re-center the viewport on the clicked node so members can
-          // explore the graph without navigating away. Double-click
-          // navigates to the member's profile page.
-          flowRef.current?.setCenter(node.position.x, node.position.y, {
-            zoom: flowRef.current.getZoom(),
-            duration: 400,
-          });
-        }}
-        onNodeDoubleClick={(_event, node) => {
-          const slug = node.data.slug ?? node.data.id;
-          router.push(`/members/${slug}`);
-        }}
-        onEdgeClick={(_event, edge) => {
-          // Re-rate is only available on edges I authored. Incoming-only
-          // edges (someone else rated me, I haven't reciprocated) route
-          // through the suggestion feed instead.
-          const data = edge.data as EdgeData | undefined;
-          if (!data?.isOutgoing) return;
-          onOpenRelating({
-            id: data.relateeId,
-            displayName: data.relateeName,
-            currentValue: isRelationValue(data.value) ? data.value : null,
-          });
-        }}
-      >
-        {/* Built-in +/-/fit-view buttons for users who can't or don't
-         * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
-         * is hidden — selection and connection are already disabled. */}
-        <Controls position="top-left" showInteractive={false} />
-        <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
-          {/* Click-to-toggle (not hover) so the hints stay reachable on
-           * touch devices where hover doesn't exist. */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
-            aria-expanded={hintOpen}
-            aria-controls="web-graph-hints"
-            onClick={() => setHintOpen((h) => !h)}
-            className="rounded-full border border-border bg-background/90 font-bold"
-          >
-            ?
-          </Button>
-          {hintOpen && (
-            <ul
-              id="web-graph-hints"
-              className="flex max-w-[18rem] flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
-            >
-              <li>Drag the background to pan.</li>
-              <li>Scroll or pinch to zoom.</li>
-              <li>Single-click a node to center the view on it.</li>
-              <li>Double-click a node to open their profile.</li>
-              <li>
-                <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
-              </li>
-            </ul>
-          )}
-        </Panel>
-        <Panel
-          position="top-right"
-          className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+    <div
+      data-tour="graph"
+      className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
+    >
+      <EdgeRelatingContext.Provider value={onOpenRelating}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.15 }}
+          onInit={(instance) => {
+            flowRef.current = instance;
+          }}
+          onMove={(event) => {
+            // Programmatic fitView calls pass event=null; only flip the
+            // flag on user gestures (MouseEvent / TouchEvent / Wheel).
+            if (event !== null) userMovedViewportRef.current = true;
+          }}
+          onNodesChange={onNodesChange}
+          onNodeDragStart={onNodeDragStart}
+          onNodeDrag={onNodeDrag}
+          onNodeDragStop={onNodeDragStop}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          proOptions={{ hideAttribution: true }}
+          onNodeClick={(_event, node) => {
+            // Re-center the viewport on the clicked node so members can
+            // explore the graph without navigating away. Double-click
+            // navigates to the member's profile page.
+            flowRef.current?.setCenter(node.position.x, node.position.y, {
+              zoom: flowRef.current.getZoom(),
+              duration: 400,
+            });
+          }}
+          onNodeDoubleClick={(_event, node) => {
+            const slug = node.data.slug ?? node.data.id;
+            router.push(`/members/${slug}`);
+          }}
         >
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={view.hops === 2}
-              onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
-            />
-            2 hops
-          </label>
-        </Panel>
-      </ReactFlow>
+          {/* Built-in +/-/fit-view buttons for users who can't or don't
+           * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+           * is hidden — selection and connection are already disabled. */}
+          <Controls position="top-left" showInteractive={false} />
+          <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+            {/* Click-to-toggle (not hover) so the hints stay reachable on
+             * touch devices where hover doesn't exist. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+              aria-expanded={hintOpen}
+              aria-controls="web-graph-hints"
+              onClick={() => setHintOpen((h) => !h)}
+              className="rounded-full border border-border bg-background/90 font-bold"
+            >
+              ?
+            </Button>
+            {hintOpen && (
+              <div
+                id="web-graph-hints"
+                className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+              >
+                <ul className="flex flex-col gap-1">
+                  <li>Drag the background to pan.</li>
+                  <li>Drag a circle to reposition it.</li>
+                  <li>Scroll or pinch to zoom.</li>
+                  <li>Single-click a circle to center the view on it.</li>
+                  <li>Double-click a circle to open their profile.</li>
+                  <li>
+                    <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
+                  </li>
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHintOpen(false);
+                    onReplayTour();
+                  }}
+                  className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+                >
+                  Replay guided tour
+                </button>
+              </div>
+            )}
+          </Panel>
+          <Panel
+            position="top-right"
+            className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+          >
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={view.hops === 2}
+                onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
+              />
+              2 hops
+            </label>
+          </Panel>
+        </ReactFlow>
+      </EdgeRelatingContext.Provider>
     </div>
   );
 }

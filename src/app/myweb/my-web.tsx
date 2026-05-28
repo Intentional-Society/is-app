@@ -43,27 +43,50 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   // Lifted to MyWeb so both the suggestion feed (WebBuilder) and the
   // graph (WebGraph) can request a rating dialog from a single source.
   const [relatingTarget, setRelatingTarget] = useState<RelatingTarget | null>(null);
-  // Tour dismissed for the rest of this tab session (sessionStorage),
-  // for this navigation (markDone success), or for this state (parent
-  // setTourDismissed). The sessionStorage check makes e2e tests trivial
-  // to set up: addInitScript with the flag and the tour stays off.
-  const [tourDismissed, setTourDismissed] = useState(false);
+  // Controlled tour state so a "Replay guided tour" action can re-fire
+  // it for returning members. The initial-run decision (first visit,
+  // not already dismissed this session) runs in an effect so SSR markup
+  // matches the hydrated tree. The sessionStorage check still makes
+  // e2e tests trivial: addInitScript with the flag and the tour stays off.
+  const [tourRun, setTourRun] = useState(false);
+  // Bumped on replay so Joyride fully unmounts/remounts — toggling
+  // `run` alone doesn't reliably reset stepIndex back to 0.
+  const [tourKey, setTourKey] = useState(0);
+  // Bumped after a successful relation so the tour advances past the
+  // "click anyone here" step automatically.
+  const [tourAdvanceToken, setTourAdvanceToken] = useState(0);
   useEffect(() => {
-    if (window.sessionStorage.getItem(TOUR_DISMISSED_KEY) === "1") {
-      setTourDismissed(true);
-    }
-  }, []);
+    if (initialLastUpdatedWeb !== null) return;
+    if (window.sessionStorage.getItem(TOUR_DISMISSED_KEY) === "1") return;
+    setTourRun(true);
+  }, [initialLastUpdatedWeb]);
   const markDone = useMarkDone(() => setMode("view"));
-  const tourRun = initialLastUpdatedWeb === null && !tourDismissed && !markDone.isSuccess;
 
   const dismissTour = () => {
-    setTourDismissed(true);
+    setTourRun(false);
     window.sessionStorage.setItem(TOUR_DISMISSED_KEY, "1");
+  };
+
+  // Done is the tour's intended finisher — close the tour synchronously
+  // on click so the tooltip doesn't linger while the mutation runs.
+  const handleDoneClick = () => {
+    dismissTour();
+    markDone.mutate();
+  };
+
+  const replayTour = () => {
+    // The tour spotlights edit-mode UI (the suggestion feed, the Done
+    // button); ensure we're in edit mode before it starts, otherwise
+    // those targets don't exist on the page.
+    setMode("edit");
+    window.sessionStorage.removeItem(TOUR_DISMISSED_KEY);
+    setTourKey((k) => k + 1);
+    setTourRun(true);
   };
 
   return (
     <div className="flex w-full max-w-5xl flex-col items-center gap-6">
-      <WebGraph onOpenRelating={setRelatingTarget} />
+      <WebGraph onOpenRelating={setRelatingTarget} onReplayTour={replayTour} />
 
       {/* Toggle floats in the right gutter so it doesn't claim its own
        * row. Edit and Done sit at the same coordinates across modes —
@@ -75,7 +98,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
               variant="secondary"
               data-tour="done-button"
               disabled={markDone.isPending}
-              onClick={() => markDone.mutate()}
+              onClick={handleDoneClick}
             >
               {markDone.isPending ? "Saving…" : "Done"}
             </Button>
@@ -96,8 +119,14 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
         )}
       </div>
 
-      <RelatingDialog target={relatingTarget} onClose={() => setRelatingTarget(null)} />
-      <WelcomeTour run={tourRun} onClose={dismissTour} />
+      <RelatingDialog
+        target={relatingTarget}
+        onClose={() => setRelatingTarget(null)}
+        onRelated={() => {
+          if (tourRun) setTourAdvanceToken((t) => t + 1);
+        }}
+      />
+      <WelcomeTour key={tourKey} run={tourRun} advanceToken={tourAdvanceToken} onClose={dismissTour} />
     </div>
   );
 }
