@@ -35,10 +35,10 @@ The MVP visualization is *you, and 1–2 hops out*. Whole-network views are bori
 
 A single value from a small set captures both "visible trust" and resonance, with room to add dimensions later. Drafted vocabulary (subject to refinement, worth member testing before committing):
 
-- `1` — we've met in group settings and know of each other.
-- `2` — we've spent some time talking 1-on-1 enjoyably.
-- `3` — friend.
-- `4` — deep trust and knowing.
+- `1` — **Acquaintance / Supporter**: I have spent some time with them and feel supportive.
+- `2` — **Friend / Collaborator**: I trust them in most ways and we can work well together.
+- `3` — **Companion / Comrade**: I feel deep resonance and shared purpose with them.
+- `4` — **Kindred / Co-Creator**: a kindred spirit; I hope to partner with them for decades.
 
 The absence of a relation is an absence of a row. There is no explicit "0 / no connection of interest" rating — un-rated suggestions simply re-surface in future feeds, and at MVP scale (50–100 members) that's a non-problem. A future "intentional dissonance" value (`-1`) is also deferred — the social cost of publicly logged negative feelings wants more design care than we have lived experience to provide right now.
 

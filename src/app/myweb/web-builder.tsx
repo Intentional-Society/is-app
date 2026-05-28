@@ -15,21 +15,32 @@ const fetchCandidates = async (): Promise<RelationCandidatesFeed> => {
   return res.json();
 };
 
-const targetFromCandidate = (candidate: RelationCandidate): RelatingTarget => {
-  // Hint cards reveal the hinter's name in the dialog so the member
-  // sees who suggested them. addedYou cards intentionally omit the
-  // value (soft-hide) — the API never sends it, so there's nothing
-  // to omit here either.
-  const hintAttribution =
-    candidate.reason.type === "hint"
-      ? `${candidate.reason.hintedBy?.displayName ?? "Someone"} suggested you know each other`
-      : null;
-  return {
-    id: candidate.id,
-    displayName: candidate.displayName,
-    hintAttribution,
-  };
+const buildHintAttribution = (candidate: RelationCandidate): string | null => {
+  const reason = candidate.reason;
+  switch (reason.type) {
+    case "hint": {
+      const name = reason.hintedBy?.displayName ?? "Someone";
+      return `${name} suggested that you know each other.`;
+    }
+    case "viaInviter": {
+      const name = reason.inviter.displayName ?? "Your inviter";
+      return `${name} suggested that you know each other.`;
+    }
+    case "addedYou": {
+      return `They have added you to their relational web.`;
+    }
+    case "recentlyActive":
+      return "They've been active here recently.";
+    case "member":
+      return null;
+  }
 };
+
+const targetFromCandidate = (candidate: RelationCandidate): RelatingTarget => ({
+  id: candidate.id,
+  displayName: candidate.displayName,
+  hintAttribution: buildHintAttribution(candidate),
+});
 
 export function WebBuilder({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
   const { data, isPending, isError } = useQuery({

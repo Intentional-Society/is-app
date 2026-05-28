@@ -43,7 +43,7 @@ describe("MemberRelationControl", () => {
 
     // Regression guard: the label must render the headline string, not the
     // RELATION_VALUE_LABELS object (which stringifies to "[object Object]").
-    expect(await screen.findByText("Connected · Talked 1-on-1")).toBeVisible();
+    expect(await screen.findByText("Connected · Friend / Collaborator")).toBeVisible();
     expect(screen.getByRole("button", { name: "Edit" })).toBeVisible();
   });
 
