@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  applyNodeChanges,
   BaseEdge,
   Controls,
   type Edge,
@@ -12,6 +13,7 @@ import {
   getStraightPath,
   Handle,
   type Node,
+  type NodeChange,
   type NodeProps,
   Panel,
   Position,
@@ -20,7 +22,7 @@ import {
 } from "@xyflow/react";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
@@ -240,6 +242,13 @@ export function WebGraph({
   // mount, so a settling simulation would otherwise overflow whatever
   // scale the initial random positions happened to produce.
   const flowRef = useRef<ReactFlowInstance<Node<MemberNodeData>, Edge<EdgeData>> | null>(null);
+  // Shared between the d3-force sim and the drag handlers: drag needs
+  // to mutate fx/fy on the sim node directly, and drag-induced sim
+  // position changes shouldn't re-derive the render-coords scale (the
+  // dragged node would drift under your cursor as the bbox shifts).
+  const simNodesByIdRef = useRef<Map<string, SimNode>>(new Map());
+  const normRef = useRef<{ cx: number; cy: number; scale: number } | null>(null);
+  const draggedNodeIdRef = useRef<string | null>(null);
 
   // Edges never change after the subgraph loads — derive instead of
   // duplicating into React state.
@@ -288,8 +297,11 @@ export function WebGraph({
       };
     });
     // Lookup map kept around for paintFromSim — avoids an O(n²) .find
-    // scan on every tick.
+    // scan on every tick. Also exposed via simNodesByIdRef so the
+    // node-drag handlers (outside this effect) can mutate fx/fy on
+    // the dragged node.
     const simNodeById = new Map(simNodes.map((n) => [n.id, n]));
+    simNodesByIdRef.current = simNodeById;
     const simEdges: SimEdge[] = data.edges.map((e) => ({
       source: e.relatorId,
       target: e.relateeId,
@@ -304,7 +316,10 @@ export function WebGraph({
           type: "member",
           position: { x: sn?.x ?? 0, y: sn?.y ?? 0 },
           data: { ...n, isCenter: n.id === centerId },
-          draggable: true,
+          // Center node is fx/fy-pinned at the origin; letting the user
+          // drag it would either fight the pin or move "yourself" on
+          // your own web, neither of which is the intent.
+          draggable: n.id !== centerId,
           // Override ReactFlow's default ".react-flow__node{pointer-events: all}"
           // so only the Avatar (pointer-events-auto + clip-path:circle) is a
           // click target. The corners around the round avatar no longer count
@@ -386,22 +401,33 @@ export function WebGraph({
     // the rendered graph fill the viewport regardless of node count.
     function paintFromSim() {
       if (simNodes.length === 0) return;
-      const TARGET = 600;
-      let minX = simNodes[0].x;
-      let maxX = minX;
-      let minY = simNodes[0].y;
-      let maxY = minY;
-      for (let i = 1; i < simNodes.length; i++) {
-        const sn = simNodes[i];
-        if (sn.x < minX) minX = sn.x;
-        else if (sn.x > maxX) maxX = sn.x;
-        if (sn.y < minY) minY = sn.y;
-        else if (sn.y > maxY) maxY = sn.y;
+      // During a drag, freeze the normalization. Recomputing it would
+      // shift cx/cy/scale based on the moving bbox, which makes the
+      // dragged node visually drift away from the cursor.
+      let cx: number;
+      let cy: number;
+      let scale: number;
+      if (draggedNodeIdRef.current && normRef.current) {
+        ({ cx, cy, scale } = normRef.current);
+      } else {
+        const TARGET = 600;
+        let minX = simNodes[0].x;
+        let maxX = minX;
+        let minY = simNodes[0].y;
+        let maxY = minY;
+        for (let i = 1; i < simNodes.length; i++) {
+          const sn = simNodes[i];
+          if (sn.x < minX) minX = sn.x;
+          else if (sn.x > maxX) maxX = sn.x;
+          if (sn.y < minY) minY = sn.y;
+          else if (sn.y > maxY) maxY = sn.y;
+        }
+        const longer = Math.max(maxX - minX, maxY - minY);
+        scale = longer > 1 ? TARGET / longer : 1;
+        cx = (maxX + minX) / 2;
+        cy = (maxY + minY) / 2;
+        normRef.current = { cx, cy, scale };
       }
-      const longer = Math.max(maxX - minX, maxY - minY);
-      const scale = longer > 1 ? TARGET / longer : 1;
-      const cx = (maxX + minX) / 2;
-      const cy = (maxY + minY) / 2;
 
       setNodes((prev) => {
         let changed = false;
@@ -421,6 +447,9 @@ export function WebGraph({
         return changed ? next : prev;
       });
 
+      // Skip auto-refit during drag — the user is steering the layout,
+      // shifting the viewport under them mid-drag is disorienting.
+      if (draggedNodeIdRef.current) return;
       const now = performance.now();
       if (now - lastFit >= FIT_MS) {
         lastFit = now;
@@ -437,6 +466,59 @@ export function WebGraph({
       sim.stop();
     };
   }, [data]);
+
+  // Required for ReactFlow's drag to actually update positions in our
+  // controlled `nodes` state; without it, drag fires events that go
+  // nowhere and the node visually doesn't move.
+  const onNodesChange = useCallback((changes: NodeChange<Node<MemberNodeData>>[]) => {
+    setNodes((nds) => applyNodeChanges(changes, nds));
+  }, []);
+
+  // Drag handlers integrate the user with the d3-force sim: pinning
+  // the dragged node via fx/fy lets the rest of the graph relax
+  // around the new position. On release, fx/fy is cleared so the node
+  // re-enters the sim's normal physics.
+  const flowPositionToSim = useCallback((flow: { x: number; y: number }) => {
+    const norm = normRef.current;
+    if (!norm) return null;
+    return { x: flow.x / norm.scale + norm.cx, y: flow.y / norm.scale + norm.cy };
+  }, []);
+  const onNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: Node<MemberNodeData>) => {
+      const simNode = simNodesByIdRef.current.get(node.id);
+      const sim = flowPositionToSim(node.position);
+      if (!simNode || !sim) return;
+      draggedNodeIdRef.current = node.id;
+      simNode.fx = sim.x;
+      simNode.fy = sim.y;
+      // alphaTarget keeps the sim warm for the duration of the drag —
+      // without it, alpha decays past alphaMin (~5s on defaults) and
+      // ticks stop firing, freezing the layout mid-pull. alpha(0.3)
+      // gives an immediate burst, alphaTarget(0.3) keeps it there.
+      simRef.current?.alphaTarget(0.3).alpha(0.3).restart();
+    },
+    [flowPositionToSim],
+  );
+  const onNodeDrag = useCallback(
+    (_event: React.MouseEvent, node: Node<MemberNodeData>) => {
+      const simNode = simNodesByIdRef.current.get(node.id);
+      const sim = flowPositionToSim(node.position);
+      if (!simNode || !sim) return;
+      simNode.fx = sim.x;
+      simNode.fy = sim.y;
+    },
+    [flowPositionToSim],
+  );
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node<MemberNodeData>) => {
+    const simNode = simNodesByIdRef.current.get(node.id);
+    if (simNode) {
+      simNode.fx = null;
+      simNode.fy = null;
+    }
+    // Release the alpha target so the sim cools normally back to rest.
+    simRef.current?.alphaTarget(0);
+    draggedNodeIdRef.current = null;
+  }, []);
 
   const empty = !data || data.nodes.length === 0;
 
@@ -474,6 +556,10 @@ export function WebGraph({
           onInit={(instance) => {
             flowRef.current = instance;
           }}
+          onNodesChange={onNodesChange}
+          onNodeDragStart={onNodeDragStart}
+          onNodeDrag={onNodeDrag}
+          onNodeDragStop={onNodeDragStop}
           nodesConnectable={false}
           elementsSelectable={false}
           proOptions={{ hideAttribution: true }}
