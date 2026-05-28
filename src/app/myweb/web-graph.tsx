@@ -20,7 +20,7 @@ import {
 } from "@xyflow/react";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
@@ -114,28 +114,53 @@ function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
 
 const nodeTypes = { member: MemberNode };
 
+// Lets the edge label pop the relating dialog without threading a
+// callback through the edge data object (which would defeat the edges
+// useMemo). NumberedEdge is registered via ReactFlow's edgeTypes prop;
+// the Provider wraps ReactFlow so context still propagates to it.
+const EdgeRelatingContext = createContext<((target: RelatingTarget) => void) | null>(null);
+
 // Straight-line edge with an HTML circle label at the geometric midpoint
 // of the line between source and target. ReactFlow's default bezier
 // edges arc upward (both ends are Position.Top), so their parametric
 // midpoint sits above the visual line — using a straight edge keeps the
 // label on the line, and HTML labels (via EdgeLabelRenderer) give us a
 // real circular pill that an SVG <rect> can't.
+
 function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: EdgeProps<Edge<EdgeData>>) {
   const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
+  const openRelating = useContext(EdgeRelatingContext);
+  const isClickable = data?.isOutgoing === true && openRelating !== null;
+  const handleClick = isClickable
+    ? () =>
+        openRelating?.({
+          id: data.relateeId,
+          displayName: data.relateeName,
+          currentValue: isRelationValue(data.value) ? data.value : null,
+        })
+    : undefined;
   return (
     <>
       <BaseEdge id={id} path={edgePath} style={style} />
       <EdgeLabelRenderer>
-        <div
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={!isClickable}
+          aria-label={isClickable ? "Adjust your rating" : undefined}
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            pointerEvents: "none",
+            // Restore pointer events so the label catches clicks; the
+            // SVG edge path underneath only covers a few px of the line.
+            pointerEvents: "auto",
           }}
-          className="flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground"
+          className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground ${
+            isClickable ? "cursor-pointer hover:bg-canvas/90" : "cursor-default"
+          }`}
         >
           {data?.value}
-        </div>
+        </button>
       </EdgeLabelRenderer>
     </>
   );
@@ -153,12 +178,7 @@ function parseStoredView(raw: string | null): SubgraphViewOptions | null {
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "hops" in parsed &&
-      (parsed.hops === 1 || parsed.hops === 2)
-    ) {
+    if (typeof parsed === "object" && parsed !== null && "hops" in parsed && (parsed.hops === 1 || parsed.hops === 2)) {
       return { hops: parsed.hops };
     }
   } catch {
@@ -433,105 +453,107 @@ export function WebGraph({
       data-tour="graph"
       className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
-        onInit={(instance) => {
-          flowRef.current = instance;
-        }}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        proOptions={{ hideAttribution: true }}
-        onNodeClick={(_event, node) => {
-          // Re-center the viewport on the clicked node so members can
-          // explore the graph without navigating away. Double-click
-          // navigates to the member's profile page.
-          flowRef.current?.setCenter(node.position.x, node.position.y, {
-            zoom: flowRef.current.getZoom(),
-            duration: 400,
-          });
-        }}
-        onNodeDoubleClick={(_event, node) => {
-          const slug = node.data.slug ?? node.data.id;
-          router.push(`/members/${slug}`);
-        }}
-        onEdgeClick={(_event, edge) => {
-          // Re-rate is only available on edges I authored. Incoming-only
-          // edges (someone else rated me, I haven't reciprocated) route
-          // through the suggestion feed instead.
-          const data = edge.data as EdgeData | undefined;
-          if (!data?.isOutgoing) return;
-          onOpenRelating({
-            id: data.relateeId,
-            displayName: data.relateeName,
-            currentValue: isRelationValue(data.value) ? data.value : null,
-          });
-        }}
-      >
-        {/* Built-in +/-/fit-view buttons for users who can't or don't
-         * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
-         * is hidden — selection and connection are already disabled. */}
-        <Controls position="top-left" showInteractive={false} />
-        <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
-          {/* Click-to-toggle (not hover) so the hints stay reachable on
-           * touch devices where hover doesn't exist. */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
-            aria-expanded={hintOpen}
-            aria-controls="web-graph-hints"
-            onClick={() => setHintOpen((h) => !h)}
-            className="rounded-full border border-border bg-background/90 font-bold"
-          >
-            ?
-          </Button>
-          {hintOpen && (
-            <div
-              id="web-graph-hints"
-              className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
-            >
-              <ul className="flex flex-col gap-1">
-                <li>Drag the background to pan.</li>
-                <li>Scroll or pinch to zoom.</li>
-                <li>Single-click a node to center the view on it.</li>
-                <li>Double-click a node to open their profile.</li>
-                <li>
-                  <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
-                </li>
-              </ul>
-              <button
-                type="button"
-                onClick={() => {
-                  setHintOpen(false);
-                  onReplayTour();
-                }}
-                className="self-start text-foreground underline underline-offset-2 hover:text-primary"
-              >
-                Replay guided tour
-              </button>
-            </div>
-          )}
-        </Panel>
-        <Panel
-          position="top-right"
-          className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+      <EdgeRelatingContext.Provider value={onOpenRelating}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.15 }}
+          onInit={(instance) => {
+            flowRef.current = instance;
+          }}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          proOptions={{ hideAttribution: true }}
+          onNodeClick={(_event, node) => {
+            // Re-center the viewport on the clicked node so members can
+            // explore the graph without navigating away. Double-click
+            // navigates to the member's profile page.
+            flowRef.current?.setCenter(node.position.x, node.position.y, {
+              zoom: flowRef.current.getZoom(),
+              duration: 400,
+            });
+          }}
+          onNodeDoubleClick={(_event, node) => {
+            const slug = node.data.slug ?? node.data.id;
+            router.push(`/members/${slug}`);
+          }}
+          onEdgeClick={(_event, edge) => {
+            // Re-rate is only available on edges I authored. Incoming-only
+            // edges (someone else rated me, I haven't reciprocated) route
+            // through the suggestion feed instead.
+            const data = edge.data as EdgeData | undefined;
+            if (!data?.isOutgoing) return;
+            onOpenRelating({
+              id: data.relateeId,
+              displayName: data.relateeName,
+              currentValue: isRelationValue(data.value) ? data.value : null,
+            });
+          }}
         >
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={view.hops === 2}
-              onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
-            />
-            2 hops
-          </label>
-        </Panel>
-      </ReactFlow>
+          {/* Built-in +/-/fit-view buttons for users who can't or don't
+           * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+           * is hidden — selection and connection are already disabled. */}
+          <Controls position="top-left" showInteractive={false} />
+          <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+            {/* Click-to-toggle (not hover) so the hints stay reachable on
+             * touch devices where hover doesn't exist. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+              aria-expanded={hintOpen}
+              aria-controls="web-graph-hints"
+              onClick={() => setHintOpen((h) => !h)}
+              className="rounded-full border border-border bg-background/90 font-bold"
+            >
+              ?
+            </Button>
+            {hintOpen && (
+              <div
+                id="web-graph-hints"
+                className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+              >
+                <ul className="flex flex-col gap-1">
+                  <li>Drag the background to pan.</li>
+                  <li>Scroll or pinch to zoom.</li>
+                  <li>Single-click a node to center the view on it.</li>
+                  <li>Double-click a node to open their profile.</li>
+                  <li>
+                    <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
+                  </li>
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHintOpen(false);
+                    onReplayTour();
+                  }}
+                  className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+                >
+                  Replay guided tour
+                </button>
+              </div>
+            )}
+          </Panel>
+          <Panel
+            position="top-right"
+            className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+          >
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={view.hops === 2}
+                onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
+              />
+              2 hops
+            </label>
+          </Panel>
+        </ReactFlow>
+      </EdgeRelatingContext.Provider>
     </div>
   );
 }
