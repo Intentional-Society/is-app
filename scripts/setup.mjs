@@ -2,10 +2,24 @@
 // One-time setup for new developers. Safe to re-run — every step is idempotent.
 // Extend by adding more step functions below and calling them from main().
 
+import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "..");
+
+function ensureLefthookInstalled() {
+  // Wires lefthook's binary into .git/hooks. Re-running is a no-op.
+  const result = spawnSync("npx", ["lefthook", "install"], {
+    cwd: repoRoot,
+    stdio: "inherit",
+    shell: true,
+  });
+  if (result.status !== 0) {
+    console.error("  lefthook install failed — pre-commit formatting will not run");
+    process.exit(1);
+  }
+}
 
 function ensureLocalEnv() {
   const target = resolve(repoRoot, ".env.local");
@@ -28,8 +42,11 @@ function ensureLocalEnv() {
 function main() {
   console.log("Setting up is-app for local development...\n");
 
-  console.log("1. (and only step currently) Environment file");
+  console.log("1. Environment file");
   ensureLocalEnv();
+
+  console.log("\n2. Git hooks (lefthook)");
+  ensureLefthookInstalled();
 
   console.log("\nDone. Next: run `npm run dev` (Docker Desktop must be running).");
 }

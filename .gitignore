@@ -37,8 +37,13 @@ Thumbs.db
 playwright-report/
 test-results/
 
-# claude
-.claude/
+# claude — ignore everything in .claude/ EXCEPT shared team files: the
+# project-scoped settings (PostToolUse hook config) and the hook scripts
+# the settings reference. Per-developer state (`.claude/settings.local.json`)
+# stays ignored.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .vercel
 
 # agent scratch notes — emergent design decisions, working memory

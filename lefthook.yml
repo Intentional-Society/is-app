@@ -1,0 +1,21 @@
+# Lefthook pre-commit hook — auto-formats staged JS/TS/JSON/CSS files via
+# Biome before they land in a commit, then re-stages the fixes.
+#
+# `npm test` and CI also enforce Biome, but this saves the round-trip of
+# discovering format violations only at PR time. Scoped to staged files,
+# not the whole repo, so commits stay fast.
+#
+# Bypass: `git commit --no-verify`.
+# Install: `npx lefthook install` (also run by `npm run setup`).
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: biome
+      glob: "*.{js,jsx,ts,tsx,json,jsonc,css}"
+      # --no-errors-on-unmatched: lefthook may pass paths Biome's `includes`
+      #   excludes; don't fail the commit on those.
+      # --files-ignore-unknown=true: skip files Biome doesn't recognize
+      #   rather than erroring.
+      run: npx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true

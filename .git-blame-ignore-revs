@@ -1,0 +1,7 @@
+# Revisions listed here are skipped by `git blame` and by GitHub's blame view.
+# Add commits that are pure formatting / mechanical reformatting, never logic
+# changes. To honor this locally:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# chore: tighten biome scope + baseline format pass (issue #140)
+9a6cd6b
