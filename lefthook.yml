@@ -13,9 +13,11 @@ pre-commit:
   jobs:
     - name: biome
       glob: "*.{js,jsx,ts,tsx,json,jsonc,css}"
-      # --no-errors-on-unmatched: lefthook may pass paths Biome's `includes`
-      #   excludes; don't fail the commit on those.
-      # --files-ignore-unknown=true: skip files Biome doesn't recognize
-      #   rather than erroring.
-      run: npx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      # Wrapper runs biome on the staged files AND logs whether any
+      # reformatting happened to .scratch/biome-precommit-stats.log.
+      # The stats answer "would a per-edit Claude format hook have
+      # been worth its overhead?" — see scripts/biome-precommit.mjs
+      # header for context. Remove the wrapper indirection once that
+      # question is settled and revert this to a direct biome call.
+      run: node scripts/biome-precommit.mjs {staged_files}
       stage_fixed: true
