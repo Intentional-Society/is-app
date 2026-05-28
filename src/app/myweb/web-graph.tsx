@@ -252,6 +252,11 @@ export function WebGraph({
   // True once the user pans/zooms — auto-fitView during sim ticks
   // would otherwise yank the viewport back every ~250ms.
   const userMovedViewportRef = useRef(false);
+  // True once paintFromSim has run a one-shot fit against the
+  // normalized layout. ReactFlow's `fitView` prop fires too early
+  // (before the first paint) and would otherwise leave the viewport
+  // sized for the unnormalized random positions.
+  const initialPaintFittedRef = useRef(false);
 
   // Edges never change after the subgraph loads — derive instead of
   // duplicating into React state.
@@ -378,6 +383,12 @@ export function WebGraph({
     };
 
     const sim = forceSimulation(simNodes)
+      // Default alphaMin is 0.001, which combined with the default
+      // alphaDecay drags the sim out to ~5s with the last ~3.2s being
+      // sub-pixel motion no one can see. Bumping alphaMin cuts the
+      // trailing tail off (~1.8s end) without speeding up the
+      // perceptible early settling.
+      .alphaMin(0.08)
       .force("charge", forceManyBody().strength(-800))
       .force(
         "link",
@@ -456,12 +467,20 @@ export function WebGraph({
         return changed ? next : prev;
       });
 
-      // No periodic fitView here. ReactFlow's `fitView` prop fits on
-      // mount, and the normalization above keeps the layout at a stable
-      // ~TARGET sim units throughout settling — so a one-time fit
-      // covers it. The sim's "end" handler does one more fit when the
-      // layout has fully relaxed, in case the user hasn't taken over
-      // the viewport in the meantime.
+      // One-shot fit on the first normalized paint — ReactFlow's
+      // `fitView` prop fires before this runs, against the unnormalized
+      // 200-unit random layout, so without this the viewport stays
+      // zoomed in for the entire settling phase. After this initial
+      // fit, no periodic refits during settling (the normalization
+      // keeps the layout at a stable ~TARGET sim units). The sim's
+      // "end" handler does one more fit when the layout has fully
+      // relaxed.
+      if (!initialPaintFittedRef.current && !userMovedViewportRef.current) {
+        initialPaintFittedRef.current = true;
+        requestAnimationFrame(() => {
+          flowRef.current?.fitView({ padding: 0.15, duration: 0 });
+        });
+      }
     }
 
     simRef.current?.stop();
@@ -613,11 +632,12 @@ export function WebGraph({
               >
                 <ul className="flex flex-col gap-1">
                   <li>Drag the background to pan.</li>
+                  <li>Drag a circle to reposition it.</li>
                   <li>Scroll or pinch to zoom.</li>
-                  <li>Single-click a node to center the view on it.</li>
-                  <li>Double-click a node to open their profile.</li>
+                  <li>Single-click a circle to center the view on it.</li>
+                  <li>Double-click a circle to open their profile.</li>
                   <li>
-                    <span className="font-medium text-foreground">2 hops</span> adds friends of friends.
+                    <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
                   </li>
                 </ul>
                 <button
