@@ -249,6 +249,9 @@ export function WebGraph({
   const simNodesByIdRef = useRef<Map<string, SimNode>>(new Map());
   const normRef = useRef<{ cx: number; cy: number; scale: number } | null>(null);
   const draggedNodeIdRef = useRef<string | null>(null);
+  // True once the user pans/zooms — auto-fitView during sim ticks
+  // would otherwise yank the viewport back every ~250ms.
+  const userMovedViewportRef = useRef(false);
 
   // Edges never change after the subgraph loads — derive instead of
   // duplicating into React state.
@@ -335,10 +338,7 @@ export function WebGraph({
     // Without this throttle a dev build can render-storm so hard the
     // browser never paints between frames and the simulation looks blank.
     const FRAME_MS = 50;
-    // fitView is not free; throttle to ~4×/sec instead of every paint.
-    const FIT_MS = 250;
     let lastUpdate = 0;
-    let lastFit = 0;
     // No forceCenter — the viewing member is already pinned at the
     // origin via fx/fy, so forceCenter would only pull the other nodes
     // toward the pinned center, fighting the link-distance equilibrium
@@ -393,7 +393,16 @@ export function WebGraph({
         lastUpdate = now;
         paintFromSim();
       })
-      .on("end", () => paintFromSim());
+      .on("end", () => {
+        paintFromSim();
+        // One-shot refit once the layout has fully relaxed, unless the
+        // user has already taken over the viewport.
+        if (!userMovedViewportRef.current) {
+          requestAnimationFrame(() => {
+            flowRef.current?.fitView({ padding: 0.15, duration: 200 });
+          });
+        }
+      });
 
     // Paints React node positions from the live simNodes, normalized so
     // the layout's longer axis spans TARGET sim units and is centered
@@ -447,16 +456,12 @@ export function WebGraph({
         return changed ? next : prev;
       });
 
-      // Skip auto-refit during drag — the user is steering the layout,
-      // shifting the viewport under them mid-drag is disorienting.
-      if (draggedNodeIdRef.current) return;
-      const now = performance.now();
-      if (now - lastFit >= FIT_MS) {
-        lastFit = now;
-        requestAnimationFrame(() => {
-          flowRef.current?.fitView({ padding: 0.15, duration: 0 });
-        });
-      }
+      // No periodic fitView here. ReactFlow's `fitView` prop fits on
+      // mount, and the normalization above keeps the layout at a stable
+      // ~TARGET sim units throughout settling — so a one-time fit
+      // covers it. The sim's "end" handler does one more fit when the
+      // layout has fully relaxed, in case the user hasn't taken over
+      // the viewport in the meantime.
     }
 
     simRef.current?.stop();
@@ -555,6 +560,11 @@ export function WebGraph({
           fitViewOptions={{ padding: 0.15 }}
           onInit={(instance) => {
             flowRef.current = instance;
+          }}
+          onMove={(event) => {
+            // Programmatic fitView calls pass event=null; only flip the
+            // flag on user gestures (MouseEvent / TouchEvent / Wheel).
+            if (event !== null) userMovedViewportRef.current = true;
           }}
           onNodesChange={onNodesChange}
           onNodeDragStart={onNodeDragStart}
