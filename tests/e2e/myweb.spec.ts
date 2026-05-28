@@ -61,8 +61,8 @@ test.describe("/myweb — first-time welcome tour", () => {
     await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 
-    await expect(page.getByText("Welcome to your relational web")).toBeVisible({ timeout: 5_000 });
-    await page.getByRole("button", { name: /^Skip$/ }).click();
-    await expect(page.getByText("Welcome to your relational web")).toBeHidden();
+    await expect(page.getByText("Mapping your relational web")).toBeVisible({ timeout: 5_000 });
+    await page.getByRole("button", { name: /^Dismiss tour$/ }).click();
+    await expect(page.getByText("Mapping your relational web")).toBeHidden();
   });
 });
