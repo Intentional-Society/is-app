@@ -71,13 +71,15 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
     }
     ```
 
-    Populate on cold cache, in parallel:
+    Populate on cold cache. Steps (1) and (2) run in parallel; step (3) fans out per-login after (1) returns and the bot filter is applied:
 
     1. `gh api 'repos/<owner>/<repo>/collaborators' --paginate --jq '.[].login'` — full collaborator list.
     2. `gh api user --jq '.login'` — the running human's login (stored as `self`).
     3. For each surviving login, `gh api users/<login> --jq '.name // .login'` in parallel — display names. `// .login` returns the login when `.name` is null.
 
     Apply the **bot filter** to (1) before writing the cache: drop `github-advanced-security`, `copilot-pull-request-reviewer`, `claude`, any login starting with `app/`, any login containing `[bot]`. Maintain the list here in the SKILL.md as GitHub adds new advisory bots over time.
+
+    <!-- TODO(PR#305-followup): bot filter is applied at cache-write time, so existing teammate caches don't auto-invalidate when this list changes. Self-heals on the next `gh pr create --reviewer` rejection via the refresh-on-rejection path — at the cost of one wasted prompt cycle. Worth an explicit "force-refresh on filter version bump" if that cycle ever matters in practice. -->
 
     **Refresh triggers** (any one):
     - `refreshedAt` is older than **15 days**.
@@ -97,10 +99,10 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
 
     **Accept the human's reply** in any of these shapes and resolve to a list of GitHub logins:
 
-    - Numbers (`1 3`, `1,3`, `1, 3`) — positional pick from the rendered order.
+    - Numbers (`1 3`, `1,3`, `1, 3`) — positional pick from the rendered order. If any number is out of range (e.g., `7` when only 5 entries are rendered), surface the invalid index and re-ask rather than partial-resolve.
     - Display names or partial names (`james and benji`, `Alexis`) — match against the cached display-name dictionary. On ambiguity, ask one clarifying question rather than guess.
     - Exact logins (`james-baker, benjifriedman`) — passed through after validating against the cache.
-    - `all` / `everyone` / `whole team` — every collaborator except `self`.
+    - `all` / `everyone` / `whole team` — every collaborator except `self`. If the resulting set is empty (one-person repo where `self` is the only collaborator), treat as `none`.
     - `none` / blank / `skip` — no reviewers.
     - `refresh` — refresh the team cache and re-render the picker.
 
