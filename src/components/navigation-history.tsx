@@ -15,9 +15,7 @@ export function NavigationHistory() {
     try {
       const raw = window.sessionStorage.getItem(HISTORY_KEY);
       const parsed: unknown = raw ? JSON.parse(raw) : [];
-      const stack: string[] = Array.isArray(parsed)
-        ? parsed.filter((x): x is string => typeof x === "string")
-        : [];
+      const stack: string[] = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
       const last = stack[stack.length - 1];
       if (last === pathname) return;
       const prev = stack[stack.length - 2];

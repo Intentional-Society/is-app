@@ -4,4 +4,4 @@
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 # chore: tighten biome scope + baseline format pass (issue #140)
-9a6cd6b
+4c2a6b5

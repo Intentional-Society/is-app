@@ -202,8 +202,7 @@ describe("GET /auth/callback (invited sign-in, invite query param)", () => {
     await deleteAuthUser(inviterId);
   });
 
-  const callbackUrl = (inviteCode: string) =>
-    `/auth/callback?token_hash=hash&type=email&invite=${inviteCode}`;
+  const callbackUrl = (inviteCode: string) => `/auth/callback?token_hash=hash&type=email&invite=${inviteCode}`;
 
   it("redeems a valid invite and stamps referredBy + displayName", async () => {
     const r = await createInvite({

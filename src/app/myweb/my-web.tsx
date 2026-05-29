@@ -94,12 +94,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
       <div className="relative w-full">
         <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
           {mode === "edit" ? (
-            <Button
-              variant="secondary"
-              data-tour="done-button"
-              disabled={markDone.isPending}
-              onClick={handleDoneClick}
-            >
+            <Button variant="secondary" data-tour="done-button" disabled={markDone.isPending} onClick={handleDoneClick}>
               {markDone.isPending ? "Saving…" : "Done"}
             </Button>
           ) : (

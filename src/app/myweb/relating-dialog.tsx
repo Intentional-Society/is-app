@@ -144,7 +144,9 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
             </p>
           )}
 
-          <p className="mt-3 text-xs text-muted-foreground">Keyboard shortcuts: Number keys 1 through 4, or Esc to cancel</p>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Keyboard shortcuts: Number keys 1 through 4, or Esc to cancel
+          </p>
 
           <div className="mt-2 flex flex-col gap-2">
             {RELATION_VALUES.map((value) => {
@@ -177,8 +179,8 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
           )}
 
           <p className="mt-3 text-xs text-muted-foreground">
-            Notes: Yes, these become visible to them and others. It&apos;s okay to pick a different relation value than they
-            do for you! Everyone will have their own slightly unique interpretation.
+            Notes: Yes, these become visible to them and others. It&apos;s okay to pick a different relation value than
+            they do for you! Everyone will have their own slightly unique interpretation.
           </p>
         </Dialog.Popup>
       </Dialog.Portal>

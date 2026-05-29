@@ -31,7 +31,8 @@ const STEPS: Step[] = [
   {
     target: "[data-tour='done-button']",
     title: "Finish by clicking Done",
-    content: "No notifications are sent, but your relations become hints for others. Click Done now! (You can add more anytime.)",
+    content:
+      "No notifications are sent, but your relations become hints for others. Click Done now! (You can add more anytime.)",
     placement: "left",
     // No primary button on the final step — the spotlighted Done
     // button on the page is the only finisher.
