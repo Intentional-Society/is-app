@@ -36,7 +36,7 @@ function SentView({ email, origin }: { email: string; origin: string }) {
     await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${origin}/`,
+        emailRedirectTo: `${origin}/auth/callback?type=email`,
         shouldCreateUser: false,
       },
     });
@@ -109,7 +109,13 @@ export function SigninForm() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        // The full callback URL travels as `emailRedirectTo` so the
+        // email's action link points back at the origin the form was
+        // submitted on. Templates use `.RedirectTo` directly as the
+        // action URL host — see docs/design-emails.md. Without this,
+        // preview-deploy emails would always land users on prod (the
+        // Supabase project's `.SiteURL`).
+        emailRedirectTo: `${window.location.origin}/auth/callback?type=email`,
         // Block auto-creation of users via this form. Keeps auth.users
         // from accumulating rows when a bot (or a typo) submits unknown
         // emails, and closes the loophole where a pre-existing row with

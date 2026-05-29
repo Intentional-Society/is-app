@@ -6,7 +6,9 @@ Covers both the hosted production project (configured via the Supabase dashboard
 
 ## Magic-link flow (token-hash + verifyOtp)
 
-The magic-link and password-reset emails embed `{{ .TokenHash }}` directly in a URL pointing at `/auth/callback?token_hash=…&type=…&next=…`. The route calls `supabase.auth.verifyOtp({ token_hash, type })` server-side, so the link works regardless of which browser opens it. The `next` query param carries the `emailRedirectTo` URL the form passed and tells the route where to land the user post-verification.
+The magic-link and password-reset emails embed `{{ .TokenHash }}` directly in a URL pointing at `/auth/callback?type=…&token_hash=…`. The route calls `supabase.auth.verifyOtp({ token_hash, type })` server-side, so the link works regardless of which browser opens it.
+
+The forms pass the full callback URL as `emailRedirectTo`, and templates use `{{ .RedirectTo }}` as the action URL host. That keeps the link env-aware — preview-deploy emails point at the preview origin, not at `.SiteURL` (which is hardcoded to prod). Signup adds `&invite=${code}` to the callback URL; the route reads it directly from its query params.
 
 PKCE is still the configured client `flowType` and still governs session cookies / refresh-token rotation. Only the email-verification step is bypassed by the token-hash flow. See `docs/old-archive/plan-cross-browser-magic-link.md` for the migration rationale.
 
@@ -69,7 +71,7 @@ These settings control where Supabase redirects users after magic-link sign-in. 
 
 Local dev does **not** need entries here — it hits the local Supabase stack, whose allowlist is in `supabase/config.toml`. Only add `localhost` / `127.0.0.1` to this prod allowlist if a developer intentionally points their local frontend at prod Supabase (rare, and sends real magic-link emails).
 
-The bare `/*` covers all three `emailRedirectTo` targets the forms pass: `/` (signin), `/?invite=<code>` (signup), and `/auth/reset-password` (forgot-password). Anything more specific would need a separate entry per target. Without a matching wildcard, Supabase rejects the URL and silently falls back to **Site URL**, stranding the user at `/` with no session.
+The bare `/*` covers the `emailRedirectTo` targets all three forms pass — `/auth/callback?type=email`, `/auth/callback?type=email&invite=<code>`, and `/auth/callback?type=recovery`. Anything more specific would need a separate entry per target. Without a matching wildcard, Supabase rejects the URL and silently falls back to **Site URL**, stranding the user at the prod origin with no session.
 
 ### Auth providers
 

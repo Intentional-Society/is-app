@@ -203,8 +203,29 @@ Supabase substitutes Go-template variables before sending. The ones in use:
 The action-URL pattern both reachable templates use:
 
 ```
-{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=<email|recovery>&next={{ .RedirectTo }}
+{{ .RedirectTo }}&token_hash={{ .TokenHash }}
 ```
+
+`.RedirectTo` is the `emailRedirectTo` URL the form passed; the forms
+build it as the full callback URL with `type` and (for signup) `invite`
+already in the query string:
+
+| Form              | `emailRedirectTo`                                                 |
+| ----------------- | ----------------------------------------------------------------- |
+| `/signin`         | `${origin}/auth/callback?type=email`                              |
+| `/signup`         | `${origin}/auth/callback?type=email&invite=${code}`               |
+| `/forgot-password`| `${origin}/auth/callback?type=recovery`                           |
+
+This is what makes preview-deploy emails work: the action URL's host
+comes from the form's `window.location.origin` (preview / prod /
+localhost), not from `.SiteURL` (which is hardcoded to prod in the
+Supabase project config). Templates contribute only `&token_hash=…`.
+
+Each `emailRedirectTo` must match Supabase's redirect-URL allowlist
+([`doc-supabase.md`](./doc-supabase.md) → "Authentication → URL
+Configuration"). The wildcard entries already cover the `/auth/callback?…`
+path on all three target origins — no allowlist edit is needed when
+the query string changes.
 
 Templates are HTML; Supabase wraps them in a minimal MIME envelope. Email
 clients vary wildly in CSS support — keep styling inline and conservative
