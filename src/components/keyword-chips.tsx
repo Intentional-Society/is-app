@@ -10,15 +10,16 @@ export function KeywordChips({
   max?: number;
   className?: string;
 }) {
-  if (keywords.length === 0) return null;
+  const unique = [...new Set(keywords)];
+  if (unique.length === 0) return null;
   return (
     <div className={className}>
-      {keywords.slice(0, max).map((kw) => (
-        <span key={kw} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+      {unique.slice(0, max).map((kw, i) => (
+        <span key={`${kw}-${i}`} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           {kw}
         </span>
       ))}
-      {keywords.length > max && (
+      {unique.length > max && (
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">…</span>
       )}
     </div>

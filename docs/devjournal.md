@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-29 | Benji | Fix duplicate keywords (#219)
+
+De-duplicate keywords on save in `parseEditableProfile` (server-side) and in `KeywordChips` (client-side). Fixes the React duplicate-key warning and prevents visually identical chips from rendering. Added a functional test asserting dedup on PUT /me.
+
 ## 2026-05-28 | Benji | Give Feedback card on homepage
 
 Added a 6th card to the logged-in homepage grid linking to the Google Form feedback survey. Opens in a new tab, styled to match the existing NavCard pattern.
