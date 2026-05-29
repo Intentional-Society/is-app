@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-29 | Blake | Biome enforcement + codebase baseline (#307)
+
+One-time baseline format pass on ~50 files of accumulated drift, plus three Biome enforcement layers: `npm test` gate, lefthook pre-commit auto-fix, and `biome ci .` in CI. Considered a per-edit Claude Code hook but dropped it — npx overhead was ~1.1s per Edit/Write; `scripts/biome-precommit.mjs` logs telemetry to inform whether to revisit. New `.git-blame-ignore-revs` skips the baseline commit; `npm run setup` wires the local `git config`.
+
 ## 2026-05-29 | Benji | Fix duplicate keywords (#219)
 
 De-duplicate keywords on save in `parseEditableProfile` (server-side) and in `KeywordChips` (client-side). Fixes the React duplicate-key warning and prevents visually identical chips from rendering. Added a functional test asserting dedup on PUT /me.
