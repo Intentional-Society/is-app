@@ -37,3 +37,7 @@ Branch protection enforces *up-to-date-with-main* before the merge button works 
 Default to a merge commit (`gh pr merge --merge --delete-branch`). The merge commit preserves the branch boundary: `git log --first-parent main` reads as one line per PR, with each PR's individual commits still reachable through the merge commit's second parent. Squash loses the commits; rebase keeps the commits but loses the boundary.
 
 `--delete-branch` removes the local and remote branch copies in one shot. Repository settings disable squash and rebase merging entirely, so the merge button can't pick a different method by accident — see `docs/doc-github.md` for the full PR settings.
+
+### Related Skills
+
+`/commit` (`.claude/skills/commit/SKILL.md`) auto-creates a feature branch when invoked on `main`; `/pr` (`.claude/skills/pr/SKILL.md`) rebases onto `origin/main` when main has moved and re-runs `npm test` before pushing; `/ship` (`.claude/skills/ship/SKILL.md`) handles the merge step (`gh pr merge --merge --delete-branch`) and tidies the local branch.

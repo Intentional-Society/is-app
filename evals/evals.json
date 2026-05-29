@@ -1,0 +1,96 @@
+{
+  "$comment": "Eval prompt definitions for the three portable AI procedure Skills (/commit, /pr, /ship). Each entry is the realistic user prompt that would invoke the Skill in production, plus an expected_output description of correct behavior. Prompts are taken from docs/plan-portable-ai-procedures.md sections 4.1, 4.2, 4.3. This file is a committed acceptance artifact, not a generated run output.",
+  "skills": [
+    {
+      "skill_name": "commit",
+      "skill_path": ".claude/skills/commit/SKILL.md",
+      "spec_section": "docs/spec-portable-ai-procedures.md §4.1",
+      "evals": [
+        {
+          "id": "commit-1-happy-path",
+          "eval_name": "happy-path-feature-branch-cc-subject",
+          "prompt": "/commit \"fix profile redirect\"",
+          "preconditions": "On a dirty feature branch (not main); a handful of modified files in src/ related to the profile-redirect bug; no .env or generated artifacts in the diff; gh is authenticated.",
+          "expected_output": "Skill stages only the explicit profile-redirect paths (no `git add -A`), runs the suspicious-file blocker (clean), runs `npm test` (pass), drafts a Conventional Commit-style subject like `fix: fix profile redirect` (≤70 chars) with Summary/Why/Behavior/Test Plan body sections and the `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` trailer, shows the bundled approval block (message + staged payload + no devjournal since this is a bugfix), awaits Y/n, then commits and pushes. Reports SHA + tracking info."
+        },
+        {
+          "id": "commit-2-refusal-suspicious-file",
+          "eval_name": "refusal-env-local-in-payload",
+          "prompt": "/commit \"add user endpoint\"",
+          "preconditions": "On a feature branch with a few edits to src/server/api.ts AND a modified `.env.local` in the working tree; no staging done yet.",
+          "expected_output": "Skill identifies `.env.local` as a suspicious-file blocker match (`.env*` rule), refuses to stage it, surfaces the filename, and asks the human for direction (remove from payload, include intentionally, or split). Does NOT proceed to `npm test` or commit. Does NOT use `git add -A`."
+        },
+        {
+          "id": "commit-3-edge-schema-expand-and-combined-refusal",
+          "eval_name": "schema-expand-surface-plus-combined-expand-contract-refusal",
+          "prompt": "/commit #142",
+          "preconditions": "Issue 142 is open and describes a schema change. Two sub-scenarios are evaluated under this id:\n  (a) Payload contains only an expand change to `src/server/schema.ts` and a new `drizzle/0019_add_column.sql`. Expected: Skill correctly identifies the expand phase, surfaces in the approval block that `/ship` will need to run `npm run prod:db:expand` after PR creation (with the `prod-db` maintainer-approval gate) and that the post-deploy `e2e.yml` must pass before merge, then proceeds normally through `npm test` + approval + commit + push.\n  (b) Payload contains an expand change AND a contract change to `src/server/schema.ts` in the same commit (a column added and a different column dropped). Expected: Skill refuses with `Refuse combined expand+contract payloads`, asks the human to split into two commits in deploy order (expand first, contract second).",
+          "expected_output": "(a) Expand-only: schema-expand wait narration appears in the approval block; commit proceeds normally. (b) Combined: hard refusal naming both phases; no commit happens."
+        }
+      ]
+    },
+    {
+      "skill_name": "pr",
+      "skill_path": ".claude/skills/pr/SKILL.md",
+      "spec_section": "docs/spec-portable-ai-procedures.md §4.2",
+      "evals": [
+        {
+          "id": "pr-1-happy-path-existing-pr",
+          "eval_name": "happy-path-existing-pr-comment-on-push",
+          "prompt": "/pr",
+          "preconditions": "On a feature branch that has an open PR; 2 new commits ahead of the last push; working tree clean; gh authenticated; `origin/main` has not advanced (rebase is a no-op).",
+          "expected_output": "Skill runs `gh auth status` (pass), confirms tree clean, `git fetch origin main`, `merge-base --is-ancestor` succeeds (no rebase needed), skips the post-rebase `npm test` re-run (rebase was a no-op), `git push -u origin <branch>`, posts a PR-conversation comment summarizing each new commit (one bullet per commit), does NOT update the PR body (no material scope change), prints the PR URL, stops. Does NOT poll CI checks."
+        },
+        {
+          "id": "pr-2-refusal-branch-mismatch",
+          "eval_name": "refusal-pr-on-different-branch",
+          "prompt": "/pr 145",
+          "preconditions": "Current checkout is on branch `feature-x`. PR 145 is on branch `feature-y`. Tree clean; gh authenticated.",
+          "expected_output": "Skill resolves the argument to PR 145 via `gh pr view 145`, detects the branch mismatch, refuses to switch (per `/pr` policy), names both branches in the refusal, and suggests `/ship 145` for switching. No fetch, no push, no PR-side mutation."
+        },
+        {
+          "id": "pr-3-edge-dirty-tree-delegation",
+          "eval_name": "edge-case-delegation-to-commit-then-create-pr",
+          "prompt": "/pr \"wire up dashboard\"",
+          "preconditions": "On a feature branch with uncommitted changes related to a dashboard wiring task; no existing PR; gh authenticated.",
+          "expected_output": "Skill detects dirty tree at the working-tree pre-flight, delegates to `/commit \"wire up dashboard\"` with the same argument. `/commit` runs its full flow (stage, test, approval, commit, push). On return, `/pr` continues: fetch, no-op rebase, no-op re-test, push (already pushed by `/commit`; idempotent), then drafts a CC-format PR title (e.g., `feat: wire up dashboard`) and structured body for human approval, runs `gh pr create` on approval, prints the URL, stops."
+        },
+        {
+          "id": "pr-4-new-pr-cc-title-breaking-change",
+          "eval_name": "new-pr-cc-title-and-breaking-change-flag",
+          "prompt": "/pr",
+          "preconditions": "On a feature branch with no open PR; tree clean; the branch contains a single commit that removes a public API field (a breaking change); gh authenticated; `origin/main` has not advanced (rebase no-op).",
+          "expected_output": "Skill runs `gh auth status`, confirms tree clean, fetch, no-op rebase, no-op re-test, push, then drafts a CC-format title with the breaking-change flag — e.g., `feat!: remove deprecated profile.legacyId field` (≤70 chars). Body includes the `Summary:` / `Why:` / `Behavior:` / `Test Plan:` sections and a `BREAKING CHANGE:` footer explaining the compatibility impact. Surfaces the breaking-change classification in the approval prompt so the human can confirm before `gh pr create`."
+        }
+      ]
+    },
+    {
+      "skill_name": "ship",
+      "skill_path": ".claude/skills/ship/SKILL.md",
+      "spec_section": "docs/spec-portable-ai-procedures.md §4.3",
+      "evals": [
+        {
+          "id": "ship-1-happy-path-preexisting-pr",
+          "eval_name": "happy-path-preexisting-pr-all-green",
+          "prompt": "/ship",
+          "preconditions": "On a feature branch with a pre-existing open PR (not opened during this run); tree clean; `origin/main` has not advanced; required + visible advisory checks (Lint & Functional Tests, E2E, CodeQL) are all green; no schema expand pending.",
+          "expected_output": "Skill runs `gh auth status` (pass), fetch, `merge-base --is-ancestor` succeeds (no rebase, no re-test), no expand dispatch, `gh pr checks <N> --watch` returns all-green immediately, recognizes the PR pre-existed (no second merge confirmation prompt — narrates the merge in one line), runs `gh pr merge <N> --merge --delete-branch` (no `--squash`, no `--merge-title`, no `--body`), tidies (`git switch main && git pull --ff-only && git branch -d <feature-branch>`), captures merge SHA, runs `gh run list --branch main --commit <sha>`, watches the post-merge runs for up to 5 minutes. On all-green within window: reports merge SHA + Vercel production URL + `main: green.`"
+        },
+        {
+          "id": "ship-2-refusal-pending-advisory-past-wait",
+          "eval_name": "refusal-pending-advisory-past-5min-three-options",
+          "prompt": "/ship",
+          "preconditions": "On a feature branch with a pre-existing open PR; tree clean; required check `Lint & Functional Tests` green within 1 minute; advisory E2E still pending after the 5-minute wait window; no `proceed` option offered.",
+          "expected_output": "Skill enters the wait at step 8, waits 5 minutes for advisories, then presents EXACTLY three options: `wait+5`, `troubleshoot`, `abort`. No `proceed` option is offered or accepted. If the human picks `wait+5`, repeats the wait; if `troubleshoot`, exits the wait and surfaces the still-pending check name + URL; if `abort`, abandons the merge attempt without calling `gh pr merge`."
+        },
+        {
+          "id": "ship-3-edge-docs-only-pr",
+          "eval_name": "edge-docs-only-pr-absent-advisories-expected",
+          "prompt": "/ship",
+          "preconditions": "On a docs-only branch (diff confined to `docs/**` and root `CLAUDE.md`) with a pre-existing open PR; tree clean; `Lint & Functional Tests` posts green within seconds via `dorny/paths-filter` skip; Vercel preview is suppressed per `vercel.json`'s `ignoreCommand` so no preview `deployment_status` event fires and preview `e2e.yml` does not run.",
+          "expected_output": "Skill recognizes the docs-only condition, treats absent advisory checks as expected (per `docs/doc-github.md` docs-only rule), does NOT wait 5 minutes for advisories that the docs-only path skipped by design, proceeds on required-green only, runs `gh pr merge --merge --delete-branch`, tidies, captures merge SHA, runs the post-merge watch on `main`. Production builds still run on `main` (including for docs-only merges), so if a production deploy or production `e2e.yml` run appears in the post-merge run list, the Skill reports its result. Reports merge SHA + post-merge status."
+        }
+      ]
+    }
+  ]
+}

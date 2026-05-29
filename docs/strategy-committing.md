@@ -91,3 +91,28 @@ This works because Drizzle's schema is TypeScript code, so removing a column tur
 ## AI-assisted commits
 
 We allow and encourage AI coding support, but you are responsible for the quality of both the code changes and the commit message. Commits made fully by AI assistance include a `Co-Authored-By` trailer for attribution and traceability.
+
+### Conventional Commit style
+
+Commit subjects (and PR titles, since PR titles become the merge commit subject per `merge_commit_title: PR_TITLE` in `docs/doc-github.md`) follow the [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) format:
+
+`<type>[(scope)]: <imperative summary>`, **≤70 characters**.
+
+Repo-observed types: `feat`, `fix`, `a11y`, `test`, `docs`, `chore`. Use the common CC types (`refactor`, `perf`, `ci`, `build`) when they fit. If several apply, pick the dominant intent.
+
+Breaking changes get `!` before the colon AND a `BREAKING CHANGE:` footer in the body that explains the compatibility impact. Example: `feat!: remove deprecated profile.legacyId field`.
+
+Commit body sections, in order: `Summary:` (one sentence), `Why:`, `Behavior:`, `Test Plan:`. Use plain bullets in `Test Plan:`, not Markdown task-list checkboxes — the body becomes the durable merge commit message (`merge_commit_message: PR_BODY`), and unchecked task boxes look like outstanding work. Don't add task-list checkboxes unless they already come from the PR template.
+
+### AI co-author trailer
+
+Every AI-authored commit (whether typed by hand from an AI suggestion or run via `/commit`) ends with a `Co-Authored-By:` trailer. Two paths:
+
+- **Detection path (preferred).** When the agent can read its own model identity from runtime context, emit the canonical form: `Co-Authored-By: <Model Name> <Version> <noreply@anthropic.com>`. Example: `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`.
+- **Fallback path (detection failed).** Ask the human once for the attribution string. Emit `Co-Authored-By: <human-provided string> <noreply@unspecified>` and append a one-line caveat to the commit body: `Note: AI co-author identity provided by human; auto-detection failed.`
+
+v1 is Claude-only — no multi-vendor matrix.
+
+### Related Skills
+
+The `/commit` Skill (`.claude/skills/commit/SKILL.md`) encodes both rules above, plus the suspicious-file blocker, the combined-expand+contract refusal, and the single bundled human approval checkpoint. Run it explicitly as `/commit [issue-or-context]`.
