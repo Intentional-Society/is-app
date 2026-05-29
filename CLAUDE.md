@@ -53,6 +53,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - Schema/API migrations use the **expand-contract pattern** (see `docs/strategy-committing.md`)
 - All pushes trigger Vercel deployment; docs-only changes (`docs/**`, root `CLAUDE.md`) skip automatically (see `docs/strategy-committing.md`)
 - Add `docs/devjournal.md` entries for decisions teammates should know about
+- **Temporary files** (scratch notes, plans, research, intermediate artifacts): create inside the repo under `.scratch/`. If working on a specific issue or PR, use `.scratch/<issue-number>/` as the subdirectory (e.g. `.scratch/133/`). `.scratch/` is gitignored.
 
 ## CI/CD
 
