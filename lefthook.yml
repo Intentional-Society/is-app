@@ -12,7 +12,7 @@ pre-commit:
   parallel: true
   jobs:
     - name: biome
-      glob: "*.{js,jsx,ts,tsx,json,jsonc,css}"
+      glob: "*.{js,jsx,mjs,cjs,ts,tsx,json,jsonc,css}"
       # Wrapper runs biome on the staged files AND logs whether any
       # reformatting happened to .scratch/biome-precommit-stats.log.
       # The stats answer "would a per-edit Claude format hook have
