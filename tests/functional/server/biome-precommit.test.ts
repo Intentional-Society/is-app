@@ -7,9 +7,6 @@
 
 import { describe, expect, it } from "vitest";
 
-// @ts-expect-error — .mjs import; vitest resolves it fine, TS just doesn't
-// have ambient types for the bare-path import. The helpers are
-// dependency-free pure JS so no type info is needed at the call site.
 import { formatStatsLine, parseBiomeFixedCount } from "../../../scripts/biome-precommit.mjs";
 
 describe("parseBiomeFixedCount", () => {
