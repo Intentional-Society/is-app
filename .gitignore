@@ -44,6 +44,8 @@ test-results/
 # and re-include .claude/skills/ explicitly.
 .claude/*
 !.claude/skills/
+# per-machine Skill state (team-cache, etc.) — never commit
+.claude/skills/**/.team-cache.json
 .vercel
 
 # agent scratch notes — emergent design decisions, working memory

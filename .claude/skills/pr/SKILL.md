@@ -43,7 +43,7 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
 
 9. **If no open PR for this branch — draft and create.**
 
-    Draft a PR title and body for human approval, then run `gh pr create`.
+    Draft a PR title, body, and reviewer list for human approval, then run `gh pr create`.
 
     **Title:** same Conventional Commit-style headline rule as `/commit`. `<type>[(scope)]: <imperative summary>`, ≤70 chars, including `!` for breaking changes. The title is durable: GitHub uses it verbatim as the merge commit subject (`merge_commit_title: PR_TITLE`).
 
@@ -58,7 +58,68 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
 
     **Test-plan formatting.** Plain bullets, not Markdown task-list checkboxes. The body becomes the durable merge commit message in this repo (`merge_commit_message: PR_BODY`), and unchecked task-list boxes look like outstanding work. If human-only verification remains, surface it as a pending action or reviewer note, not as completed test evidence. Don't add task-list checkboxes unless they already come from `.github/PULL_REQUEST_TEMPLATE.md`.
 
-    Present the full draft (title + body) for human Y/n approval before `gh pr create`. On approval, run `gh pr create`.
+    **Reviewers — show a one-line picker so the human picks correct logins without spelling them.** The bundled approval block has a third item alongside title and body: a `Reviewers:` picker built from a cached team list. Humans often think in real names ("add Blake") but GitHub needs the login (`NorsemanSpiff`); surfacing the team list eliminates name-to-handle guessing AND catches stale handles (e.g., `alexisChen9090` is a frozen historical handle for `AlexisChen99`).
+
+    **Team cache.** Store at `.claude/skills/pr/.team-cache.json` (per-machine, gitignored):
+
+    ```json
+    {
+      "collaborators": ["<login>", ...],
+      "displayNames": { "<login>": "<name or login>", ... },
+      "self": "<your login>",
+      "refreshedAt": "<ISO timestamp>"
+    }
+    ```
+
+    Populate on cold cache. Steps (1) and (2) run in parallel; step (3) fans out per-login after (1) returns and the bot filter is applied:
+
+    1. `gh api 'repos/<owner>/<repo>/collaborators' --paginate --jq '.[].login'` — full collaborator list.
+    2. `gh api user --jq '.login'` — the running human's login (stored as `self`).
+    3. For each surviving login, `gh api users/<login> --jq '.name // .login'` in parallel — display names. `// .login` returns the login when `.name` is null.
+
+    Apply the **bot filter** to (1) before writing the cache: drop `github-advanced-security`, `copilot-pull-request-reviewer`, `claude`, any login starting with `app/`, any login containing `[bot]`. Maintain the list here in the SKILL.md as GitHub adds new advisory bots over time.
+
+    <!-- TODO(PR#305-followup): bot filter is applied at cache-write time, so existing teammate caches don't auto-invalidate when this list changes. Self-heals on the next `gh pr create --reviewer` rejection via the refresh-on-rejection path — at the cost of one wasted prompt cycle. Worth an explicit "force-refresh on filter version bump" if that cycle ever matters in practice. -->
+
+    **Refresh triggers** (any one):
+    - `refreshedAt` is older than **15 days**.
+    - `gh pr create --reviewer <list>` rejects a login that exists in the cache (signal: a teammate was removed).
+    - The human types `refresh` in the reviewer prompt (escape hatch for "new teammate joined, refresh now").
+
+    **Render the picker.** Exclude `self` at render time so the same cache works for any teammate running `/pr`. Sort the remaining collaborators alphabetically by display name, case-insensitive. Number them in sort order. Render every collaborator — no truncation:
+
+    ```text
+    Reviewers? Reply with names, logins, numbers, "all", or blank:
+      [1] AlexisChen99    (AlexisChen)
+      [2] benjifriedman   (Benji Friedman)
+      [3] Ceantaur        (Sean)
+      [4] james-baker     (James Baker)
+      [5] oolu4236        (OLA)
+    ```
+
+    **Accept the human's reply** in any of these shapes and resolve to a list of GitHub logins:
+
+    - Numbers (`1 3`, `1,3`, `1, 3`) — positional pick from the rendered order. If any number is out of range (e.g., `7` when only 5 entries are rendered), surface the invalid index and re-ask rather than partial-resolve.
+    - Display names or partial names (`james and benji`, `Alexis`) — match against the cached display-name dictionary. On ambiguity, ask one clarifying question rather than guess.
+    - Exact logins (`james-baker, benjifriedman`) — passed through after validating against the cache.
+    - `all` / `everyone` / `whole team` — every collaborator except `self`. If the resulting set is empty (one-person repo where `self` is the only collaborator), treat as `none`.
+    - `none` / blank / `skip` — no reviewers.
+    - `refresh` — refresh the team cache and re-render the picker.
+
+    **Echo the resolution** as one line before `gh pr create`, so the human always sees what got resolved:
+
+    ```text
+    → Requesting review from james-baker, benjifriedman. Proceeding.
+    ```
+
+    Pass the resolved list to `gh pr create --reviewer <login1>,<login2>,...` (no `@` prefix, no spaces inside the `--reviewer` value); omit the flag entirely when the list is empty.
+
+    **Failure handling.**
+
+    - If the cache file is missing or unreadable, regenerate it via the cold-cache path above. If regeneration fails (network, rate limit, gh unauthenticated), fall back to a bare `Reviewers (comma-separated logins or blank):` prompt with no picker — the Skill still works, just less ergonomically.
+    - If `gh pr create --reviewer` rejects a login (typo, no longer a collaborator), refresh the cache, surface the exact `gh` error + the refreshed picker, and re-ask. Don't retry blindly.
+
+    Present the full draft (title + body + reviewers) for human Y/n approval before `gh pr create`. On approval, run `gh pr create` with `--reviewer` when the list is non-empty.
 
 10. **If an open PR for this branch exists — comment-by-default, body-update only on material scope change.**
 
