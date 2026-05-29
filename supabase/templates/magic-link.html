@@ -19,11 +19,11 @@
               <p style="margin:0 0 24px;font-size:16px;line-height:1.5;mso-line-height-rule:exactly;color:#1a1a1a;">Use the button below to sign in. This link expires in 1 hour.</p>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
                 <td bgcolor="#1a1a1a" style="border-radius:6px;">
-                  <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}" style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px;">Sign in</a>
+                  <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}" style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px;">Sign in</a>
                 </td>
               </tr></table>
               <p style="margin:24px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;">Or paste this URL into your browser:</p>
-              <p style="margin:4px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;"><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}" style="color:#555;">{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}</a></p>
+              <p style="margin:4px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;"><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}" style="color:#555;">{{ .RedirectTo }}&token_hash={{ .TokenHash }}</a></p>
               <p style="margin:24px 0 0;font-size:14px;line-height:1.5;mso-line-height-rule:exactly;color:#555;">We sent this to {{ .Email }}. If you didn't ask to sign in, you can safely ignore it.</p>
             </td>
           </tr>

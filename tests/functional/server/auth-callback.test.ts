@@ -183,7 +183,7 @@ describe("GET /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-upd
   });
 });
 
-describe("GET /auth/callback (invited sign-in, invite read from next)", () => {
+describe("GET /auth/callback (invited sign-in, invite query param)", () => {
   let inviterId: string;
   let newUserId: string;
   let weeklyProgramId: string;
@@ -205,10 +205,8 @@ describe("GET /auth/callback (invited sign-in, invite read from next)", () => {
     await deleteAuthUser(inviterId);
   });
 
-  const callbackUrl = (inviteCode: string) => {
-    const next = encodeURIComponent(`/?invite=${inviteCode}`);
-    return `/auth/callback?token_hash=hash&type=email&next=${next}`;
-  };
+  const callbackUrl = (inviteCode: string) =>
+    `/auth/callback?token_hash=hash&type=email&invite=${inviteCode}`;
 
   it("redeems a valid invite and stamps referredBy + displayName", async () => {
     const r = await createInvite({

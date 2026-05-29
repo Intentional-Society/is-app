@@ -42,11 +42,12 @@ test("submitting the forgot-password form sends a recovery email and confirms", 
   await page.getByRole("button", { name: "Send reset link" }).click();
 
   await expect(page.getByText("Password reset email sent — check your inbox.")).toBeVisible();
-  // After verifyOtp succeeds on /auth/callback, the recovery branch
-  // redirects here. redirectTo is forwarded as &next= in the email URL,
-  // so the form's value lands the user directly on the set-password
-  // page. (Both paths must be on the Supabase redirect allowlist.)
-  expect(decodeURIComponent(recoverUrl ?? "")).toContain("/auth/reset-password");
+  // The form's `redirectTo` is the full callback URL so the email's
+  // action link points back at this origin (env-aware). The callback's
+  // recovery branch then redirects to /auth/reset-password. The
+  // callback URL — not /auth/reset-password — must be on the Supabase
+  // redirect allowlist.
+  expect(decodeURIComponent(recoverUrl ?? "")).toContain("/auth/callback?type=recovery");
 });
 
 test("reset-password rejects a too-short password", async ({ page }) => {
