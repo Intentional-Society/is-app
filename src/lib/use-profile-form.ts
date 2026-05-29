@@ -11,7 +11,7 @@ export type ProfileFormValues = {
   location: string;
   supplementaryInfo: string;
   emergencyContact: string;
-  liveDesire: string;
+  currentIntention: string;
 };
 
 export type ProfileFormStatus =
@@ -27,7 +27,7 @@ export function useProfileForm(initial: ProfileFormValues) {
   const [location, setLocation] = useState(initial.location);
   const [supplementaryInfo, setSupplementaryInfo] = useState(initial.supplementaryInfo);
   const [emergencyContact, setEmergencyContact] = useState(initial.emergencyContact);
-  const [liveDesire, setLiveDesire] = useState(initial.liveDesire);
+  const [currentIntention, setCurrentIntention] = useState(initial.currentIntention);
   const [status, setStatus] = useState<ProfileFormStatus>({ kind: "idle" });
 
   const submit = async (): Promise<boolean> => {
@@ -46,7 +46,7 @@ export function useProfileForm(initial: ProfileFormValues) {
           location: location.trim() || null,
           supplementaryInfo: supplementaryInfo.trim() || null,
           emergencyContact: emergencyContact.trim() || null,
-          liveDesire: liveDesire.trim() || null,
+          currentIntention: currentIntention.trim() || null,
         },
       });
 
@@ -68,7 +68,7 @@ export function useProfileForm(initial: ProfileFormValues) {
   };
 
   return {
-    fields: { displayName, bio, keywordsText, location, supplementaryInfo, emergencyContact, liveDesire },
+    fields: { displayName, bio, keywordsText, location, supplementaryInfo, emergencyContact, currentIntention },
     setters: {
       setDisplayName,
       setBio,
@@ -76,7 +76,7 @@ export function useProfileForm(initial: ProfileFormValues) {
       setLocation,
       setSupplementaryInfo,
       setEmergencyContact,
-      setLiveDesire,
+      setCurrentIntention,
     },
     status,
     setStatus,

@@ -55,6 +55,8 @@ export const profiles = pgTable("profiles", {
   lastSignedAgreements: timestamp("last_signed_agreements", { withTimezone: true }),
   lastUpdatedProfile: timestamp("last_updated_profile", { withTimezone: true }),
   lastReviewedPrograms: timestamp("last_reviewed_programs", { withTimezone: true }),
+  currentIntention: text("current_intention"),
+  intentionUpdatedAt: timestamp("intention_updated_at", { withTimezone: true }),
   lastUpdatedWeb: timestamp("last_updated_web", { withTimezone: true }),
   // Buttondown subscriber id — populated lazily by the sync the first
   // time it encounters this profile. Lookups by id are stable across

@@ -17,6 +17,7 @@ export const EDITABLE_PROFILE_FIELDS = [
   "supplementaryInfo",
   "emergencyContact",
   "liveDesire",
+  "currentIntention",
 ] as const;
 
 type EditableField = (typeof EDITABLE_PROFILE_FIELDS)[number];
@@ -29,6 +30,7 @@ export type EditableProfileInput = Partial<{
   supplementaryInfo: string | null;
   emergencyContact: string | null;
   liveDesire: string | null;
+  currentIntention: string | null;
 }>;
 
 const isNullableString = (v: unknown): v is string | null => v === null || typeof v === "string";
@@ -108,6 +110,8 @@ export type ProfileForSelf = {
   avatarUrl: string | null;
   emergencyContact: string | null;
   liveDesire: string | null;
+  currentIntention: string | null;
+  intentionUpdatedAt: Date | null;
   isAdmin: boolean;
   lastSignedAgreements: Date | null;
   lastUpdatedProfile: Date | null;
@@ -131,6 +135,8 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       avatarPath: profiles.avatarPath,
       emergencyContact: profiles.emergencyContact,
       liveDesire: profiles.liveDesire,
+      currentIntention: profiles.currentIntention,
+      intentionUpdatedAt: profiles.intentionUpdatedAt,
       isAdmin: profiles.isAdmin,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
@@ -184,6 +190,8 @@ export const getProfileForSelfWithProbe = async (
       avatarPath: profiles.avatarPath,
       emergencyContact: profiles.emergencyContact,
       liveDesire: profiles.liveDesire,
+      currentIntention: profiles.currentIntention,
+      intentionUpdatedAt: profiles.intentionUpdatedAt,
       isAdmin: profiles.isAdmin,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
@@ -260,6 +268,8 @@ export type ProfileForMember = {
   avatarUrl: string | null;
   liveDesire: string | null;
   email: string | null;
+  currentIntention: string | null;
+  intentionUpdatedAt: Date | null;
   createdAt: Date;
 };
 
@@ -289,6 +299,8 @@ export const getProfileForMember = async (
       avatarPath: profiles.avatarPath,
       liveDesire: profiles.liveDesire,
       email: authUsers.email,
+      currentIntention: profiles.currentIntention,
+      intentionUpdatedAt: profiles.intentionUpdatedAt,
       createdAt: profiles.createdAt,
     })
     .from(profiles)

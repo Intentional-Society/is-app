@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-29 | James | Re-timestamp a migration if main gained one after you generated it
+
+Drizzle applies a migration only when its journal `when` is newer than the highest already-applied one, so a migration authored before a later one lands on `main` is silently skipped — no DDL, no error — on any DB already past that point. After rebasing, if `main` has a newer migration than yours, bump your entry's `when` in `drizzle/meta/_journal.json` above it. (Functional test added to catch this.)
+
 ## 2026-05-29 | Blake | Biome enforcement + codebase baseline (#307)
 
 One-time baseline format pass on ~50 files of accumulated drift, plus three Biome enforcement layers: `npm test` gate, lefthook pre-commit auto-fix, and `biome ci .` in CI. Considered a per-edit Claude Code hook but dropped it — npx overhead was ~1.1s per Edit/Write; `scripts/biome-precommit.mjs` logs telemetry to inform whether to revisit. New `.git-blame-ignore-revs` skips the baseline commit; `npm run setup` wires the local `git config`.

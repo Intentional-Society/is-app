@@ -38,7 +38,6 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
 
   const { profile }: { profile: MemberProfile } = await res.json();
   const memberSince = new Date(profile.createdAt).getFullYear();
-
   const isOwnProfile = me.id === profile.id;
 
   return (
@@ -66,7 +65,19 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
           <Field label="Bio">{profile.bio}</Field>
           <Field label="Keywords">{profile.keywords.length > 0 ? profile.keywords.join(", ") : null}</Field>
           <Field label="Location">{profile.location}</Field>
-          <Field label="Live desire">{profile.liveDesire}</Field>
+          {profile.currentIntention && (
+            <Field label="Current intention">
+              <span>{profile.currentIntention}</span>
+              {profile.intentionUpdatedAt && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {new Date(profile.intentionUpdatedAt).toLocaleDateString(undefined, {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              )}
+            </Field>
+          )}
           <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
         </dl>
 

@@ -25,7 +25,7 @@ export default async function WelcomeProfilePage() {
           location: profile?.location ?? "",
           supplementaryInfo: profile?.supplementaryInfo ?? "",
           emergencyContact: profile?.emergencyContact ?? "",
-          liveDesire: profile?.liveDesire ?? "",
+          currentIntention: profile?.currentIntention ?? "",
         }}
       />
     </>
