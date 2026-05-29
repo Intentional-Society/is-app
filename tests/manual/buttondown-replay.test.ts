@@ -14,18 +14,11 @@ import { describe, expect, it } from "vitest";
 import type { ButtondownSubscriber } from "@/server/buttondown";
 
 import { createFakeButtondownClient } from "../functional/server/buttondown-fake";
-import { buildProbes, runProbeSequence, type ProbeResult } from "./_buttondown-probes";
+import { buildProbes, type ProbeResult, runProbeSequence } from "./_buttondown-probes";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = resolve(HERE, "..", "..");
-const DATA_ROOT = resolve(
-  PROJECT_ROOT,
-  "tests",
-  "functional",
-  "server",
-  "__data__",
-  "buttondown",
-);
+const DATA_ROOT = resolve(PROJECT_ROOT, "tests", "functional", "server", "__data__", "buttondown");
 const SEED_PATH = resolve(DATA_ROOT, "fixtures", "seed.json");
 const GOLDS_DIR = resolve(DATA_ROOT, "golds");
 

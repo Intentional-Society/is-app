@@ -247,18 +247,12 @@ describe("Admin programs API", () => {
 
       let res = await patch(programId, { archived: true });
       expect(res.status).toBe(200);
-      let [row] = await db
-        .select({ archivedAt: programs.archivedAt })
-        .from(programs)
-        .where(eq(programs.id, programId));
+      let [row] = await db.select({ archivedAt: programs.archivedAt }).from(programs).where(eq(programs.id, programId));
       expect(row.archivedAt).not.toBeNull();
 
       res = await patch(programId, { archived: false });
       expect(res.status).toBe(200);
-      [row] = await db
-        .select({ archivedAt: programs.archivedAt })
-        .from(programs)
-        .where(eq(programs.id, programId));
+      [row] = await db.select({ archivedAt: programs.archivedAt }).from(programs).where(eq(programs.id, programId));
       expect(row.archivedAt).toBeNull();
     });
 
@@ -278,10 +272,7 @@ describe("Admin programs API", () => {
 
       res = await patch(programId, { signupsOpen: false });
       expect(res.status).toBe(200);
-      [row] = await db
-        .select({ signupsOpen: programs.signupsOpen })
-        .from(programs)
-        .where(eq(programs.id, programId));
+      [row] = await db.select({ signupsOpen: programs.signupsOpen }).from(programs).where(eq(programs.id, programId));
       expect(row.signupsOpen).toBe(false);
     });
 
@@ -390,10 +381,7 @@ describe("Admin programs API", () => {
       // The program and the enrollment both survive a rejected delete.
       const rows = await db.select().from(programs).where(eq(programs.id, programId));
       expect(rows).toHaveLength(1);
-      const enrolled = await db
-        .select()
-        .from(profilePrograms)
-        .where(eq(profilePrograms.programId, programId));
+      const enrolled = await db.select().from(profilePrograms).where(eq(profilePrograms.programId, programId));
       expect(enrolled).toHaveLength(1);
     });
 
@@ -445,10 +433,7 @@ describe("Admin programs API", () => {
       const res = await addParticipant(programId, member);
       expect(res.status).toBe(200);
 
-      const rows = await db
-        .select()
-        .from(profilePrograms)
-        .where(eq(profilePrograms.programId, programId));
+      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.programId, programId));
       expect(rows).toHaveLength(1);
       expect(rows[0].profileId).toBe(member);
     });
@@ -493,10 +478,7 @@ describe("Admin programs API", () => {
 
       // The row still exists but is marked left so the original
       // assignedAt is available for any future re-add.
-      const rows = await db
-        .select()
-        .from(profilePrograms)
-        .where(eq(profilePrograms.programId, programId));
+      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.programId, programId));
       expect(rows).toHaveLength(1);
       expect(rows[0].leftAt).not.toBeNull();
     });
@@ -505,10 +487,7 @@ describe("Admin programs API", () => {
       const programId = await seedProgram("Re-Addable Program");
       await db.insert(profilePrograms).values({ profileId: member, programId });
 
-      const [original] = await db
-        .select()
-        .from(profilePrograms)
-        .where(eq(profilePrograms.programId, programId));
+      const [original] = await db.select().from(profilePrograms).where(eq(profilePrograms.programId, programId));
       const originalAssignedAt = original.assignedAt;
 
       authAs(admin);
@@ -526,10 +505,7 @@ describe("Admin programs API", () => {
       });
       expect(res.status).toBe(200);
 
-      const [after] = await db
-        .select()
-        .from(profilePrograms)
-        .where(eq(profilePrograms.programId, programId));
+      const [after] = await db.select().from(profilePrograms).where(eq(profilePrograms.programId, programId));
       expect(after.leftAt).toBeNull();
       expect(after.assignedAt.getTime()).toBe(originalAssignedAt.getTime());
     });

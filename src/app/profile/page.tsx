@@ -55,7 +55,9 @@ export default async function ProfilePage() {
         <Field label="Location">{profile.location}</Field>
         <Field label="Live desire">{profile.liveDesire}</Field>
         <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
-        <Field label="Emergency contact" badge="Only visible to you and admins">{profile.emergencyContact}</Field>
+        <Field label="Emergency contact" badge="Only visible to you and admins">
+          {profile.emergencyContact}
+        </Field>
       </dl>
 
       <Button render={<Link href="/profile/edit" />}>Edit profile</Button>

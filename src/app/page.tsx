@@ -88,15 +88,23 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
         <NavCard href="/members" title="Member directory" description="Browse and find other members." />
         <NavCard href="/myweb" title="My web" description="Build your relational map by adding connections!" />
         <NavCard href="/profile" title="My profile" description="View and edit your profile information." />
-        <NavCard href="/invites" title="Invite a friend" description="Generate an invite code to bring someone into the network." />
+        <NavCard
+          href="/invites"
+          title="Invite a friend"
+          description="Generate an invite code to bring someone into the network."
+        />
         <a
           href="https://docs.google.com/forms/d/e/1FAIpQLScXhdSxbQ3LxjiYhqN2fmuyy66SK292rTYEZV3QaHgzn1eVjA/viewform?usp=dialog"
           target="_blank"
           rel="noopener noreferrer"
           className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:bg-accent hover:shadow-sm"
         >
-          <h2 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">Give Feedback</h2>
-          <p className="text-sm text-muted-foreground">Share your thoughts, suggestions, or report issues with the app.</p>
+          <h2 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">
+            Give Feedback
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Share your thoughts, suggestions, or report issues with the app.
+          </p>
         </a>
       </div>
     </main>

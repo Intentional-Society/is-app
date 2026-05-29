@@ -12,8 +12,7 @@ export const MEMBER_SEARCH_THRESHOLD = 0.8;
 
 // Location + interest keywords act as search aliases — matchable, but ranked
 // below the display name (which is the item value).
-export const memberKeywords = (m: MemberSummary): string[] =>
-  [m.location ?? "", ...(m.keywords ?? [])].filter(Boolean);
+export const memberKeywords = (m: MemberSummary): string[] => [m.location ?? "", ...(m.keywords ?? [])].filter(Boolean);
 
 // cmdk's CommandFilter shape: score value/search/keywords and gate at the
 // threshold. Pass straight to <Command filter={...}>. defaultFilter is

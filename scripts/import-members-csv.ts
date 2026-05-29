@@ -447,7 +447,9 @@ async function main() {
       // cell is surfaced rather than silently defaulting to now().
       const signupDate = parseSignupDate(row[COLUMN.timestamp] ?? "");
       if (!signupDate) {
-        console.warn(`  WARN   ${email}: unparseable signup timestamp "${row[COLUMN.timestamp] ?? ""}" — join date defaults to now`);
+        console.warn(
+          `  WARN   ${email}: unparseable signup timestamp "${row[COLUMN.timestamp] ?? ""}" — join date defaults to now`,
+        );
       }
       // De-duplicate keywords — a CSV cell can repeat a value, and a
       // stored duplicate breaks KeywordChips' React keys (see #219).

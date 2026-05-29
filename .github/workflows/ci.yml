@@ -57,8 +57,11 @@ jobs:
       - if: steps.filter.outputs.code == 'true'
         run: npx supabase start
 
+      # `biome ci` == `biome check` plus CI-flavored output (GitHub
+      # annotations, no interactive prompts). Same coverage as
+      # `npm run lint` locally; richer signal in PR checks.
       - if: steps.filter.outputs.code == 'true'
-        run: npm run lint
+        run: npx biome ci .
 
       - if: steps.filter.outputs.code == 'true'
         run: npm run typecheck

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
-import { apiClient } from "@/lib/api";
-import { RELATION_VALUE_LABELS, isRelationValue } from "@/lib/relation-value";
-import { RelatingDialog } from "@/app/myweb/relating-dialog";
-import type { RelatingTarget } from "@/app/myweb/relating-dialog";
 import { relationValueQueryKey } from "@/app/myweb/query-keys";
+import type { RelatingTarget } from "@/app/myweb/relating-dialog";
+import { RelatingDialog } from "@/app/myweb/relating-dialog";
+import { apiClient } from "@/lib/api";
+import { isRelationValue, RELATION_VALUE_LABELS } from "@/lib/relation-value";
 
 type Props = {
   memberId: string;
@@ -44,19 +44,14 @@ export function MemberRelationControl({ memberId, memberName }: Props) {
         </span>
         <button
           type="button"
-          onClick={() =>
-            setDialogTarget({ id: memberId, displayName: memberName, currentValue: value })
-          }
+          onClick={() => setDialogTarget({ id: memberId, displayName: memberName, currentValue: value })}
           className="text-sm text-muted-foreground underline hover:no-underline"
         >
           {value !== null ? "Edit" : "Connect"}
         </button>
       </div>
 
-      <RelatingDialog
-        target={dialogTarget}
-        onClose={() => setDialogTarget(null)}
-      />
+      <RelatingDialog target={dialogTarget} onClose={() => setDialogTarget(null)} />
     </>
   );
 }

@@ -49,12 +49,9 @@ const deleteUserAndProfile = async (id: string) => {
   await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
 };
 
-const seedProgram = async (opts: {
-  name?: string;
-  slug?: string;
-  buttondownTag?: string | null;
-  archived?: boolean;
-} = {}): Promise<string> => {
+const seedProgram = async (
+  opts: { name?: string; slug?: string; buttondownTag?: string | null; archived?: boolean } = {},
+): Promise<string> => {
   const id = randomUUID();
   await db.insert(programs).values({
     id,
@@ -88,11 +85,7 @@ const sampleSubscriber = (
 // tests can assert against their own profile's actions without being
 // polluted by other rows the sync also processed.
 const effectsForEmail = (effects: FakeButtondownEffect[], email: string): FakeButtondownEffect[] =>
-  effects.filter((e) =>
-    e.kind === "create"
-      ? e.input.email_address.toLowerCase() === email.toLowerCase()
-      : false,
-  );
+  effects.filter((e) => (e.kind === "create" ? e.input.email_address.toLowerCase() === email.toLowerCase() : false));
 
 const effectsForSubscriberId = (effects: FakeButtondownEffect[], id: string): FakeButtondownEffect[] =>
   effects.filter((e) => (e.kind === "update" ? e.id === id : false));
@@ -155,9 +148,7 @@ describe("runButtondownSync (daily reconciler)", () => {
       .where(eq(profiles.id, profileId));
     expect(row.buttondownSubscriberId).not.toBeNull();
 
-    expect(
-      events.find((e) => e.action === "subscriber-created" && e.profileId === profileId),
-    ).toBeDefined();
+    expect(events.find((e) => e.action === "subscriber-created" && e.profileId === profileId)).toBeDefined();
   });
 
   it("PATCHes a subscribed person's tags when the managed set has drifted", async () => {
@@ -243,7 +234,13 @@ describe("runButtondownSync (daily reconciler)", () => {
     const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
     const { alerts, raise } = collectingAlerts();
 
-    await runButtondownSync({ client, runId: "r5", write: true, raiseUnsubscribeAlert: raise, scopeProfileIds: [profileId] });
+    await runButtondownSync({
+      client,
+      runId: "r5",
+      write: true,
+      raiseUnsubscribeAlert: raise,
+      scopeProfileIds: [profileId],
+    });
 
     expect(effectsForSubscriberId(client.effects, "sub_eve")).toHaveLength(0);
     const my = alerts.find((a) => a.profileId === profileId);
@@ -364,9 +361,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     expect(effectsForEmail(client.effects, "kelvin@example.com")).toHaveLength(0);
     expect(summary.created).toBe(0);
     expect(summary.skippedHiddenCreate).toBe(1);
-    expect(
-      events.find((e) => e.action === "skipped-hidden-create" && e.profileId === profileId),
-    ).toBeDefined();
+    expect(events.find((e) => e.action === "skipped-hidden-create" && e.profileId === profileId)).toBeDefined();
   });
 
   // Defense in depth against an E2E or fixture user that somehow has

@@ -18,8 +18,8 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
-import { apiClient } from "@/lib/api";
 import { MemberRelationControl } from "@/app/members/[id]/relation-control";
+import { apiClient } from "@/lib/api";
 
 const $get = vi.mocked(apiClient.api.relations.value[":relateeId"].$get);
 

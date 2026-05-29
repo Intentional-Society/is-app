@@ -75,10 +75,14 @@ export function ChangePasswordForm() {
       </Button>
 
       {status.kind === "success" && (
-        <p role="status" className="text-sm text-success">Password updated.</p>
+        <p role="status" className="text-sm text-success">
+          Password updated.
+        </p>
       )}
       {status.kind === "error" && (
-        <p role="alert" className="text-sm text-destructive">{status.message}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {status.message}
+        </p>
       )}
     </form>
   );

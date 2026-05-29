@@ -33,7 +33,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
 import { config } from "dotenv";
 
 import { TEMPLATES } from "../supabase/templates/templates.manifest.mjs";
@@ -49,7 +48,9 @@ const dryRun = args.has("--dry-run");
 const download = args.has("--download");
 
 if (dryRun && download) {
-  console.error("--dry-run and --download are mutually exclusive (--dry-run previews a push, --download saves the current remote state).");
+  console.error(
+    "--dry-run and --download are mutually exclusive (--dry-run previews a push, --download saves the current remote state).",
+  );
   process.exit(1);
 }
 

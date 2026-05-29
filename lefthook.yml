@@ -1,0 +1,23 @@
+# Lefthook pre-commit hook — auto-formats staged JS/TS/JSON/CSS files via
+# Biome before they land in a commit, then re-stages the fixes.
+#
+# `npm test` and CI also enforce Biome, but this saves the round-trip of
+# discovering format violations only at PR time. Scoped to staged files,
+# not the whole repo, so commits stay fast.
+#
+# Bypass: `git commit --no-verify`.
+# Install: `npx lefthook install` (also run by `npm run setup`).
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: biome
+      glob: "*.{js,jsx,mjs,cjs,ts,tsx,json,jsonc,css}"
+      # Wrapper runs biome on the staged files AND logs whether any
+      # reformatting happened to .scratch/biome-precommit-stats.log.
+      # The stats answer "would a per-edit Claude format hook have
+      # been worth its overhead?" — see scripts/biome-precommit.mjs
+      # header for context. Remove the wrapper indirection once that
+      # question is settled and revert this to a direct biome call.
+      run: node scripts/biome-precommit.mjs {staged_files}
+      stage_fixed: true

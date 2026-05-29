@@ -201,9 +201,7 @@ describe("profiles.hidden", () => {
     visibleId = randomUUID();
     hiddenId = randomUUID();
     for (const id of [visibleId, hiddenId]) {
-      await db.execute(
-        sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${id}::uuid, false, false)`,
-      );
+      await db.execute(sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${id}::uuid, false, false)`);
     }
     await db.insert(profiles).values({ id: visibleId, displayName: "Visible Vera" });
     await db.insert(profiles).values({ id: hiddenId, displayName: "Hidden Henry", hidden: true });

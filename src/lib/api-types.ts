@@ -26,10 +26,7 @@ export type ProgramDetail = InferResponseType<
 
 export type ProgramDetailMember = ProgramDetail["members"][number];
 
-export type AdminProgram = InferResponseType<
-  (typeof apiClient.api.admin.programs)["$get"],
-  200
->["programs"][number];
+export type AdminProgram = InferResponseType<(typeof apiClient.api.admin.programs)["$get"], 200>["programs"][number];
 
 export type AdminProgramDetail = InferResponseType<
   (typeof apiClient.api.admin.programs)[":id"]["$get"],

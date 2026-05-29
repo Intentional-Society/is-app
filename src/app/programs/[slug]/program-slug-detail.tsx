@@ -1,7 +1,7 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UrlObject } from "node:url";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 import { Avatar } from "@/components/avatar";
@@ -44,8 +44,7 @@ export function ProgramSlugDetail({ slug }: { slug: string }) {
 
 function ProgramBody({ program }: { program: ProgramDetail }) {
   const queryClient = useQueryClient();
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) });
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -93,19 +92,12 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
       </header>
 
       {program.description && (
-        <p className="font-serif text-base text-muted-foreground leading-relaxed">
-          {program.description}
-        </p>
+        <p className="font-serif text-base text-muted-foreground leading-relaxed">{program.description}</p>
       )}
 
       <div className="flex items-center gap-3">
         {program.joined ? (
-          <Button
-            type="button"
-            variant="primary"
-            disabled={pending}
-            onClick={() => leaveMutation.mutate()}
-          >
+          <Button type="button" variant="primary" disabled={pending} onClick={() => leaveMutation.mutate()}>
             {leaveMutation.isPending ? "Leaving…" : "Leave program"}
           </Button>
         ) : program.signupsOpen ? (

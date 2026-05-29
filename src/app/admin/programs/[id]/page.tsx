@@ -5,11 +5,7 @@ import { requireUser } from "@/lib/api-server";
 
 import { ProgramDetail } from "./program-detail";
 
-export default async function AdminProgramDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function AdminProgramDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireUser();
   // Generic 404 for non-admins, matching the /admin hub page.
   if (!me.profile?.isAdmin) notFound();

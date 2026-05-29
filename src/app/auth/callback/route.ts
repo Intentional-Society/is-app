@@ -4,8 +4,8 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
-import { autoSubscribeNewMember } from "@/server/programs";
 import { upsertProfile } from "@/server/profiles";
+import { autoSubscribeNewMember } from "@/server/programs";
 import { materializeInviteRelations } from "@/server/relations";
 import { invites, profiles } from "@/server/schema";
 
