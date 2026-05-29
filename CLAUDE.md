@@ -60,6 +60,16 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - **e2e.yml**: Playwright against Vercel preview URL, triggered by `deployment_status` event. Not a required GitHub check, but team policy requires it green before merging to `main`.
 - Vercel auto-deploys `main` to production; the build command runs `drizzle-kit migrate` before `next build` on production deploys only (gated by `VERCEL_ENV`)
 
+## AI Skills
+
+Three Claude Code Skills live at `.claude/skills/` and encode the team's check-in workflow. They fire on explicit slash invocation only (`disable-model-invocation: true`).
+
+- `/commit [issue-or-context]` — stage, run `npm test`, draft a Conventional Commit-style message, bundled human approval, push. See [.claude/skills/commit/SKILL.md](.claude/skills/commit/SKILL.md).
+- `/pr [PR#|URL|issue-or-context]` — fetch + rebase if main moved, push, open or update the PR. Does not watch CI. See [.claude/skills/pr/SKILL.md](.claude/skills/pr/SKILL.md).
+- `/ship [PR#|URL|issue-or-context]` — orchestrates `/pr` (which orchestrates `/commit`), waits for CI green, merges via `gh pr merge --merge --delete-branch`, watches `main` for 5 minutes post-merge. See [.claude/skills/ship/SKILL.md](.claude/skills/ship/SKILL.md).
+
+Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-ai-procedures.md).
+
 ## Key docs
 
 - `docs/strategy-branching.md` — branching strategy and rationale

@@ -37,8 +37,15 @@ Thumbs.db
 playwright-report/
 test-results/
 
-# claude
-.claude/
+# claude — ignore everything in .claude/ EXCEPT .claude/skills/, which holds
+# the portable AI procedure framework from PR #133 (docs/spec-portable-ai-procedures.md)
+# and must ship in the repo. Note: gitignore can't re-include children of an
+# excluded parent, so we exclude .claude/* (contents) rather than .claude/ (dir)
+# and re-include .claude/skills/ explicitly.
+.claude/*
+!.claude/skills/
+# per-machine Skill state (team-cache, etc.) — never commit
+.claude/skills/**/.team-cache.json
 .vercel
 
 # agent scratch notes — emergent design decisions, working memory

@@ -68,6 +68,16 @@ supabase/           Local Supabase config (config.toml)
 drizzle/            Database migration files
 ```
 
+## Working with AI assistants
+
+Three Claude Code Skills under [.claude/skills/](.claude/skills/) encode the team's check-in workflow. Invoke them explicitly by name:
+
+- `/commit [issue-or-context]` — stage, test, draft a Conventional Commit-style message, bundled human approval, push.
+- `/pr [PR#|URL|issue-or-context]` — fetch + rebase if needed, push, open or update the PR.
+- `/ship [PR#|URL|issue-or-context]` — orchestrates the full chain (`/pr` → `/commit` as needed), waits for CI green, merges, watches `main`.
+
+Design rationale and the full step lists are in [docs/spec-portable-ai-procedures.md](docs/spec-portable-ai-procedures.md).
+
 ## Documentation
 
 | Doc | Description |

@@ -35,6 +35,10 @@ Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-pr
 - **Code-owner review required** on paths listed in `.github/CODEOWNERS` (currently `.github/workflows/` and `.github/CODEOWNERS` itself). A CI-secret-touching workflow change can't land without a second codeowner's approval.
 - **Repository Admin can bypass per-PR** by ticking the bypass checkbox in the merge box (`bypass_mode: "pull_request"`). Not silent — admin merges that don't tick it still enforce every rule, including codeowner review. Previously was `"always"`, which silently skipped every rule for admins and defeated the codeowner gate; tightened after PR #159 merged without triggering review.
 
+## Related Skills
+
+The `/ship` Skill (`.claude/skills/ship/SKILL.md`) reads the required + visible advisory checks via `gh pr checks <N> --watch`, refuses to merge through anything not green (no "Proceed" option), and runs `gh pr merge --merge --delete-branch` — the only merge form the repo accepts. It never passes `--merge-title` or `--body` flags, so the PR title and body land verbatim in `main` history per the `merge_commit_title` / `merge_commit_message` settings above.
+
 ## CI workflows
 
 - `.github/workflows/ci.yml` — lint + functional tests, triggers on `pull_request` to main. Spins up the full local Supabase stack via `supabase/setup-cli@v1` + `supabase start`, then applies Drizzle migrations before running Vitest. Functional tests that hit the DB (e.g. `profiles.test.ts`) run against this stack, matching the dev-box setup exactly.
