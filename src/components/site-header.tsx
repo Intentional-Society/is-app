@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { clearNavHistory } from "@/lib/route-labels";
 
 export function SiteHeader({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
   const { user } = useAuth();
@@ -27,7 +28,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/" className="rounded px-2 py-2 hover:bg-muted">
+                <Link href="/" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
                   Home
                 </Link>
               }
@@ -35,7 +36,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/programs" className="rounded px-2 py-2 hover:bg-muted">
+                <Link href="/programs" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
                   Programs
                 </Link>
               }
@@ -43,7 +44,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/members" className="rounded px-2 py-2 hover:bg-muted">
+                <Link href="/members" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
                   Member directory
                 </Link>
               }
@@ -51,7 +52,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/myweb" className="rounded px-2 py-2 hover:bg-muted">
+                <Link href="/myweb" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
                   My web
                 </Link>
               }
@@ -59,7 +60,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/profile" className="rounded px-2 py-2 hover:bg-muted">
+                <Link href="/profile" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
                   My profile
                 </Link>
               }
@@ -67,7 +68,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <SheetClose
               nativeButton={false}
               render={
-                <Link href="/invites" className="rounded px-2 py-2 hover:bg-muted">
+                <Link href="/invites" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
                   Invite a friend
                 </Link>
               }
@@ -84,7 +85,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
               <SheetClose
                 nativeButton={false}
                 render={
-                  <Link href="/admin" className="flex items-center gap-2 rounded px-2 py-2 text-green-700 hover:bg-muted">
+                  <Link href="/admin" onClick={clearNavHistory} className="flex items-center gap-2 rounded px-2 py-2 text-green-700 hover:bg-muted">
                     <ShieldCheck className="h-4 w-4 shrink-0" />
                     Admin dashboard
                   </Link>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Avatar } from "@/components/avatar";
+import { BreadcrumbLink } from "@/components/breadcrumb-link";
 import { KeywordChips } from "@/components/keyword-chips";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/api-server";
@@ -34,9 +35,7 @@ export default async function ProfilePage() {
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <div className="flex w-full max-w-md items-center justify-between">
         <h1 className="text-2xl font-bold">My profile</h1>
-        <Link href="/" className="text-base text-muted-foreground hover:text-foreground">
-          ← Back
-        </Link>
+        <BreadcrumbLink fallback="/" />
       </div>
 
       <Avatar
