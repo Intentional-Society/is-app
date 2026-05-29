@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/avatar";
+import { BreadcrumbLink } from "@/components/breadcrumb-link";
 import { QueryProvider } from "@/components/query-provider";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberProfile } from "@/lib/api-types";
@@ -29,9 +29,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
       <main className="flex min-h-screen flex-col items-center gap-6 p-8">
         <div className="flex w-full max-w-md items-center justify-between">
           <h1 className="text-2xl font-bold">Member not found</h1>
-          <Link href="/members" className="text-base text-muted-foreground hover:text-foreground">
-            ← Directory
-          </Link>
+          <BreadcrumbLink fallback="/members" />
         </div>
         <p className="text-muted-foreground">We couldn&apos;t find a member with that name or ID.</p>
       </main>
@@ -51,9 +49,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
             <h1 className="text-2xl font-bold">{profile.displayName ?? "Member"}</h1>
             <p className="text-sm text-muted-foreground">Member since {memberSince}</p>
           </div>
-          <Link href="/members" className="text-base text-muted-foreground hover:text-foreground">
-            ← Directory
-          </Link>
+          <BreadcrumbLink fallback="/members" />
         </div>
 
         <Avatar

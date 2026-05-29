@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BreadcrumbLink } from "@/components/breadcrumb-link";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 
 import { AdminHidden } from "./admin-hidden";
@@ -22,9 +23,7 @@ export default async function AdminPage() {
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
       <div className="flex w-full max-w-xl items-center justify-between">
         <h1 className="text-2xl font-bold">Admin</h1>
-        <Link href="/" className="text-base text-muted-foreground hover:text-foreground">
-          ← Back
-        </Link>
+        <BreadcrumbLink fallback="/" />
       </div>
 
       <section className="flex w-full max-w-xl flex-col gap-2">

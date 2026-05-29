@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Gudea, Ovo } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
+import { NavigationHistory } from "@/components/navigation-history";
 import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
 import { loadMe } from "@/lib/api-server";
@@ -52,6 +53,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <AuthProvider initialUser={user}>
           <QueryProvider>
+            <NavigationHistory />
             <SiteHeader displayName={me?.profile?.displayName ?? null} isAdmin={me?.profile?.isAdmin ?? false} />
             {children}
           </QueryProvider>
