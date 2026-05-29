@@ -70,7 +70,10 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
               <span>{profile.currentIntention}</span>
               {profile.intentionUpdatedAt && (
                 <span className="ml-2 text-xs text-muted-foreground">
-                  {new Date(profile.intentionUpdatedAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                  {new Date(profile.intentionUpdatedAt).toLocaleDateString(undefined, {
+                    month: "long",
+                    year: "numeric",
+                  })}
                 </span>
               )}
             </Field>

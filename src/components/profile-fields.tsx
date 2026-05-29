@@ -70,8 +70,7 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
       />
 
       <Label htmlFor="currentIntention">
-        Current intention{" "}
-        <span className="text-muted-foreground">(what are you focused on right now?)</span>
+        Current intention <span className="text-muted-foreground">(what are you focused on right now?)</span>
       </Label>
       <Textarea
         id="currentIntention"
