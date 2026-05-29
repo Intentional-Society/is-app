@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-28 | Benji | Give Feedback card on homepage
+
+Added a 6th card to the logged-in homepage grid linking to the Google Form feedback survey. Opens in a new tab, styled to match the existing NavCard pattern.
+
 ## 2026-05-26 | Blake | Stash-pop antipattern callout in committing strategy
 
 Added a callout to `docs/strategy-committing.md` warning against `git stash && X; git stash pop` as a clean-slate verification idiom — instead, use `git stash list` to check the stack first, and only pop if you actually put something there. Surfaced from RCA #284 (Gap 4); resolves #287.
@@ -11,10 +15,6 @@ Added a callout to `docs/strategy-committing.md` warning against `git stash && X
 ## 2026-05-25 | James | Buttondown sync
 
 Mirrors program memberships into Buttondown subscriber tags via a daily cron plus inline hooks on join/leave/admin-remove, replacing the Apps Script pipeline. Per-program opt-in via `programs.buttondown_tag`; ships in dry-run, then `scripts/buttondown-bootstrap.ts` reconciles the existing audience and `BUTTONDOWN_SYNC_WRITE=1` flips writes on. Design: `docs/design-buttondown.md`. (#280)
-
-## 2026-05-28 | Benji | Give Feedback card on homepage
-
-Added a 6th card to the logged-in homepage grid linking to the Google Form feedback survey. Opens in a new tab, styled to match the existing NavCard pattern.
 
 ## 2026-05-24 | Benji | Custom 404 page
 
