@@ -143,6 +143,13 @@ describe("GET /api/me", () => {
     expect(res2.status).toBe(400);
   });
 
+  it("PUT /me de-duplicates keywords on save", async () => {
+    const res = await putMe({ keywords: ["running", "running", "yoga", "yoga", "running"] });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { profile: { keywords: string[] } };
+    expect(body.profile.keywords).toEqual(["running", "yoga"]);
+  });
+
   it("PUT /me rejects malformed JSON body", async () => {
     const res = await app.request("/api/me", {
       method: "PUT",

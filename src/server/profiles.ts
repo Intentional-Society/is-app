@@ -60,7 +60,7 @@ export const parseEditableProfile = (body: unknown): EditableProfileInput | { er
       if (!isStringArray(value)) {
         return { error: "keywords must be an array of strings" };
       }
-      out.keywords = value;
+      out.keywords = [...new Set(value)];
     } else {
       if (!isNullableString(value)) {
         return { error: `${key} must be a string or null` };
