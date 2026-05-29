@@ -160,15 +160,16 @@ enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
 site_url = "http://localhost:3000"
-# A list of URLs that auth providers are permitted to redirect to post authentication. Supabase
-# matches these with trailing-`*` wildcard support. Cover both 127.0.0.1 and localhost because
-# window.location.origin on the client depends on which host the dev server was opened with.
-# Bare `/*` covers the three `emailRedirectTo` targets the forms pass:
-# `/auth/callback?type=email` (signin), `/auth/callback?type=email&invite=<code>` (signup),
-# and `/auth/callback?type=recovery` (forgot-password).
+# A list of URLs that auth providers are permitted to redirect to post authentication. Cover both
+# 127.0.0.1 and localhost because window.location.origin on the client depends on which host the
+# dev server was opened with. The `/**` wildcard matches multi-segment paths (Supabase's `*` only
+# matches non-separator characters, with `/` counted as a separator), so it covers the three
+# `emailRedirectTo` targets the forms pass: `/auth/callback?type=email` (signin),
+# `/auth/callback?type=email&invite=<code>` (signup), and `/auth/callback?type=recovery`
+# (forgot-password). See https://supabase.com/docs/guides/auth/redirect-urls for wildcard rules.
 additional_redirect_urls = [
-  "http://127.0.0.1:3000/*",
-  "http://localhost:3000/*",
+  "http://127.0.0.1:3000/**",
+  "http://localhost:3000/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

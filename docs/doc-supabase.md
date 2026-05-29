@@ -66,12 +66,12 @@ These settings control where Supabase redirects users after magic-link sign-in. 
 
 - **Site URL:** `https://app.intentionalsociety.org`
 - **Redirect URLs** (allowlist):
-  - `https://app.intentionalsociety.org/*` — production
-  - `https://is-app-vercel-*-intentional-society-vercel.vercel.app/*` — Vercel preview deploys (wildcard)
+  - `https://app.intentionalsociety.org/**` — production
+  - `https://is-app-vercel-*-intentional-society-vercel.vercel.app/**` — Vercel preview deploys (wildcard host)
 
 Local dev does **not** need entries here — it hits the local Supabase stack, whose allowlist is in `supabase/config.toml`. Only add `localhost` / `127.0.0.1` to this prod allowlist if a developer intentionally points their local frontend at prod Supabase (rare, and sends real magic-link emails).
 
-The bare `/*` covers the `emailRedirectTo` targets all three forms pass — `/auth/callback?type=email`, `/auth/callback?type=email&invite=<code>`, and `/auth/callback?type=recovery`. Anything more specific would need a separate entry per target. Without a matching wildcard, Supabase rejects the URL and silently falls back to **Site URL**, stranding the user at the prod origin with no session.
+The `/**` wildcard covers the `emailRedirectTo` targets all three forms pass — `/auth/callback?type=email` (signin), `/auth/callback?type=email&invite=<code>` (signup), and `/auth/callback?type=recovery` (forgot-password). Supabase's `*` wildcard matches non-separator characters only, with `/` and `.` counted as separators, so `/**` is required for the multi-segment `/auth/callback` path — `/*` would only match a single segment. The host wildcard `is-app-vercel-*-…vercel.app` uses single-star because Vercel preview subdomains are one DNS segment. See the [Supabase redirect URL docs](https://supabase.com/docs/guides/auth/redirect-urls) for the full wildcard table.
 
 ### Auth providers
 
@@ -148,7 +148,7 @@ The local Supabase stack (spun up by `supabase start`, wrapped by `npm run dev:d
 Same silent-fallback semantics as prod: if `emailRedirectTo` from the client isn't in the allowlist, Supabase falls back to `site_url`.
 
 - **`site_url`** — `http://127.0.0.1:3000`
-- **`additional_redirect_urls`** — bare `/*` for both `127.0.0.1:3000` and `localhost:3000`, since `window.location.origin` depends on which host the dev server was opened with and the wildcard covers all three form redirect targets.
+- **`additional_redirect_urls`** — `/**` for both `127.0.0.1:3000` and `localhost:3000`, since `window.location.origin` depends on which host the dev server was opened with and the wildcard covers all three form redirect targets (see the prod URL Configuration section above for why `/**` rather than `/*`).
 
 ### Inbucket (local email catcher)
 
