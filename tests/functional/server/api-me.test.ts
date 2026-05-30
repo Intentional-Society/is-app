@@ -82,7 +82,6 @@ describe("GET /api/me", () => {
         referredByLegacy: null,
         avatarUrl: null,
         emergencyContact: null,
-        liveDesire: null,
         currentIntention: null,
         intentionUpdatedAt: null,
         isAdmin: false,

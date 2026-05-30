@@ -16,7 +16,6 @@ export const EDITABLE_PROFILE_FIELDS = [
   "location",
   "supplementaryInfo",
   "emergencyContact",
-  "liveDesire",
   "currentIntention",
 ] as const;
 
@@ -29,7 +28,6 @@ export type EditableProfileInput = Partial<{
   location: string | null;
   supplementaryInfo: string | null;
   emergencyContact: string | null;
-  liveDesire: string | null;
   currentIntention: string | null;
 }>;
 
@@ -109,7 +107,6 @@ export type ProfileForSelf = {
   referredByLegacy: string | null;
   avatarUrl: string | null;
   emergencyContact: string | null;
-  liveDesire: string | null;
   currentIntention: string | null;
   intentionUpdatedAt: Date | null;
   isAdmin: boolean;
@@ -134,7 +131,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       referredByLegacy: profiles.referredByLegacy,
       avatarPath: profiles.avatarPath,
       emergencyContact: profiles.emergencyContact,
-      liveDesire: profiles.liveDesire,
+
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       isAdmin: profiles.isAdmin,
@@ -189,7 +186,7 @@ export const getProfileForSelfWithProbe = async (
       referredByLegacy: profiles.referredByLegacy,
       avatarPath: profiles.avatarPath,
       emergencyContact: profiles.emergencyContact,
-      liveDesire: profiles.liveDesire,
+
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       isAdmin: profiles.isAdmin,
@@ -266,7 +263,6 @@ export type ProfileForMember = {
   location: string | null;
   supplementaryInfo: string | null;
   avatarUrl: string | null;
-  liveDesire: string | null;
   email: string | null;
   currentIntention: string | null;
   intentionUpdatedAt: Date | null;
@@ -297,7 +293,7 @@ export const getProfileForMember = async (
       location: profiles.location,
       supplementaryInfo: profiles.supplementaryInfo,
       avatarPath: profiles.avatarPath,
-      liveDesire: profiles.liveDesire,
+
       email: authUsers.email,
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
