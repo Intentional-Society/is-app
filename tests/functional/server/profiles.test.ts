@@ -127,6 +127,7 @@ describe("getProfileForSelf", () => {
         "liveDesire",
         "currentIntention",
         "intentionUpdatedAt",
+        "deactivatedAt",
         "isAdmin",
         "lastSignedAgreements",
         "lastUpdatedProfile",
@@ -174,6 +175,7 @@ describe("getProfileForMember", () => {
         "email",
         "currentIntention",
         "intentionUpdatedAt",
+        "deactivatedAt",
         "createdAt",
       ].sort(),
     );
