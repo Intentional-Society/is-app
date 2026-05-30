@@ -287,9 +287,7 @@ export const getProfileForMember = async (
   const match = isUuid(idOrSlug)
     ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
     : eq(profiles.slug, idOrSlug);
-  const where = options.includeHidden
-    ? match
-    : and(match, eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
+  const where = options.includeHidden ? match : and(match, eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
 
   const [row] = await db
     .select({

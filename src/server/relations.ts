@@ -324,10 +324,7 @@ export const getPersonalWeb = async (params: {
       .select({ id: profiles.id })
       .from(profiles)
       .where(
-        and(
-          inArray(profiles.id, [...candidateIds]),
-          or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt)),
-        ),
+        and(inArray(profiles.id, [...candidateIds]), or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt))),
       );
     for (const r of rows) hiddenIds.add(r.id);
   }
@@ -375,12 +372,7 @@ export const getPersonalWeb = async (params: {
           const rows = await db
             .select({ id: profiles.id })
             .from(profiles)
-            .where(
-              and(
-                inArray(profiles.id, newIds),
-                or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt)),
-              ),
-            );
+            .where(and(inArray(profiles.id, newIds), or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt))));
           for (const r of rows) hiddenIds.add(r.id);
           for (const id of newIds) candidateIds.add(id);
         }

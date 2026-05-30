@@ -18,7 +18,6 @@ import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validate
 import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
   deactivateProfile,
-  reactivateProfile,
   getProfileForMember,
   getProfileForSelf,
   getProfileForSelfWithProbe,
@@ -30,6 +29,7 @@ import {
   type ProfileForSelf,
   type ProfileReadProbe,
   parseEditableProfile,
+  reactivateProfile,
   setProfileHidden,
   toSlug,
   upsertProfile,
