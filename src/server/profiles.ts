@@ -112,6 +112,7 @@ export type ProfileForSelf = {
   liveDesire: string | null;
   currentIntention: string | null;
   intentionUpdatedAt: Date | null;
+  deactivatedAt: Date | null;
   isAdmin: boolean;
   lastSignedAgreements: Date | null;
   lastUpdatedProfile: Date | null;
