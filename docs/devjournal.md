@@ -4,6 +4,18 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-30 | Ola | Deactivate account (member self-serve, #185)
+
+Members can deactivate their own account from the edit-profile page (`POST /me/deactivate`). Deactivated profiles are filtered from the directory, member lookups, relation suggestions, and the web graph — same `IS NULL` guard pattern as `profiles.hidden`. Members can reactivate themselves at any time via the same page (`POST /me/reactivate`); no admin action needed. `deactivated_at` is exposed in `GET /me` so the UI can show state. Functional tests cover deactivate, reactivate, and the self-shape assertion. (#301)
+
+## 2026-05-30 | Ola | Drop live_desire column (#319)
+
+Contract step following #245. The `live_desire` data was already migrated to `current_intention` in migration 0011. Migration 0012 drops the column; removed from schema, type definitions, `EDITABLE_PROFILE_FIELDS`, all SELECT statements, test-reset, and test assertions.
+
+## 2026-05-29 | Ola | Quarterly intentions field (#243)
+
+Added `current_intention` (text) and `intention_updated_at` (timestamptz) to profiles. Data migration copies existing `live_desire` values across. Field is shown on member profile pages with a month/year timestamp and is editable from the profile form. Renamed from the original `liveDesire` after James's feedback that they were the same concept.
+
 ## 2026-05-29 | James | Re-timestamp a migration if main gained one after you generated it
 
 Drizzle applies a migration only when its journal `when` is newer than the highest already-applied one, so a migration authored before a later one lands on `main` is silently skipped — no DDL, no error — on any DB already past that point. After rebasing, if `main` has a newer migration than yours, bump your entry's `when` in `drizzle/meta/_journal.json` above it. (Functional test added to catch this.)
