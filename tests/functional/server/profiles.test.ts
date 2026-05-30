@@ -175,7 +175,6 @@ describe("getProfileForMember", () => {
         "email",
         "currentIntention",
         "intentionUpdatedAt",
-        "deactivatedAt",
         "createdAt",
       ].sort(),
     );
