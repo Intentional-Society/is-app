@@ -109,7 +109,9 @@ export const getRelationSuggestions = async (
   userId: string,
   options: { includeHidden?: boolean } = {},
 ): Promise<RelationSuggestionFeed> => {
-  const notHidden = options.includeHidden ? sql`true` : sql`${profiles.hidden} = false`;
+  const notHidden = options.includeHidden
+    ? sql`true`
+    : sql`${profiles.hidden} = false AND ${profiles.deactivatedAt} IS NULL`;
   const seen = new Set<string>([userId]);
   const suggestions: SuggestionCardRow[] = [];
   const otherMembers: SuggestionCardRow[] = [];
@@ -309,8 +311,8 @@ export const getPersonalWeb = async (params: {
     .from(relations)
     .where(and(firstHopWhere, isNotNull(relations.value)));
 
-  // Determine which ids are hidden so we can drop them as nodes and as
-  // edge endpoints before rendering. Skipped entirely for admins.
+  // Determine which ids are hidden or deactivated so we can drop them
+  // as nodes and as edge endpoints before rendering. Skipped for admins.
   const candidateIds = new Set<string>([centerId]);
   for (const e of firstHop) {
     candidateIds.add(e.relatorId);
@@ -321,7 +323,12 @@ export const getPersonalWeb = async (params: {
     const rows = await db
       .select({ id: profiles.id })
       .from(profiles)
-      .where(and(inArray(profiles.id, [...candidateIds]), eq(profiles.hidden, true)));
+      .where(
+        and(
+          inArray(profiles.id, [...candidateIds]),
+          or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt)),
+        ),
+      );
     for (const r of rows) hiddenIds.add(r.id);
   }
   // Center is exempt — the viewer's own web always includes themselves,
@@ -368,7 +375,12 @@ export const getPersonalWeb = async (params: {
           const rows = await db
             .select({ id: profiles.id })
             .from(profiles)
-            .where(and(inArray(profiles.id, newIds), eq(profiles.hidden, true)));
+            .where(
+              and(
+                inArray(profiles.id, newIds),
+                or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt)),
+              ),
+            );
           for (const r of rows) hiddenIds.add(r.id);
           for (const id of newIds) candidateIds.add(id);
         }

@@ -45,9 +45,10 @@ export default async function EditProfilePage() {
       <div className="flex w-full max-w-md flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-base font-semibold">Deactivate account</h2>
         <p className="text-sm text-muted-foreground">
-          Hides your profile from other members. An admin can reactivate it for you at any time.
+          Hides your profile from other members. Some records of past participation may remain visible in other
+          people&apos;s history data.
         </p>
-        <DeactivateAccountForm />
+        <DeactivateAccountForm isDeactivated={!!profile.deactivatedAt} />
       </div>
     </main>
   );

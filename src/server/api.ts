@@ -18,6 +18,7 @@ import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validate
 import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
   deactivateProfile,
+  reactivateProfile,
   getProfileForMember,
   getProfileForSelf,
   getProfileForSelfWithProbe,
@@ -381,6 +382,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .post("/me/deactivate", async (c) => {
     const user = c.get("user");
     const result = await deactivateProfile(user.id);
+    if ("error" in result) return c.json({ error: "profile not found" }, 404);
+    return c.json({ ok: true });
+  })
+  .post("/me/reactivate", async (c) => {
+    const user = c.get("user");
+    const result = await reactivateProfile(user.id);
     if ("error" in result) return c.json({ error: "profile not found" }, 404);
     return c.json({ ok: true });
   })
