@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-29 | James | About page + member-facing changelog (#170)
+
+New `/about` page, with a changelog, version (the date of the newest entry), and short team blurb. Entries live in `src/lib/changelog.ts` — plain-language member-facing copy, deliberately separate from this journal; seeded by curating member-visible features out of it.
+
 ## 2026-05-29 | James | Re-timestamp a migration if main gained one after you generated it
 
 Drizzle applies a migration only when its journal `when` is newer than the highest already-applied one, so a migration authored before a later one lands on `main` is silently skipped — no DDL, no error — on any DB already past that point. After rebasing, if `main` has a newer migration than yours, bump your entry's `when` in `drizzle/meta/_journal.json` above it. (Functional test added to catch this.)

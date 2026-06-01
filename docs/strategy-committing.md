@@ -6,6 +6,8 @@ If you touch code, have test coverage for it! Make sure you're keeping the docs 
 
 If you've done work your teammates should know about, add a `docs/devjournal.md` entry (typically at a higher level than all the commit messages on that branch).
 
+If you shipped something members can see or use, add an entry to the top of `src/lib/changelog.ts` — plain-language member-facing copy, distinct from the internal devjournal. It surfaces in the "Changelog" section of the `/about` page, and its date becomes the app version shown there.
+
 Run `npm test` (all suites) and confirm green before committing. Don't push code that you haven't tested locally. If you're changing frontend layout, check both phone and desktop rendering.
 
 **Watch out:** `git stash && <command>; git stash pop` looks like a safe way to test against a clean slate, but it isn't. `git stash` is a no-op when the tree is already clean — it does not push an empty marker — so the trailing `git stash pop` falls through to whatever was already on the stack, potentially applying leftover work from another branch. Instead, use `git stash list` to check the stack first, and only pop if you actually put something there.

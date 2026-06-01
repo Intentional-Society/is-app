@@ -7,6 +7,31 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { clearNavHistory } from "@/lib/route-labels";
+import { cn } from "@/lib/utils";
+
+// Internal nav links share one shape: a SheetClose (so the menu closes
+// on tap) wrapping a Link that clears the breadcrumb history. The
+// optional className layers extra styling on top of the shared base.
+function MenuLink({
+  href,
+  className,
+  children,
+}: {
+  href: React.ComponentProps<typeof Link>["href"];
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <SheetClose
+      nativeButton={false}
+      render={
+        <Link href={href} onClick={clearNavHistory} className={cn("rounded px-2 py-2 hover:bg-muted", className)}>
+          {children}
+        </Link>
+      }
+    />
+  );
+}
 
 export function SiteHeader({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
   const { user } = useAuth();
@@ -25,54 +50,13 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             {displayName ? <p className="font-serif italic text-sm text-muted-foreground">{displayName}</p> : null}
           </SheetHeader>
           <nav className="flex flex-col gap-1 px-4 pb-4">
-            <SheetClose
-              nativeButton={false}
-              render={
-                <Link href="/" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
-                  Home
-                </Link>
-              }
-            />
-            <SheetClose
-              nativeButton={false}
-              render={
-                <Link href="/programs" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
-                  Programs
-                </Link>
-              }
-            />
-            <SheetClose
-              nativeButton={false}
-              render={
-                <Link href="/members" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
-                  Member directory
-                </Link>
-              }
-            />
-            <SheetClose
-              nativeButton={false}
-              render={
-                <Link href="/myweb" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
-                  My web
-                </Link>
-              }
-            />
-            <SheetClose
-              nativeButton={false}
-              render={
-                <Link href="/profile" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
-                  My profile
-                </Link>
-              }
-            />
-            <SheetClose
-              nativeButton={false}
-              render={
-                <Link href="/invites" onClick={clearNavHistory} className="rounded px-2 py-2 hover:bg-muted">
-                  Invite a friend
-                </Link>
-              }
-            />
+            <MenuLink href="/">Home</MenuLink>
+            <MenuLink href="/programs">Programs</MenuLink>
+            <MenuLink href="/members">Member directory</MenuLink>
+            <MenuLink href="/myweb">My web</MenuLink>
+            <MenuLink href="/profile">My profile</MenuLink>
+            <MenuLink href="/invites">Invite a friend</MenuLink>
+            <MenuLink href="/about">About</MenuLink>
             <a
               href="https://docs.google.com/forms/d/e/1FAIpQLScXhdSxbQ3LxjiYhqN2fmuyy66SK292rTYEZV3QaHgzn1eVjA/viewform?usp=dialog"
               target="_blank"
@@ -82,19 +66,10 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
               Give Feedback
             </a>
             {isAdmin ? (
-              <SheetClose
-                nativeButton={false}
-                render={
-                  <Link
-                    href="/admin"
-                    onClick={clearNavHistory}
-                    className="flex items-center gap-2 rounded px-2 py-2 text-green-700 hover:bg-muted"
-                  >
-                    <ShieldCheck className="h-4 w-4 shrink-0" />
-                    Admin dashboard
-                  </Link>
-                }
-              />
+              <MenuLink href="/admin" className="flex items-center gap-2 text-green-700">
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                Admin dashboard
+              </MenuLink>
             ) : null}
             <form action="/signout" method="post">
               <SheetClose
