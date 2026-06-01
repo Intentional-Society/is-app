@@ -32,6 +32,7 @@ const EXACT_LABELS: Record<string, string> = {
   "/profile": "Profile",
   "/profile/edit": "Edit profile",
   "/invites": "Invites",
+  "/about": "About",
   "/admin": "Admin",
   "/admin/programs": "Admin programs",
 };
