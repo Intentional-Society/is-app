@@ -83,12 +83,17 @@ const INTERACTION_AGREEMENTS: { category: string; items: { title: string; body: 
   },
 ];
 
-export function AgreementsContent() {
+export function AgreementsContent({ hasProfile }: { hasProfile: boolean }) {
   return (
     <div className="flex w-full max-w-xl flex-col gap-8">
       <div className="flex flex-col items-center gap-3 text-center">
         <h1 className="text-4xl font-bold">Welcome to the Web</h1>
         <p className="text-base text-muted-foreground">First, what we all share: intentions and agreements</p>
+        {hasProfile && (
+          <p className="text-base text-muted-foreground">
+            (You’ve agreed to these before, so this is just a review for you.)
+          </p>
+        )}
       </div>
 
       <section className="flex flex-col gap-3">
