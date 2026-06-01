@@ -8,8 +8,8 @@
 export const AGREEMENTS_UPDATED_AT = new Date("2026-05-19T00:00:00Z");
 
 const INTENTIONS = [
-  "I intend to notice, name, and welcome what’s “alive” for me internally and relationally.",
   "I intend to be who I want to be and do things I value.",
+  "I intend to notice, name, and welcome what’s “alive” for me internally and relationally.",
   "I intend to contribute to the wellbeing of others around me.",
 ];
 
@@ -106,35 +106,37 @@ export function AgreementsContent() {
         <p className="text-base">
           We also strive to uphold these interaction agreements (v2.0 adopted July 2022) when we are together:
         </p>
-        {INTERACTION_AGREEMENTS.map((group) => (
-          <div key={group.category} className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">{group.category}</h2>
-            <ul className="flex flex-col gap-2">
-              {group.items.map((item) => (
-                <li key={item.title}>
-                  <details className="group rounded-xl bg-card">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-                      <span>{item.title}</span>
-                      <svg
-                        viewBox="0 0 12 12"
-                        aria-hidden="true"
-                        className="size-3 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="m3 4.5 3 3 3-3" />
-                      </svg>
-                    </summary>
-                    <p className="px-4 pb-4 text-sm text-muted-foreground">{item.body}</p>
-                  </details>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <ul className="flex flex-col gap-3">
+          {INTERACTION_AGREEMENTS.map((group) => (
+            <li key={group.category}>
+              <details className="group rounded-xl bg-card">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-lg font-semibold [&::-webkit-details-marker]:hidden">
+                  <span>{group.category}</span>
+                  <svg
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                    className="size-3 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m3 4.5 3 3 3-3" />
+                  </svg>
+                </summary>
+                <ul className="flex flex-col gap-2 px-4 pb-4 text-sm">
+                  {group.items.map((item) => (
+                    <li key={item.title}>
+                      <span className="font-semibold">{item.title}.</span>{" "}
+                      <span className="text-muted-foreground">{item.body}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <p className="text-center text-sm text-muted-foreground">
