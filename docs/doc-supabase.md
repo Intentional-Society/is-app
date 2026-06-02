@@ -6,9 +6,11 @@ Covers both the hosted production project (configured via the Supabase dashboard
 
 ## Magic-link flow (token-hash + verifyOtp)
 
-The magic-link and password-reset emails embed `{{ .TokenHash }}` directly in a URL pointing at `/auth/callback?type=…&token_hash=…`. The route calls `supabase.auth.verifyOtp({ token_hash, type })` server-side, so the link works regardless of which browser opens it.
+The magic-link and password-reset emails embed `{{ .TokenHash }}` directly in a URL pointing at `/auth/callback?type=…&token_hash=…`. The route verifies the token via `supabase.auth.verifyOtp({ token_hash, type })` server-side, so the link works regardless of which browser opens it.
 
-The forms pass the full callback URL as `emailRedirectTo`, and templates use `{{ .RedirectTo }}` as the action URL host. That keeps the link env-aware — preview-deploy emails point at the preview origin, not at `.SiteURL` (which is hardcoded to prod). Signup adds `&invite=${code}` to the callback URL; the route reads it directly from its query params.
+**Two-step GET → POST (anti-prefetch).** The clicked link is a `GET`, but verification runs on a `POST`. The `GET` only renders a tiny "Signing you in…" page whose form auto-submits (inline script; `<noscript>` degrades to a Continue button) back to `/auth/callback` as a `POST`, and only that `POST` calls `verifyOtp`. This exists because email link scanners — Microsoft Defender Safe Links most notably — prefetch the link with a bare `GET` to vet it, which would otherwise consume the single-use token before the member's real click ever lands (surfacing as `otp_expired`; see issue #325). Scanners don't execute scripts or submit forms, so the token survives the prefetch. The `POST` redirects with 303 so the browser follows it with a `GET`.
+
+The forms pass the full callback URL as `emailRedirectTo`, and templates use `{{ .RedirectTo }}` as the action URL host. That keeps the link env-aware — preview-deploy emails point at the preview origin, not at `.SiteURL` (which is hardcoded to prod). Signup adds `&invite=${code}` to the callback URL; the `GET` reads it from the query string and carries it through the transit form into the `POST`.
 
 PKCE is still the configured client `flowType` and still governs session cookies / refresh-token rotation. Only the email-verification step is bypassed by the token-hash flow. See `docs/old-archive/plan-cross-browser-magic-link.md` for the migration rationale.
 
