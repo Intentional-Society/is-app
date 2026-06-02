@@ -485,6 +485,36 @@ describe("getPersonalWeb", () => {
       await deleteUserAndProfile(c);
     }
   });
+
+  it("drops a deactivated neighbor and their edge from the map", async () => {
+    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
+    await db.update(profiles).set({ deactivatedAt: new Date() }).where(eq(profiles.id, b));
+
+    const sub = await getPersonalWeb({
+      centerId: center,
+      includeIncoming: false,
+      includeOutgoing: true,
+      hops: 1,
+    });
+    expect(sub.nodes.map((n) => n.id).includes(b)).toBe(false);
+    expect(sub.edges.some((e) => e.relateeId === b)).toBe(false);
+    expect(sub.nodes.map((n) => n.id).includes(a)).toBe(true);
+  });
+
+  it("includeHidden=true still drops deactivated neighbors (admin viewer)", async () => {
+    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
+    await db.update(profiles).set({ deactivatedAt: new Date() }).where(eq(profiles.id, a));
+
+    const sub = await getPersonalWeb({
+      centerId: center,
+      includeIncoming: false,
+      includeOutgoing: true,
+      hops: 1,
+      includeHidden: true,
+    });
+    expect(sub.nodes.map((n) => n.id).includes(a)).toBe(false);
+  });
 });
 
 describe("getRelationSuggestions — hidden filter", () => {

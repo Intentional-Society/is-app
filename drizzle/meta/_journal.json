@@ -87,10 +87,10 @@
       "breakpoints": true
     },
     {
-      "idx": 12,
+      "idx": 13,
       "version": "7",
-      "when": 1780165705136,
-      "tag": "0012_add_profile_deactivated_at",
+      "when": 1780252105136,
+      "tag": "0013_add_profile_deactivated_at",
       "breakpoints": true
     }
   ]
