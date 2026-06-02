@@ -20,6 +20,7 @@ import {
   getProfileForMember,
   getProfileForSelf,
   getProfileForSelfWithProbe,
+  listCurrentIntentions,
   listHiddenMembers,
   listMembers,
   markAgreementsSigned,
@@ -332,6 +333,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
       const update = {
         ...parsed,
         ...(parsed.displayName !== undefined ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null } : {}),
+        // Stamp the intention's own timestamp only when its text actually
+        // changes — the /intentions cloud orders "freshest on top" by it,
+        // so an unrelated profile edit must not float a stale intention up.
+        ...(parsed.currentIntention !== undefined && parsed.currentIntention !== (existing?.currentIntention ?? null)
+          ? { intentionUpdatedAt: sql`now()` }
+          : {}),
         lastUpdatedProfile: sql`now()`,
       };
       try {
@@ -505,6 +512,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const profile = await getProfileForMember(memberId, { includeHidden });
     if (!profile) return c.json({ error: "not_found" }, 404);
     return c.json({ profile });
+  })
+  .get("/intentions", async (c) => {
+    const user = c.get("user");
+    const includeHidden = await isAdmin(user.id);
+    const intentions = await listCurrentIntentions({ includeHidden });
+    return c.json({ intentions });
   })
   .get("/programs", async (c) => {
     const user = c.get("user");

@@ -337,6 +337,43 @@ export const listMembers = async (options: { includeHidden?: boolean } = {}): Pr
   return (await attachAvatarUrls(rows)) as MemberSummary[];
 };
 
+export type IntentionSummary = {
+  id: string;
+  slug: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  currentIntention: string;
+  intentionUpdatedAt: Date | null;
+};
+
+// Every member who has set a non-empty current intention, freshest
+// first — the /intentions browse cloud renders the most recently
+// updated on top (highest z-index) and largest. `nulls last` parks the
+// rare row whose intentionUpdatedAt was never stamped at the back.
+// Hidden profiles are excluded unless an admin caller opts in, matching
+// listMembers.
+export const listCurrentIntentions = async (options: { includeHidden?: boolean } = {}): Promise<IntentionSummary[]> => {
+  const present = and(
+    isNotNull(profiles.displayName),
+    isNotNull(profiles.currentIntention),
+    sql`btrim(${profiles.currentIntention}) <> ''`,
+  );
+  const where = options.includeHidden ? present : and(present, eq(profiles.hidden, false));
+  const rows = await db
+    .select({
+      id: profiles.id,
+      slug: profiles.slug,
+      displayName: profiles.displayName,
+      avatarPath: profiles.avatarPath,
+      currentIntention: profiles.currentIntention,
+      intentionUpdatedAt: profiles.intentionUpdatedAt,
+    })
+    .from(profiles)
+    .where(where)
+    .orderBy(sql`${profiles.intentionUpdatedAt} desc nulls last`);
+  return (await attachAvatarUrls(rows)) as IntentionSummary[];
+};
+
 export type HiddenMemberSummary = MemberSummary;
 
 // Hidden-only directory for the admin page. Includes profiles with

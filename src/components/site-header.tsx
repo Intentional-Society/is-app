@@ -53,6 +53,7 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <MenuLink href="/">Home</MenuLink>
             <MenuLink href="/programs">Programs</MenuLink>
             <MenuLink href="/members">Member directory</MenuLink>
+            <MenuLink href="/intentions">Current intentions</MenuLink>
             <MenuLink href="/myweb">My web</MenuLink>
             <MenuLink href="/profile">My profile</MenuLink>
             <MenuLink href="/invites">Invite a friend</MenuLink>

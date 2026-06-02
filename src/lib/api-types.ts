@@ -13,6 +13,10 @@ export type MemberProfile = InferResponseType<(typeof apiClient.api.members)[":i
 
 export type MemberSummary = InferResponseType<(typeof apiClient.api.members)["$get"], 200>["members"][number];
 
+export type IntentionsResponse = InferResponseType<(typeof apiClient.api.intentions)["$get"], 200>;
+
+export type Intention = IntentionsResponse["intentions"][number];
+
 export type Me = InferResponseType<(typeof apiClient.api.me)["$get"], 200>;
 
 export type ProgramsResponse = InferResponseType<(typeof apiClient.api.programs)["$get"], 200>;
