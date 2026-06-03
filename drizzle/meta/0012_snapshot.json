@@ -1,6 +1,6 @@
 {
-  "id": "415505cb-bdf6-4606-9e10-0f9196c0c6cb",
-  "prevId": "92ef1525-ba0f-41f4-95f7-469500341915",
+  "id": "92ef1525-ba0f-41f4-95f7-469500341915",
+  "prevId": "a1a225c1-2f62-4edf-a8d6-038fd7198fc3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -390,12 +390,6 @@
         },
         "intention_updated_at": {
           "name": "intention_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deactivated_at": {
-          "name": "deactivated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

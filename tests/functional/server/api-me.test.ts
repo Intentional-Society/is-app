@@ -82,7 +82,6 @@ describe("GET /api/me", () => {
         referredByLegacy: null,
         avatarUrl: null,
         emergencyContact: null,
-        liveDesire: null,
         currentIntention: null,
         intentionUpdatedAt: null,
         deactivatedAt: null,
@@ -337,5 +336,112 @@ describe("POST /api/me/deactivate and /api/me/reactivate", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.profile.deactivatedAt).not.toBeNull();
+  });
+});
+
+describe("PUT /api/me intention timestamp", () => {
+  let testUserId: string;
+  // A clearly-historical timestamp so "did it move to now()?" is unambiguous.
+  const OLD = new Date("2020-01-01T00:00:00.000Z");
+
+  beforeEach(async () => {
+    testUserId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${testUserId}::uuid, 'intention-test@testfake.local', false, false)`,
+    );
+
+    mockCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: makeUser(testUserId, "intention-test@testfake.local") },
+          error: null,
+        }),
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: test mock shape
+    } as any);
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await db.delete(profiles).where(eq(profiles.id, testUserId));
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`);
+  });
+
+  const putMe = (body: unknown) =>
+    app.request("/api/me", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  const readRow = async () => {
+    const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
+    return row;
+  };
+
+  it("stamps intentionUpdatedAt when an intention is first set", async () => {
+    await db.insert(profiles).values({ id: testUserId, displayName: "Intent Tester" });
+    const before = new Date();
+
+    const res = await putMe({ currentIntention: "Ship the intentions cloud" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.profile.currentIntention).toBe("Ship the intentions cloud");
+    expect(body.profile.intentionUpdatedAt).not.toBeNull();
+
+    const row = await readRow();
+    expect(row.intentionUpdatedAt?.getTime() ?? 0).toBeGreaterThanOrEqual(before.getTime() - 1000);
+  });
+
+  it("re-stamps intentionUpdatedAt when the intention text changes", async () => {
+    await db.insert(profiles).values({
+      id: testUserId,
+      displayName: "Intent Tester",
+      currentIntention: "Old intention",
+      intentionUpdatedAt: OLD,
+    });
+    const before = new Date();
+
+    const res = await putMe({ currentIntention: "New intention" });
+    expect(res.status).toBe(200);
+
+    const row = await readRow();
+    expect(row.currentIntention).toBe("New intention");
+    expect(row.intentionUpdatedAt?.getTime() ?? 0).toBeGreaterThanOrEqual(before.getTime() - 1000);
+    expect(row.intentionUpdatedAt?.getTime()).not.toBe(OLD.getTime());
+  });
+
+  it("leaves intentionUpdatedAt untouched when an unrelated field is edited", async () => {
+    await db.insert(profiles).values({
+      id: testUserId,
+      displayName: "Intent Tester",
+      currentIntention: "Steady intention",
+      intentionUpdatedAt: OLD,
+    });
+
+    const res = await putMe({ bio: "Just updating my bio." });
+    expect(res.status).toBe(200);
+
+    const row = await readRow();
+    expect(row.bio).toBe("Just updating my bio.");
+    // The whole point of the conditional stamp: the /intentions cloud
+    // orders "freshest on top" by intentionUpdatedAt, so editing a bio
+    // (or any other field) must not float a stale intention to the top.
+    expect(row.intentionUpdatedAt?.getTime()).toBe(OLD.getTime());
+  });
+
+  it("does not re-stamp when the same intention text is submitted again", async () => {
+    await db.insert(profiles).values({
+      id: testUserId,
+      displayName: "Intent Tester",
+      currentIntention: "Same intention",
+      intentionUpdatedAt: OLD,
+    });
+
+    const res = await putMe({ currentIntention: "Same intention" });
+    expect(res.status).toBe(200);
+
+    const row = await readRow();
+    expect(row.intentionUpdatedAt?.getTime()).toBe(OLD.getTime());
   });
 });

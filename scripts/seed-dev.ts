@@ -35,7 +35,7 @@ type SeedProfile = {
   referredByLegacy: string | null;
   avatarUrl: string | null;
   emergencyContact: string | null;
-  liveDesire: string | null;
+  currentIntention: string | null;
   isAdmin: boolean;
   supplementaryInfo: string | null;
 };
@@ -109,6 +109,12 @@ function toSlug(displayName: string): string {
 }
 
 async function seedProfiles(): Promise<SeedResult> {
+  // Stagger intention_updated_at across the members who have an intention
+  // so the /intentions cloud has a real freshest-first ordering to render
+  // (it z-orders and sizes by recency). ~1.5 days apart, newest first;
+  // members without an intention get a null timestamp.
+  const now = Date.now();
+  let intentionRank = 0;
   const values = seedData.profiles.map((p) => ({
     id: p.id,
     displayName: p.displayName,
@@ -120,7 +126,8 @@ async function seedProfiles(): Promise<SeedResult> {
     referredByLegacy: p.referredByLegacy,
     avatarUrl: p.avatarUrl,
     emergencyContact: p.emergencyContact,
-    liveDesire: p.liveDesire,
+    currentIntention: p.currentIntention,
+    intentionUpdatedAt: p.currentIntention?.trim() ? new Date(now - intentionRank++ * 37 * 60 * 60 * 1000) : null,
     isAdmin: p.isAdmin,
     supplementaryInfo: p.supplementaryInfo,
   }));
@@ -145,16 +152,31 @@ async function seedPrograms(): Promise<SeedResult> {
 }
 
 async function seedProfilePrograms(): Promise<SeedResult> {
-  const values = seedData.profilePrograms.map((pp) => ({
-    profileId: pp.profileId,
-    programId: pp.programId,
-  }));
+  // Resolve program ids from the DB by slug rather than trusting the
+  // JSON's hardcoded uuids. A program like weekly-web-updates can already
+  // exist under a different id (slug is unique), in which case the
+  // programs upsert above skipped the JSON row — so a membership pointing
+  // at the JSON uuid would violate the FK. Mapping JSON uuid → slug → the
+  // real db id keeps memberships attached to the program that actually
+  // exists; any slug with no matching program is dropped, not fatal.
+  const slugByJsonId = new Map(seedData.programs.map((p) => [p.id, p.slug]));
+  const dbPrograms = await db.select({ id: programs.id, slug: programs.slug }).from(programs);
+  const idBySlug = new Map(dbPrograms.map((p) => [p.slug, p.id]));
+
+  const values = seedData.profilePrograms
+    .map((pp) => {
+      const slug = slugByJsonId.get(pp.programId);
+      const programId = slug ? idBySlug.get(slug) : undefined;
+      return programId ? { profileId: pp.profileId, programId } : null;
+    })
+    .filter((v): v is { profileId: string; programId: string } => v !== null);
+
   const result = await db
     .insert(profilePrograms)
     .values(values)
     .onConflictDoNothing()
     .returning({ profileId: profilePrograms.profileId });
-  return { inserted: result.length, skipped: values.length - result.length };
+  return { inserted: result.length, skipped: seedData.profilePrograms.length - result.length };
 }
 
 async function seedInvites(): Promise<SeedResult> {

@@ -11,8 +11,8 @@ import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpe
 //
 // Serial mode: all the authed tests in this file share the regular
 // user, so parallel runs would race on beforeEach resets / invite
-// creation. Local Playwright defaults to workers > 1; CI runs single-
-// worker regardless.
+// creation. playwright.config.ts pins workers to 1 globally; this
+// serial mode is within-file belt-and-braces on top of that.
 test.describe.configure({ mode: "serial" });
 
 test.describe("invites — authed member flow", () => {

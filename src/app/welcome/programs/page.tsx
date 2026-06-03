@@ -13,8 +13,8 @@ export default async function WelcomeProgramsPage() {
       <div className="flex flex-col items-center gap-3 text-center">
         <h1 className="text-4xl font-bold">Programs</h1>
         <p className="max-w-md text-base text-muted-foreground">
-          These programs are open to new participants — join any that you’d like to sign up for. (We added one for you,
-          opt out if you like.)
+          These programs are open to new participants — join any that you’d like to sign up for. (Note: Weekly Web
+          Updates defaults to on/joined.)
         </p>
       </div>
       <ProgramsList />

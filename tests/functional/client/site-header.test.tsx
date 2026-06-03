@@ -70,6 +70,19 @@ describe("SiteHeader", () => {
     expect(await screen.findByText("Admin dashboard")).toBeVisible();
   });
 
+  it("shows an About link to /about", async () => {
+    render(
+      <AuthProvider initialUser={user}>
+        <SiteHeader displayName={null} isAdmin={false} />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
+    const link = await screen.findByText("About");
+    expect(link).toBeVisible();
+    expect(link.tagName).toBe("A");
+    expect(link).toHaveAttribute("href", "/about");
+  });
+
   it("shows Give Feedback link that opens in a new tab", async () => {
     render(
       <AuthProvider initialUser={user}>

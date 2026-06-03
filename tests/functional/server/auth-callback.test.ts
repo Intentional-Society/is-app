@@ -7,7 +7,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-import { GET } from "@/app/auth/callback/route";
+import { GET, POST } from "@/app/auth/callback/route";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
@@ -15,7 +15,16 @@ import { invites, profilePrograms, profiles, programs } from "@/server/schema";
 
 const mockCreateClient = vi.mocked(createClient);
 
-const makeRequest = (path: string) => new NextRequest(new URL(path, "http://testfake.local"));
+const makeGet = (path: string) => new NextRequest(new URL(path, "http://testfake.local"));
+
+// The transit form auto-submits a urlencoded POST back to the route;
+// these requests stand in for that submission.
+const makePost = (fields: Record<string, string>) =>
+  new NextRequest(new URL("/auth/callback", "http://testfake.local"), {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(fields).toString(),
+  });
 
 const mockSupabase = (user: { id: string; email: string } | null) => {
   const signOut = vi.fn().mockResolvedValue({ error: null });
@@ -73,34 +82,84 @@ const ensureWeeklyProgram = async (): Promise<string> => {
   return row.id;
 };
 
-describe("GET /auth/callback", () => {
+describe("GET /auth/callback (renders the transit page, never verifies)", () => {
   beforeEach(() => {
     mockCreateClient.mockReset();
   });
 
-  it("redirects to /signin?error=missing_token when the token_hash query param is absent", async () => {
-    const res = await GET(makeRequest("/auth/callback?type=email"));
+  it("redirects to /signin?error=missing_token when the token_hash query param is absent", () => {
+    const res = GET(makeGet("/auth/callback?type=email"));
 
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=missing_token");
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
 
-  it("redirects to /signin?error=missing_token when the type query param is absent", async () => {
-    const res = await GET(makeRequest("/auth/callback?token_hash=abc"));
+  it("redirects to /signin?error=missing_token when the type query param is absent", () => {
+    const res = GET(makeGet("/auth/callback?token_hash=abc"));
 
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=missing_token");
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
 
-  it("redirects to /signin?error=missing_token when type is not one we handle", async () => {
+  it("redirects to /signin?error=missing_token when type is not one we handle", () => {
     // `signup` is a valid EmailOtpType in the Supabase SDK but our
     // templates never emit it — the runtime guard rejects it before we
-    // ever call verifyOtp.
-    const res = await GET(makeRequest("/auth/callback?token_hash=abc&type=signup"));
+    // ever render a verifiable form.
+    const res = GET(makeGet("/auth/callback?token_hash=abc&type=signup"));
 
     expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=missing_token");
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("renders an auto-submit form on a valid GET without consuming the token", async () => {
+    // The defining property of the fix (issue #325): a bare GET — which
+    // is all an email link scanner does — must NOT call verifyOtp, so the
+    // single-use token survives for the member's real click.
+    const res = GET(makeGet("/auth/callback?token_hash=tok123&type=email"));
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+
+    const html = await res.text();
+    expect(html).toContain('method="POST"');
+    expect(html).toContain('action="/auth/callback"');
+    expect(html).toContain('name="token_hash"');
+    expect(html).toContain('value="tok123"');
+    expect(html).toContain('name="type"');
+
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("carries the invite code into the transit form", async () => {
+    const res = GET(makeGet("/auth/callback?token_hash=tok123&type=email&invite=ABCDEFGHIJ"));
+    const html = await res.text();
+
+    expect(html).toContain('name="invite"');
+    expect(html).toContain('value="ABCDEFGHIJ"');
+  });
+
+  it("escapes untrusted query values reflected into the form", async () => {
+    const res = GET(makeGet(`/auth/callback?token_hash=${encodeURIComponent('"><script>x()</script>')}&type=email`));
+    const html = await res.text();
+
+    expect(html).not.toContain("<script>x()</script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("POST /auth/callback (verifies the token)", () => {
+  beforeEach(() => {
+    mockCreateClient.mockReset();
+  });
+
+  it("redirects to /signin?error=missing_token when params are absent", async () => {
+    const res = await POST(makePost({ type: "email" }));
+
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=missing_token");
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
@@ -108,9 +167,9 @@ describe("GET /auth/callback", () => {
   it("redirects to /signin?error=verify_failed when verifyOtp errors", async () => {
     mockSupabase(null);
 
-    const res = await GET(makeRequest("/auth/callback?token_hash=bad&type=email"));
+    const res = await POST(makePost({ token_hash: "bad", type: "email" }));
 
-    expect(res.status).toBe(307);
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=verify_failed");
   });
 
@@ -120,9 +179,9 @@ describe("GET /auth/callback", () => {
     mockSupabase({ id: userId, email: `${userId}@testfake.local` });
 
     try {
-      const res = await GET(makeRequest("/auth/callback?token_hash=hash&type=recovery"));
+      const res = await POST(makePost({ token_hash: "hash", type: "recovery" }));
 
-      expect(res.status).toBe(307);
+      expect(res.status).toBe(303);
       expect(res.headers.get("location")).toBe("http://testfake.local/auth/reset-password");
 
       // No profile row created — recovery branch skips that step.
@@ -134,7 +193,7 @@ describe("GET /auth/callback", () => {
   });
 });
 
-describe("GET /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-updates)", () => {
+describe("POST /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-updates)", () => {
   let userId: string;
   let weeklyProgramId: string;
 
@@ -153,9 +212,9 @@ describe("GET /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-upd
   it("auto-subscribes the new member to weekly-web-updates", async () => {
     mockSupabase({ id: userId, email: "newbie@testfake.local" });
 
-    const res = await GET(makeRequest("/auth/callback?token_hash=hash&type=email"));
+    const res = await POST(makePost({ token_hash: "hash", type: "email" }));
 
-    expect(res.status).toBe(307);
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/");
 
     const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
@@ -170,9 +229,9 @@ describe("GET /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-upd
 
     mockSupabase({ id: userId, email: "returning@testfake.local" });
 
-    const res = await GET(makeRequest("/auth/callback?token_hash=hash&type=email"));
+    const res = await POST(makePost({ token_hash: "hash", type: "email" }));
 
-    expect(res.status).toBe(307);
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/");
 
     const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
@@ -180,7 +239,7 @@ describe("GET /auth/callback (ordinary sign-in, auto-subscribe to weekly-web-upd
   });
 });
 
-describe("GET /auth/callback (invited sign-in, invite query param)", () => {
+describe("POST /auth/callback (invited sign-in, invite field)", () => {
   let inviterId: string;
   let newUserId: string;
   let weeklyProgramId: string;
@@ -202,7 +261,7 @@ describe("GET /auth/callback (invited sign-in, invite query param)", () => {
     await deleteAuthUser(inviterId);
   });
 
-  const callbackUrl = (inviteCode: string) => `/auth/callback?token_hash=hash&type=email&invite=${inviteCode}`;
+  const invitePost = (inviteCode: string) => makePost({ token_hash: "hash", type: "email", invite: inviteCode });
 
   it("redeems a valid invite and stamps referredBy + displayName", async () => {
     const r = await createInvite({
@@ -212,9 +271,9 @@ describe("GET /auth/callback (invited sign-in, invite query param)", () => {
     if ("error" in r) throw new Error("seed failed");
     mockSupabase({ id: newUserId, email: "newbie@testfake.local" });
 
-    const res = await GET(makeRequest(callbackUrl(r.code)));
+    const res = await POST(invitePost(r.code));
 
-    expect(res.status).toBe(307);
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/");
 
     const [profile] = await db.select().from(profiles).where(eq(profiles.id, newUserId));
@@ -240,9 +299,9 @@ describe("GET /auth/callback (invited sign-in, invite query param)", () => {
       email: "newbie@testfake.local",
     });
 
-    const res = await GET(makeRequest(callbackUrl(r.code)));
+    const res = await POST(invitePost(r.code));
 
-    expect(res.status).toBe(307);
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=invite_invalid");
     expect(signOut).toHaveBeenCalledOnce();
 
@@ -257,9 +316,9 @@ describe("GET /auth/callback (invited sign-in, invite query param)", () => {
       email: "newbie@testfake.local",
     });
 
-    const res = await GET(makeRequest(callbackUrl("ZZZZZZZZZZ")));
+    const res = await POST(invitePost("ZZZZZZZZZZ"));
 
-    expect(res.status).toBe(307);
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/signin?error=invite_invalid");
     expect(signOut).toHaveBeenCalledOnce();
   });
@@ -272,9 +331,9 @@ describe("GET /auth/callback (invited sign-in, invite query param)", () => {
     if ("error" in r) throw new Error("seed failed");
     mockSupabase({ id: newUserId, email: "newbie@testfake.local" });
 
-    const res = await GET(makeRequest(callbackUrl(r.code)));
+    const res = await POST(invitePost(r.code));
 
-    expect(res.status).toBe(307);
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://testfake.local/");
 
     const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, newUserId));

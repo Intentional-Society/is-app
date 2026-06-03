@@ -86,6 +86,11 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
       <div className="grid w-full max-w-lg gap-4 sm:grid-cols-2">
         <NavCard href="/programs" title="Programs" description="Explore and join IS Web programs." />
         <NavCard href="/members" title="Member directory" description="Browse and find other members." />
+        <NavCard
+          href="/intentions"
+          title="Current intentions"
+          description="See what the whole network is working toward."
+        />
         <NavCard href="/myweb" title="My web" description="Build your relational map by adding connections!" />
         <NavCard href="/profile" title="My profile" description="View and edit your profile information." />
         <NavCard

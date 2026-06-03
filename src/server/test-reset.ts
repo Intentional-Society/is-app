@@ -81,7 +81,6 @@ export const resetE2EUsers = async (): Promise<{
       referredByLegacy: null,
       avatarPath: null,
       emergencyContact: null,
-      liveDesire: null,
       lastUpdatedWeb: null,
     })
     .where(inArray(profiles.id, ids))

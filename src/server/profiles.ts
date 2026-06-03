@@ -16,7 +16,6 @@ export const EDITABLE_PROFILE_FIELDS = [
   "location",
   "supplementaryInfo",
   "emergencyContact",
-  "liveDesire",
   "currentIntention",
 ] as const;
 
@@ -29,7 +28,6 @@ export type EditableProfileInput = Partial<{
   location: string | null;
   supplementaryInfo: string | null;
   emergencyContact: string | null;
-  liveDesire: string | null;
   currentIntention: string | null;
 }>;
 
@@ -109,7 +107,6 @@ export type ProfileForSelf = {
   referredByLegacy: string | null;
   avatarUrl: string | null;
   emergencyContact: string | null;
-  liveDesire: string | null;
   currentIntention: string | null;
   intentionUpdatedAt: Date | null;
   deactivatedAt: Date | null;
@@ -135,7 +132,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       referredByLegacy: profiles.referredByLegacy,
       avatarPath: profiles.avatarPath,
       emergencyContact: profiles.emergencyContact,
-      liveDesire: profiles.liveDesire,
+
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
@@ -191,7 +188,7 @@ export const getProfileForSelfWithProbe = async (
       referredByLegacy: profiles.referredByLegacy,
       avatarPath: profiles.avatarPath,
       emergencyContact: profiles.emergencyContact,
-      liveDesire: profiles.liveDesire,
+
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
@@ -269,7 +266,6 @@ export type ProfileForMember = {
   location: string | null;
   supplementaryInfo: string | null;
   avatarUrl: string | null;
-  liveDesire: string | null;
   email: string | null;
   currentIntention: string | null;
   intentionUpdatedAt: Date | null;
@@ -300,7 +296,7 @@ export const getProfileForMember = async (
       location: profiles.location,
       supplementaryInfo: profiles.supplementaryInfo,
       avatarPath: profiles.avatarPath,
-      liveDesire: profiles.liveDesire,
+
       email: authUsers.email,
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
@@ -342,6 +338,43 @@ export const listMembers = async (options: { includeHidden?: boolean } = {}): Pr
     .where(where)
     .orderBy(asc(profiles.displayName));
   return (await attachAvatarUrls(rows)) as MemberSummary[];
+};
+
+export type IntentionSummary = {
+  id: string;
+  slug: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  currentIntention: string;
+  intentionUpdatedAt: Date | null;
+};
+
+// Every member who has set a non-empty current intention, freshest
+// first — the /intentions browse cloud renders the most recently
+// updated on top (highest z-index) and largest. `nulls last` parks the
+// rare row whose intentionUpdatedAt was never stamped at the back.
+// Hidden profiles are excluded unless an admin caller opts in, matching
+// listMembers.
+export const listCurrentIntentions = async (options: { includeHidden?: boolean } = {}): Promise<IntentionSummary[]> => {
+  const present = and(
+    isNotNull(profiles.displayName),
+    isNotNull(profiles.currentIntention),
+    sql`btrim(${profiles.currentIntention}) <> ''`,
+  );
+  const where = options.includeHidden ? present : and(present, eq(profiles.hidden, false));
+  const rows = await db
+    .select({
+      id: profiles.id,
+      slug: profiles.slug,
+      displayName: profiles.displayName,
+      avatarPath: profiles.avatarPath,
+      currentIntention: profiles.currentIntention,
+      intentionUpdatedAt: profiles.intentionUpdatedAt,
+    })
+    .from(profiles)
+    .where(where)
+    .orderBy(sql`${profiles.intentionUpdatedAt} desc nulls last`);
+  return (await attachAvatarUrls(rows)) as IntentionSummary[];
 };
 
 export type HiddenMemberSummary = MemberSummary;

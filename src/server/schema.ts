@@ -46,7 +46,6 @@ export const profiles = pgTable("profiles", {
   // path, not a URL. See docs/design-profile-pictures.md.
   avatarPath: text("avatar_url"),
   emergencyContact: text("emergency_contact"),
-  liveDesire: text("live_desire"),
   isAdmin: boolean("is_admin").notNull().default(false),
   // Hidden profiles are invisible to non-admin members everywhere —
   // directory, suggestions, web, typeaheads. Admins still see them so

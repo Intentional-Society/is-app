@@ -87,9 +87,16 @@
       "breakpoints": true
     },
     {
+      "idx": 12,
+      "version": "7",
+      "when": 1780165705136,
+      "tag": "0012_drop_live_desire",
+      "breakpoints": true
+    },
+    {
       "idx": 13,
       "version": "7",
-      "when": 1780252105136,
+      "when": 1780506291419,
       "tag": "0013_add_profile_deactivated_at",
       "breakpoints": true
     }

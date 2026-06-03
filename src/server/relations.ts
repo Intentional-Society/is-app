@@ -311,21 +311,23 @@ export const getPersonalWeb = async (params: {
     .from(relations)
     .where(and(firstHopWhere, isNotNull(relations.value)));
 
-  // Determine which ids are hidden or deactivated so we can drop them
-  // as nodes and as edge endpoints before rendering. Skipped for admins.
+  // Determine which ids to drop as nodes and as edge endpoints before
+  // rendering. Deactivated profiles are always dropped; hidden ones only
+  // for non-admins (admins pass includeHidden=true and keep seeing them).
   const candidateIds = new Set<string>([centerId]);
   for (const e of firstHop) {
     candidateIds.add(e.relatorId);
     candidateIds.add(e.relateeId);
   }
+  const dropFilter = includeHidden
+    ? isNotNull(profiles.deactivatedAt)
+    : or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt));
   const hiddenIds = new Set<string>();
-  if (!includeHidden && candidateIds.size > 0) {
+  if (candidateIds.size > 0) {
     const rows = await db
       .select({ id: profiles.id })
       .from(profiles)
-      .where(
-        and(inArray(profiles.id, [...candidateIds]), or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt))),
-      );
+      .where(and(inArray(profiles.id, [...candidateIds]), dropFilter));
     for (const r of rows) hiddenIds.add(r.id);
   }
   // Center is exempt — the viewer's own web always includes themselves,
@@ -364,18 +366,17 @@ export const getPersonalWeb = async (params: {
         .where(
           and(isNotNull(relations.value), inArray(relations.relatorId, firstHopIds), ne(relations.relateeId, centerId)),
         );
-      // Second-hop relatees can introduce new ids; mark any hidden ones
-      // so the filter below catches them too.
-      if (!includeHidden) {
-        const newIds = secondHop.map((e) => e.relateeId).filter((id) => !candidateIds.has(id));
-        if (newIds.length > 0) {
-          const rows = await db
-            .select({ id: profiles.id })
-            .from(profiles)
-            .where(and(inArray(profiles.id, newIds), or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt))));
-          for (const r of rows) hiddenIds.add(r.id);
-          for (const id of newIds) candidateIds.add(id);
-        }
+      // Second-hop relatees can introduce new ids; mark any to-drop ones
+      // (always deactivated, plus hidden for non-admins) so the filter
+      // below catches them too.
+      const newIds = secondHop.map((e) => e.relateeId).filter((id) => !candidateIds.has(id));
+      if (newIds.length > 0) {
+        const rows = await db
+          .select({ id: profiles.id })
+          .from(profiles)
+          .where(and(inArray(profiles.id, newIds), dropFilter));
+        for (const r of rows) hiddenIds.add(r.id);
+        for (const id of newIds) candidateIds.add(id);
       }
       const seen = new Set(edges.map(edgeKey));
       for (const e of secondHop) {
