@@ -126,6 +126,7 @@ describe("getProfileForSelf", () => {
         "emergencyContact",
         "currentIntention",
         "intentionUpdatedAt",
+        "deactivatedAt",
         "isAdmin",
         "lastSignedAgreements",
         "lastUpdatedProfile",

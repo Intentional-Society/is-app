@@ -4,6 +4,7 @@ import type { Me } from "@/lib/api-types";
 
 import { AvatarUploader } from "../avatar-uploader";
 import { ChangePasswordForm } from "../change-password-form";
+import { DeactivateAccountForm } from "../deactivate-account-form";
 import { ProfileForm } from "../profile-form";
 
 export default async function EditProfilePage() {
@@ -39,6 +40,15 @@ export default async function EditProfilePage() {
         <h2 className="text-base font-semibold">Set or change password</h2>
         <p className="text-sm text-muted-foreground">If you prefer signing in via email, you don't need a password.</p>
         <ChangePasswordForm />
+      </div>
+
+      <div className="flex w-full max-w-md flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-base font-semibold">Deactivate account</h2>
+        <p className="text-sm text-muted-foreground">
+          Hides your profile from other members. Some records of past participation may remain visible in other
+          people&apos;s history data.
+        </p>
+        <DeactivateAccountForm isDeactivated={!!profile.deactivatedAt} />
       </div>
     </main>
   );

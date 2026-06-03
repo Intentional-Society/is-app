@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -109,6 +109,7 @@ export type ProfileForSelf = {
   emergencyContact: string | null;
   currentIntention: string | null;
   intentionUpdatedAt: Date | null;
+  deactivatedAt: Date | null;
   isAdmin: boolean;
   lastSignedAgreements: Date | null;
   lastUpdatedProfile: Date | null;
@@ -134,6 +135,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
 
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
+      deactivatedAt: profiles.deactivatedAt,
       isAdmin: profiles.isAdmin,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
@@ -189,6 +191,7 @@ export const getProfileForSelfWithProbe = async (
 
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
+      deactivatedAt: profiles.deactivatedAt,
       isAdmin: profiles.isAdmin,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
@@ -281,7 +284,7 @@ export const getProfileForMember = async (
   const match = isUuid(idOrSlug)
     ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
     : eq(profiles.slug, idOrSlug);
-  const where = options.includeHidden ? match : and(match, eq(profiles.hidden, false));
+  const where = options.includeHidden ? match : and(match, eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
 
   const [row] = await db
     .select({
@@ -321,7 +324,7 @@ export type MemberSummary = {
 export const listMembers = async (options: { includeHidden?: boolean } = {}): Promise<MemberSummary[]> => {
   const where = options.includeHidden
     ? isNotNull(profiles.displayName)
-    : and(isNotNull(profiles.displayName), eq(profiles.hidden, false));
+    : and(isNotNull(profiles.displayName), eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
   const rows = await db
     .select({
       id: profiles.id,
@@ -405,6 +408,26 @@ export const setProfileHidden = async (params: {
     .update(profiles)
     .set({ hidden: params.hidden })
     .where(eq(profiles.id, params.profileId))
+    .returning({ id: profiles.id });
+  if (result.length === 0) return { error: "not_found" };
+  return { ok: true };
+};
+
+export const deactivateProfile = async (userId: string): Promise<{ ok: true } | { error: "not_found" }> => {
+  const result = await db
+    .update(profiles)
+    .set({ deactivatedAt: new Date() })
+    .where(eq(profiles.id, userId))
+    .returning({ id: profiles.id });
+  if (result.length === 0) return { error: "not_found" };
+  return { ok: true };
+};
+
+export const reactivateProfile = async (userId: string): Promise<{ ok: true } | { error: "not_found" }> => {
+  const result = await db
+    .update(profiles)
+    .set({ deactivatedAt: null })
+    .where(eq(profiles.id, userId))
     .returning({ id: profiles.id });
   if (result.length === 0) return { error: "not_found" };
   return { ok: true };

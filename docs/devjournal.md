@@ -4,6 +4,14 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-05-30 | Ola | Deactivate account (member self-serve, #185)
+
+Members can deactivate their own account from the edit-profile page (`POST /me/deactivate`). Deactivated profiles are filtered from the directory, member lookups, relation suggestions, and the web graph — same `IS NULL` guard pattern as `profiles.hidden`. Members can reactivate themselves at any time via the same page (`POST /me/reactivate`); no admin action needed. `deactivated_at` is exposed in `GET /me` so the UI can show state. Functional tests cover deactivate, reactivate, and the self-shape assertion. (#301)
+
+## 2026-05-29 | Ola | Quarterly intentions field (#243)
+
+Added `current_intention` (text) and `intention_updated_at` (timestamptz) to profiles. Data migration copies existing `live_desire` values across. Field is shown on member profile pages with a month/year timestamp and is editable from the profile form. Renamed from the original `liveDesire` after James's feedback that they were the same concept.
+
 ## 2026-05-29 | James | About page + member-facing changelog (#170)
 
 New `/about` page, with a changelog, version (the date of the newest entry), and short team blurb. Entries live in `src/lib/changelog.ts` — plain-language member-facing copy, deliberately separate from this journal; seeded by curating member-visible features out of it.

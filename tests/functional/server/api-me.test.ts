@@ -84,6 +84,7 @@ describe("GET /api/me", () => {
         emergencyContact: null,
         currentIntention: null,
         intentionUpdatedAt: null,
+        deactivatedAt: null,
         isAdmin: false,
         lastSignedAgreements: null,
         lastUpdatedProfile: null,
@@ -273,6 +274,68 @@ describe("PUT /api/me welcome-step markers", () => {
     const stamped = row[column];
     expect(stamped).not.toBeNull();
     expect(stamped?.getTime() ?? 0).toBeGreaterThanOrEqual(before.getTime() - 1000);
+  });
+});
+
+describe("POST /api/me/deactivate and /api/me/reactivate", () => {
+  let testUserId: string;
+
+  beforeEach(async () => {
+    testUserId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${testUserId}::uuid, 'deactivate-test@testfake.local', false, false)`,
+    );
+    mockCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: makeUser(testUserId, "deactivate-test@testfake.local") },
+          error: null,
+        }),
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: test mock shape
+    } as any);
+    // Ensure profile row exists.
+    await app.request("/api/me");
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await db.delete(profiles).where(eq(profiles.id, testUserId));
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${testUserId}::uuid`);
+  });
+
+  it("POST /api/me/deactivate sets deactivated_at", async () => {
+    const before = new Date();
+    const res = await app.request("/api/me/deactivate", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+
+    const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
+    expect(row.deactivatedAt).not.toBeNull();
+    expect(row.deactivatedAt!.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
+  });
+
+  it("POST /api/me/reactivate clears deactivated_at", async () => {
+    // Deactivate first.
+    await app.request("/api/me/deactivate", { method: "POST" });
+    const [before] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
+    expect(before.deactivatedAt).not.toBeNull();
+
+    // Now reactivate.
+    const res = await app.request("/api/me/reactivate", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+
+    const [after] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
+    expect(after.deactivatedAt).toBeNull();
+  });
+
+  it("GET /me exposes deactivatedAt after deactivation", async () => {
+    await app.request("/api/me/deactivate", { method: "POST" });
+    const res = await app.request("/api/me");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.profile.deactivatedAt).not.toBeNull();
   });
 });
 

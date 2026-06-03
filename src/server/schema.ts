@@ -62,6 +62,10 @@ export const profiles = pgTable("profiles", {
   // member email changes; the cron PATCHes the subscriber's email when
   // it sees a mismatch. See docs/design-buttondown.md.
   buttondownSubscriberId: text("buttondown_subscriber_id"),
+  // Set by the member themselves via POST /me/deactivate. Deactivated profiles
+  // are hidden from all member-facing views. Admins can reactivate by clearing
+  // the field. Distinct from `hidden` which is an admin-only test-account flag.
+  deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
