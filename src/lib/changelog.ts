@@ -34,7 +34,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-05-29",
     title: "Share your current intention",
     description:
-      'The "Live Desire" field is now "Current Intention", and is change-dated for freshness in future visualization.',
+      'The "Live Desire" field is now "Current Intention", and there\'s now a basic visualization/browsing feature.',
   },
   {
     date: "2026-05-28",

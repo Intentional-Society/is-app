@@ -24,7 +24,12 @@ export default async function AboutPage() {
       </p>
 
       <section className="flex w-full max-w-2xl flex-col gap-4">
-        <h2 className="text-lg font-semibold">Changelog</h2>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold">Changelog</h2>
+          <p className="text-sm text-muted-foreground">
+            This is a running list, newest first, of significant updates made to this app.
+          </p>
+        </div>
         <ol className="rounded-xl border border-border bg-card">
           {changelog.map((entry) => (
             <li key={`${entry.date}-${entry.title}`} className="flex gap-4 border-t border-border p-5 first:border-t-0">
