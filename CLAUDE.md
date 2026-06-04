@@ -89,5 +89,6 @@ Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-a
 - `docs/doc-github.md` — GitHub settings and CI workflows
 - `docs/doc-sentry.md` — Sentry error tracking and performance monitoring
 - `docs/doc-axiom.md` — Axiom logging and Web Vitals
+- `docs/doc-biome.md` — Biome lint/format config rationale and the version-bump policy
 - `docs/setup-dev-machine.md` — system prerequisites (Node.js, Docker, etc.)
 - `docs/devjournal.md` — development decision log (most recent first)
