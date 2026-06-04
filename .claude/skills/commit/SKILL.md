@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Stage, commit, and push the current local changes for the Intentional Society repo. Invoke explicitly as `/commit [issue-or-context]` to draft a Conventional Commit-style message, run the local `npm test` gate, surface a single bundled human approval block (message + staged payload + optional devjournal draft), and push the branch. Auto-creates a feature branch when invoked on `main`. Refuses suspicious payloads, combined expand+contract schema changes, and missing `gh` auth. This Skill fires only on explicit `/commit` invocation; natural-language phrasings ("commit this") are guidance for the reader, not triggers.
+description: "[is-app] Stage, commit, and push the current local changes for the Intentional Society repo. Invoke explicitly as `/commit [issue-or-context]` to draft a Conventional Commit-style message, run the local `npm test` gate, surface a single bundled human approval block (message + staged payload + optional devjournal draft), and push the branch. Auto-creates a feature branch when invoked on `main`. Refuses suspicious payloads, combined expand+contract schema changes, and missing `gh` auth. This Skill fires only on explicit `/commit` invocation; natural-language phrasings (\"commit this\") are guidance for the reader, not triggers."
 disable-model-invocation: true
 ---
 
