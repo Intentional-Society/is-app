@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-03 | James | Guard drizzle generate against stray auth-schema DDL
+
+An attempt to stop `drizzle-kit generate` re-emitting `CREATE/ALTER/DROP TABLE "auth"` for the `pgSchema("auth")` reference (`schemaFilter`/`tablesFilter` gate only `pull`; tables have no `.existing()` yet — drizzle-orm #1305): `auth.users` is now tracked in the `0013` snapshot baseline, with a functional guard rejecting auth-schema DDL as the backstop.
+
 ## 2026-05-30 | Ola | Deactivate account (member self-serve, #185)
 
 Members can deactivate their own account from the edit-profile page (`POST /me/deactivate`). Deactivated profiles are filtered from the directory, member lookups, relation suggestions, and the web graph — same `IS NULL` guard pattern as `profiles.hidden`. Members can reactivate themselves at any time via the same page (`POST /me/reactivate`); no admin action needed. `deactivated_at` is exposed in `GET /me` so the UI can show state. Functional tests cover deactivate, reactivate, and the self-shape assertion. (#301)
