@@ -4,7 +4,7 @@
 export type RelationValue = 1 | 2 | 3 | 4;
 
 export const isRelationValue = (v: unknown): v is RelationValue =>
-  typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 4;
+  typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 5;
 
 export const RELATION_VALUES: readonly RelationValue[] = [1, 2, 3, 4];
 
