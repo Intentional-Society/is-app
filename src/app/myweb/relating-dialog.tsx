@@ -162,14 +162,14 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
                 <Button
                   key={value}
                   variant={isCurrent ? "secondary" : "primary"}
-                  className="h-auto justify-start gap-3 px-3 py-2 text-left"
+                  className="h-auto justify-start gap-3 px-3 py-2 text-left whitespace-normal"
                   disabled={mutation.isPending}
                   onClick={() => relate(value)}
                 >
                   <span className="text-lg font-bold tabular-nums">{value}</span>
-                  <span className="flex flex-col">
+                  <span className="flex min-w-0 flex-col">
                     <span className="font-semibold">{headline}</span>
-                    <span className="text-sm text-muted-foreground">{detail}</span>
+                    <span className="text-sm leading-snug text-muted-foreground">{detail}</span>
                   </span>
                   {isPending && <span className="ml-auto text-sm text-muted-foreground">…</span>}
                 </Button>
