@@ -33,12 +33,12 @@ The MVP visualization is *you, and 1–2 hops out*. Whole-network views are bori
 
 ### One dimension at MVP
 
-A single value from a small set captures both "visible trust" and resonance, with room to add dimensions later. Drafted vocabulary (subject to refinement, worth member testing before committing):
+A single value from a small set captures both "visible trust" and resonance, with room to add dimensions later. At heart it's a 1–4 **depth (of relationship) scale** — how deep the bond runs, whether that depth comes through closeness or through shared work (rungs 3–4 admit both). The descriptions exist to calibrate it: they're phrased *relative to the member's own relationships* ("like others I'm lucky to have", "more than most of my friends", "the rare few") so people with different objective social distributions still map sensibly, while the implied shape — many friends, fewer close, rare kin — gently discourages normalising one's whole web onto the top of the scale:
 
-- `1` — **Acquaintance / Supporter**: I have spent some time with them and feel supportive.
-- `2` — **Friend / Collaborator**: I trust them in most ways and we can work well together.
-- `3` — **Companion / Comrade**: I feel deep resonance and shared purpose with them.
-- `4` — **Kindred / Co-Creator**: a kindred spirit; I hope to partner with them for decades.
+- `1` — **Acquaintance**: I'm glad we've met and wish them well, but we haven't drawn particularly close.
+- `2` — **Friend**: A genuine friend whom I enjoy and make time for, like others I'm lucky to have.
+- `3` — **Close Friend**: I really confide in, count on, or collaborate with them more than most of my friends.
+- `4` — **Kin**: Among the rare few who feel like chosen family or co-founders — soul-level kinship that may last a lifetime.
 
 The absence of a relation is an absence of a row. There is no explicit "0 / no connection of interest" rating — un-rated suggestions simply re-surface in future feeds, and at MVP scale (50–100 members) that's a non-problem. A future "intentional dissonance" value (`-1`) is also deferred — the social cost of publicly logged negative feelings wants more design care than we have lived experience to provide right now.
 

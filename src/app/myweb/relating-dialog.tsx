@@ -126,7 +126,9 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/20 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <Dialog.Popup
           className="fixed top-1/2 left-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded border border-border bg-popover p-5 text-popover-foreground shadow-lg data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150"
-          aria-describedby={target?.hintAttribution ? "relating-attribution" : undefined}
+          aria-describedby={
+            target?.hintAttribution ? "relating-attribution relating-instruction" : "relating-instruction"
+          }
         >
           <Dialog.Close
             disabled={mutation.isPending}
@@ -140,9 +142,12 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
           </Dialog.Title>
           {target?.hintAttribution && (
             <p id="relating-attribution" className="mt-1 text-sm text-muted-foreground">
-              {target.hintAttribution}
+              ({target.hintAttribution})
             </p>
           )}
+          <p id="relating-instruction" className="mt-1 text-sm text-muted-foreground">
+            On a scale of 1-to-4, please estimate how deep <em className="italic">you</em> feel your relationship is.
+          </p>
 
           <p className="mt-3 text-xs text-muted-foreground">
             Keyboard shortcuts: Number keys 1 through 4, or Esc to cancel
@@ -179,8 +184,8 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
           )}
 
           <p className="mt-3 text-xs text-muted-foreground">
-            Notes: Yes, these become visible to them and others. It&apos;s okay to pick a different relation value than
-            they do for you! Everyone will have their own slightly unique interpretation.
+            Notes: Yes, these become visible to them and others. It&apos;s okay to pick a different relationship depth
+            estimate than they do for you! Everyone will have their own slightly unique interpretation.
           </p>
         </Dialog.Popup>
       </Dialog.Portal>
