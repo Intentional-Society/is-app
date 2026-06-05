@@ -14,6 +14,7 @@ import {
   RELATION_VALUES,
   type RelationValue,
 } from "@/lib/relation-value";
+import { cn } from "@/lib/utils";
 
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY, relationValueQueryKey } from "./query-keys";
 
@@ -174,7 +175,17 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
                   <span className="text-lg font-bold tabular-nums">{value}</span>
                   <span className="flex min-w-0 flex-col">
                     <span className="font-semibold">{headline}</span>
-                    <span className="text-sm leading-snug text-muted-foreground">{detail}</span>
+                    {/* The selected value renders as `secondary` (dark teal
+                        fill), where muted-foreground gray is unreadable; switch
+                        the detail line to the light on-fill color in that state. */}
+                    <span
+                      className={cn(
+                        "text-sm leading-snug",
+                        isCurrent ? "text-primary-foreground/80" : "text-muted-foreground",
+                      )}
+                    >
+                      {detail}
+                    </span>
                   </span>
                   {isPending && <span className="ml-auto text-sm text-muted-foreground">…</span>}
                 </Button>
