@@ -1,3 +1,4 @@
+import type { User } from "@supabase/supabase-js";
 import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -5,6 +6,7 @@ import { log } from "next-axiom";
 
 import { isRelationValue } from "@/lib/relation-value";
 
+import { getActivityMetrics } from "./activity-metrics";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
@@ -73,6 +75,10 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/appsettings", async (c) => {
     const appSettings = await getAppSettings();
     return c.json({ appSettings });
+  })
+  .get("/activity", async (c) => {
+    const metrics = await getActivityMetrics();
+    return c.json({ metrics });
   })
   .get("/hints", async (c) => {
     const hints = await listPendingHints();
@@ -257,6 +263,11 @@ const api = new Hono<{ Variables: ApiVariables }>()
       path: c.req.path,
       status: c.res.status,
       duration,
+      // The auth UUID (pseudonymous, never the email) so Axiom can count
+      // distinct people and per-path adoption. Unset on public/401 paths
+      // — this middleware logs after requireAuth runs but also fires for
+      // requests it never authenticates. See docs/doc-axiom.md.
+      userId: (c.get("user") as User | undefined)?.id ?? null,
     });
   })
   .use("*", requireAuth)

@@ -21,6 +21,14 @@ Every API request is logged by Hono middleware in `src/server/api.ts` with:
 - `path` — request path
 - `status` — response status code
 - `duration` — response time in milliseconds
+- `userId` — the authenticated Supabase user UUID, or `null` on public/401 paths. This is the pseudonymous auth id only (never the email), keeping the log line consistent with the PII stance in `doc-sentry.md`.
+
+`userId` is what makes per-person analysis possible — distinct visitors, per-path adoption, return visits — that the request shape alone can't give. `next-axiom` nests it under `fields`, so query it as `['fields.userId']`:
+
+- **Distinct people active in a window:** `["vercel"] | where message == "api request" | summarize dcount(['fields.userId'])`
+- **Adoption by path (who touched what):** `["vercel"] | where message == "api request" | summarize dcount(['fields.userId']) by path`
+
+For funnel and per-member-state questions (signed up → set intention → built web → joined a program, plus the invite funnel), the DB is the better source — see the admin **Activity metrics** view (`/admin`, backed by `src/server/activity-metrics.ts`), which reads current state rather than aging-out logs.
 
 ## Environment Variables
 
