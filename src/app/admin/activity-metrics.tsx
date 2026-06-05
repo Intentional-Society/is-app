@@ -4,14 +4,32 @@ import { serverApiClient } from "@/lib/api-server";
 
 const pct = (n: number, total: number): string => (total > 0 ? `${Math.round((n / total) * 100)}%` : "—");
 
+const METRICS_TIMEOUT_MS = 5000;
+
+// Resolve `promise`, or reject after `ms`. Guards against a slow/hung
+// metrics read taking the whole admin page down to a 504: the queries
+// run over the Supabase transaction pooler, where a burst of reads can
+// stall, and a never-settling await would otherwise block the render
+// past the platform timeout.
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`activity metrics timed out after ${ms}ms`)), ms)),
+  ]);
+
 // Read-only funnel over the DB (see src/server/activity-metrics.ts).
 // Fetches its own data so the admin page only has to drop it into a
-// section. Best-effort: a failed read renders an inline notice and
-// reports to Sentry rather than throwing, so a metrics hiccup can't take
-// down the rest of the admin page.
+// section. Best-effort: a failed or slow read renders an inline notice
+// and reports to Sentry rather than throwing or hanging, so a metrics
+// hiccup can't take down the rest of the admin page.
 export async function ActivityMetrics() {
   try {
-    const res = await serverApiClient.api.admin.activity.$get();
+    const request = serverApiClient.api.admin.activity.$get();
+    // If the timeout wins the race the request keeps running; swallow its
+    // eventual settle so it can't surface as an unhandled rejection on a
+    // reused Fluid Compute instance.
+    request.catch(() => {});
+    const res = await withTimeout(request, METRICS_TIMEOUT_MS);
     if (!res.ok) throw new Error(`activity metrics request failed: ${res.status}`);
     const { metrics } = await res.json();
     const { members, invites } = metrics;
