@@ -55,6 +55,7 @@ import {
 import {
   createRelationHint,
   deleteRelationHint,
+  deleteRelationValue,
   getPersonalWeb,
   getRelationSuggestions,
   getRelationValue,
@@ -654,6 +655,19 @@ const api = new Hono<{ Variables: ApiVariables }>()
       return c.json({ ok: true });
     },
   )
+  // Remove the caller's own confirmed relationship with :relateeId — the "No
+  // Relationship" control. relatorId is fixed to the authed user, so a
+  // member can only delete their own outgoing edge. Idempotent: deleting
+  // an absent relation still returns 200, so a stale UI never errors.
+  .delete("/relations/value/:relateeId", async (c) => {
+    const user = c.get("user");
+    const relateeId = c.req.param("relateeId");
+    if (!isUuid(relateeId)) {
+      return c.json({ error: "relateeId must be a UUID" }, 400);
+    }
+    await deleteRelationValue({ relatorId: user.id, relateeId });
+    return c.json({ ok: true });
+  })
   .post("/relations/hint", async (c) => {
     const user = c.get("user");
     // Generic 404 — same rationale as /api/admin/*: don't advertise

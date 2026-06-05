@@ -40,7 +40,7 @@ A single value from a small set captures both "visible trust" and resonance, wit
 - `3` — **Close Friend**: I really confide in, count on, or collaborate with them more than most of my friends.
 - `4` — **Kin**: Among the rare few who feel like chosen family or co-founders — soul-level kinship that may last a lifetime.
 
-The absence of a relation is an absence of a row. There is no explicit "0 / no connection of interest" rating — un-rated suggestions simply re-surface in future feeds, and at MVP scale (50–100 members) that's a non-problem. A future "intentional dissonance" value (`-1`) is also deferred — the social cost of publicly logged negative feelings wants more design care than we have lived experience to provide right now.
+The absence of a relation is an absence of a row. There is no explicit "0 / no connection of interest" value — un-rated suggestions simply re-surface in future feeds, and at MVP scale (50–100 members) that's a non-problem. A future "intentional dissonance" value (`-1`) is also deferred — the social cost of publicly logged negative feelings wants more design care than we have lived experience to provide right now.
 
 ## Data model
 
@@ -91,10 +91,10 @@ export const relations = pgTable(
 
 Two valid row states:
 
-- **Confirmed rating.** `value` ∈ 1..4, `isHint = false`. `hintedBy` may or may not be set (preserving the trail of who originally seeded it, even after confirmation).
+- **Confirmed relationship.** `value` ∈ 1..4, `isHint = false`. `hintedBy` may or may not be set (preserving the trail of who originally seeded it, even after confirmation).
 - **Pending hint.** `value` IS NULL, `isHint = true`. `hintedBy` is set on creation (the API requires it), but the FK is `onDelete: set null` so a hint can become anonymous if the hinter's profile is deleted. The check constraint accepts `hintedBy IS NULL` to make this safe.
 
-A hint becomes a confirmed rating by setting `value` and flipping `isHint` to false.
+A hint becomes a confirmed relationship by setting `value` and flipping `isHint` to false.
 
 Sparse representation: there is no row for "haven't been shown" or "haven't acted" — that state is `(no row in relations)`. Cost: no "deferred / ask me later" affordance — at 50–100 members the suggestion pool is small enough that simply re-surfacing un-rated suggestions each visit is fine. Revisit if the feed gets noisy.
 
@@ -146,7 +146,7 @@ relationValue: integer("creator_value"), // 1..4 if set; null allowed for admin-
 
 Plus a check constraint `invites_creator_value_range` enforcing `creator_value IS NULL OR creator_value BETWEEN 1 AND 4`.
 
-The inviter declares their relation to the invitee at invite-creation time, immediately after the "who is this?" input. The picker offers 1–4 (the same vocabulary as the rating dialog). A soft warn at 1 nudges the inviter to reconsider: weak-tie invites tend to make for weak community fit, and we'd rather members invite people they actually have a relation with. Admin-issued invites may leave the value null.
+The inviter declares their relation to the invitee at invite-creation time, immediately after the "who is this?" input. The picker offers 1–4 (the same vocabulary as the relating dialog). A soft warn at 1 nudges the inviter to reconsider: weak-tie invites tend to make for weak community fit, and we'd rather members invite people they actually have a relation with. Admin-issued invites may leave the value null.
 
 On invite redemption, if `relationValue IS NOT NULL`, materialize a `relations` row: `relatorId = invites.createdBy`, `relateeId = invites.redeemedBy`, `value = invites.relationValue`, `isHint = false`, `hintedBy = null`. The new member opens the app and finds their inviter at the top of the suggestion feed via the "people who've rated me" signal — the warmest possible first interaction.
 
@@ -171,14 +171,14 @@ The "welcome page" expands into a guided multi-step tour. Steps land on real app
 
 1. **Welcome.** Brief framing of IS Web and what the next ~2 minutes will set up.
 2. **Profile.** Edit the standard profile fields.
-3. **Relations: meet your suggestions.** The suggestion feed renders, pre-populated. The inviter sits at the top — their relation to the new member was materialized from `invites.creator_value` at redemption, so they show up as the strongest "people who've rated me" signal. Below them, the invite's hint rows. New suggestions appear as ratings happen (the inviter's high-rated connections, anyone else who has already rated the new member).
+3. **Relations: meet your suggestions.** The suggestion feed renders, pre-populated. The inviter sits at the top — their relation to the new member was materialized from `invites.creator_value` at redemption, so they show up as the strongest "people who've rated me" signal. Below them, the invite's hint rows. New suggestions appear as relationships form (the inviter's high-rated connections, anyone else who has already rated the new member).
 4. **See your web.** Personal subgraph view — the user themselves at center, their newly rated connections at one hop. The Done button transitions from edit to view mode and bumps `last_updated_web`.
 
 ### Edit mode ↔ View mode
 
 The personal subgraph is always displayed, regardless of mode — the web is the page, not a tab. Mode toggles only what surfaces around it:
 
-- **Edit mode.** Suggestion feed visible below the graph (single column on mobile, grid on desktop). Cards are clickable to open the rating dialog. Edits persist in real time, and the graph re-renders optimistically as ratings happen.
+- **Edit mode.** Suggestion feed visible below the graph (single column on mobile, grid on desktop). Cards are clickable to open the relating dialog. Edits persist in real time, and the graph re-renders optimistically as relationships form.
 - **View mode.** Suggestion feed hidden. The graph is the only content, oriented toward exploration and reading.
 
 The toggle is a paired **Edit** / **Done** button — Edit in view mode, Done in edit mode. **Done** has one side effect: bumping `last_updated_web` on the user's profile — a signal of "I'm done updating for now," used by other members' "recently active" suggestion signal. Real-time persistence means no batched save is happening; the button captures intent, not state. Members can re-enter edit mode any time.
@@ -195,21 +195,22 @@ Surfaced in approximate priority order. At MVP scale (50–100 members), simpler
 
 Sources 1–4 carry an explicit "reason" surfaced in the UI (`addedYou` / `hintedBy <name>` / `via <inviter>` / `recently active`) — a sub-line that grounds the suggestion in something legible. Source 5 has no derived signal and renders without a reason chip.
 
-The asymmetry-visibility ethos: when someone shows up because they rated me, I don't see their rating before responding. This is a soft UI hiding, not a hard constraint, and I see their rating on the completed two-way relation.
+The asymmetry-visibility ethos: when someone shows up because they rated me, I don't see their value before responding. This is a soft UI hiding, not a hard constraint, and I see their value on the completed two-way relation.
 
 The feed renders as a single section titled **"Add people to your relational web"** — sources 1–4 (each marked with the corner indicator that opens the reason on hover) come first, followed by source 5. The indicator is enough to distinguish signal-bearing cards from directory cards without a section break.
 
-### Rating a suggestion
+### Relating to a suggestion
 
 Clicking a suggestion card opens a small modal:
 
-- A vertical column of four buttons labeled **1**, **2**, **3**, **4**, each next to its vocabulary description. Clicking a button sets the rating and closes the dialog — no separate Save step.
-- Numeric keystrokes 1–4 are caught as a backup shortcut, equivalent to clicking the matching button.
+- A vertical column of four buttons labeled **1**, **2**, **3**, **4**, each next to its vocabulary description. Clicking a button sets the relationship and closes the dialog — no separate Save step.
+- Numeric keystrokes 1–4 are caught as a backup shortcut, equivalent to clicking the matching button (plus `0` when the remove option below is present).
+- **Removing a mistaken relationship (#352).** When the dialog opens on a relationship that already exists — an edge click in the graph, or **Edit** on a member's profile — a **0 — No Relationship** option appears above 1–4, described "Remove this relationship from my web." Selecting it deletes the `relations` row (relator = me, `isHint = false`) and closes the dialog, instant like the 1–4 buttons and undone by simply relating again. Absence of a relationship stays absence of a row: nothing stores a `0`. The option is hidden on fresh suggestion cards (no relationship to remove) and on pending hints (the row has no `value`, so it never surfaces — the relator still can't withdraw a hint here).
 - Clicking outside the dialog dismisses it and cancels — no relation is created. The suggestion remains un-rated and re-surfaces in a future feed cycle.
 - For hint cards (`isHint = true`), the dialog surfaces the `hintedBy` attribution ("James suggested you know this person"). Selecting any of 1–4 confirms the hint: `value` is set, `isHint` flips to false.
 - For "people who rated me" cards, the relator's value of me stays hidden in the dialog (consistent with the soft-UI-hide policy) and is revealed once I've responded.
 
-On rating, the mutation goes through Hono RPC; TanStack Query optimistically updates the local cache so the graph re-renders with the new relation before the server round-trip completes. Failed mutations revert with an error toast.
+On relating, the mutation goes through Hono RPC; TanStack Query optimistically updates the local cache so the graph re-renders with the new relation before the server round-trip completes. Failed mutations revert with an error toast.
 
 ### Personal subgraph view
 
@@ -223,7 +224,7 @@ Hint rows (`value IS NULL`) are filtered out of the visualization. They live on 
 
 **Click behavior** (same in both modes):
 
-- **Edge (relation) click** — opens the rating dialog pre-filled with the current value. Same dialog component as the suggestion-feed rating flow; selecting a new 1–4 updates `value` and re-renders. Outside-click cancels with no change.
+- **Edge (relation) click** — opens the relating dialog pre-filled with the current value. Same dialog component as the suggestion-feed relating flow; selecting a new 1–4 updates `value` and re-renders. Outside-click cancels with no change.
 - **Node (person) click** — navigates to that person's profile page.
 
 **Small-N rendering.** A brand-new member's first graph has 1–3 nodes (themselves, their inviter, maybe a confirmed hint or two). The graph component must render gracefully at these sizes — a single node should look intentional. Test cases at N = 1, 2, 3 are part of the implementation acceptance criteria.
@@ -235,8 +236,8 @@ Whole-network views are out of scope at MVP. The data model permits them — any
 The predecessor here is SumApp + Kumu, used at Limicon 2024 and 2025. Specific pain points to design against:
 
 - **Random-ordered grid of all members.** Replaced by the suggestion feed, ordered by signal (people who rated you > hints > inviter's connections > recently active).
-- **No hover detail.** Each suggestion card surfaces enough profile information to make a rating decision without navigating away.
-- **No multiselect.** Some affordance for multi-select will let you tap/click multiple people and assign them the same rating.
+- **No hover detail.** Each suggestion card surfaces enough profile information to make a relating decision without navigating away.
+- **No multiselect.** Some affordance for multi-select will let you tap/click multiple people and assign them the same value.
 - **No "what's new since last visit."** `last_updated_web` and the recently-active suggestion signal address this directly.
 - **Static, no responsiveness.** Real-time RPC persistence, optimistic UI updates via TanStack Query.
 
@@ -249,7 +250,8 @@ These are choices made during the design interview. Each is reversible but refle
 | Decision | Rationale |
 | --- | --- |
 | One dimension, 4 values (1..4) | Capture visible-trust and resonance with the smallest possible model. Add dimensions later if needed. |
-| No explicit `0` rating | Considered and dropped. Un-rated suggestions re-surface in the feed; the only state distinction is "have row, value 1..4" vs "no row." Simpler dialog, simpler check constraints, fewer affordances to design. |
+| No explicit `0` value | Considered and dropped. Un-rated suggestions re-surface in the feed; the only state distinction is "have row, value 1..4" vs "no row." Simpler dialog, simpler check constraints, fewer affordances to design. (A later `0 — No Relationship` control deletes the row entirely — see below — but still stores no `0`.) |
+| `0 — No Relationship` removes a mistaken relation (#352) | Members need to undo a wrong relationship. Done as a row delete, not a stored `0` — keeps "absence = no row" and the check constraints intact. Surfaces only when a confirmed relationship exists; pending hints stay non-removable by the relator. |
 | Doubly unidirectional, no symmetrization | Asymmetry is information, and people can see it. |
 | Open data model, cozy UX layer | Members can see all relations in principle; the app's defaults make exploration deliberate. |
 | Sparse state, no `suggestion_state` table | No row = no interaction. Trade-off: no "deferred / ask me later" — re-surface un-rated suggestions each visit. |
@@ -269,11 +271,10 @@ These are choices made during the design interview. Each is reversible but refle
 - **Inferred relations from in-app activity** (event co-attendance, thread participation). Layer on top of self-declared data once the core feature lands.
 - **Quarterly Convening as refresh ritual.** Once the events table exists, "your last update was before the winter convening — refresh before Saturday's gathering" becomes a first-class nudge.
 - **Coordination feature leg.** Posting board / matchmaker that uses the graph as filter/ranker. Layered on top of relations once data density is reasonable.
-- **`-1` "intentional dissonance" rating.** Skipped at MVP; revisit with lived data.
+- **`-1` "intentional dissonance" value.** Skipped at MVP; revisit with lived data.
 - **Whole-network browsing modes.** Permitted by the data model, deferred from the MVP UX.
 - **Embedded subgraph displays on member profile pages.** A read-only `WebGraph` centered on the profile's member, alongside their bio. The data model already supports this — the `WebGraph` component is being built parameterized on `centerMemberId` so this slots in without rework. Visibility specifics (full personal subgraph at 2 hops vs. first-degree only, hint exclusion) to settle when this lands.
 
 ## Open questions
 
-- **Hint edit / withdrawal.** If a hint is wrong, can the relator dismiss it without rating? At MVP: any of 1–4 confirms the hint; outside-click cancels and leaves the hint in place to re-surface next visit. There is no "delete this hint" affordance for the relator. Likely fine; revisit if hints become a source of friction.
-- **Vocabulary refinement.** The 1–4 labels are a draft. Worth user-testing with a handful of members before committing.
+- **Hint edit / withdrawal.** If a hint is wrong, can the relator dismiss it without relating? At MVP: any of 1–4 confirms the hint; outside-click cancels and leaves the hint in place to re-surface next visit. There is no "delete this hint" affordance for the relator — the #352 "No Relationship" remove control is scoped to confirmed relationships (`isHint = false`), so it doesn't touch this. Likely fine; revisit if hints become a source of friction.

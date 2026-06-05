@@ -198,7 +198,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       await tx.update(profiles).set({ referredBy: inviterId }).where(eq(profiles.id, userId));
 
-      // Materialize the inviter→redeemer rating (from relation_value)
+      // Materialize the inviter→redeemer relationship (from relation_value)
       // and the redeemer→relatee hints (from invite_hints) into
       // relations rows. Same tx as the redemption itself so a failure
       // here rolls back the consumed invite — the new member never

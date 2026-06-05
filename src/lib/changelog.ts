@@ -31,6 +31,11 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-06-05",
+    title: "Remove a relationship",
+    description: "You can now remove relationships by setting a depth of 0.",
+  },
+  {
     date: "2026-06-04",
     title: "Clearer relationship labels",
     description:

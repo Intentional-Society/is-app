@@ -41,7 +41,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   // was the explicit "I'm done" click. The toggle is freely flipable.
   const [mode, setMode] = useState<Mode>(initialLastUpdatedWeb ? "view" : "edit");
   // Lifted to MyWeb so both the suggestion feed (WebBuilder) and the
-  // graph (WebGraph) can request a rating dialog from a single source.
+  // graph (WebGraph) can request a relating dialog from a single source.
   const [relatingTarget, setRelatingTarget] = useState<RelatingTarget | null>(null);
   // Controlled tour state so a "Replay guided tour" action can re-fire
   // it for returning members. The initial-run decision (first visit,
@@ -102,7 +102,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
           )}
           {markDone.isError && (
             <p role="alert" className="text-sm text-destructive">
-              Couldn&apos;t save your update — your ratings are still saved.
+              Couldn&apos;t save your update — your relationships are still saved.
             </p>
           )}
         </div>

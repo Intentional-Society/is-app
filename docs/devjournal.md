@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-05 | James | Relations: remove a mistaken relationship (#352)
+
+A `0 — No Relationship` control above 1–4 in the relating dialog deletes the relations row, shown only when editing a relationship that already exists (graph edge click, member-profile **Edit**).
+
 ## 2026-06-04 | James | Activity instrumentation for launch
 
 Added `userId` (pseudonymous Supabase UUID) to the `api request` log so Axiom can count distinct people, and an admin **Activity metrics** view (`src/server/activity-metrics.ts`) reading the signup and invite funnels, plus a signed-in-past-week/month count from `auth.users.last_sign_in_at`, from current DB state.

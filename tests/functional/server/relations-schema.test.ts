@@ -48,7 +48,7 @@ describe("relations table constraints", () => {
     await deleteUserAndProfile(relateeId);
   });
 
-  it("accepts a confirmed rating in the 1..4 range", async () => {
+  it("accepts a confirmed relationship in the 1..4 range", async () => {
     await db.insert(relations).values({ relatorId, relateeId, value: 3 });
     const [row] = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
     expect(row.value).toBe(3);
