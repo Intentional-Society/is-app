@@ -22,11 +22,23 @@ export function WelcomeForm({ initial }: { initial: ProfileFormValues }) {
 
     if (password.length > 0) {
       const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) {
+      try {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) {
+          setStatus({
+            kind: "error",
+            message: `Profile saved, but password update failed: ${error.message}`,
+          });
+          return;
+        }
+      } catch (err) {
+        // updateUser can reject outright (network drop, CORS) instead of
+        // returning { error }. Without this catch the rejection is unhandled
+        // and the form dead-ends after a successful profile save — no error
+        // surfaced, no navigation.
         setStatus({
           kind: "error",
-          message: `Profile saved, but password update failed: ${error.message}`,
+          message: `Profile saved, but password update failed: ${err instanceof Error ? err.message : "network error"}`,
         });
         return;
       }

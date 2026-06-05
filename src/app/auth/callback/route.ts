@@ -132,7 +132,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let result: { created: boolean };
     try {
       result = await upsertProfile(data.user);
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err);
       return NextResponse.redirect(new URL("/signin?error=profile_error", request.url), 303);
     }
     if (result.created) {
@@ -216,6 +217,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       await supabase.auth.signOut();
       return NextResponse.redirect(new URL("/signin?error=invite_invalid", request.url), 303);
     }
+    // Anything other than InviteInvalid (the routine "code already
+    // redeemed/expired" path) is a real Postgres/transaction failure —
+    // capture it instead of swallowing it behind the generic redirect.
+    Sentry.captureException(err);
     return NextResponse.redirect(new URL("/signin?error=profile_error", request.url), 303);
   }
 
