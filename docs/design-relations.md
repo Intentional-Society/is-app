@@ -35,7 +35,7 @@ The MVP visualization is *you, and 1–2 hops out*. Whole-network views are bori
 
 A single value from a small set captures both "visible trust" and resonance, with room to add dimensions later. At heart it's a 1–4 **depth (of relationship) scale** — how deep the bond runs, whether that depth comes through closeness or through shared work (rungs 3–4 admit both). The descriptions exist to calibrate it: they're phrased *relative to the member's own relationships* ("like others I'm lucky to have", "more than most of my friends", "the rare few") so people with different objective social distributions still map sensibly, while the implied shape — many friends, fewer close, rare kin — gently discourages normalising one's whole web onto the top of the scale:
 
-- `1` — **Acquaintance**: I'm glad we've met and wish them well, but we haven't drawn particularly close.
+- `1` — **Acquaintance**: I'm glad we've met and wish them well.
 - `2` — **Friend**: A genuine friend whom I enjoy and make time for, like others I'm lucky to have.
 - `3` — **Close Friend**: I really confide in, count on, or collaborate with them more than most of my friends.
 - `4` — **Kin**: Among the rare few who feel like chosen family or co-founders — soul-level kinship that may last a lifetime.
