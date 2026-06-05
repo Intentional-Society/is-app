@@ -13,7 +13,7 @@ export const RELATION_VALUES: readonly RelationValue[] = [1, 2, 3, 4];
 export const RELATION_VALUE_LABELS: Record<RelationValue, { headline: string; detail: string }> = {
   1: {
     headline: "Acquaintance",
-    detail: "I'm glad we've met and wish them well, but we haven't drawn particularly close.",
+    detail: "I'm glad we've met and wish them well.",
   },
   2: {
     headline: "Friend",
