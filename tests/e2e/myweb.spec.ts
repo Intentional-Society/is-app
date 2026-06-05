@@ -4,7 +4,7 @@ import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpe
 
 // Smoke coverage of /myweb's wiring: page loads, the WebBuilder
 // suggestion feed renders, the Done button toggles into View mode and
-// the Edit button toggles back. The rich rating-flow path is left to
+// the Edit button toggles back. The rich relating-flow path is left to
 // PR 4's e2e once the welcome tour seeds enough relational data to
 // drive a populated suggestion feed.
 

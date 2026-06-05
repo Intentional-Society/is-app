@@ -9,7 +9,7 @@ export const isRelationValue = (v: unknown): v is RelationValue =>
 export const RELATION_VALUES: readonly RelationValue[] = [1, 2, 3, 4];
 
 // Mirror of the vocabulary in design-relations.md. Shared by every UI
-// that lets a member pick a 1..4 value (rating dialog, invite form).
+// that lets a member pick a 1..4 value (relating dialog, invite form).
 export const RELATION_VALUE_LABELS: Record<RelationValue, { headline: string; detail: string }> = {
   1: {
     headline: "Acquaintance",
@@ -30,7 +30,16 @@ export const RELATION_VALUE_LABELS: Record<RelationValue, { headline: string; de
   },
 };
 
-// Reassurance shown wherever a member picks a 1..4 value — the rating
+// The "No Relationship" affordance shown above 1..4 when a confirmed
+// relationship already exists — the escape hatch for a relation made by
+// mistake. It deletes the relations row rather than storing a `0`:
+// absence of a relationship is absence of a row (see design-relations.md).
+export const RELATION_REMOVE_LABEL = {
+  headline: "No Relationship",
+  detail: "Remove this relationship from my web.",
+};
+
+// Reassurance shown wherever a member picks a 1..4 value — the relating
 // dialog and the invite form. One definition so the two never drift.
 export const RELATION_VALUE_VISIBILITY_NOTE =
   "Yes, these become visible to them and others. It's okay to pick a different relationship depth estimate than they do for you! Everyone will have their own slightly unique interpretation.";

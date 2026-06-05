@@ -41,7 +41,7 @@ export type RelationSuggestionReason =
   | { type: "recentlyActive" }
   | { type: "member" };
 
-// Card payload for the rating-decision UI. Fields are chosen so a
+// Card payload for the relating-decision UI. Fields are chosen so a
 // member can decide without navigating away from the suggestion feed.
 export type RelationSuggestion = Omit<SuggestionCardRow, "avatarPath"> & { avatarUrl: string | null };
 
@@ -439,7 +439,7 @@ export const updateRelationValue = async (params: {
   if (params.relatorId === params.relateeId) return { error: "self_relating" };
 
   // The `relations_hint_state` check requires value and isHint to move
-  // together; a pending hint converting to a confirmed rating must set
+  // together; a pending hint converting to a confirmed relationship must set
   // both in the same statement.
   try {
     await db
@@ -464,6 +464,32 @@ export const updateRelationValue = async (params: {
   }
 
   return { ok: true };
+};
+
+export type DeleteRelationValueResult = { ok: true; deleted: boolean };
+
+// Removes the member's confirmed relationship with `relateeId` — the "No
+// Relationship" affordance for a relation made by mistake. Scoped to
+// isHint = false so it never silently clears a pending hint (the design
+// keeps hint-withdrawal off the relator's plate). Idempotent: a missing
+// row reports deleted=false rather than erroring, so a double-click or a
+// stale second tab still resolves as success.
+export const deleteRelationValue = async (params: {
+  relatorId: string;
+  relateeId: string;
+}): Promise<DeleteRelationValueResult> => {
+  const result = await db
+    .delete(relations)
+    .where(
+      and(
+        eq(relations.relatorId, params.relatorId),
+        eq(relations.relateeId, params.relateeId),
+        eq(relations.isHint, false),
+      ),
+    )
+    .returning({ relatorId: relations.relatorId });
+
+  return { ok: true, deleted: result.length > 0 };
 };
 
 export type CreateRelationHintResult =
@@ -572,7 +598,7 @@ export const listPendingHints = async (): Promise<PendingHint[]> => {
 
 export type DeleteRelationHintResult = { ok: true } | { error: "not_found" };
 
-// Refuses to delete a confirmed rating — the isHint = true predicate
+// Refuses to delete a confirmed relationship — the isHint = true predicate
 // scopes the delete to pending hints only.
 export const deleteRelationHint = async (params: {
   relatorId: string;

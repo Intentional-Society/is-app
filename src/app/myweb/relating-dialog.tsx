@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
 import {
+  RELATION_REMOVE_LABEL,
   RELATION_VALUE_LABELS,
   RELATION_VALUE_VISIBILITY_NOTE,
   RELATION_VALUES,
@@ -70,7 +71,7 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
     },
     onSettled: (_data, _err, { relateeId }) => {
       // Re-sync candidates and subgraph so any newly-revealed cards
-      // (e.g. inviter's connections opened up by this rating) appear
+      // (e.g. inviter's connections opened up by relating to them) appear
       // and the graph picks up the new edge once it exists.
       queryClient.invalidateQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: RELATION_SUBGRAPH_QUERY_KEY });
@@ -80,8 +81,33 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
     },
   });
 
+  // Deletes the confirmed relationship — the "No Relationship" option. No
+  // optimistic feed edit: a rated member isn't in the candidates feed, so
+  // there's nothing to drop. onSettled re-syncs once the delete lands —
+  // the edge leaves the graph, the per-member control reverts to "Not yet
+  // connected", and the member can resurface as a suggestion.
+  const removeMutation = useMutation({
+    mutationFn: async ({ relateeId }: { relateeId: string }) => {
+      const res = await apiClient.api.relations.value[":relateeId"].$delete({
+        param: { relateeId },
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `relations/value DELETE: ${res.status}`);
+      }
+      return res.json();
+    },
+    onSettled: (_data, _err, { relateeId }) => {
+      queryClient.invalidateQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: RELATION_SUBGRAPH_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: relationValueQueryKey(relateeId) });
+    },
+  });
+
+  const busy = mutation.isPending || removeMutation.isPending;
+
   const relate = (value: RelationValue) => {
-    if (!target || mutation.isPending) return;
+    if (!target || busy) return;
     setPendingValue(value);
     mutation.mutate(
       { relateeId: target.id, value },
@@ -98,13 +124,33 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
     );
   };
 
-  // 1–4 keyboard shortcut while the dialog is open. Re-attached on
-  // every render — cheap, and avoids stale closures on `relate` /
-  // `target`. Skips when a text field would have caught the keystroke.
+  const remove = () => {
+    if (!target || busy) return;
+    removeMutation.mutate(
+      { relateeId: target.id },
+      {
+        // No onRelated() — removing a relationship isn't the "added a
+        // person" signal the welcome tour waits on.
+        onSuccess: () => onClose(),
+      },
+    );
+  };
+
+  // 0–4 keyboard shortcut while the dialog is open (0 only when there's a
+  // relationship to remove). Re-attached on every render — cheap, and
+  // avoids stale closures on `relate` / `remove` / `target`. Skips when a
+  // text field would have caught the keystroke.
   useEffect(() => {
     if (!target) return;
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
+        return;
+      }
+      // 0 removes, but only when there's a relationship to remove —
+      // matches the button, which is hidden on fresh suggestion cards.
+      if (e.key === "0" && target.currentValue != null) {
+        e.preventDefault();
+        remove();
         return;
       }
       const n = Number.parseInt(e.key, 10);
@@ -125,7 +171,7 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
-        if (!next && !mutation.isPending) onClose();
+        if (!next && !busy) onClose();
       }}
     >
       <Dialog.Portal>
@@ -137,7 +183,7 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
           }
         >
           <Dialog.Close
-            disabled={mutation.isPending}
+            disabled={busy}
             aria-label="Close"
             className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
@@ -156,10 +202,29 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
           </p>
 
           <p className="mt-3 text-xs text-muted-foreground">
-            Keyboard shortcuts: Number keys 1 through 4, or Esc to cancel
+            Keyboard shortcuts: Number keys {target?.currentValue != null ? "0" : "1"} through 4, or Esc to cancel
           </p>
 
           <div className="mt-2 flex flex-col gap-2">
+            {/* "No Relationship" surfaces only when a relationship already
+                exists — the made-by-mistake escape hatch. It deletes the
+                row (no `0` is stored), so it makes no sense on a fresh
+                suggestion card where there's nothing to remove. */}
+            {target?.currentValue != null && (
+              <Button
+                variant="destructive"
+                className="h-auto justify-start gap-3 px-3 py-2 text-left whitespace-normal"
+                disabled={busy}
+                onClick={remove}
+              >
+                <span className="text-lg font-bold tabular-nums">0</span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-semibold">{RELATION_REMOVE_LABEL.headline}</span>
+                  <span className="text-sm leading-snug text-destructive/70">{RELATION_REMOVE_LABEL.detail}</span>
+                </span>
+                {removeMutation.isPending && <span className="ml-auto text-sm">…</span>}
+              </Button>
+            )}
             {RELATION_VALUES.map((value) => {
               const { headline, detail } = RELATION_VALUE_LABELS[value];
               const isCurrent = target?.currentValue === value;
@@ -169,7 +234,7 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
                   key={value}
                   variant={isCurrent ? "secondary" : "primary"}
                   className="h-auto justify-start gap-3 px-3 py-2 text-left whitespace-normal"
-                  disabled={mutation.isPending}
+                  disabled={busy}
                   onClick={() => relate(value)}
                 >
                   <span className="text-lg font-bold tabular-nums">{value}</span>
@@ -193,10 +258,16 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
             })}
           </div>
 
-          {mutation.isError && (
+          {removeMutation.isError ? (
             <p role="alert" className="mt-3 text-sm text-destructive">
-              Couldn&apos;t save the rating. Click again to retry.
+              Couldn&apos;t remove the relationship. Click again to retry.
             </p>
+          ) : (
+            mutation.isError && (
+              <p role="alert" className="mt-3 text-sm text-destructive">
+                Couldn&apos;t save the relationship. Click again to retry.
+              </p>
+            )
           )}
 
           <p className="mt-3 text-xs text-muted-foreground">Notes: {RELATION_VALUE_VISIBILITY_NOTE}</p>

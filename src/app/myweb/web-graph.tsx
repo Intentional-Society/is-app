@@ -155,7 +155,7 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
           type="button"
           onClick={handleClick}
           disabled={!isClickable}
-          aria-label={isClickable ? "Adjust your rating" : undefined}
+          aria-label={isClickable ? "Adjust this relationship" : undefined}
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
@@ -220,14 +220,14 @@ export function WebGraph({
     window.localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
   }, [view]);
   // The view options become part of the query key so toggling refetches
-  // automatically and the rating-mutation invalidator (which uses the
+  // automatically and the relating-dialog's mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
   const { data, isPending, isError } = useQuery({
     queryKey: [...RELATION_SUBGRAPH_QUERY_KEY, view] as const,
     queryFn: () => fetchSubgraph(view),
     // The default view is prefetched server-side and dehydrated into
     // this cache; staleTime keeps the client from immediately refetching
-    // it on mount. Mutations still invalidate via the rating-dialog
+    // it on mount. Mutations still invalidate via the relating-dialog
     // onSettled handler, so this only suppresses redundant fetches.
     staleTime: 60_000,
     // Without this, toggling a view checkbox the first time collapses
@@ -559,7 +559,7 @@ export function WebGraph({
   if (empty) {
     return (
       <p className="text-base text-muted-foreground">
-        No connections yet — start rating members in Edit mode and they&apos;ll appear here.
+        No connections yet — start relating to members in Edit mode and they&apos;ll appear here.
       </p>
     );
   }

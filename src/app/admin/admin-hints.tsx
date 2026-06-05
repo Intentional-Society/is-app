@@ -87,7 +87,7 @@ export function AdminHints() {
       <div className="flex flex-col gap-3 rounded border border-border p-3">
         <p className="text-sm text-muted-foreground">
           Seed a hint that <em>relator</em> might know <em>target</em>. The hint surfaces on the relator's suggestion
-          feed; they convert it by rating, or it stays pending.
+          feed; they convert it by relating, or it stays pending.
         </p>
         <MemberTypeahead
           label="Relator (whose feed gets the hint)"

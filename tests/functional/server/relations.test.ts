@@ -13,6 +13,7 @@ import app from "@/server/api";
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
 import {
+  deleteRelationValue,
   getPersonalWeb,
   getRelationSuggestions,
   getRelationValue,
@@ -80,7 +81,7 @@ describe("updateRelationValue", () => {
     await deleteUserAndProfile(relateeId);
   });
 
-  it("creates a confirmed rating row", async () => {
+  it("creates a confirmed relationship row", async () => {
     const r = await updateRelationValue({ relatorId, relateeId, value: 3 });
     expect(r).toEqual({ ok: true });
 
@@ -89,7 +90,7 @@ describe("updateRelationValue", () => {
     expect(row.isHint).toBe(false);
   });
 
-  it("re-rating updates value and bumps updatedAt without changing the primary key", async () => {
+  it("updating an existing relationship changes value and bumps updatedAt without changing the primary key", async () => {
     await updateRelationValue({ relatorId, relateeId, value: 2 });
     const [first] = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
 
@@ -126,12 +127,12 @@ describe("updateRelationValue", () => {
     }
   });
 
-  it("rejects self-rating before hitting the DB constraint", async () => {
+  it("rejects self-relating before hitting the DB constraint", async () => {
     const r = await updateRelationValue({ relatorId, relateeId: relatorId, value: 3 });
     expect(r).toEqual({ error: "self_relating" });
   });
 
-  it("rejects rating a non-existent ratee", async () => {
+  it("rejects relating to a non-existent ratee", async () => {
     const r = await updateRelationValue({ relatorId, relateeId: randomUUID(), value: 3 });
     expect(r).toEqual({ error: "relatee_not_found" });
   });
@@ -170,6 +171,55 @@ describe("getRelationValue", () => {
   it("ignores hint rows (value-less, isHint=true)", async () => {
     await db.insert(relations).values({ relatorId, relateeId, value: null, isHint: true, hintedBy: relateeId });
     expect(await getRelationValue({ relatorId, relateeId })).toBeNull();
+  });
+});
+
+describe("deleteRelationValue", () => {
+  let relatorId: string;
+  let relateeId: string;
+
+  beforeEach(async () => {
+    relatorId = randomUUID();
+    relateeId = randomUUID();
+    await insertUserAndProfile(relatorId);
+    await insertUserAndProfile(relateeId);
+  });
+
+  afterEach(async () => {
+    await deleteUserAndProfile(relatorId);
+    await deleteUserAndProfile(relateeId);
+  });
+
+  it("removes a confirmed relationship", async () => {
+    await updateRelationValue({ relatorId, relateeId, value: 3 });
+
+    const r = await deleteRelationValue({ relatorId, relateeId });
+    expect(r).toEqual({ ok: true, deleted: true });
+
+    const rows = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("is idempotent — deleting an absent relation reports deleted=false, not an error", async () => {
+    expect(await deleteRelationValue({ relatorId, relateeId })).toEqual({ ok: true, deleted: false });
+  });
+
+  it("leaves a pending hint untouched (scoped to isHint=false)", async () => {
+    await db.insert(relations).values({ relatorId, relateeId, value: null, isHint: true, hintedBy: relateeId });
+
+    expect(await deleteRelationValue({ relatorId, relateeId })).toEqual({ ok: true, deleted: false });
+
+    const [row] = await db.select().from(relations).where(eq(relations.relatorId, relatorId));
+    expect(row.isHint).toBe(true);
+  });
+
+  it("is directional — does not delete the reverse edge", async () => {
+    await updateRelationValue({ relatorId: relateeId, relateeId: relatorId, value: 4 });
+
+    expect(await deleteRelationValue({ relatorId, relateeId })).toEqual({ ok: true, deleted: false });
+
+    const rows = await db.select().from(relations).where(eq(relations.relatorId, relateeId));
+    expect(rows).toHaveLength(1);
   });
 });
 
@@ -373,7 +423,7 @@ describe("getPersonalWeb", () => {
     expect(sub.edges).toEqual([]);
   });
 
-  it("hops=1, outgoing only — returns my ratings", async () => {
+  it("hops=1, outgoing only — returns my relationships", async () => {
     await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
     await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
     const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
@@ -382,7 +432,7 @@ describe("getPersonalWeb", () => {
     expect(sub.edges.every((e) => e.relatorId === center)).toBe(true);
   });
 
-  it("hops=1, incoming only — returns ratings of me", async () => {
+  it("hops=1, incoming only — returns relationships pointing at me", async () => {
     await updateRelationValue({ relatorId: a, relateeId: center, value: 3 });
     const sub = await getPersonalWeb({ centerId: center, includeIncoming: true, includeOutgoing: false, hops: 1 });
     expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a]));
@@ -585,7 +635,7 @@ describe("materializeInviteRelations", () => {
     await deleteUserAndProfile(h2);
   });
 
-  it("inserts a confirmed inviter→redeemer rating from creator_value", async () => {
+  it("inserts a confirmed inviter→redeemer relationship from creator_value", async () => {
     const r = await createInvite({ createdBy: inviter, note: "creator value materialization" });
     if ("error" in r) throw new Error("seed failed");
     const [row] = await db.select({ id: invites.id }).from(invites).where(eq(invites.code, r.code));
@@ -794,7 +844,7 @@ describe("PUT /api/relations/value/:relateeId", () => {
     expect((await put(other, { value: "3" })).status).toBe(400);
   });
 
-  it("rejects self-rating", async () => {
+  it("rejects self-relating", async () => {
     const res = await put(me, { value: 3 });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe("self_relating");
@@ -807,6 +857,59 @@ describe("PUT /api/relations/value/:relateeId", () => {
 
   it("rejects malformed UUID in path", async () => {
     const res = await put("not-a-uuid", { value: 3 });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("DELETE /api/relations/value/:relateeId", () => {
+  let me: string;
+  let other: string;
+
+  beforeEach(async () => {
+    me = randomUUID();
+    other = randomUUID();
+    await insertUserAndProfile(me);
+    await insertUserAndProfile(other);
+    authAs(me);
+  });
+
+  afterEach(async () => {
+    mockCreateServerClient.mockReset();
+    await deleteUserAndProfile(me);
+    await deleteUserAndProfile(other);
+  });
+
+  const del = (relateeId: string) => app.request(`/api/relations/value/${relateeId}`, { method: "DELETE" });
+
+  it("removes the caller's relationship and returns 200", async () => {
+    await updateRelationValue({ relatorId: me, relateeId: other, value: 3 });
+
+    const res = await del(other);
+    expect(res.status).toBe(200);
+
+    const rows = await db.select().from(relations).where(eq(relations.relatorId, me));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("returns 200 even when no relation exists (idempotent)", async () => {
+    const res = await del(other);
+    expect(res.status).toBe(200);
+  });
+
+  it("only deletes the caller's own outgoing edge", async () => {
+    // other → me exists; me deleting "other" must not touch it, since the
+    // route fixes relatorId to the authed user.
+    await updateRelationValue({ relatorId: other, relateeId: me, value: 4 });
+
+    const res = await del(other);
+    expect(res.status).toBe(200);
+
+    const rows = await db.select().from(relations).where(eq(relations.relatorId, other));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("rejects malformed UUID in path", async () => {
+    const res = await del("not-a-uuid");
     expect(res.status).toBe(400);
   });
 });
@@ -926,7 +1029,7 @@ describe("POST /api/relations/hint (admin-only)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("400 on self-rating", async () => {
+  it("400 on self-relating", async () => {
     authAs(admin);
     const res = await post({ relatorId: relator, relateeId: relator });
     expect(res.status).toBe(400);
@@ -979,7 +1082,7 @@ describe("DELETE /api/relations/hint/:relatorId/:relateeId (admin-only)", () => 
     expect(rows).toEqual([]);
   });
 
-  it("refuses to delete a confirmed rating (404)", async () => {
+  it("refuses to delete a confirmed relationship (404)", async () => {
     await updateRelationValue({ relatorId: relator, relateeId: target, value: 3 });
     authAs(admin);
     const res = await app.request(`/api/relations/hint/${relator}/${target}`, { method: "DELETE" });
