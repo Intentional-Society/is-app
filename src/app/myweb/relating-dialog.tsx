@@ -8,7 +8,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
-import { RELATION_VALUE_LABELS, RELATION_VALUES, type RelationValue } from "@/lib/relation-value";
+import {
+  RELATION_VALUE_LABELS,
+  RELATION_VALUE_VISIBILITY_NOTE,
+  RELATION_VALUES,
+  type RelationValue,
+} from "@/lib/relation-value";
 
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY, relationValueQueryKey } from "./query-keys";
 
@@ -183,10 +188,7 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
             </p>
           )}
 
-          <p className="mt-3 text-xs text-muted-foreground">
-            Notes: Yes, these become visible to them and others. It&apos;s okay to pick a different relationship depth
-            estimate than they do for you! Everyone will have their own slightly unique interpretation.
-          </p>
+          <p className="mt-3 text-xs text-muted-foreground">Notes: {RELATION_VALUE_VISIBILITY_NOTE}</p>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

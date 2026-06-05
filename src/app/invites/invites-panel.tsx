@@ -4,11 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 
 import { MemberChip, MemberTypeahead } from "@/components/member-typeahead";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
 import type { Me, MemberSummary } from "@/lib/api-types";
-import { RELATION_VALUE_LABELS, RELATION_VALUES, type RelationValue } from "@/lib/relation-value";
+import { HINTS_PER_INVITE_LIMIT, MIN_NOTE_LENGTH } from "@/lib/invite-limits";
+import {
+  RELATION_VALUE_LABELS,
+  RELATION_VALUE_VISIBILITY_NOTE,
+  RELATION_VALUES,
+  type RelationValue,
+} from "@/lib/relation-value";
 
 type InviteRow = {
   code: string;
@@ -21,8 +27,6 @@ type InviteRow = {
 };
 
 type PanelState = { kind: "idle" } | { kind: "creating" } | { kind: "error"; message: string };
-
-const HINT_LIMIT = 10;
 
 type HintMember = Pick<MemberSummary, "id" | "displayName">;
 
@@ -58,10 +62,10 @@ export function InvitesPanel({ me }: { me: Me }) {
   const create = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = note.trim();
-    if (trimmed.length < 10) {
+    if (trimmed.length < MIN_NOTE_LENGTH) {
       setState({
         kind: "error",
-        message: "Note must be at least 10 characters.",
+        message: `Please write at least ${MIN_NOTE_LENGTH} characters about who you're inviting.`,
       });
       return;
     }
@@ -134,7 +138,7 @@ export function InvitesPanel({ me }: { me: Me }) {
   };
 
   const addHint = (m: MemberSummary) => {
-    if (hints.length >= HINT_LIMIT) return;
+    if (hints.length >= HINTS_PER_INVITE_LIMIT) return;
     if (hints.some((h) => h.id === m.id)) return;
     setHints((prev) => [...prev, { id: m.id, displayName: m.displayName }]);
   };
@@ -152,16 +156,19 @@ export function InvitesPanel({ me }: { me: Me }) {
       className="flex w-full max-w-xl flex-col gap-4 rounded border border-border p-4"
     >
       <h2 id="invites-heading" className="text-lg font-semibold">
-        Invite a member
+        Invite a new member
       </h2>
+      <p className="text-base text-muted-foreground">
+        You can bring others into the IS Web — ideally people <em>already</em> woven into our larger network of
+        relationships. If you're their only connection here, make it a strong one.
+      </p>
       <form onSubmit={create} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="invite-note">Note (for your records and theirs — who are you inviting?)</Label>
-          <Textarea
+          <Label htmlFor="invite-note">Who are you inviting? (We'll use this to greet them initially.)</Label>
+          <Input
             id="invite-note"
             required
-            minLength={10}
-            rows={2}
+            minLength={MIN_NOTE_LENGTH}
             value={note}
             onChange={(event) => setNote(event.target.value)}
             disabled={submitting}
@@ -172,12 +179,12 @@ export function InvitesPanel({ me }: { me: Me }) {
 
         <div className="flex flex-col gap-2">
           <MemberTypeahead
-            label="Hints (optional) — people you think they'll want to know"
-            triggerLabel="Add a hint…"
+            label="Recommendations: Who in this Web do you think they already know?"
+            triggerLabel="Add a connection recommendation…"
             selectedIds={hints.map((h) => h.id)}
             excludeIds={excludeFromHints}
             onSelect={addHint}
-            disabled={submitting || hints.length >= HINT_LIMIT}
+            disabled={submitting || hints.length >= HINTS_PER_INVITE_LIMIT}
           />
           {hints.length > 0 && (
             <div className="flex flex-wrap gap-1">
@@ -186,8 +193,8 @@ export function InvitesPanel({ me }: { me: Me }) {
               ))}
             </div>
           )}
-          {hints.length >= HINT_LIMIT && (
-            <p className="text-sm text-muted-foreground">Up to {HINT_LIMIT} hints per invite.</p>
+          {hints.length >= HINTS_PER_INVITE_LIMIT && (
+            <p className="text-sm text-muted-foreground">Up to {HINTS_PER_INVITE_LIMIT} hints per invite.</p>
           )}
         </div>
 
@@ -202,7 +209,7 @@ export function InvitesPanel({ me }: { me: Me }) {
       </form>
 
       <div>
-        <h3 className="mb-2 text-base font-semibold uppercase tracking-wide text-muted-foreground">My invites</h3>
+        <h3 className="mb-2 text-base font-semibold text-muted-foreground">My Invites</h3>
         {rows === null ? (
           <p className="text-base text-muted-foreground">Loading…</p>
         ) : rows.length === 0 ? (
@@ -210,23 +217,33 @@ export function InvitesPanel({ me }: { me: Me }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((row) => (
-              <li key={row.code} className="flex flex-col gap-1 rounded border border-border p-3 text-base">
-                <div className="flex items-center gap-3">
-                  <code className="font-mono text-base">{row.code}</code>
-                  <StatusBadge status={row.status} />
+              <li
+                key={row.code}
+                className="flex items-start justify-between gap-3 rounded-xl bg-popover p-3 text-base ring-1 ring-foreground/10"
+              >
+                <div className="flex min-w-0 flex-col gap-1">
+                  <p className="text-foreground">{row.note}</p>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={row.status} />
+                    <span className="text-sm text-muted-foreground">Expires {formatDate(row.expiresAt)}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="whitespace-nowrap text-base">
+                    <span className="text-muted-foreground">Code: </span>
+                    <code className="font-mono">{row.code}</code>
+                  </div>
                   {row.status === "active" && (
-                    <>
-                      <Button size="xs" className="ml-auto" onClick={() => copy(row.code)}>
-                        {copiedCode === row.code ? "Copied" : "Copy"}
+                    <div className="flex gap-2">
+                      <Button size="xs" onClick={() => copy(row.code)}>
+                        {copiedCode === row.code ? "Copied" : "Copy invite link"}
                       </Button>
                       <Button variant="destructive" size="xs" onClick={() => revoke(row.code)}>
                         Revoke
                       </Button>
-                    </>
+                    </div>
                   )}
                 </div>
-                <p className="text-foreground">{row.note}</p>
-                <p className="text-sm text-muted-foreground">Expires {formatDate(row.expiresAt)}</p>
               </li>
             ))}
           </ul>
@@ -246,36 +263,45 @@ function RelationValuePicker({
   disabled?: boolean;
 }) {
   return (
-    <fieldset className="flex flex-col gap-2" disabled={disabled}>
-      <legend className="text-base font-medium">Your relationship to them (optional)</legend>
-      <div className="flex flex-col gap-2">
-        {RELATION_VALUES.map((v) => {
-          const { headline, detail } = RELATION_VALUE_LABELS[v];
-          const selected = value === v;
-          return (
-            <Button
-              key={v}
-              type="button"
-              variant={selected ? "secondary" : "primary"}
-              className="h-auto justify-start gap-3 px-3 py-2 text-left"
-              onClick={() => onChange(selected ? null : v)}
-              aria-pressed={selected}
-            >
-              <span className="text-lg font-bold tabular-nums">{v}</span>
-              <span className="flex flex-col">
-                <span className="font-semibold">{headline}</span>
-                <span className="text-sm text-muted-foreground">{detail}</span>
-              </span>
-            </Button>
-          );
-        })}
-      </div>
-      {value === 1 && (
-        <p className="text-sm text-muted-foreground">
-          Inviting people you've only met in group settings tends to lead to weak fit. Is this the right time?
-        </p>
-      )}
-    </fieldset>
+    <div className="flex flex-col gap-2">
+      <p id="relation-value-heading" className="text-base font-medium leading-none">
+        What's your relationship to them?
+      </p>
+      <fieldset
+        className="flex flex-col gap-2 rounded-xl bg-popover p-4 text-popover-foreground ring-1 ring-foreground/10"
+        disabled={disabled}
+        aria-labelledby="relation-value-heading"
+      >
+        <div className="flex flex-col gap-2">
+          {RELATION_VALUES.map((v) => {
+            const { headline, detail } = RELATION_VALUE_LABELS[v];
+            const selected = value === v;
+            return (
+              <Button
+                key={v}
+                type="button"
+                variant={selected ? "secondary" : "primary"}
+                className="h-auto justify-start gap-3 whitespace-normal px-3 py-2 text-left"
+                onClick={() => onChange(selected ? null : v)}
+                aria-pressed={selected}
+              >
+                <span className="text-lg font-bold tabular-nums">{v}</span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-semibold">{headline}</span>
+                  <span className="text-sm text-muted-foreground">{detail}</span>
+                </span>
+              </Button>
+            );
+          })}
+        </div>
+        {value === 1 && (
+          <p className="text-sm text-muted-foreground">
+            Inviting people you've only met in group settings tends to lead to weak fit. Is this the right time?
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">Notes: {RELATION_VALUE_VISIBILITY_NOTE}</p>
+      </fieldset>
+    </div>
   );
 }
 
