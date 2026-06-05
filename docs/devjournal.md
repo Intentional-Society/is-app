@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-04 | James | Activity instrumentation for launch
+
+Added `userId` (pseudonymous Supabase UUID) to the `api request` log so Axiom can count distinct people, and an admin **Activity metrics** view (`src/server/activity-metrics.ts`) reading the signup and invite funnels, plus a signed-in-past-week/month count from `auth.users.last_sign_in_at`, from current DB state.
+
 ## 2026-06-03 | James | Guard drizzle generate against stray auth-schema DDL
 
 An attempt to stop `drizzle-kit generate` re-emitting `CREATE/ALTER/DROP TABLE "auth"` for the `pgSchema("auth")` reference (`schemaFilter`/`tablesFilter` gate only `pull`; tables have no `.existing()` yet — drizzle-orm #1305): `auth.users` is now tracked in the `0013` snapshot baseline, with a functional guard rejecting auth-schema DDL as the backstop.
