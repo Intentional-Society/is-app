@@ -50,7 +50,6 @@ const deleteUserAndProfile = async (id: string) => {
 };
 
 type ActivityMetrics = {
-  launchDate: string;
   members: {
     total: number;
     new7d: number;
@@ -65,16 +64,6 @@ type ActivityMetrics = {
     signedIn30d: number;
   };
   invites: { created: number; redeemed: number; pending: number; expired: number; revoked: number };
-  sinceLaunch: {
-    signedIn: number;
-    signedAgreements: number;
-    setIntention: number;
-    editedProfile: number;
-    builtWeb: number;
-    joinedProgram: number;
-    invitesCreated: number;
-    invitesRedeemed: number;
-  };
 };
 
 const fetchMetrics = async (): Promise<ActivityMetrics> => {
@@ -117,8 +106,6 @@ describe("GET /api/admin/activity", () => {
     const m = await fetchMetrics();
     for (const v of Object.values(m.members)) expect(typeof v).toBe("number");
     for (const v of Object.values(m.invites)) expect(typeof v).toBe("number");
-    for (const v of Object.values(m.sinceLaunch)) expect(typeof v).toBe("number");
-    expect(typeof m.launchDate).toBe("string");
   });
 
   it("counts a seeded member's progress in the right buckets", async () => {
@@ -135,13 +122,7 @@ describe("GET /api/admin/activity", () => {
     await insertUserAndProfile(relatee, { hidden: true });
     await db
       .update(profiles)
-      .set({
-        lastSignedAgreements: new Date(),
-        currentIntention: "be present",
-        intentionUpdatedAt: new Date(),
-        lastUpdatedProfile: new Date(),
-        lastUpdatedWeb: new Date(),
-      })
+      .set({ lastSignedAgreements: new Date(), currentIntention: "be present", lastUpdatedProfile: new Date() })
       .where(eq(profiles.id, member));
     await db.execute(sql`UPDATE auth.users SET last_sign_in_at = now() WHERE id = ${member}::uuid`);
     await db.insert(programs).values({ id: programId, slug: `prog-${programId}`, name: "Test Program" });
@@ -177,17 +158,6 @@ describe("GET /api/admin/activity", () => {
     expect(m.invites.created).toBeGreaterThanOrEqual(2);
     expect(m.invites.redeemed).toBeGreaterThanOrEqual(1);
     expect(m.invites.pending).toBeGreaterThanOrEqual(1);
-
-    // The cohort's actions are stamped now(), which is after the (earlier,
-    // fixed) LAUNCH_DATE constant, so each registers in the since-launch block.
-    expect(m.sinceLaunch.signedIn).toBeGreaterThanOrEqual(1);
-    expect(m.sinceLaunch.signedAgreements).toBeGreaterThanOrEqual(1);
-    expect(m.sinceLaunch.setIntention).toBeGreaterThanOrEqual(1);
-    expect(m.sinceLaunch.editedProfile).toBeGreaterThanOrEqual(1);
-    expect(m.sinceLaunch.builtWeb).toBeGreaterThanOrEqual(1);
-    expect(m.sinceLaunch.joinedProgram).toBeGreaterThanOrEqual(1);
-    expect(m.sinceLaunch.invitesCreated).toBeGreaterThanOrEqual(2);
-    expect(m.sinceLaunch.invitesRedeemed).toBeGreaterThanOrEqual(1);
 
     await db.delete(invites).where(sql`${invites.id} IN (${inviteRedeemed}::uuid, ${invitePending}::uuid)`);
     await db.delete(relations).where(eq(relations.relatorId, member));
