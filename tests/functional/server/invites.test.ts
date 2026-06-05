@@ -310,11 +310,11 @@ describe("POST /api/invites", () => {
     expect(typeof body.expiresAt).toBe("string");
   });
 
-  it("rejects a note shorter than 10 chars", async () => {
-    const res = await post({ note: "too short" });
+  it("rejects a note shorter than 5 chars", async () => {
+    const res = await post({ note: "hi" });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/at least 10/);
+    expect(body.error).toMatch(/at least 5/);
   });
 
   it("rejects a malformed JSON body", async () => {

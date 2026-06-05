@@ -31,9 +31,9 @@ test.describe("invites — authed member flow", () => {
   test("create an invite, see it listed, revoke it", async ({ page }) => {
     await page.getByRole("link", { name: "Invite a friend" }).click();
     await page.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
-    await expect(page.getByRole("heading", { name: "Invite a member" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Invite a new member" })).toBeVisible();
 
-    await page.getByLabel(/Note \(for your records/).fill("bringing a friend from the meditation group");
+    await page.getByLabel("Who are you inviting?").fill("bringing a friend from the meditation group");
     await page.getByRole("button", { name: "Create invite" }).click();
 
     const codeLocator = page.locator("code").first();
@@ -51,7 +51,7 @@ test.describe("invites — authed member flow", () => {
     await page.getByRole("link", { name: "Invite a friend" }).click();
     await page.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
     // Stub POST /api/invites to return 429 — we don't want to seed
-    // ten real invites per test run, and we only need to verify the
+    // fifty real invites per test run, and we only need to verify the
     // UI's error branch for the cap case.
     await page.route("**/api/invites", async (route) => {
       if (route.request().method() === "POST") {
@@ -60,7 +60,7 @@ test.describe("invites — authed member flow", () => {
           contentType: "application/json",
           body: JSON.stringify({
             error: "too_many_active_invites",
-            limit: 10,
+            limit: 50,
           }),
         });
         return;
@@ -68,10 +68,10 @@ test.describe("invites — authed member flow", () => {
       await route.continue();
     });
 
-    await page.getByLabel(/Note \(for your records/).fill("this should trigger the cap message");
+    await page.getByLabel("Who are you inviting?").fill("this should trigger the cap message");
     await page.getByRole("button", { name: "Create invite" }).click();
 
-    await expect(page.getByText(/You already have 10 active invites/)).toBeVisible();
+    await expect(page.getByText(/You already have 50 active invites/)).toBeVisible();
   });
 });
 
@@ -99,7 +99,7 @@ test.describe("/signup — unauthed invite flow", () => {
       });
       await memberPage.getByRole("link", { name: "Invite a friend" }).click();
       await memberPage.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
-      await memberPage.getByLabel(/Note \(for your records/).fill("e2e signup-flow invite — come on in");
+      await memberPage.getByLabel("Who are you inviting?").fill("e2e signup-flow invite — come on in");
       await memberPage.getByRole("button", { name: "Create invite" }).click();
       const codeLocator = memberPage.locator("code").first();
       await expect(codeLocator).toHaveText(/^[A-HJ-NP-Z2-9]{10}$/);

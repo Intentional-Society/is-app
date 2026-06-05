@@ -29,3 +29,8 @@ export const RELATION_VALUE_LABELS: Record<RelationValue, { headline: string; de
       "Among the rare few who feel like chosen family or co-founders — soul-level kinship that may last a lifetime.",
   },
 };
+
+// Reassurance shown wherever a member picks a 1..4 value — the rating
+// dialog and the invite form. One definition so the two never drift.
+export const RELATION_VALUE_VISIBILITY_NOTE =
+  "Yes, these become visible to them and others. It's okay to pick a different relationship depth estimate than they do for you! Everyone will have their own slightly unique interpretation.";

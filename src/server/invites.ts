@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
+import { MIN_NOTE_LENGTH } from "@/lib/invite-limits";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import { db } from "./db";
@@ -16,7 +17,6 @@ const CODE_LENGTH = 10;
 
 const MAX_ACTIVE_INVITES_PER_USER = 50;
 const INVITE_LIFETIME_DAYS = 30;
-const MIN_NOTE_LENGTH = 10;
 
 export type InviteStatus = "active" | "redeemed" | "revoked" | "expired";
 

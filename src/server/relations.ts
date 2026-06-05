@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
+import { HINTS_PER_INVITE_LIMIT } from "@/lib/invite-limits";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import { isUuid } from "./auth-middleware";
@@ -591,8 +592,6 @@ export const deleteRelationHint = async (params: {
   if (result.length === 0) return { error: "not_found" };
   return { ok: true };
 };
-
-export const HINTS_PER_INVITE_LIMIT = 10;
 
 export type ValidateHintsResult =
   | { ok: true; ids: string[] }
