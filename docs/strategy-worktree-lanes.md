@@ -91,6 +91,14 @@ stable manual session *and* an e2e run simultaneously, use two lanes.
 - **Footprint:** ~10 containers + ~2 GB RAM per lane. 2–4 lanes is comfortable
   on 16 GB+; beyond that, push e2e to CI (which already runs against per-branch
   Vercel previews) instead of adding local stacks.
+- **Looping e2e (running the suite many times):** pre-start ONE lane server and
+  reuse it — `npm run dev -- --port <E2E_PORT>`, which Playwright picks up via
+  `reuseExistingServer`. Don't let each `playwright test` cold-start the server:
+  that tree-kills `next dev` between runs, and repeated kill-mid-compile corrupts
+  the Turbopack `.next` cache until first-request route compilation outruns
+  Playwright's 60 s `webServer` timeout (socket bound, never serving — the run
+  fails before any test). One reused server ran 20 cycles clean; the cold-start
+  loop cliffs after ~5. If a lane's `.next` wedges, delete it to rebuild.
 - **Stop a lane's stack:** `npm run dev:db:stop` from that worktree.
 - **Remove a lane:** `git worktree remove ../is-app-worktrees/is-app-2`.
 - **Windows port grabbing:** reserve a lane's Supabase block once in an admin

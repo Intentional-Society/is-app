@@ -150,7 +150,10 @@ describe("runFirstProfileSaveSync (inline hook)", () => {
 
   it("raises an unsubscribe alert and writes nothing when the subscriber is unsubscribed", async () => {
     const profileId = await makeProfile({ email: "fs-dan@example.com" });
-    const programId = await makeProgram({ buttondownTag: "weekly", slug: "weekly-prog" });
+    // Unique slug per run: parallel files share one DB, so a fixed slug
+    // races buttondown-sync's twin test on programs_slug_unique.
+    const heldSlug = `weekly-prog-${randomUUID().slice(0, 8)}`;
+    const programId = await makeProgram({ buttondownTag: "weekly", slug: heldSlug });
     await db.insert(profilePrograms).values({ profileId, programId });
 
     const initial: ButtondownSubscriber = {
@@ -174,7 +177,7 @@ describe("runFirstProfileSaveSync (inline hook)", () => {
     expect(alerts[0]).toMatchObject({
       profileId,
       email: "fs-dan@example.com",
-      programSlugsHeld: ["weekly-prog"],
+      programSlugsHeld: [heldSlug],
     });
   });
 

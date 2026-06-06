@@ -222,7 +222,9 @@ describe("runButtondownSync (daily reconciler)", () => {
       email: "eve@example.com",
       buttondownSubscriberId: "sub_eve",
     });
-    const programId = await makeProgram({ buttondownTag: "weekly", slug: "weekly-prog" });
+    // Unique slug per run — see the twin test in buttondown-first-save.
+    const heldSlug = `weekly-prog-${randomUUID().slice(0, 8)}`;
+    const programId = await makeProgram({ buttondownTag: "weekly", slug: heldSlug });
     await join(profileId, programId);
 
     const initial = sampleSubscriber({
@@ -247,7 +249,7 @@ describe("runButtondownSync (daily reconciler)", () => {
     expect(my).toMatchObject({
       profileId,
       email: "eve@example.com",
-      programSlugsHeld: ["weekly-prog"],
+      programSlugsHeld: [heldSlug],
     });
   });
 
