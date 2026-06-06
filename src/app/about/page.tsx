@@ -4,6 +4,9 @@ import { BreadcrumbLink } from "@/components/breadcrumb-link";
 import { requireUser } from "@/lib/api-server";
 import { appVersion, changelog, formatChangelogDate } from "@/lib/changelog";
 
+import { CollapsibleSection } from "./collapsible-section";
+import { SystemMetrics } from "./system-metrics";
+
 export const metadata: Metadata = { title: "About" };
 
 export default async function AboutPage() {
@@ -16,34 +19,38 @@ export default async function AboutPage() {
         <BreadcrumbLink fallback="/" />
       </div>
 
-      <p className="flex w-full max-w-2xl items-center gap-2 text-sm text-muted-foreground">
-        <span className="rounded-full border border-border bg-card px-2.5 py-1 font-mono text-xs text-card-foreground">
-          v{appVersion.replaceAll("-", ".")}
-        </span>
-        <span className="font-serif italic">Updated {formatChangelogDate(appVersion)}</span>
-      </p>
+      <CollapsibleSection title="System Metrics">
+        <SystemMetrics />
+      </CollapsibleSection>
 
-      <section className="flex w-full max-w-2xl flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold">Changelog</h2>
-          <p className="text-sm text-muted-foreground">
-            This is a running list, newest first, of significant updates made to this app.
-          </p>
-        </div>
-        <ol className="rounded-xl border border-border bg-card">
+      <CollapsibleSection
+        title="Changelog"
+        accessory={
+          <span className="rounded-full border border-border bg-card px-2.5 py-1 font-mono text-xs text-card-foreground">
+            v{appVersion.replaceAll("-", ".")}
+          </span>
+        }
+      >
+        <p className="mb-4 text-sm text-muted-foreground">
+          This is a running list, newest first, of significant updates made to this app.
+        </p>
+        <ol className="flex flex-col">
           {changelog.map((entry) => (
-            <li key={`${entry.date}-${entry.title}`} className="flex gap-4 border-t border-border p-5 first:border-t-0">
-              <time dateTime={entry.date} className="w-24 shrink-0 pt-0.5 text-xs text-muted-foreground sm:w-28">
+            <li
+              key={`${entry.date}-${entry.title}`}
+              className="flex gap-4 border-t border-border py-2.5 first:border-t-0 first:pt-0"
+            >
+              <time dateTime={entry.date} className="w-24 shrink-0 text-xs text-muted-foreground sm:w-28">
                 {formatChangelogDate(entry.date)}
               </time>
-              <div className="flex flex-col gap-1">
-                <h3 className="text-base font-semibold text-card-foreground">{entry.title}</h3>
+              <div className="flex flex-col gap-0.5">
+                <h3 className="text-sm font-semibold text-card-foreground">{entry.title}</h3>
                 <p className="text-sm text-muted-foreground">{entry.description}</p>
               </div>
             </li>
           ))}
         </ol>
-      </section>
+      </CollapsibleSection>
 
       <section className="w-full max-w-2xl">
         <h2 className="text-lg font-semibold">The team</h2>

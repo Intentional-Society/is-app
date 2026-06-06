@@ -48,7 +48,7 @@ export async function SystemMetrics() {
 
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded border border-border">
+        <div className="rounded border border-border bg-background">
           <div className="border-b border-border px-3 py-2 text-sm font-medium">Members</div>
           <dl className="divide-y divide-border">
             <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
@@ -80,7 +80,7 @@ export async function SystemMetrics() {
           </dl>
         </div>
 
-        <div className="rounded border border-border">
+        <div className="rounded border border-border bg-background">
           <div className="border-b border-border px-3 py-2 text-sm font-medium">Activity</div>
           <dl className="divide-y divide-border">
             <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
@@ -100,7 +100,7 @@ export async function SystemMetrics() {
           </dl>
         </div>
 
-        <div className="rounded border border-border">
+        <div className="rounded border border-border bg-background">
           <div className="border-b border-border px-3 py-2 text-sm font-medium">Invites</div>
           <dl className="divide-y divide-border">
             {inviteRows.map((row) => (

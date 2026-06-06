@@ -25,10 +25,15 @@ test.describe("/about page", () => {
     await page.waitForURL((u) => u.pathname === "/about", { timeout: TIMEOUT_MS });
 
     await expect(page.getByRole("heading", { name: "About", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Changelog", exact: true })).toBeVisible();
     // Version line: the date of the newest entry, e.g. "v2026.05.29".
     await expect(page.getByText(/^v\d{4}\.\d{2}\.\d{2}$/)).toBeVisible();
-    // A stable seed entry.
+    // System Metrics is the top section, Changelog below it. Both are
+    // collapsed <details> by default, so their summary headings show but
+    // their bodies stay hidden until expanded.
+    await expect(page.getByRole("heading", { name: "System Metrics", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Changelog", exact: true })).toBeVisible();
+    // Expand the changelog; a stable seed entry then renders.
+    await page.getByRole("heading", { name: "Changelog", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Profile pictures", exact: true })).toBeVisible();
   });
 });

@@ -58,7 +58,6 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
             <MenuLink href="/profile">My profile</MenuLink>
             <MenuLink href="/invites">Invite a friend</MenuLink>
             <MenuLink href="/about">About</MenuLink>
-            <MenuLink href="/metrics">System metrics</MenuLink>
             <a
               href="https://docs.google.com/forms/d/e/1FAIpQLScXhdSxbQ3LxjiYhqN2fmuyy66SK292rTYEZV3QaHgzn1eVjA/viewform?usp=dialog"
               target="_blank"
