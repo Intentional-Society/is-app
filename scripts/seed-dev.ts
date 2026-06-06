@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import { invites, profilePrograms, profiles, programs } from "../src/server/schema.js";
+import { invites, profilePrograms, profiles, programs, relations } from "../src/server/schema.js";
 
 // Load .env.local so this script works standalone via `npx tsx`.
 config({ path: resolve(process.cwd(), ".env.local") });
@@ -67,6 +68,18 @@ type SeedData = {
 const scriptDir = fileURLToPath(new URL(".", import.meta.url));
 const seedData = JSON.parse(readFileSync(resolve(scriptDir, "seed-dev.json"), "utf-8")) as SeedData;
 
+// The first seed member (Aria Chen) doubles as a durable demo account: the
+// rich web is built around her (seedRelations) and a dev-only password is
+// set so the /signin dev panel can log in as her. She's an ordinary seed
+// profile, so the e2e reset — which only touches the two e2e users — never
+// disturbs her web. Password is the literal "password"; local-only, guarded
+// by the localhost check above.
+const DEMO = {
+  id: seedData.profiles[0].id,
+  email: seedData.profiles[0].email,
+  password: "password",
+};
+
 type SeedResult = { inserted: number; skipped: number };
 
 async function seedAuthUsers(): Promise<SeedResult> {
@@ -98,6 +111,16 @@ async function seedAuthUsers(): Promise<SeedResult> {
     if (result.length > 0) inserted++;
     else skipped++;
   }
+
+  // Dev-only: give the demo account a known bcrypt password so the /signin
+  // dev panel can sign in as her. The 39 other seed members keep their null
+  // password and remain non-loginable.
+  await client`
+    UPDATE auth.users
+    SET encrypted_password = crypt(${DEMO.password}, gen_salt('bf'))
+    WHERE id = ${DEMO.id}::uuid
+  `;
+
   return { inserted, skipped };
 }
 
@@ -195,6 +218,79 @@ async function seedInvites(): Promise<SeedResult> {
   return { inserted: result.length, skipped: values.length - result.length };
 }
 
+// Build a relational web centered on the demo account (Aria, members[0]) so
+// signing in as her and opening /myweb lands on a populated graph:
+//
+//   - Aria → 30 of the other 39 members. Relationship depth (the 1..4 value
+//     — Acquaintance/Friend/Close Friend/Kin per design-relations.md) is
+//     cycled across the 30 so all four rungs are represented.
+//   - 5 of those 30 act as hubs, each relating to 15 members: the 9 "outer"
+//     members Aria is NOT directly tied to (so the 2-hop view pulls them
+//     in), plus a rotating window of 6 inner first-degree peers (cross-links
+//     within the inner ring). Hubs are first-degree to Aria, so their
+//     relations surface as the second ring when the "2 hops" toggle is on.
+//
+// All rows are confirmed relations (isHint=false, value 1..4) among seed
+// profiles only, so the e2e reset never disturbs them. Idempotent via
+// onConflictDoNothing.
+async function seedRelations(): Promise<SeedResult> {
+  const members = seedData.profiles; // 40 seed members; members[0] = Aria (center)
+  const CENTER_DEGREE = 30;
+  const HUB_COUNT = 5;
+  const HUB_DEGREE = 15;
+
+  // Cycle relationship depth 1..4 across a relatee list so every rung shows.
+  const depthFor = (i: number) => (i % 4) + 1;
+
+  const center = members[0];
+  const rows: { relatorId: string; relateeId: string; value: number; isHint: boolean }[] = [];
+
+  // Aria → the next 30 members (her first-degree ring, indices 1..30).
+  const firstDegree = members.slice(1, 1 + CENTER_DEGREE);
+  for (const [i, m] of firstDegree.entries()) {
+    rows.push({ relatorId: center.id, relateeId: m.id, value: depthFor(i), isHint: false });
+  }
+
+  // 5 hubs (indices 1..5, all first-degree to Aria) → 15 each. Every hub
+  // reaches all 9 "outer" members (indices 31..39) so the 2-hop view brings
+  // them in; each hub also links a rotating window of 6 inner peers drawn
+  // from the rest of the first-degree ring (indices 6..30).
+  const outer = members.slice(1 + CENTER_DEGREE); // 9 members
+  const innerPool = members.slice(1 + HUB_COUNT, 1 + CENTER_DEGREE); // 25 members (indices 6..30)
+  const innerCount = HUB_DEGREE - outer.length; // 6
+  for (let h = 0; h < HUB_COUNT; h++) {
+    const hub = members[1 + h];
+    const inner = Array.from({ length: innerCount }, (_, j) => innerPool[(h * innerCount + j) % innerPool.length]);
+    const relatees = [...outer, ...inner];
+    for (const [k, m] of relatees.entries()) {
+      if (m.id === hub.id) continue; // defensive; windows never include the hubs
+      rows.push({ relatorId: hub.id, relateeId: m.id, value: depthFor(k), isHint: false });
+    }
+  }
+
+  const result = await db
+    .insert(relations)
+    .values(rows)
+    .onConflictDoNothing()
+    .returning({ relatorId: relations.relatorId });
+
+  // Finish making Aria a sign-in-ready demo: mark onboarding complete (so
+  // sign-in skips /welcome — see welcomeEntryStep) and bump last_updated_web
+  // so /myweb opens in View mode (the square canvas).
+  const now = new Date();
+  await db
+    .update(profiles)
+    .set({
+      lastSignedAgreements: now,
+      lastUpdatedProfile: now,
+      lastReviewedPrograms: now,
+      lastUpdatedWeb: now,
+    })
+    .where(eq(profiles.id, center.id));
+
+  return { inserted: result.length, skipped: rows.length - result.length };
+}
+
 function logResult(label: string, result: SeedResult) {
   const padded = label.padEnd(22);
   console.log(`  ${padded}${result.inserted} inserted, ${result.skipped} skipped`);
@@ -217,6 +313,9 @@ async function main() {
 
   const inviteResult = await seedInvites();
   logResult("invites:", inviteResult);
+
+  const relationResult = await seedRelations();
+  logResult("relations:", relationResult);
 
   console.log("\nDone.");
   process.exit(0);
