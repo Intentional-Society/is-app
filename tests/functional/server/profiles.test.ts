@@ -15,6 +15,11 @@ import {
 } from "@/server/profiles";
 import { profiles } from "@/server/schema";
 
+// Unique per run: toSlug(displayName) feeds the global profiles slug
+// unique constraint, and parallel test files share one DB — a fixed
+// "Test User" collides with api-me.test.ts on the derived slug.
+const TEST_DISPLAY_NAME = `Test User ${randomUUID().slice(0, 8)}`;
+
 describe("upsertProfile", () => {
   let testUserId: string;
 
@@ -36,7 +41,7 @@ describe("upsertProfile", () => {
   it("is idempotent across repeated calls for the same user", async () => {
     const user = {
       id: testUserId,
-      user_metadata: { displayName: "Test User" },
+      user_metadata: { displayName: TEST_DISPLAY_NAME },
       app_metadata: {},
       aud: "authenticated",
       created_at: "2026-01-01T00:00:00Z",
@@ -48,13 +53,13 @@ describe("upsertProfile", () => {
     const rows = await db.select().from(profiles).where(eq(profiles.id, testUserId));
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.displayName).toBe("Test User");
+    expect(rows[0]?.displayName).toBe(TEST_DISPLAY_NAME);
   });
 
   it("reports created=true on first call and created=false thereafter", async () => {
     const user = {
       id: testUserId,
-      user_metadata: { displayName: "Test User" },
+      user_metadata: { displayName: TEST_DISPLAY_NAME },
       app_metadata: {},
       aud: "authenticated",
       created_at: "2026-01-01T00:00:00Z",

@@ -15,11 +15,16 @@ import { profiles } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 
+// Unique per run: upsertProfile derives the profile slug via toSlug,
+// which hits a global unique constraint, and parallel test files share
+// one DB — a fixed "Test User" collides with profiles.test.ts.
+const TEST_DISPLAY_NAME = `Test User ${randomUUID().slice(0, 8)}`;
+
 const makeUser = (id: string, email: string): User =>
   ({
     id,
     email,
-    user_metadata: { displayName: "Test User" },
+    user_metadata: { displayName: TEST_DISPLAY_NAME },
     app_metadata: {},
     aud: "authenticated",
     created_at: "2026-01-01T00:00:00Z",
@@ -73,7 +78,7 @@ describe("GET /api/me", () => {
       email: "me-test@testfake.local",
       profile: {
         id: testUserId,
-        displayName: "Test User",
+        displayName: TEST_DISPLAY_NAME,
         bio: null,
         keywords: [],
         location: null,
