@@ -7,7 +7,12 @@ import { invites, profilePrograms, profiles, programs, relations } from "./schem
 // stream. Answers "how many members signed up and how far did they get"
 // from the state the app already records. The DB keeps last-touched, not
 // history, so the sign-in figures are snapshots, not retention curves.
-export type ActivityMetrics = {
+//
+// Member-facing (the /metrics page): nothing here may name a person
+// except the members who redeemed an invite, who are part of the
+// community. Inviter notes and pending-invite names are deliberately
+// absent — they describe people who haven't joined and stay admin-only.
+export type SystemMetrics = {
   members: {
     // Active member population: `hidden` admin test accounts and
     // deactivated members both excluded. `deactivated` reports the latter
@@ -36,12 +41,11 @@ export type ActivityMetrics = {
     pending: number;
     expired: number;
     revoked: number;
-    // The inviter's note ("who are you inviting?") for each redeemed and
-    // pending invite, newest first — surfaced behind a "?" in the admin
-    // UI. Admin-only: notes name real people, so they must not reach any
-    // member-facing view built on these metrics.
-    redeemedNotes: { id: string; note: string }[];
-    pendingNotes: { id: string; note: string }[];
+    // Display names of the members who joined by redeeming an invite,
+    // newest first — surfaced behind a "?" on the Redeemed row. Hidden
+    // test accounts are excluded, so `redeemed` counts only invites whose
+    // redeemer is a visible member.
+    redeemedNames: { id: string; name: string | null }[];
   };
 };
 
@@ -62,8 +66,8 @@ const inviteCount = async (cond?: SQL): Promise<number> => {
   return row?.c ?? 0;
 };
 
-export const getActivityMetrics = async (): Promise<ActivityMetrics> => {
-  const [memberAgg, builtWeb, joinedProgram, signins, invCreated, redeemedNotes, pendingNotes, invExpired, invRevoked] =
+export const getSystemMetrics = async (): Promise<SystemMetrics> => {
+  const [memberAgg, builtWeb, joinedProgram, signins, invCreated, redeemedNames, invPending, invExpired, invRevoked] =
     await Promise.all([
       // One scan over profiles covers Total Members, the deactivated
       // count, the onboarding funnel, and the sign-up windows — a
@@ -133,20 +137,19 @@ export const getActivityMetrics = async (): Promise<ActivityMetrics> => {
         `)
         .then((rows) => (rows as unknown as { in7: number; in30: number }[])[0]),
       inviteCount(),
-      // redeemed / pending fetch the note text (newest first) for the
-      // admin "?" popups; their counts are the array lengths. The pending
-      // vs expired split matches countActiveInvitesForCreator in invites.ts.
+      // redeemed — the display names of members who joined via an invite,
+      // newest first. Joining to profiles excludes invites redeemed by a
+      // hidden test account, so the count tracks real members only.
       db
-        .select({ id: invites.id, note: invites.note })
+        .select({ id: invites.id, name: profiles.displayName })
         .from(invites)
-        .where(isNotNull(invites.redeemedAt))
+        .innerJoin(profiles, eq(profiles.id, invites.redeemedBy))
+        .where(and(isNotNull(invites.redeemedAt), visible))
         .orderBy(desc(invites.redeemedAt)),
-      db
-        .select({ id: invites.id, note: invites.note })
-        .from(invites)
-        .where(and(isNull(invites.redeemedAt), isNull(invites.revokedAt), gt(invites.expiresAt, sql`now()`)))
-        .orderBy(desc(invites.createdAt)),
-      // expired / revoked partition the rest of the un-redeemed invites.
+      // pending / expired / revoked partition the un-redeemed invites; the
+      // pending vs expired split matches countActiveInvitesForCreator in
+      // invites.ts. Pending names stay admin-only, so only the count ships.
+      inviteCount(and(isNull(invites.redeemedAt), isNull(invites.revokedAt), gt(invites.expiresAt, sql`now()`))),
       inviteCount(and(isNull(invites.redeemedAt), isNull(invites.revokedAt), lte(invites.expiresAt, sql`now()`))),
       inviteCount(and(isNull(invites.redeemedAt), isNotNull(invites.revokedAt))),
     ]);
@@ -167,12 +170,11 @@ export const getActivityMetrics = async (): Promise<ActivityMetrics> => {
     },
     invites: {
       created: invCreated,
-      redeemed: redeemedNotes.length,
-      pending: pendingNotes.length,
+      redeemed: redeemedNames.length,
+      pending: invPending,
       expired: invExpired,
       revoked: invRevoked,
-      redeemedNotes,
-      pendingNotes,
+      redeemedNames,
     },
   };
 };

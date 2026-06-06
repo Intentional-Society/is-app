@@ -2,46 +2,46 @@ import * as Sentry from "@sentry/nextjs";
 
 import { serverApiClient } from "@/lib/api-server";
 
-import { InviteNotesHint } from "./invite-notes-hint";
+import { RedeemedNamesHint } from "./redeemed-names-hint";
 
-type InviteNote = { id: string; note: string };
+type RedeemedName = { id: string; name: string | null };
 
 const pct = (n: number, total: number): string => (total > 0 ? `${Math.round((n / total) * 100)}%` : "—");
 
 const METRICS_TIMEOUT_MS = 5000;
 
 // Resolve `promise`, or reject after `ms`. Guards against a slow/hung
-// metrics read taking the whole admin page down to a 504: the queries
-// run over the Supabase transaction pooler, where a burst of reads can
-// stall, and a never-settling await would otherwise block the render
-// past the platform timeout.
+// metrics read taking the whole page down to a 504: the queries run over
+// the Supabase transaction pooler, where a burst of reads can stall, and
+// a never-settling await would otherwise block the render past the
+// platform timeout.
 const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
   Promise.race([
     promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`activity metrics timed out after ${ms}ms`)), ms)),
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`system metrics timed out after ${ms}ms`)), ms)),
   ]);
 
-// Read-only funnel over the DB (see src/server/activity-metrics.ts).
-// Fetches its own data so the admin page only has to drop it into a
-// section. Best-effort: a failed or slow read renders an inline notice
-// and reports to Sentry rather than throwing or hanging, so a metrics
-// hiccup can't take down the rest of the admin page.
-export async function ActivityMetrics() {
+// Read-only funnel over the DB (see src/server/system-metrics.ts). Fetches
+// its own data so the page only has to drop it into a section.
+// Best-effort: a failed or slow read renders an inline notice and reports
+// to Sentry rather than throwing or hanging, so a metrics hiccup can't
+// take down the rest of the page.
+export async function SystemMetrics() {
   try {
-    const request = serverApiClient.api.admin.activity.$get();
+    const request = serverApiClient.api.metrics.$get();
     // If the timeout wins the race the request keeps running; swallow its
     // eventual settle so it can't surface as an unhandled rejection on a
     // reused Fluid Compute instance.
     request.catch(() => {});
     const res = await withTimeout(request, METRICS_TIMEOUT_MS);
-    if (!res.ok) throw new Error(`activity metrics request failed: ${res.status}`);
+    if (!res.ok) throw new Error(`system metrics request failed: ${res.status}`);
     const { metrics } = await res.json();
     const { members, invites } = metrics;
 
-    const inviteRows: { label: string; value: number; notes?: InviteNote[] }[] = [
+    const inviteRows: { label: string; value: number; redeemedNames?: RedeemedName[] }[] = [
       { label: "Created", value: invites.created },
-      { label: "Redeemed", value: invites.redeemed, notes: invites.redeemedNotes },
-      { label: "Pending", value: invites.pending, notes: invites.pendingNotes },
+      { label: "Redeemed", value: invites.redeemed, redeemedNames: invites.redeemedNames },
+      { label: "Pending", value: invites.pending },
       { label: "Expired", value: invites.expired },
       { label: "Revoked", value: invites.revoked },
     ];
@@ -108,7 +108,7 @@ export async function ActivityMetrics() {
                 <dt className="text-muted-foreground">{row.label}</dt>
                 <dd className="tabular-nums">
                   {row.value}
-                  {row.notes ? <InviteNotesHint label={row.label} notes={row.notes} /> : null}
+                  {row.redeemedNames ? <RedeemedNamesHint names={row.redeemedNames} /> : null}
                 </dd>
               </div>
             ))}
@@ -118,6 +118,6 @@ export async function ActivityMetrics() {
     );
   } catch (err) {
     Sentry.captureException(err);
-    return <p className="text-sm text-muted-foreground">Activity metrics unavailable.</p>;
+    return <p className="text-sm text-muted-foreground">System metrics unavailable.</p>;
   }
 }

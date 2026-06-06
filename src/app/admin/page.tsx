@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { BreadcrumbLink } from "@/components/breadcrumb-link";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 
-import { ActivityMetrics } from "./activity-metrics";
 import { AdminHidden } from "./admin-hidden";
 import { AdminHints } from "./admin-hints";
 import { ButtondownSyncButtons } from "./buttondown-sync-buttons";
@@ -26,11 +25,6 @@ export default async function AdminPage() {
         <h1 className="text-2xl font-bold">Admin</h1>
         <BreadcrumbLink fallback="/" />
       </div>
-
-      <section className="flex w-full max-w-xl flex-col gap-2">
-        <h2 className="text-lg font-semibold">Activity metrics</h2>
-        <ActivityMetrics />
-      </section>
 
       <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">App settings</h2>

@@ -28,7 +28,7 @@ Every API request is logged by Hono middleware in `src/server/api.ts` with:
 - **Distinct people active in a window:** `["vercel"] | where message == "api request" | summarize dcount(['fields.userId'])`
 - **Adoption by path (who touched what):** `["vercel"] | where message == "api request" | summarize dcount(['fields.userId']) by path`
 
-For funnel and per-member-state questions (signed up → set intention → built web → joined a program, plus the invite funnel), the DB is the better source — see the admin **Activity metrics** view (`/admin`, backed by `src/server/activity-metrics.ts`), which reads current state rather than aging-out logs.
+For funnel and per-member-state questions (signed up → set intention → built web → joined a program, plus the invite funnel), the DB is the better source — see the member-facing **System Metrics** page (`/metrics`, backed by `src/server/system-metrics.ts`), which reads current state rather than aging-out logs.
 
 ## Environment Variables
 

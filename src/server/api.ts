@@ -6,7 +6,6 @@ import { log } from "next-axiom";
 
 import { isRelationValue } from "@/lib/relation-value";
 
-import { getActivityMetrics } from "./activity-metrics";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
@@ -64,6 +63,7 @@ import {
   updateRelationValue,
 } from "./relations";
 import { profiles } from "./schema";
+import { getSystemMetrics } from "./system-metrics";
 import { resetE2EUsers } from "./test-reset";
 
 // Admin-only sub-router. requireAdmin runs after the main api's
@@ -76,10 +76,6 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/appsettings", async (c) => {
     const appSettings = await getAppSettings();
     return c.json({ appSettings });
-  })
-  .get("/activity", async (c) => {
-    const metrics = await getActivityMetrics();
-    return c.json({ metrics });
   })
   .get("/hints", async (c) => {
     const hints = await listPendingHints();
@@ -274,6 +270,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .use("*", requireAuth)
   .get("/hello", (c) => {
     return c.json({ message: "Hello from Intentional Society API" });
+  })
+  // Community figures for the /metrics page. Member-readable (mounted
+  // under requireAuth above) — getSystemMetrics omits anything naming a
+  // not-yet-member, so no admin gate is needed.
+  .get("/metrics", async (c) => {
+    const metrics = await getSystemMetrics();
+    return c.json({ metrics });
   })
   .get("/me", async (c) => {
     const user = c.get("user");

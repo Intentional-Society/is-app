@@ -49,7 +49,7 @@ const deleteUserAndProfile = async (id: string) => {
   await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
 };
 
-type ActivityMetrics = {
+type SystemMetrics = {
   members: {
     total: number;
     new7d: number;
@@ -69,20 +69,19 @@ type ActivityMetrics = {
     pending: number;
     expired: number;
     revoked: number;
-    redeemedNotes: { id: string; note: string }[];
-    pendingNotes: { id: string; note: string }[];
+    redeemedNames: { id: string; name: string | null }[];
   };
 };
 
 const INVITE_COUNT_KEYS = ["created", "redeemed", "pending", "expired", "revoked"] as const;
 
-const fetchMetrics = async (): Promise<ActivityMetrics> => {
-  const res = await app.request("/api/admin/activity");
+const fetchMetrics = async (): Promise<SystemMetrics> => {
+  const res = await app.request("/api/metrics");
   expect(res.status).toBe(200);
-  return ((await res.json()) as { metrics: ActivityMetrics }).metrics;
+  return ((await res.json()) as { metrics: SystemMetrics }).metrics;
 };
 
-describe("GET /api/admin/activity", () => {
+describe("GET /api/metrics", () => {
   let admin: string;
   let nonAdmin: string;
 
@@ -99,25 +98,24 @@ describe("GET /api/admin/activity", () => {
     await deleteUserAndProfile(nonAdmin);
   });
 
-  it("returns 404 for an authenticated non-admin", async () => {
+  it("is readable by any authenticated member, not just admins", async () => {
     authAs(nonAdmin);
-    const res = await app.request("/api/admin/activity");
-    expect(res.status).toBe(404);
+    const res = await app.request("/api/metrics");
+    expect(res.status).toBe(200);
   });
 
   it("returns 401 when no session is present", async () => {
     authAs(null);
-    const res = await app.request("/api/admin/activity");
+    const res = await app.request("/api/metrics");
     expect(res.status).toBe(401);
   });
 
-  it("returns a numeric value for every bucket", async () => {
+  it("returns a numeric value for every count bucket", async () => {
     authAs(admin);
     const m = await fetchMetrics();
     for (const v of Object.values(m.members)) expect(typeof v).toBe("number");
     for (const k of INVITE_COUNT_KEYS) expect(typeof m.invites[k]).toBe("number");
-    expect(Array.isArray(m.invites.redeemedNotes)).toBe(true);
-    expect(Array.isArray(m.invites.pendingNotes)).toBe(true);
+    expect(Array.isArray(m.invites.redeemedNames)).toBe(true);
   });
 
   it("counts a seeded member's progress in the right buckets", async () => {
@@ -134,7 +132,12 @@ describe("GET /api/admin/activity", () => {
     await insertUserAndProfile(relatee, { hidden: true });
     await db
       .update(profiles)
-      .set({ lastSignedAgreements: new Date(), currentIntention: "be present", lastUpdatedProfile: new Date() })
+      .set({
+        lastSignedAgreements: new Date(),
+        currentIntention: "be present",
+        lastUpdatedProfile: new Date(),
+        displayName: "Redeemer One",
+      })
       .where(eq(profiles.id, member));
     await db.execute(sql`UPDATE auth.users SET last_sign_in_at = now() WHERE id = ${member}::uuid`);
     await db.insert(programs).values({ id: programId, slug: `prog-${programId}`, name: "Test Program" });
@@ -170,9 +173,8 @@ describe("GET /api/admin/activity", () => {
     expect(m.invites.created).toBeGreaterThanOrEqual(2);
     expect(m.invites.redeemed).toBeGreaterThanOrEqual(1);
     expect(m.invites.pending).toBeGreaterThanOrEqual(1);
-    // The "?" popups list the inviter note for each redeemed/pending invite.
-    expect(m.invites.redeemedNotes.some((n) => n.note === "redeemed invite")).toBe(true);
-    expect(m.invites.pendingNotes.some((n) => n.note === "pending invite")).toBe(true);
+    // Redeemed lists the joining member's display name (visible members only).
+    expect(m.invites.redeemedNames.some((r) => r.name === "Redeemer One")).toBe(true);
 
     await db.delete(invites).where(sql`${invites.id} IN (${inviteRedeemed}::uuid, ${invitePending}::uuid)`);
     await db.delete(relations).where(eq(relations.relatorId, member));
