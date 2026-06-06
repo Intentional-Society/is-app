@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-05 | James | Parallel worktree "lanes" for concurrent dev/test
+
+Each git worktree can run its own isolated Supabase stack + dev/e2e ports, so several branches (or agents) run dev/test/e2e at once without clobbering one DB. To try it: `git worktree add ../is-app-worktrees/is-app-2` (the dir name sets the lane), then inside it `npm install && npm run setup && npm run make_lane_inside_worktree`; from then on `npm run dev` / `npm test` / `npm run test:e2e` use lane 2's stack on +200 ports. Reference: docs/strategy-worktree-lanes.md.
+
 ## 2026-06-05 | James | Relations: remove a mistaken relationship (#352)
 
 A `0 — No Relationship` control above 1–4 in the relating dialog deletes the relations row, shown only when editing a relationship that already exists (graph edge click, member-profile **Edit**).

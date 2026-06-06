@@ -7,7 +7,11 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", quiet: true });
 
 const isCI = !!process.env.CI;
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3093";
+// Lane-aware port: `npm run make_lane_inside_worktree` writes E2E_PORT into a
+// worktree's .env.local so parallel lanes don't collide on one web server.
+// Defaults to 3093 for the base worktree / CI. See docs/strategy-worktree-lanes.md.
+const e2ePort = process.env.E2E_PORT || "3093";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${e2ePort}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -58,8 +62,8 @@ export default defineConfig({
   webServer: isCI
     ? undefined
     : {
-        command: "npm run dev -- --port 3093",
-        url: "http://localhost:3093",
+        command: `npm run dev -- --port ${e2ePort}`,
+        url: `http://localhost:${e2ePort}`,
         reuseExistingServer: true,
       },
 });

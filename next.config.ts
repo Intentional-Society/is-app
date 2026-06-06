@@ -8,12 +8,17 @@ const isProd = process.env.NODE_ENV === "production";
 // does not need it, so we keep it out of the production policy.
 const scriptSrc = isProd ? "script-src 'self' 'unsafe-inline'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
 
-// Local Supabase (started by `npm run dev`) runs at http://127.0.0.1:54321.
-// The browser auth client and AuthProvider token refresh call it directly, so
-// it has to be in connect-src for dev — but never in production.
+// Local Supabase (started by `npm run dev`) runs at http://127.0.0.1:54321 by
+// default. Derive the origin from NEXT_PUBLIC_SUPABASE_URL so worktree "lanes"
+// on offset ports (e.g. :54521) work without editing this file — see
+// docs/strategy-worktree-lanes.md.
+const localSupabaseUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321");
+
+// The browser auth client and AuthProvider token refresh call Supabase
+// directly, so it has to be in connect-src for dev — but never in production.
 const connectSrc = isProd
   ? "connect-src 'self' https://*.supabase.co"
-  : "connect-src 'self' https://*.supabase.co http://127.0.0.1:54321";
+  : `connect-src 'self' https://*.supabase.co ${localSupabaseUrl.origin}`;
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -51,15 +56,16 @@ const securityHeaders = [
 // Avatar objects are served from Supabase Storage (signed URLs) and
 // rendered through next/image, so the optimizer must be allowed to
 // fetch from the Supabase host. Local dev points at the Supabase
-// container on 127.0.0.1:54321 — mirror the isProd CSP branching.
+// container (host/port from NEXT_PUBLIC_SUPABASE_URL) — mirror the isProd
+// CSP branching.
 const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
   { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/**" },
 ];
 if (!isProd) {
   remotePatterns.push({
     protocol: "http",
-    hostname: "127.0.0.1",
-    port: "54321",
+    hostname: localSupabaseUrl.hostname,
+    port: localSupabaseUrl.port,
     pathname: "/storage/v1/object/**",
   });
 }

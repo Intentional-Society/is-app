@@ -9,6 +9,7 @@ Intentional Society web application — an authenticated app for a small, global
 ## Commands
 
 - `npm run setup` — one-time: generate `.env.local` with local Supabase defaults (idempotent)
+- `npm run make_lane_inside_worktree` — one-time: turn the current git worktree into an isolated parallel "lane" (own Supabase stack + ports); see `docs/strategy-worktree-lanes.md`
 - `npm run dev` — start local Supabase (if needed) + dev server (http://localhost:3000)
 - `npm run build` — production build
 - `npm run lint` — Biome
@@ -73,6 +74,7 @@ Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-a
 ## Key docs
 
 - `docs/strategy-branching.md` — branching strategy and rationale
+- `docs/strategy-worktree-lanes.md` — running parallel worktrees as isolated "lanes" (own Supabase stack + ports) for concurrent dev/test
 - `docs/strategy-committing.md` — commit conventions and expand-contract pattern
 - `docs/strategy-db-transactions.md` — writing transactions that survive the Supabase connection pooler
 - `docs/strategy-project-management.md` — GitHub Projects board conventions
