@@ -48,3 +48,7 @@ export type RelationSubgraph = InferResponseType<(typeof apiClient.api.relations
 export type AdminMembersResponse = InferResponseType<(typeof apiClient.api.admin.members)["$get"], 200>;
 
 export type AdminMember = AdminMembersResponse["members"][number];
+
+export type AdminInvitesResponse = InferResponseType<(typeof apiClient.api.admin.invites)["$get"], 200>;
+
+export type AdminInvite = AdminInvitesResponse["invites"][number];

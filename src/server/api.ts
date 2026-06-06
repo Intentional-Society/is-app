@@ -15,7 +15,15 @@ import {
   runProfileResyncForServer,
 } from "./buttondown-runner";
 import { db } from "./db";
-import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
+import {
+  checkInvite,
+  createInvite,
+  deleteInvite,
+  getInvitesForCreator,
+  listAllInvitesForAdmin,
+  revokeInvite,
+  validateNote,
+} from "./invites";
 import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
   deactivateProfile,
@@ -247,7 +255,20 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       }
       return c.json({ ok: true });
     },
-  );
+  )
+  .get("/invites", async (c) => {
+    const invitesList = await listAllInvitesForAdmin();
+    return c.json({ invites: invitesList });
+  })
+  // Hard delete (not revoke), per the /admin/invites page. invite_hints
+  // cascade, so the row and its hints go together.
+  .delete("/invites/:id", async (c) => {
+    const id = c.req.param("id");
+    if (!isUuid(id)) return c.json({ error: "id must be a UUID" }, 400);
+    const result = await deleteInvite(id);
+    if ("error" in result) return c.json({ error: "not_found" }, 404);
+    return c.json({ ok: true });
+  });
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")

@@ -1,12 +1,13 @@
 import { randomInt } from "node:crypto";
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { MIN_NOTE_LENGTH } from "@/lib/invite-limits";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import { db } from "./db";
 import { validateInviteHints } from "./relations";
-import { invites } from "./schema";
+import { invites, profiles } from "./schema";
 
 // Alphabet: 24 uppercase letters (no I, O — visually confusable with
 // 1/0) plus 8 digits (no 0, 1 — same reason). 32 chars.
@@ -257,4 +258,60 @@ export const checkInvite = async (code: string): Promise<CheckInviteResult> => {
     return { valid: false, reason: "expired" };
   }
   return { valid: true, note: row.note };
+};
+
+export type AdminInviteRow = {
+  id: string;
+  code: string;
+  note: string;
+  status: InviteStatus;
+  createdAt: string;
+  expiresAt: string;
+  creatorName: string | null;
+  redeemerName: string | null;
+};
+
+// Admin view: every invite in the system, newest first, with the creator
+// and redeemer display names resolved. Left joins because created_by /
+// redeemed_by can be null once a referenced profile is deleted (the FKs
+// are ON DELETE SET NULL).
+export const listAllInvitesForAdmin = async (): Promise<AdminInviteRow[]> => {
+  const creator = alias(profiles, "creator");
+  const redeemer = alias(profiles, "redeemer");
+  const rows = await db
+    .select({
+      id: invites.id,
+      code: invites.code,
+      note: invites.note,
+      createdAt: invites.createdAt,
+      expiresAt: invites.expiresAt,
+      redeemedAt: invites.redeemedAt,
+      revokedAt: invites.revokedAt,
+      creatorName: creator.displayName,
+      redeemerName: redeemer.displayName,
+    })
+    .from(invites)
+    .leftJoin(creator, eq(creator.id, invites.createdBy))
+    .leftJoin(redeemer, eq(redeemer.id, invites.redeemedBy))
+    .orderBy(desc(invites.createdAt));
+
+  return rows.map((r) => ({
+    id: r.id,
+    code: r.code,
+    note: r.note,
+    status: deriveStatus(r),
+    createdAt: r.createdAt.toISOString(),
+    expiresAt: r.expiresAt.toISOString(),
+    creatorName: r.creatorName,
+    redeemerName: r.redeemerName,
+  }));
+};
+
+// Hard delete (not revoke) — used by the /admin/invites page. invite_hints
+// rows cascade on their FK, so the invite and its hints are removed
+// together. Returns not_found when the id matches nothing.
+export const deleteInvite = async (id: string): Promise<{ ok: true } | { error: "not_found" }> => {
+  const deleted = await db.delete(invites).where(eq(invites.id, id)).returning({ id: invites.id });
+  if (deleted.length === 0) return { error: "not_found" };
+  return { ok: true };
 };

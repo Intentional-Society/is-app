@@ -48,6 +48,16 @@ export default async function AdminPage() {
       </section>
 
       <section className="flex w-full max-w-xl flex-col gap-2">
+        <h2 className="text-lg font-semibold">Invites</h2>
+        <Link
+          href="/admin/invites"
+          className="text-sm text-muted-foreground underline hover:text-foreground hover:no-underline"
+        >
+          Manage invites →
+        </Link>
+      </section>
+
+      <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">Web</h2>
         <AdminHints />
       </section>
