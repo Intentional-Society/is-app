@@ -63,8 +63,18 @@ type ActivityMetrics = {
     signedIn7d: number;
     signedIn30d: number;
   };
-  invites: { created: number; redeemed: number; pending: number; expired: number; revoked: number };
+  invites: {
+    created: number;
+    redeemed: number;
+    pending: number;
+    expired: number;
+    revoked: number;
+    redeemedNotes: { id: string; note: string }[];
+    pendingNotes: { id: string; note: string }[];
+  };
 };
+
+const INVITE_COUNT_KEYS = ["created", "redeemed", "pending", "expired", "revoked"] as const;
 
 const fetchMetrics = async (): Promise<ActivityMetrics> => {
   const res = await app.request("/api/admin/activity");
@@ -105,7 +115,9 @@ describe("GET /api/admin/activity", () => {
     authAs(admin);
     const m = await fetchMetrics();
     for (const v of Object.values(m.members)) expect(typeof v).toBe("number");
-    for (const v of Object.values(m.invites)) expect(typeof v).toBe("number");
+    for (const k of INVITE_COUNT_KEYS) expect(typeof m.invites[k]).toBe("number");
+    expect(Array.isArray(m.invites.redeemedNotes)).toBe(true);
+    expect(Array.isArray(m.invites.pendingNotes)).toBe(true);
   });
 
   it("counts a seeded member's progress in the right buckets", async () => {
@@ -158,6 +170,9 @@ describe("GET /api/admin/activity", () => {
     expect(m.invites.created).toBeGreaterThanOrEqual(2);
     expect(m.invites.redeemed).toBeGreaterThanOrEqual(1);
     expect(m.invites.pending).toBeGreaterThanOrEqual(1);
+    // The "?" popups list the inviter note for each redeemed/pending invite.
+    expect(m.invites.redeemedNotes.some((n) => n.note === "redeemed invite")).toBe(true);
+    expect(m.invites.pendingNotes.some((n) => n.note === "pending invite")).toBe(true);
 
     await db.delete(invites).where(sql`${invites.id} IN (${inviteRedeemed}::uuid, ${invitePending}::uuid)`);
     await db.delete(relations).where(eq(relations.relatorId, member));

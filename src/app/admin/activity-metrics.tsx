@@ -2,6 +2,10 @@ import * as Sentry from "@sentry/nextjs";
 
 import { serverApiClient } from "@/lib/api-server";
 
+import { InviteNotesHint } from "./invite-notes-hint";
+
+type InviteNote = { id: string; note: string };
+
 const pct = (n: number, total: number): string => (total > 0 ? `${Math.round((n / total) * 100)}%` : "—");
 
 const METRICS_TIMEOUT_MS = 5000;
@@ -34,19 +38,10 @@ export async function ActivityMetrics() {
     const { metrics } = await res.json();
     const { members, invites } = metrics;
 
-    const funnel = [
-      { label: "Signed up", value: members.total },
-      { label: "Signed agreements", value: members.signedAgreements },
-      { label: "Set an intention", value: members.setIntention },
-      { label: "Filled out profile", value: members.updatedProfile },
-      { label: "Built their web", value: members.builtWeb },
-      { label: "Joined a program", value: members.joinedProgram },
-    ];
-
-    const inviteRows = [
+    const inviteRows: { label: string; value: number; notes?: InviteNote[] }[] = [
       { label: "Created", value: invites.created },
-      { label: "Redeemed", value: invites.redeemed },
-      { label: "Pending", value: invites.pending },
+      { label: "Redeemed", value: invites.redeemed, notes: invites.redeemedNotes },
+      { label: "Pending", value: invites.pending, notes: invites.pendingNotes },
       { label: "Expired", value: invites.expired },
       { label: "Revoked", value: invites.revoked },
     ];
@@ -54,28 +49,55 @@ export async function ActivityMetrics() {
     return (
       <div className="flex flex-col gap-4">
         <div className="rounded border border-border">
-          <div className="border-b border-border px-3 py-2 text-sm font-medium">
-            Members{" "}
-            <span className="font-normal text-muted-foreground">
-              · {members.new7d} new this week · {members.new30d} this month
-            </span>
-          </div>
+          <div className="border-b border-border px-3 py-2 text-sm font-medium">Members</div>
           <dl className="divide-y divide-border">
-            {funnel.map((row) => (
-              <div key={row.label} className="flex items-baseline justify-between px-3 py-1.5 text-sm">
-                <dt className="text-muted-foreground">{row.label}</dt>
-                <dd className="tabular-nums">
-                  {row.value}
-                  <span className="ml-2 text-xs text-muted-foreground">{pct(row.value, members.total)}</span>
-                </dd>
-              </div>
-            ))}
+            <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
+              <dt className="text-muted-foreground">
+                Total Members <span className="text-xs">(Deactivated: {members.deactivated})</span>
+              </dt>
+              <dd className="tabular-nums">{members.total}</dd>
+            </div>
+            <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
+              <dt className="text-muted-foreground">Onboarding: Agreements / Profile / MyWeb</dt>
+              <dd className="tabular-nums">
+                {members.signedAgreements} / {members.updatedProfile} / {members.builtWeb}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
+              <dt className="text-muted-foreground">Have a Current Intention</dt>
+              <dd className="tabular-nums">
+                {members.setIntention}
+                <span className="ml-2 text-xs text-muted-foreground">{pct(members.setIntention, members.total)}</span>
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
+              <dt className="text-muted-foreground">In a program (other than Weekly Web Updates)</dt>
+              <dd className="tabular-nums">
+                {members.joinedProgram}
+                <span className="ml-2 text-xs text-muted-foreground">{pct(members.joinedProgram, members.total)}</span>
+              </dd>
+            </div>
           </dl>
-          <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-            Signed in: <span className="tabular-nums text-foreground">{members.signedIn7d}</span> past week ·{" "}
-            <span className="tabular-nums text-foreground">{members.signedIn30d}</span> past month (last full sign-in) ·
-            Deactivated: <span className="tabular-nums text-foreground">{members.deactivated}</span>
-          </div>
+        </div>
+
+        <div className="rounded border border-border">
+          <div className="border-b border-border px-3 py-2 text-sm font-medium">Activity</div>
+          <dl className="divide-y divide-border">
+            <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
+              <dt className="text-muted-foreground">Signed up</dt>
+              <dd className="text-xs text-muted-foreground">
+                <span className="tabular-nums text-foreground">{members.new7d}</span> past week ·{" "}
+                <span className="tabular-nums text-foreground">{members.new30d}</span> past month
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between px-3 py-1.5 text-sm">
+              <dt className="text-muted-foreground">Signed in</dt>
+              <dd className="text-xs text-muted-foreground">
+                <span className="tabular-nums text-foreground">{members.signedIn7d}</span> past week ·{" "}
+                <span className="tabular-nums text-foreground">{members.signedIn30d}</span> past month
+              </dd>
+            </div>
+          </dl>
         </div>
 
         <div className="rounded border border-border">
@@ -84,7 +106,10 @@ export async function ActivityMetrics() {
             {inviteRows.map((row) => (
               <div key={row.label} className="flex items-baseline justify-between px-3 py-1.5 text-sm">
                 <dt className="text-muted-foreground">{row.label}</dt>
-                <dd className="tabular-nums">{row.value}</dd>
+                <dd className="tabular-nums">
+                  {row.value}
+                  {row.notes ? <InviteNotesHint label={row.label} notes={row.notes} /> : null}
+                </dd>
               </div>
             ))}
           </dl>
