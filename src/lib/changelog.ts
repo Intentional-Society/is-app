@@ -32,6 +32,11 @@ export type ChangelogEntry = {
 export const changelog: ChangelogEntry[] = [
   {
     date: "2026-06-05",
+    title: "See how the network is growing",
+    description: "The About page now has a System Metrics section with member and activity stats.",
+  },
+  {
+    date: "2026-06-05",
     title: "Remove a relationship",
     description: "You can now remove relationships by setting a depth of 0.",
   },

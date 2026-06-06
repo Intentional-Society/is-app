@@ -6,7 +6,6 @@ import { log } from "next-axiom";
 
 import { isRelationValue } from "@/lib/relation-value";
 
-import { getActivityMetrics } from "./activity-metrics";
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
@@ -16,7 +15,15 @@ import {
   runProfileResyncForServer,
 } from "./buttondown-runner";
 import { db } from "./db";
-import { checkInvite, createInvite, getInvitesForCreator, revokeInvite, validateNote } from "./invites";
+import {
+  checkInvite,
+  createInvite,
+  deleteInvite,
+  getInvitesForCreator,
+  listAllInvitesForAdmin,
+  revokeInvite,
+  validateNote,
+} from "./invites";
 import { listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
   deactivateProfile,
@@ -64,6 +71,7 @@ import {
   updateRelationValue,
 } from "./relations";
 import { profiles } from "./schema";
+import { getSystemMetrics } from "./system-metrics";
 import { resetE2EUsers } from "./test-reset";
 
 // Admin-only sub-router. requireAdmin runs after the main api's
@@ -76,10 +84,6 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/appsettings", async (c) => {
     const appSettings = await getAppSettings();
     return c.json({ appSettings });
-  })
-  .get("/activity", async (c) => {
-    const metrics = await getActivityMetrics();
-    return c.json({ metrics });
   })
   .get("/hints", async (c) => {
     const hints = await listPendingHints();
@@ -251,7 +255,20 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       }
       return c.json({ ok: true });
     },
-  );
+  )
+  .get("/invites", async (c) => {
+    const invitesList = await listAllInvitesForAdmin();
+    return c.json({ invites: invitesList });
+  })
+  // Hard delete (not revoke), per the /admin/invites page. invite_hints
+  // cascade, so the row and its hints go together.
+  .delete("/invites/:id", async (c) => {
+    const id = c.req.param("id");
+    if (!isUuid(id)) return c.json({ error: "id must be a UUID" }, 400);
+    const result = await deleteInvite(id);
+    if ("error" in result) return c.json({ error: "not_found" }, 404);
+    return c.json({ ok: true });
+  });
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -274,6 +291,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .use("*", requireAuth)
   .get("/hello", (c) => {
     return c.json({ message: "Hello from Intentional Society API" });
+  })
+  // Community figures for the /metrics page. Member-readable (mounted
+  // under requireAuth above) — getSystemMetrics omits anything naming a
+  // not-yet-member, so no admin gate is needed.
+  .get("/metrics", async (c) => {
+    const metrics = await getSystemMetrics();
+    return c.json({ metrics });
   })
   .get("/me", async (c) => {
     const user = c.get("user");
