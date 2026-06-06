@@ -178,6 +178,14 @@ const edgeTypes = { numbered: NumberedEdge };
 
 const VIEW_STORAGE_KEY = "isweb-graph-view";
 
+// View<->edit canvas animation. View is a square whose height tracks the
+// measured width; edit collapses to EDIT_HEIGHT. Width never changes between
+// modes, so only the height animates — top-anchored, so the bottom edge
+// travels while ReactFlow re-fits each frame to scale the graph with the box.
+const EDIT_HEIGHT = 500;
+const MODE_ANIM_MS = 1000;
+const MODE_ANIM_EASE = "cubic-bezier(0.45, 0, 0.55, 1)"; // accelerate + decelerate
+
 // Permissive parser — any malformed/legacy payload falls back to the
 // default. Strict validation matters because the parsed shape feeds the
 // useQuery key and would otherwise produce a failing API request on
@@ -196,9 +204,13 @@ function parseStoredView(raw: string | null): SubgraphViewOptions | null {
 }
 
 export function WebGraph({
+  square,
   onOpenRelating,
   onReplayTour,
 }: {
+  // View mode renders a tall, centered square canvas; edit mode keeps the
+  // shorter landscape strip so the suggestion feed below stays in view.
+  square: boolean;
   onOpenRelating: (target: RelatingTarget) => void;
   onReplayTour: () => void;
 }) {
@@ -544,6 +556,68 @@ export function WebGraph({
     draggedNodeIdRef.current = null;
   }, []);
 
+  // Canvas height animation. Width is CSS-driven (w-full, capped to the
+  // viewport height); we measure the resulting width and use it as the
+  // square's height in view mode, collapsing to EDIT_HEIGHT in edit mode.
+  const [graphWidth, setGraphWidth] = useState(0);
+  const lastWidthRef = useRef(0);
+  // Transition is armed for mode toggles but disarmed for the initial measure
+  // and for resizes, so the box tracks the window instantly rather than easing.
+  const [animateHeight, setAnimateHeight] = useState(false);
+  const resizeObsRef = useRef<ResizeObserver | null>(null);
+  // Callback ref: attach the observer once the graph element mounts (it only
+  // renders after the loading/empty early-returns below).
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
+    resizeObsRef.current?.disconnect();
+    if (!el) {
+      resizeObsRef.current = null;
+      return;
+    }
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0].contentRect.width;
+      // Ignore height-only changes (our own animation); only width changes
+      // (resize) re-derive the square's height, and should do so instantly.
+      if (Math.abs(w - lastWidthRef.current) < 0.5) return;
+      lastWidthRef.current = w;
+      setAnimateHeight(false);
+      setGraphWidth(w);
+    });
+    ro.observe(el);
+    resizeObsRef.current = ro;
+  }, []);
+
+  // Re-arm the transition one frame after the initial measure or a resize, so
+  // the next mode toggle eases but the size change that just committed didn't.
+  useEffect(() => {
+    if (graphWidth > 0 && !animateHeight) {
+      const id = requestAnimationFrame(() => setAnimateHeight(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [graphWidth, animateHeight]);
+
+  // On a mode toggle, re-fit every frame for the duration of the height
+  // transition so the graph zooms to match the shrinking/growing box. The
+  // height eases via CSS, so fitting to the current box each frame inherits
+  // that easing. Skips the first run (initial mount fits via the sim).
+  const firstModeRef = useRef(true);
+  // `square` is the trigger, not a read value — the effect must re-run each
+  // time the mode flips so the fit follows the height transition.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: square triggers the per-toggle re-fit
+  useEffect(() => {
+    if (firstModeRef.current) {
+      firstModeRef.current = false;
+      return;
+    }
+    const start = performance.now();
+    let raf = requestAnimationFrame(function tick(now: number) {
+      flowRef.current?.fitView({ padding: 0.15, duration: 0 });
+      raf = now - start < MODE_ANIM_MS + 60 ? requestAnimationFrame(tick) : 0;
+    });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [square]);
+
   const empty = !data || data.nodes.length === 0;
 
   if (isPending) {
@@ -564,10 +638,23 @@ export function WebGraph({
     );
   }
 
+  // Width is identical in both modes — w-full capped to the viewport height,
+  // free of the page's max-w-5xl wrapper so on tall displays the square grows
+  // past 1024px. Only the height differs: the measured width (a square) in
+  // view mode, EDIT_HEIGHT in edit mode. Animating just the height keeps the
+  // box from ever widening on the toggle; the top stays put, so the bottom
+  // edge is what travels.
+  const heightPx = graphWidth > 0 ? (square ? graphWidth : Math.min(graphWidth, EDIT_HEIGHT)) : undefined;
+
   return (
     <div
+      ref={measureRef}
       data-tour="graph"
-      className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
+      style={{
+        height: heightPx ? `${heightPx}px` : undefined,
+        transition: animateHeight ? `height ${MODE_ANIM_MS}ms ${MODE_ANIM_EASE}` : undefined,
+      }}
+      className="mx-auto w-full max-w-[calc(100vh_-_12rem)] overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
     >
       <EdgeRelatingContext.Provider value={onOpenRelating}>
         <ReactFlow

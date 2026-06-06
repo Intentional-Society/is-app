@@ -85,13 +85,15 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   };
 
   return (
-    <div className="flex w-full max-w-5xl flex-col items-center gap-6">
-      <WebGraph onOpenRelating={setRelatingTarget} onReplayTour={replayTour} />
+    <div className="flex w-full flex-col items-center gap-6">
+      <WebGraph square={mode === "view"} onOpenRelating={setRelatingTarget} onReplayTour={replayTour} />
 
       {/* Toggle floats in the right gutter so it doesn't claim its own
        * row. Edit and Done sit at the same coordinates across modes —
-       * same affordance, different label. */}
-      <div className="relative w-full">
+       * same affordance, different label. Capped at max-w-5xl so the
+       * builder and toggle stay readable even though the view-mode graph
+       * above now spans wider. */}
+      <div className="relative w-full max-w-5xl">
         <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
           {mode === "edit" ? (
             <Button variant="secondary" data-tour="done-button" disabled={markDone.isPending} onClick={handleDoneClick}>
