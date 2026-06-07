@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-06 | James | E2E warms routes in setup; nav budget back to 12s
+
+The e2e setup project now warms the page-serving path (public routes + one sign-in) before timed tests, so the first spec no longer cold-starts inside `signInAs`'s budget; `TIMEOUT_MS` dropped 20s → 12s — warm a slow new route in `reset.setup.ts` rather than re-inflating the budget.
+
 ## 2026-06-06 | James | PUT /me syncs displayName to auth metadata (#229)
 
 `PUT /me` now mirrors a displayName edit back into `auth.users.user_metadata` (best-effort) so auth-email greetings stop showing the signup-time name; no backfill, existing members self-heal on their next edit.

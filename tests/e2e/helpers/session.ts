@@ -7,10 +7,13 @@ import { expect, type Page } from "@playwright/test";
 // Playwright setup project (see tests/e2e/reset.setup.ts).
 export type TestRole = "regular" | "admin";
 
-// Shared wait budget for page.waitForURL across the suite. Bumped from
-// 10s after Vercel preview cold-starts made 10s flaky; revisit once we
-// chase down the underlying first-request slowness.
-export const TIMEOUT_MS = 20_000;
+// Shared wait budget for page.waitForURL across the suite. The setup
+// project now warms the page-serving path (reset.setup.ts), so the first
+// test no longer pays cold-start compile / function spin-up inside this
+// budget — the original reason it was bumped 10s → 20s. With the server
+// warm, every navigation is a warm-route hit, so 12s is a comfortable
+// margin that also fails fast on a genuinely stuck navigation.
+export const TIMEOUT_MS = 12_000;
 
 const EMAILS: Record<TestRole, string> = {
   regular: "e2e-regular@testfake.local",
