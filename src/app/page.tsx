@@ -58,7 +58,7 @@ function NavCard({ href, title, description }: NavCardProps) {
       href={href}
       className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:bg-accent hover:shadow-sm"
     >
-      <h2 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">{title}</h2>
+      <h3 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">{title}</h3>
       <p className="text-sm text-muted-foreground">{description}</p>
     </Link>
   );
@@ -85,8 +85,10 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
       </div>
 
       <div className="flex w-full max-w-lg flex-col gap-6">
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Community</h2>
+        <section aria-label="Community" className="flex flex-col gap-3">
+          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+            Community
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <NavCard href="/programs" title="Programs" description="Explore and join IS Web programs." />
             <NavCard href="/members" title="Member directory" description="Browse and find other members." />
@@ -98,16 +100,20 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
           </div>
         </section>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Personal</h2>
+        <section aria-label="Personal" className="flex flex-col gap-3">
+          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+            Personal
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <NavCard href="/myweb" title="My web" description="Build your relational map by adding connections!" />
             <NavCard href="/profile" title="My profile" description="View and edit your profile information." />
           </div>
         </section>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Admin</h2>
+        <section aria-label="Contribute" className="flex flex-col gap-3">
+          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+            Contribute
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <NavCard
               href="/invites"
@@ -120,9 +126,9 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
               rel="noopener noreferrer"
               className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:bg-accent hover:shadow-sm"
             >
-              <h2 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">
+              <h3 className="text-lg font-semibold text-card-foreground group-hover:text-accent-foreground">
                 Give Feedback
-              </h2>
+              </h3>
               <p className="text-sm text-muted-foreground">
                 Share your thoughts, suggestions, or report issues with the app.
               </p>
