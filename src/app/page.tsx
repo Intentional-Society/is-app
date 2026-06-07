@@ -86,7 +86,10 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
 
       <div className="flex w-full max-w-lg flex-col gap-6">
         <section aria-label="Community" className="flex flex-col gap-3">
-          <p className="font-sans text-sm font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+          <p
+            className="font-sans text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+            aria-hidden="true"
+          >
             Community
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -101,7 +104,10 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
         </section>
 
         <section aria-label="Personal" className="flex flex-col gap-3">
-          <p className="font-sans text-sm font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+          <p
+            className="font-sans text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+            aria-hidden="true"
+          >
             Personal
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -111,7 +117,10 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
         </section>
 
         <section aria-label="System" className="flex flex-col gap-3">
-          <p className="font-sans text-sm font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+          <p
+            className="font-sans text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+            aria-hidden="true"
+          >
             System
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
