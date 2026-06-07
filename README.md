@@ -12,7 +12,7 @@ A Next.js frontend talks to a Hono API backend, both running in the same codebas
 
 ### 1. Install prerequisites
 
-Git, Node.js 24+, and Docker Desktop. See [docs/setup-dev-machine.md](docs/setup-dev-machine.md) for install instructions.
+Git, Node.js 24, and Docker Desktop. See [docs/setup-dev-machine.md](docs/setup-dev-machine.md) for install instructions.
 
 ### 2. Clone and install
 
