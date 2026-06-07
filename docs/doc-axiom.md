@@ -14,6 +14,17 @@ Axiom receives logs through two channels:
   - `log.info()` / `log.warn()` / `log.error()` / `log.debug()` for structured logging from client and server
   - Automatic Web Vitals reporting
 
+## Logging conventions
+
+Two rules keep logs queryable in Axiom:
+
+- **App code that should reach Axiom uses `log.<level>()`** from `next-axiom` (`log.info` / `warn` / `error` / `debug`). The **message is a stable feature label**, and structured data goes in the fields object — `log.info("api request", { method, path, status })`. next-axiom nests the object under `fields`, so a consistent label lets every query filter by `message` and split on `['fields.*']` (see the canonical example at `src/server/api.ts`, and the Buttondown queries below). Reusing a label across call sites is deliberate: the `"probe-149"` events in `/me`, the home page, and `/_test/reset` all carry `fields.route` so one query compares them.
+- **`console.log` is only for explicit dev/test helpers** whose output you read inline as raw text, never telemetry you'd query — e.g. `src/lib/timing.ts`, a header-gated latency print, and the `tests/`/`scripts/` tooling. A raw `console.log` still reaches Axiom via the Vercel log drain, but lands as an unstructured `message` string you can't filter on.
+
+This is enforced by Biome's `suspicious/noConsole` rule, with per-path `off` overrides in `biome.json` for the legitimate helpers above. To add app telemetry, reach for `log.<level>` — if Biome flags a `console` call, that's the signal.
+
+One caveat: `next-axiom`'s `log` buffers and flushes on a throttle, and Route Handlers drain it as a side effect of the request. A **Server Component has no such wrapper**, so `await log.flush()` after logging there (as `src/app/page.tsx` does) to guarantee the event is sent before the function freezes.
+
 ## Request Logging
 
 Every API request is logged by Hono middleware in `src/server/api.ts` with:

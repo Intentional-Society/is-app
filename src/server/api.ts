@@ -326,16 +326,22 @@ const api = new Hono<{ Variables: ApiVariables }>()
     }
 
     if (debug) {
-      console.log(
-        `[probe-149] route=me stage=${stage} user=${user.id} ` +
-          `bio=${JSON.stringify(profile?.bio ?? null)} ` +
-          `agreements=${profile?.lastSignedAgreements ? "set" : "null"} ` +
-          `profile=${profile?.lastUpdatedProfile ? "set" : "null"} ` +
-          `programs=${profile?.lastReviewedPrograms ? "set" : "null"} ` +
-          `ctid=${probe?.ctid ?? ""} xmin=${probe?.xmin ?? ""} ` +
-          `inRecovery=${probe?.inRecovery ?? ""} ` +
-          `serverAddr=${probe?.serverAddr ?? ""} backendPid=${probe?.backendPid ?? ""}`,
-      );
+      // message "probe-149" is the feature label; split on fields.route
+      // to compare the /me read against the /home and /reset probes.
+      log.debug("probe-149", {
+        route: "me",
+        stage,
+        userId: user.id,
+        bio: profile?.bio ?? null,
+        agreements: Boolean(profile?.lastSignedAgreements),
+        profile: Boolean(profile?.lastUpdatedProfile),
+        programs: Boolean(profile?.lastReviewedPrograms),
+        ctid: probe?.ctid ?? null,
+        xmin: probe?.xmin ?? null,
+        inRecovery: probe?.inRecovery ?? null,
+        serverAddr: probe?.serverAddr ?? null,
+        backendPid: probe?.backendPid ?? null,
+      });
     }
 
     return c.json({ id: user.id, email: user.email, profile });

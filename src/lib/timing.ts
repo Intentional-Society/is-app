@@ -16,6 +16,9 @@ export const timed = async <T>(request: { headers: Headers }, label: string, fn:
   try {
     return await fn();
   } finally {
+    // Intentional console.log, not log.<level>: this is an ad-hoc latency
+    // print read inline in the function log, not Axiom telemetry to query.
+    // The biome noConsole allowlist covers this file — see docs/doc-axiom.md.
     console.log(`[timing] ${label}=${(performance.now() - start).toFixed(1)}ms`);
   }
 };
