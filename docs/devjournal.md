@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-06 | James | PUT /me syncs displayName to auth metadata (#229)
+
+`PUT /me` now mirrors a displayName edit back into `auth.users.user_metadata` (best-effort) so auth-email greetings stop showing the signup-time name; no backfill, existing members self-heal on their next edit.
+
 ## 2026-06-05 | James | Parallel worktree "lanes" for concurrent dev/test
 
 Each git worktree can run its own isolated Supabase stack + dev/e2e ports, so several branches (or agents) run dev/test/e2e at once without clobbering one DB. To try it: `git worktree add ../is-app-worktrees/is-app-2` (the dir name sets the lane), then inside it `npm install && npm run setup && npm run make_lane_inside_worktree`; from then on `npm run dev` / `npm test` / `npm run test:e2e` use lane 2's stack on +200 ports. Reference: docs/strategy-worktree-lanes.md.

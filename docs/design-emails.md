@@ -195,7 +195,9 @@ Supabase substitutes Go-template variables before sending. The ones in use:
   in prod). Useful for footer links.
 - `{{ .Data.displayName }}` — `auth.users.user_metadata.displayName`.
   Populated by `/signup` (`signInWithOtp` `options.data`) and by the
-  CSV importer; absent on admin-created users. Always wrap with
+  CSV importer; absent on admin-created users. Kept fresh after signup by
+  `PUT /me` (`syncDisplayNameToAuthMetadata`), which mirrors a profile
+  displayName edit back into `user_metadata`. Always wrap with
   `{{ if .Data.displayName }}…{{ end }}` so the missing case renders
   cleanly. Verified against Supabase docs: `{{ .Data }}` is
   user_metadata, not per-request options.data.

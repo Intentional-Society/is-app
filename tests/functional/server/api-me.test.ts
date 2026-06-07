@@ -7,13 +7,33 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(),
 }));
 
+// Stub the privileged client so PUT /me's auth.users metadata sync is
+// observable without a real GoTrue round-trip (the test users are raw
+// SQL inserts, not GoTrue-created accounts).
+vi.mock("@/lib/supabase/admin", () => ({
+  supabaseAdmin: {
+    auth: { admin: { updateUserById: vi.fn().mockResolvedValue({ data: {}, error: null }) } },
+  },
+}));
+
+// The metadata sync swallows GoTrue failures to Sentry; mock it so the
+// best-effort path is observable and silent.
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+}));
+
+import * as Sentry from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import app from "@/server/api";
 import { db } from "@/server/db";
 import { profiles } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
+const mockUpdateUserById = vi.mocked(supabaseAdmin.auth.admin.updateUserById);
+const mockCaptureException = vi.mocked(Sentry.captureException);
 
 // Unique per run: upsertProfile derives the profile slug via toSlug,
 // which hits a global unique constraint, and parallel test files share
@@ -35,6 +55,8 @@ describe("GET /api/me", () => {
 
   beforeEach(async () => {
     testUserId = randomUUID();
+    mockUpdateUserById.mockClear();
+    mockCaptureException.mockClear();
     await db.execute(
       sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${testUserId}::uuid, 'me-test@testfake.local', false, false)`,
     );
@@ -182,10 +204,72 @@ describe("GET /api/me", () => {
       // The failed update must leave the caller's own slug untouched.
       const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
       expect(row?.slug).not.toBe("member-name");
+
+      // A clash short-circuits before the metadata sync, so profiles and
+      // user_metadata never disagree about the name.
+      expect(mockUpdateUserById).not.toHaveBeenCalled();
     } finally {
       await db.delete(profiles).where(eq(profiles.id, otherId));
       await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);
     }
+  });
+
+  it("PUT /me mirrors a displayName edit into auth.users.user_metadata", async () => {
+    // A user whose metadata carries GoTrue-managed fields alongside the
+    // name, so we can prove the sync preserves them.
+    mockCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              ...makeUser(testUserId, "me-test@testfake.local"),
+              user_metadata: { displayName: "Old Name", email_verified: true, sub: testUserId },
+            },
+          },
+          error: null,
+        }),
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: test mock shape
+    } as any);
+
+    const res = await putMe({ displayName: "Fresh Name" });
+    expect(res.status).toBe(200);
+
+    expect(mockUpdateUserById).toHaveBeenCalledTimes(1);
+    expect(mockUpdateUserById).toHaveBeenCalledWith(testUserId, {
+      // GoTrue-managed fields survive; only displayName changes.
+      user_metadata: { displayName: "Fresh Name", email_verified: true, sub: testUserId },
+    });
+  });
+
+  it("PUT /me clears the metadata displayName when set to null", async () => {
+    const res = await putMe({ displayName: null });
+    expect(res.status).toBe(200);
+    expect(mockUpdateUserById).toHaveBeenCalledWith(testUserId, {
+      user_metadata: { displayName: null },
+    });
+  });
+
+  it("PUT /me does not touch auth metadata when displayName is absent", async () => {
+    const res = await putMe({ bio: "Edited my bio, not my name." });
+    expect(res.status).toBe(200);
+    expect(mockUpdateUserById).not.toHaveBeenCalled();
+  });
+
+  it("PUT /me still succeeds (and captures) when the metadata sync fails", async () => {
+    // GoTrue returns an error: the profile write already committed, so the
+    // request must still succeed — the greeting just stays stale until the
+    // next edit, and the failure is captured rather than thrown.
+    mockUpdateUserById.mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: "gotrue down" },
+      // biome-ignore lint/suspicious/noExplicitAny: partial admin error shape
+    } as any);
+
+    const res = await putMe({ displayName: "Resilient Name" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).profile.displayName).toBe("Resilient Name");
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 });
 
