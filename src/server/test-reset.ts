@@ -1,4 +1,5 @@
 import { inArray, sql } from "drizzle-orm";
+import { log } from "next-axiom";
 
 import { db } from "./db";
 import { invites, profiles } from "./schema";
@@ -113,19 +114,27 @@ export const resetE2EUsers = async (): Promise<{
 
   // #149 baseline: log the probe data on every successful reset (not
   // only on the anomaly throw in tests/e2e/helpers/session.ts), so
-  // Vercel function logs accumulate a per-run record of which Supavisor
-  // backend the reset's read-back landed on. Across enough runs we can
-  // tell whether reads scatter across backends or stick, and spot any
-  // run where inRecovery or serverAddr drifts from the steady state.
-  console.log(
-    `[probe-149] route=reset users=${users.length} updatedIds=${JSON.stringify(updatedIds)} ` +
-      profilesAfter
-        .map(
-          (p) =>
-            `${p.email}=${JSON.stringify(p.rows.map((r) => ({ ctid: r.ctid, xmin: r.xmin, bio: r.bio, inRecovery: r.inRecovery, serverAddr: r.serverAddr, backendPid: r.backendPid })))}`,
-        )
-        .join(" "),
-  );
+  // Axiom accumulates a per-run record of which Supavisor backend the
+  // reset's read-back landed on. Across enough runs we can tell whether
+  // reads scatter across backends or stick, and spot any run where
+  // inRecovery or serverAddr drifts from the steady state. message
+  // "probe-149" matches the /me and /home probes; split on fields.route.
+  log.debug("probe-149", {
+    route: "reset",
+    users: users.length,
+    updatedIds,
+    profiles: profilesAfter.map((p) => ({
+      email: p.email,
+      rows: p.rows.map((r) => ({
+        ctid: r.ctid,
+        xmin: r.xmin,
+        bio: r.bio,
+        inRecovery: r.inRecovery,
+        serverAddr: r.serverAddr,
+        backendPid: r.backendPid,
+      })),
+    })),
+  });
 
   return { reset: users.length, updatedIds, profiles: profilesAfter };
 };

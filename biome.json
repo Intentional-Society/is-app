@@ -45,6 +45,9 @@
       "recommended": true,
       "style": {
         "noNonNullAssertion": "error"
+      },
+      "suspicious": {
+        "noConsole": "error"
       }
     }
   },
@@ -106,6 +109,19 @@
         "rules": {
           "style": {
             "noNonNullAssertion": "off"
+          },
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/lib/timing.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
           }
         }
       }
