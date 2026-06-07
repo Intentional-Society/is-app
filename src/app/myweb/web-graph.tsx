@@ -325,15 +325,19 @@ export function WebGraph({
     if (!data) return;
     const centerId = data.centerId;
 
+    // Preserve positions across data changes (a new relation, a hops toggle)
+    // so the web doesn't reshuffle. Existing nodes keep their last position;
+    // new non-center nodes emerge from the center — where a just-related card
+    // flies to — and the sim eases them out. Only a true first layout (no
+    // prior nodes) scatters randomly.
+    const prevById = simNodesByIdRef.current;
+    const isFirstLayout = prevById.size === 0;
     const simNodes: SimNode[] = data.nodes.map((n) => {
-      const isCenter = n.id === centerId;
-      return {
-        id: n.id,
-        x: isCenter ? 0 : (Math.random() - 0.5) * 200,
-        y: isCenter ? 0 : (Math.random() - 0.5) * 200,
-        fx: isCenter ? 0 : null,
-        fy: isCenter ? 0 : null,
-      };
+      if (n.id === centerId) return { id: n.id, x: 0, y: 0, fx: 0, fy: 0 };
+      const prev = prevById.get(n.id);
+      if (prev) return { id: n.id, x: prev.x, y: prev.y, vx: prev.vx, vy: prev.vy, fx: null, fy: null };
+      const spread = isFirstLayout ? 200 : 12;
+      return { id: n.id, x: (Math.random() - 0.5) * spread, y: (Math.random() - 0.5) * spread, fx: null, fy: null };
     });
     // Lookup map kept around for paintFromSim — avoids an O(n²) .find
     // scan on every tick. Also exposed via simNodesByIdRef so the
@@ -347,13 +351,19 @@ export function WebGraph({
       value: e.value,
     }));
 
+    // Seed React node positions in render space (the same normalization
+    // paintFromSim applies), so preserved nodes start at their rendered spot
+    // rather than jumping to raw sim coords for a frame before the first tick.
+    const norm = normRef.current;
+    const toRender = (x: number, y: number) =>
+      norm ? { x: (x - norm.cx) * norm.scale, y: (y - norm.cy) * norm.scale } : { x, y };
     setNodes(
       data.nodes.map((n) => {
         const sn = simNodeById.get(n.id);
         return {
           id: n.id,
           type: "member",
-          position: { x: sn?.x ?? 0, y: sn?.y ?? 0 },
+          position: toRender(sn?.x ?? 0, sn?.y ?? 0),
           data: { ...n, isCenter: n.id === centerId },
           // Center node is fx/fy-pinned at the origin; letting the user
           // drag it would either fight the pin or move "yourself" on
@@ -414,6 +424,9 @@ export function WebGraph({
     };
 
     const sim = forceSimulation(simNodes)
+      // Gentle re-warm on an incremental update (existing nodes are already at
+      // rest, so they barely move); full heat only for a fresh first layout.
+      .alpha(isFirstLayout ? 1 : 0.6)
       // Default alphaMin is 0.001, which combined with the default
       // alphaDecay drags the sim out to ~5s with the last ~3.2s being
       // sub-pixel motion no one can see. Bumping alphaMin cuts the

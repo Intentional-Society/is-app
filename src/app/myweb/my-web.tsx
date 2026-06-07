@@ -1,11 +1,13 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import type { RelationCandidatesFeed } from "@/lib/api-types";
 
+import { FlyCard } from "./fly-card";
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
 import { RelatingDialog, type RelatingTarget } from "./relating-dialog";
 import { WebBuilder } from "./web-builder";
@@ -15,6 +17,16 @@ import { WelcomeTour } from "./welcome-tour";
 type Mode = "edit" | "view";
 
 const TOUR_DISMISSED_KEY = "isweb-welcome-tour-dismissed";
+
+// How long a just-related card takes to fly from the list into the graph.
+const FLY_DURATION_MS = 550;
+
+type Flying = {
+  candidateId: string;
+  card: { displayName: string | null; avatarUrl: string | null; location: string | null };
+  sourceRect: { left: number; top: number; width: number; height: number };
+  target: { x: number; y: number };
+};
 
 // Done captures intent ("I'm done updating for now") and surfaces the
 // member in others' "recently active" suggestion source. Real-time
@@ -61,6 +73,59 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
     setTourRun(true);
   }, [initialLastUpdatedWeb]);
   const markDone = useMarkDone(() => setMode("view"));
+
+  const queryClient = useQueryClient();
+  // The suggestion card currently flying into the graph (null when idle).
+  const [flying, setFlying] = useState<Flying | null>(null);
+
+  // Drop the related candidate from the feed (closing the list hole) and
+  // refresh the graph so the new node eases in from the center. Deferred to
+  // here from the dialog (deferGraphCommit) so it fires at the fly's end.
+  const commitRelation = useCallback(
+    (candidateId: string) => {
+      const prev = queryClient.getQueryData<RelationCandidatesFeed>(RELATION_CANDIDATES_QUERY_KEY);
+      if (prev) {
+        queryClient.setQueryData<RelationCandidatesFeed>(RELATION_CANDIDATES_QUERY_KEY, {
+          suggestions: prev.suggestions.filter((c) => c.id !== candidateId),
+          otherMembers: prev.otherMembers.filter((c) => c.id !== candidateId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: RELATION_SUBGRAPH_QUERY_KEY });
+    },
+    [queryClient],
+  );
+
+  // On a successful relation: advance the tour, then fly the card into the
+  // graph if it's a card-add (a card + graph are on screen); otherwise (e.g.
+  // an edge-click edit) just commit immediately.
+  const handleRelated = useCallback(
+    (relateeId: string) => {
+      if (tourRun) setTourAdvanceToken((t) => t + 1);
+      const feed = queryClient.getQueryData<RelationCandidatesFeed>(RELATION_CANDIDATES_QUERY_KEY);
+      const candidate = feed && [...feed.suggestions, ...feed.otherMembers].find((c) => c.id === relateeId);
+      const cardEl = document.querySelector(`[data-candidate-id="${relateeId}"]`);
+      const graphEl = document.querySelector('[data-tour="graph"]');
+      if (!candidate || !cardEl || !graphEl) {
+        commitRelation(relateeId);
+        return;
+      }
+      const r = cardEl.getBoundingClientRect();
+      const g = graphEl.getBoundingClientRect();
+      setFlying({
+        candidateId: relateeId,
+        card: { displayName: candidate.displayName, avatarUrl: candidate.avatarUrl, location: candidate.location },
+        sourceRect: { left: r.left, top: r.top, width: r.width, height: r.height },
+        target: { x: g.left + g.width / 2, y: g.top + g.height / 2 },
+      });
+    },
+    [queryClient, commitRelation, tourRun],
+  );
+
+  const handleFlyDone = useCallback(() => {
+    if (flying) commitRelation(flying.candidateId);
+    setFlying(null);
+  }, [flying, commitRelation]);
 
   const dismissTour = () => {
     setTourRun(false);
@@ -117,18 +182,26 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
 
         {mode === "edit" && (
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            <WebBuilder onOpenRelating={setRelatingTarget} />
+            <WebBuilder onOpenRelating={setRelatingTarget} flyingId={flying?.candidateId ?? null} />
           </div>
         )}
       </div>
 
       <RelatingDialog
         target={relatingTarget}
+        deferGraphCommit
         onClose={() => setRelatingTarget(null)}
-        onRelated={() => {
-          if (tourRun) setTourAdvanceToken((t) => t + 1);
-        }}
+        onRelated={handleRelated}
       />
+      {flying && (
+        <FlyCard
+          card={flying.card}
+          sourceRect={flying.sourceRect}
+          target={flying.target}
+          durationMs={FLY_DURATION_MS}
+          onDone={handleFlyDone}
+        />
+      )}
       <WelcomeTour key={tourKey} run={tourRun} advanceToken={tourAdvanceToken} onClose={dismissTour} />
     </div>
   );
