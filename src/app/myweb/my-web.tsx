@@ -86,7 +86,13 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
-      <WebGraph square={mode === "view"} onOpenRelating={setRelatingTarget} onReplayTour={replayTour} />
+      {/* Below 600px the graph breaks out of the page's horizontal padding to
+       * go edge-to-edge; the title/breadcrumb (page) and the Edit/Done row +
+       * feed (below) keep their padding. The negative margin equals -(50vw -
+       * half the container), the canonical full-bleed within a padded parent. */}
+      <div className="w-full max-[600px]:mx-[calc(50%_-_50vw)] max-[600px]:w-screen">
+        <WebGraph square={mode === "view"} onOpenRelating={setRelatingTarget} onReplayTour={replayTour} />
+      </div>
 
       {/* Toggle floats in the right gutter so it doesn't claim its own
        * row. Edit and Done sit at the same coordinates across modes —
