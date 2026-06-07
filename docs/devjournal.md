@@ -6,7 +6,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-06-07 | Benji | Homepage card categories
 
-Grouped the logged-in homepage cards into three labeled sections — Community (Programs, Member directory, Current intentions), Personal (My web, My profile), and Admin (Invite a friend, Give Feedback) — with small uppercase category headers. Keeps the 2-column responsive grid within each section.
+Grouped the logged-in homepage cards into three labeled sections — Community (Programs, Member directory, Current intentions), Personal (My web, My profile), and System (Invite a friend, Give Feedback) — with small uppercase category headers. Keeps the 2-column responsive grid within each section.
 
 ## 2026-06-06 | James | Logging convention: log.<level> over console.log (#262)
 
