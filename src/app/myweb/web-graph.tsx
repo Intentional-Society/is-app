@@ -122,11 +122,20 @@ function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
 
 const nodeTypes = { member: MemberNode };
 
-// Lets the edge label pop the relating dialog without threading a
-// callback through the edge data object (which would defeat the edges
-// useMemo). NumberedEdge is registered via ReactFlow's edgeTypes prop;
-// the Provider wraps ReactFlow so context still propagates to it.
-const EdgeRelatingContext = createContext<((target: RelatingTarget) => void) | null>(null);
+// Carries edge-number reveal state + the relating callback to the
+// NumberedEdge instances without threading them through the edge data object
+// (which would defeat the edges useMemo). The Provider wraps ReactFlow so
+// context still reaches the edges registered via the edgeTypes prop.
+type EdgeInteraction = {
+  openRelating: (target: RelatingTarget) => void;
+  // Transient hover preview (desktop) and the selected edge (click/tap). A
+  // number shows when its id matches either.
+  hoverEdgeId: string | null;
+  selectedEdgeId: string | null;
+  previewEdge: (id: string) => void;
+  endPreviewSoon: () => void;
+};
+const EdgeInteractionContext = createContext<EdgeInteraction | null>(null);
 
 // Straight-line edge with an HTML circle label at the geometric midpoint
 // of the line between source and target. ReactFlow's default bezier
@@ -134,14 +143,21 @@ const EdgeRelatingContext = createContext<((target: RelatingTarget) => void) | n
 // midpoint sits above the visual line — using a straight edge keeps the
 // label on the line, and HTML labels (via EdgeLabelRenderer) give us a
 // real circular pill that an SVG <rect> can't.
+//
+// The number is hidden until its edge is active (hovered, or tapped within
+// the edge's interactionWidth). While hidden it's pointer-events-none so the
+// hover/tap falls through to the line; while shown it captures clicks to open
+// the relating dialog. onMouseEnter/Leave bridge the pointer's trip from the
+// line onto the number (paired with the parent's short hide delay).
 
 function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: EdgeProps<Edge<EdgeData>>) {
   const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-  const openRelating = useContext(EdgeRelatingContext);
-  const isClickable = data?.isOutgoing === true && openRelating !== null;
+  const interaction = useContext(EdgeInteractionContext);
+  const isClickable = data?.isOutgoing === true && interaction !== null;
+  const isVisible = interaction !== null && (interaction.hoverEdgeId === id || interaction.selectedEdgeId === id);
   const handleClick = isClickable
     ? () =>
-        openRelating?.({
+        interaction?.openRelating({
           id: data.relateeId,
           displayName: data.relateeName,
           currentValue: isRelationValue(data.value) ? data.value : null,
@@ -154,18 +170,18 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
         <button
           type="button"
           onClick={handleClick}
+          onMouseEnter={() => interaction?.previewEdge(id)}
+          onMouseLeave={() => interaction?.endPreviewSoon()}
           disabled={!isClickable}
+          aria-hidden={!isVisible}
           aria-label={isClickable ? "Adjust this relationship" : undefined}
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            // Restore pointer events so the label catches clicks; the
-            // SVG edge path underneath only covers a few px of the line.
-            pointerEvents: "auto",
           }}
-          className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground ${
-            isClickable ? "cursor-pointer hover:bg-canvas/90" : "cursor-default"
-          }`}
+          className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/80 text-xs font-semibold text-canvas-foreground transition-opacity duration-150 ${
+            isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+          } ${isClickable ? "cursor-pointer hover:bg-canvas" : "cursor-default"}`}
         >
           {data?.value}
         </button>
@@ -284,6 +300,9 @@ export function WebGraph({
         source: e.relatorId,
         target: e.relateeId,
         type: "numbered",
+        // ±5px invisible hit area around the thin line, so hover (desktop) or
+        // a tap within 5px (mobile) reveals the number.
+        interactionWidth: 10,
         style: {
           stroke: "var(--color-canvas-foreground)",
           strokeOpacity: edgeStrokeOpacity(e.value),
@@ -618,6 +637,65 @@ export function WebGraph({
     };
   }, [square]);
 
+  // Edge-number reveal. Numbers stay hidden until shown one of two ways:
+  //   - hover (desktop): a transient preview while the pointer is on the line
+  //     or the number, cleared on leave. Suppressed while an edge is selected,
+  //     so a selection doesn't spawn previews as you move around.
+  //   - selection (click/tap): clicking a line selects it and shows its number
+  //     until a click on the pane, a node, or another line. A second click on
+  //     the selected line — or a click on the number — opens the relating dialog.
+  // endPreviewSoon defers the hover hide briefly so the pointer can travel
+  // from the line onto the number; previewEdge (the number's own mouseenter)
+  // cancels that pending hide.
+  const [hoverEdgeId, setHoverEdgeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  // Mirror of selectedEdgeId for the stable previewEdge callback to read
+  // without re-creating each time the selection changes.
+  const selectedEdgeRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedEdgeRef.current = selectedEdgeId;
+  }, [selectedEdgeId]);
+  const previewTimer = useRef<number | null>(null);
+  const clearPreviewTimer = useCallback(() => {
+    if (previewTimer.current !== null) {
+      clearTimeout(previewTimer.current);
+      previewTimer.current = null;
+    }
+  }, []);
+  const previewEdge = useCallback(
+    (edgeId: string) => {
+      if (selectedEdgeRef.current !== null) return; // hover off while an edge is selected
+      clearPreviewTimer();
+      setHoverEdgeId(edgeId);
+    },
+    [clearPreviewTimer],
+  );
+  const endPreviewSoon = useCallback(() => {
+    clearPreviewTimer();
+    previewTimer.current = window.setTimeout(() => setHoverEdgeId(null), 120);
+  }, [clearPreviewTimer]);
+  const clearSelection = useCallback(() => {
+    clearPreviewTimer();
+    setHoverEdgeId(null);
+    setSelectedEdgeId(null);
+  }, [clearPreviewTimer]);
+  useEffect(() => clearPreviewTimer, [clearPreviewTimer]);
+
+  const edgeInteraction = useMemo<EdgeInteraction>(
+    () => ({ openRelating: onOpenRelating, hoverEdgeId, selectedEdgeId, previewEdge, endPreviewSoon }),
+    [onOpenRelating, hoverEdgeId, selectedEdgeId, previewEdge, endPreviewSoon],
+  );
+
+  // A selected, editable edge gets cursor:pointer on its whole hit area —
+  // ReactFlow merges this className onto the edge's <g>, and cursor inherits
+  // down to the visible path and the wider invisible interaction path, so the
+  // line (not just the number) signals it's clickable. Only the selected edge
+  // is re-spread, so this stays a cheap per-selection diff.
+  const edgesWithCursor = useMemo(
+    () => edges.map((e) => (e.id === selectedEdgeId && e.data?.isOutgoing ? { ...e, className: "cursor-pointer" } : e)),
+    [edges, selectedEdgeId],
+  );
+
   const empty = !data || data.nodes.length === 0;
 
   if (isPending) {
@@ -656,10 +734,10 @@ export function WebGraph({
       }}
       className="mx-auto w-full max-w-[calc(100vh_-_12rem)] overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
     >
-      <EdgeRelatingContext.Provider value={onOpenRelating}>
+      <EdgeInteractionContext.Provider value={edgeInteraction}>
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={edgesWithCursor}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -667,6 +745,28 @@ export function WebGraph({
           onInit={(instance) => {
             flowRef.current = instance;
           }}
+          // Hover previews a number on desktop (off while an edge is selected).
+          onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
+          onEdgeMouseLeave={() => endPreviewSoon()}
+          // Click/tap a line selects it and shows its number; a second click on
+          // the selected line opens the relating dialog (clicking the number
+          // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
+          onEdgeClick={(_event, edge) => {
+            clearPreviewTimer();
+            if (selectedEdgeId === edge.id) {
+              const d = edge.data;
+              if (d?.isOutgoing) {
+                onOpenRelating({
+                  id: d.relateeId,
+                  displayName: d.relateeName,
+                  currentValue: isRelationValue(d.value) ? d.value : null,
+                });
+              }
+              return;
+            }
+            setSelectedEdgeId(edge.id);
+          }}
+          onPaneClick={() => clearSelection()}
           onMove={(event) => {
             // Programmatic fitView calls pass event=null; only flip the
             // flag on user gestures (MouseEvent / TouchEvent / Wheel).
@@ -680,9 +780,11 @@ export function WebGraph({
           elementsSelectable={false}
           proOptions={{ hideAttribution: true }}
           onNodeClick={(_event, node) => {
-            // Re-center the viewport on the clicked node so members can
-            // explore the graph without navigating away. Double-click
-            // navigates to the member's profile page.
+            // A click on a node counts as "elsewhere" — clear any edge
+            // selection. Then re-center the viewport on the clicked node so
+            // members can explore the graph without navigating away.
+            // Double-click navigates to the member's profile page.
+            clearSelection();
             flowRef.current?.setCenter(node.position.x, node.position.y, {
               zoom: flowRef.current.getZoom(),
               duration: 400,
@@ -754,7 +856,7 @@ export function WebGraph({
             </label>
           </Panel>
         </ReactFlow>
-      </EdgeRelatingContext.Provider>
+      </EdgeInteractionContext.Provider>
     </div>
   );
 }
