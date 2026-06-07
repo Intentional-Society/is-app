@@ -41,6 +41,7 @@ import {
   parseEditableProfile,
   reactivateProfile,
   setProfileHidden,
+  syncDisplayNameToAuthMetadata,
   toSlug,
   upsertProfile,
 } from "./profiles";
@@ -389,6 +390,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
           return c.json({ error: "That display name is already taken. Please choose a different one." }, 409);
         }
         throw err;
+      }
+
+      // Mirror a displayName edit into auth.users.user_metadata so auth
+      // emails greet the member by their current name. Runs only after the
+      // DB write commits, so a slug clash (409 above) can't desync the two.
+      if (parsed.displayName !== undefined) {
+        await syncDisplayNameToAuthMetadata(user.id, parsed.displayName, user.user_metadata ?? {});
       }
     }
 

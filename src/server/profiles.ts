@@ -1,5 +1,8 @@
+import * as Sentry from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { and, asc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -94,6 +97,34 @@ export const upsertProfile = async (user: User): Promise<{ created: boolean }> =
     .returning({ id: profiles.id });
 
   return { created: rows.length > 0 };
+};
+
+// The inverse of upsertProfile's first-sign-in copy: push a profile
+// displayName edit back into auth.users.user_metadata so auth emails
+// (magic-link, recovery) greet the member by their current name instead
+// of their signup-time one — see docs/design-emails.md → {{ .Data.displayName }}.
+//
+// existingMetadata is spread so GoTrue-managed fields (email_verified,
+// phone_verified, sub) survive the write. Best-effort: the profiles row is
+// the source of truth, so a GoTrue hiccup must not fail the profile save —
+// the greeting just stays stale until the next edit. We capture so a
+// persistent failure still pages someone.
+export const syncDisplayNameToAuthMetadata = async (
+  userId: string,
+  displayName: string | null,
+  existingMetadata: Record<string, unknown>,
+): Promise<void> => {
+  try {
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { ...existingMetadata, displayName },
+    });
+    if (error) throw error;
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { area: "profile.metadata_sync" },
+      extra: { userId },
+    });
+  }
 };
 
 export type ProfileForSelf = {
