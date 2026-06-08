@@ -28,7 +28,7 @@ import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
-import { isRelationValue, RELATION_VALUE_LABELS, RELATION_VALUES, type RelationValue } from "@/lib/relation-value";
+import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import {
   DEFAULT_SUBGRAPH_VIEW,
@@ -42,6 +42,7 @@ import {
   VIEW_STORAGE_KEY,
 } from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
+import { WebGraphControls } from "./web-graph-controls";
 import { filterSubgraphByValue } from "./web-graph-filtering";
 import {
   computeNormalization,
@@ -967,47 +968,12 @@ export function WebGraph({
                 </div>
               )}
             </Panel>
-            <Panel
-              position="top-right"
-              className="flex flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm"
-            >
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={view.hops === 2}
-                  onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
-                />
-                2 hops
-              </label>
-              {/* Independent depth toggles (filled = shown). Reuses the 1–4
-               * vocabulary from the relating dialog; culling a depth thins the
-               * web to the ties that matter. */}
-              <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
-                <legend className="p-0 text-xs text-muted-foreground">Relationship depth</legend>
-                <div className="flex gap-1">
-                  {RELATION_VALUES.map((v) => {
-                    const on = valueFilter.has(v);
-                    return (
-                      <button
-                        key={v}
-                        type="button"
-                        aria-pressed={on}
-                        aria-label={`Depth ${v}: ${RELATION_VALUE_LABELS[v].headline}`}
-                        title={RELATION_VALUE_LABELS[v].headline}
-                        onClick={() => toggleValue(v)}
-                        className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${
-                          on
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-transparent text-muted-foreground hover:border-foreground"
-                        }`}
-                      >
-                        {v}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            </Panel>
+            <WebGraphControls
+              hops={view.hops}
+              onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
+              valueFilter={valueFilter}
+              onToggleValue={toggleValue}
+            />
           </ReactFlow>
         </NodeInteractionContext.Provider>
       </EdgeInteractionContext.Provider>
