@@ -97,25 +97,76 @@ const edgeStrokeOpacity = (value: number) => 0.4 + ((value - 1) / 3) * 0.4;
 // as center-to-center lines without showing connector dots.
 const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
-function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
+// A selection dims everything off the lit path by blending toward the canvas,
+// never by making content transparent (which would show edge endpoints through
+// an avatar). A dimmed element keeps this fraction of its own color: edge
+// strokes and the name via color-mix, the raster avatar via a (1 - this)-opaque
+// canvas wash. Reads as a ~30% dim; the path stays at full strength.
+const DIM_KEEP = 0.7;
+
+// Lift the lit path above the dimmed tangle. xyflow gives each edge its own
+// z-indexed <svg> and each node a z-indexed wrapper, both defaulting to 0 in the
+// viewport's stacking context — so a high zIndex clears the rest; node > edge
+// keeps avatars over their lines.
+const SELECTION_EDGE_Z = 1000;
+const SELECTION_NODE_Z = 1001;
+
+// Carries the node selection to MemberNode (rendered via nodeTypes) without
+// baking it into node.data — that would force a setNodes pass per selection and
+// tangle with the sim's position updates. Mirrors EdgeInteractionContext.
+type NodeInteraction = {
+  selectedNodeId: string | null;
+  // Node ids on the selected node's path back to the center; these stay lit.
+  pathNodeIds: Set<string>;
+};
+const NodeInteractionContext = createContext<NodeInteraction | null>(null);
+
+function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
+  const selection = useContext(NodeInteractionContext);
+  const isSelected = selection?.selectedNodeId === id;
+  // With a selection active, every node off the lit path dims (see DIM_KEEP);
+  // the selected node keeps the hover size so the click reads as "this one's it."
+  const isDimmed = selection != null && selection.selectedNodeId !== null && !selection.pathNodeIds.has(id);
+  // Every node on the lit path (selected, the steps, the root) gets the green
+  // border to match the links; otherwise the center is primary-teal, rest default.
+  const onLitPath = selection != null && selection.selectedNodeId !== null && selection.pathNodeIds.has(id);
+  const borderClass = onLitPath ? "border-success" : data.isCenter ? "border-primary" : "border-border";
   return (
-    // pointer-events-none on the wrapper + the !pointer-events-none
-    // override on .react-flow__node (set per-node above) means only the
-    // Avatar (pointer-events-auto + clip-path:circle) is a click
-    // target. The name renders in flow below the avatar so the wrapper
-    // bounding box covers the full visible node, but its
-    // pointer-events-none keeps clicks on the name inert.
+    // Only the Avatar is a click target: the wrapper is pointer-events-none and
+    // .react-flow__node is !pointer-events-none (set per-node above), so clicks on
+    // the name and the corners around the round avatar fall through as inert.
     <div className="pointer-events-none flex flex-col items-center gap-1">
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
-      <Avatar
-        name={data.displayName}
-        url={data.avatarUrl}
-        className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] transition-transform duration-150 hover:scale-110 ${
-          data.isCenter ? "h-16 w-16 border-primary" : "h-12 w-12 border-border"
-        } bg-muted text-base font-semibold text-muted-foreground`}
-      />
-      <div className="pointer-events-none max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
+      {/* Avatar + its dim wash share this box so they scale together on
+          hover/select (no half-dimmed ring). */}
+      <div className={`relative transition-transform duration-150 hover:scale-110 ${isSelected ? "scale-110" : ""}`}>
+        <Avatar
+          name={data.displayName}
+          url={data.avatarUrl}
+          className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${
+            data.isCenter ? "h-16 w-16" : "h-12 w-12"
+          } ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
+        />
+        {/* Dim wash clipped to the avatar circle (rounded-full, never a square
+            over the edges behind), blended over the opaque avatar so endpoints
+            behind it stay hidden. pointer-events-none lets clicks reach it. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-full bg-canvas transition-opacity duration-150"
+          style={{ opacity: isDimmed ? 1 - DIM_KEEP : 0 }}
+        />
+      </div>
+      {/* The name dims by mixing its text color toward the canvas — color paints
+          only the glyphs, so no covering box (square) and no bleed-through. */}
+      <div
+        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-colors duration-150"
+        style={
+          isDimmed ? { color: `color-mix(in srgb, currentColor ${DIM_KEEP * 100}%, var(--color-canvas))` } : undefined
+        }
+      >
+        {data.displayName ?? "—"}
+      </div>
     </div>
   );
 }
@@ -307,6 +358,9 @@ export function WebGraph({
           stroke: "var(--color-canvas-foreground)",
           strokeOpacity: edgeStrokeOpacity(e.value),
           strokeWidth: edgeStrokeWidth(e.value),
+          // Eases the stroke recolor when a node selection dims edges off the
+          // lit path (blend toward canvas) or paints them success-green on it.
+          transition: "stroke 150ms ease",
         },
         data: {
           isOutgoing,
@@ -662,6 +716,9 @@ export function WebGraph({
   // cancels that pending hide.
   const [hoverEdgeId, setHoverEdgeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  // Node selection (click/tap a circle). Independent of edge selection but
+  // mutually exclusive in practice: selecting one clears the other.
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   // Mirror of selectedEdgeId for the stable previewEdge callback to read
   // without re-creating each time the selection changes.
   const selectedEdgeRef = useRef<string | null>(null);
@@ -691,6 +748,7 @@ export function WebGraph({
     clearPreviewTimer();
     setHoverEdgeId(null);
     setSelectedEdgeId(null);
+    setSelectedNodeId(null);
   }, [clearPreviewTimer]);
   useEffect(() => clearPreviewTimer, [clearPreviewTimer]);
 
@@ -699,15 +757,101 @@ export function WebGraph({
     [onOpenRelating, hoverEdgeId, selectedEdgeId, previewEdge, endPreviewSoon],
   );
 
-  // A selected, editable edge gets cursor:pointer on its whole hit area —
-  // ReactFlow merges this className onto the edge's <g>, and cursor inherits
-  // down to the visible path and the wider invisible interaction path, so the
-  // line (not just the number) signals it's clickable. Only the selected edge
-  // is re-spread, so this stays a cheap per-selection diff.
-  const edgesWithCursor = useMemo(
-    () => edges.map((e) => (e.id === selectedEdgeId && e.data?.isOutgoing ? { ...e, className: "cursor-pointer" } : e)),
-    [edges, selectedEdgeId],
+  // Shortest-path tree from the center over the (undirected) edge set, rebuilt
+  // once per subgraph. Selecting a node walks these parent pointers back to the
+  // center to find the chain that should stay lit while the rest dims.
+  const parentByNode = useMemo(() => {
+    const parent = new Map<string, string | null>();
+    if (!data) return parent;
+    const adj = new Map<string, string[]>();
+    const link = (a: string, b: string) => {
+      const list = adj.get(a);
+      if (list) list.push(b);
+      else adj.set(a, [b]);
+    };
+    for (const e of data.edges) {
+      link(e.relatorId, e.relateeId);
+      link(e.relateeId, e.relatorId);
+    }
+    parent.set(data.centerId, null);
+    const queue = [data.centerId];
+    for (let i = 0; i < queue.length; i++) {
+      const cur = queue[i];
+      for (const nb of adj.get(cur) ?? []) {
+        if (!parent.has(nb)) {
+          parent.set(nb, cur);
+          queue.push(nb);
+        }
+      }
+    }
+    return parent;
+  }, [data]);
+
+  // The node ids and edge ids on the selected node's path back to the center.
+  // Edge ids are direction-stamped (`relator->relatee`) and we don't know which
+  // way the real edge runs, so add both candidates and let set-membership pick
+  // the one that exists.
+  const { pathNodeIds, pathEdgeIds } = useMemo(() => {
+    const pathNodeIds = new Set<string>();
+    const pathEdgeIds = new Set<string>();
+    if (selectedNodeId === null) return { pathNodeIds, pathEdgeIds };
+    let cur: string | null | undefined = selectedNodeId;
+    while (cur != null) {
+      pathNodeIds.add(cur);
+      const par = parentByNode.get(cur);
+      if (par == null) break;
+      pathEdgeIds.add(`${par}->${cur}`);
+      pathEdgeIds.add(`${cur}->${par}`);
+      cur = par;
+    }
+    return { pathNodeIds, pathEdgeIds };
+  }, [selectedNodeId, parentByNode]);
+
+  const nodeInteraction = useMemo<NodeInteraction>(
+    () => ({ selectedNodeId, pathNodeIds }),
+    [selectedNodeId, pathNodeIds],
   );
+
+  // Per-selection edge decorations layered onto the base edges:
+  //   - cursor:pointer on a selected, editable edge — ReactFlow merges the
+  //     className onto the edge's <g>, and cursor inherits down to the visible
+  //     and the wider invisible interaction path, so the whole line signals it.
+  //   - paint the lit path success-green and lift it above the rest
+  //     (SELECTION_EDGE_Z); dim every other edge by blending its stroke toward
+  //     the canvas. The stroke transition (on the base style) eases both.
+  // Only touched edges are re-spread, so this stays a cheap per-selection diff.
+  const decoratedEdges = useMemo(() => {
+    const nodeSelected = selectedNodeId !== null;
+    return edges.map((e) => {
+      const cursor = e.id === selectedEdgeId && e.data?.isOutgoing === true;
+      const onPath = nodeSelected && pathEdgeIds.has(e.id);
+      const dim = nodeSelected && !onPath;
+      if (!cursor && !onPath && !dim) return e;
+      const next = { ...e };
+      if (cursor) next.className = "cursor-pointer";
+      if (onPath) {
+        next.style = { ...e.style, stroke: "var(--color-success)", strokeOpacity: 1 };
+        next.zIndex = SELECTION_EDGE_Z;
+      } else if (dim) {
+        // Same blend-toward-canvas dim as the nodes; for a stroke this is
+        // identical to lowering opacity over the canvas, so look-for-look but
+        // opacity-free.
+        next.style = {
+          ...e.style,
+          stroke: `color-mix(in srgb, var(--color-canvas-foreground) ${DIM_KEEP * 100}%, var(--color-canvas))`,
+        };
+      }
+      return next;
+    });
+  }, [edges, selectedEdgeId, selectedNodeId, pathEdgeIds]);
+
+  // Lift the lit path above the dimmed graph (SELECTION_NODE_Z) so a highlight
+  // never sits under a dimmed node. Derived from the live `nodes` state so sim
+  // ticks and drags flow through untouched; same ref when nothing is selected.
+  const decoratedNodes = useMemo(() => {
+    if (selectedNodeId === null) return nodes;
+    return nodes.map((n) => (pathNodeIds.has(n.id) ? { ...n, zIndex: SELECTION_NODE_Z } : n));
+  }, [nodes, selectedNodeId, pathNodeIds]);
 
   const empty = !data || data.nodes.length === 0;
 
@@ -748,127 +892,129 @@ export function WebGraph({
       className="mx-auto w-full max-w-[calc(100vh_-_12rem)] overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
     >
       <EdgeInteractionContext.Provider value={edgeInteraction}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edgesWithCursor}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.15 }}
-          onInit={(instance) => {
-            flowRef.current = instance;
-          }}
-          // Hover previews a number on desktop (off while an edge is selected).
-          onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
-          onEdgeMouseLeave={() => endPreviewSoon()}
-          // Click/tap a line selects it and shows its number; a second click on
-          // the selected line opens the relating dialog (clicking the number
-          // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
-          onEdgeClick={(_event, edge) => {
-            clearPreviewTimer();
-            if (selectedEdgeId === edge.id) {
-              const d = edge.data;
-              if (d?.isOutgoing) {
-                onOpenRelating({
-                  id: d.relateeId,
-                  displayName: d.relateeName,
-                  currentValue: isRelationValue(d.value) ? d.value : null,
-                });
+        <NodeInteractionContext.Provider value={nodeInteraction}>
+          <ReactFlow
+            nodes={decoratedNodes}
+            edges={decoratedEdges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.15 }}
+            onInit={(instance) => {
+              flowRef.current = instance;
+            }}
+            // Hover previews a number on desktop (off while an edge is selected).
+            onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
+            onEdgeMouseLeave={() => endPreviewSoon()}
+            // Click/tap a line selects it and shows its number; a second click on
+            // the selected line opens the relating dialog (clicking the number
+            // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
+            onEdgeClick={(_event, edge) => {
+              clearPreviewTimer();
+              // Selecting an edge supersedes any node selection.
+              setSelectedNodeId(null);
+              if (selectedEdgeId === edge.id) {
+                const d = edge.data;
+                if (d?.isOutgoing) {
+                  onOpenRelating({
+                    id: d.relateeId,
+                    displayName: d.relateeName,
+                    currentValue: isRelationValue(d.value) ? d.value : null,
+                  });
+                }
+                return;
               }
-              return;
-            }
-            setSelectedEdgeId(edge.id);
-          }}
-          onPaneClick={() => clearSelection()}
-          onMove={(event) => {
-            // Programmatic fitView calls pass event=null; only flip the
-            // flag on user gestures (MouseEvent / TouchEvent / Wheel).
-            if (event !== null) userMovedViewportRef.current = true;
-          }}
-          onNodesChange={onNodesChange}
-          onNodeDragStart={onNodeDragStart}
-          onNodeDrag={onNodeDrag}
-          onNodeDragStop={onNodeDragStop}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          proOptions={{ hideAttribution: true }}
-          onNodeClick={(_event, node) => {
-            // A click on a node counts as "elsewhere" — clear any edge
-            // selection. Then re-center the viewport on the clicked node so
-            // members can explore the graph without navigating away.
-            // Double-click navigates to the member's profile page.
-            clearSelection();
-            flowRef.current?.setCenter(node.position.x, node.position.y, {
-              zoom: flowRef.current.getZoom(),
-              duration: 400,
-            });
-          }}
-          onNodeDoubleClick={(_event, node) => {
-            const slug = node.data.slug ?? node.data.id;
-            router.push(`/members/${slug}`);
-          }}
-        >
-          {/* Built-in +/-/fit-view buttons for users who can't or don't
-           * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
-           * is hidden — selection and connection are already disabled. */}
-          <Controls position="top-left" showInteractive={false} />
-          <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
-            {/* Click-to-toggle (not hover) so the hints stay reachable on
-             * touch devices where hover doesn't exist. */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
-              aria-expanded={hintOpen}
-              aria-controls="web-graph-hints"
-              onClick={() => setHintOpen((h) => !h)}
-              className="rounded-full border border-border bg-background/90 font-bold"
-            >
-              ?
-            </Button>
-            {hintOpen && (
-              <div
-                id="web-graph-hints"
-                className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
-              >
-                <ul className="flex flex-col gap-1">
-                  <li>Drag the background to pan.</li>
-                  <li>Drag a circle to reposition it.</li>
-                  <li>Scroll or pinch to zoom.</li>
-                  <li>Single-click a circle to center the view on it.</li>
-                  <li>Double-click a circle to open their profile.</li>
-                  <li>
-                    <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
-                  </li>
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHintOpen(false);
-                    onReplayTour();
-                  }}
-                  className="self-start text-foreground underline underline-offset-2 hover:text-primary"
-                >
-                  Replay guided tour
-                </button>
-              </div>
-            )}
-          </Panel>
-          <Panel
-            position="top-right"
-            className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+              setSelectedEdgeId(edge.id);
+            }}
+            onPaneClick={() => clearSelection()}
+            onMove={(event) => {
+              // Programmatic fitView calls pass event=null; only flip the
+              // flag on user gestures (MouseEvent / TouchEvent / Wheel).
+              if (event !== null) userMovedViewportRef.current = true;
+            }}
+            onNodesChange={onNodesChange}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDrag={onNodeDrag}
+            onNodeDragStop={onNodeDragStop}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            proOptions={{ hideAttribution: true }}
+            onNodeClick={(_event, node) => {
+              // Select the node (re-click toggles off): lights its path back to
+              // you and dims the rest. No viewport pan; clears any edge
+              // selection. Double-click still opens the member's profile.
+              clearPreviewTimer();
+              setHoverEdgeId(null);
+              setSelectedEdgeId(null);
+              setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
+            }}
+            onNodeDoubleClick={(_event, node) => {
+              const slug = node.data.slug ?? node.data.id;
+              router.push(`/members/${slug}`);
+            }}
           >
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={view.hops === 2}
-                onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
-              />
-              2 hops
-            </label>
-          </Panel>
-        </ReactFlow>
+            {/* Built-in +/-/fit-view buttons for users who can't or don't
+             * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+             * is hidden — selection and connection are already disabled. */}
+            <Controls position="top-left" showInteractive={false} />
+            <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+              {/* Click-to-toggle (not hover) so the hints stay reachable on
+               * touch devices where hover doesn't exist. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+                aria-expanded={hintOpen}
+                aria-controls="web-graph-hints"
+                onClick={() => setHintOpen((h) => !h)}
+                className="rounded-full border border-border bg-background/90 font-bold"
+              >
+                ?
+              </Button>
+              {hintOpen && (
+                <div
+                  id="web-graph-hints"
+                  className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+                >
+                  <ul className="flex flex-col gap-1">
+                    <li>Drag the background to pan.</li>
+                    <li>Drag a circle to reposition it.</li>
+                    <li>Scroll or pinch to zoom.</li>
+                    <li>Single-click a circle to highlight its path to you.</li>
+                    <li>Double-click a circle to open their profile.</li>
+                    <li>
+                      <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
+                    </li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHintOpen(false);
+                      onReplayTour();
+                    }}
+                    className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+                  >
+                    Replay guided tour
+                  </button>
+                </div>
+              )}
+            </Panel>
+            <Panel
+              position="top-right"
+              className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+            >
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={view.hops === 2}
+                  onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
+                />
+                2 hops
+              </label>
+            </Panel>
+          </ReactFlow>
+        </NodeInteractionContext.Provider>
       </EdgeInteractionContext.Provider>
     </div>
   );
