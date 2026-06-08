@@ -254,6 +254,11 @@ export function WebGraph({
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
   const [hintOpen, setHintOpen] = useState(false);
+  // True once the mount effect has reconciled `view` with localStorage, and
+  // true once the reconciled view's real data has landed — together they gate
+  // the first paint (see the initialReady latch below).
+  const [viewHydrated, setViewHydrated] = useState(false);
+  const [initialReady, setInitialReady] = useState(false);
 
   // Restore the user's last filter choice across reloads. Done in an
   // effect rather than the useState initializer so SSR-rendered markup
@@ -263,6 +268,7 @@ export function WebGraph({
   useEffect(() => {
     const stored = parseStoredView(window.localStorage.getItem(VIEW_STORAGE_KEY));
     if (stored && stored.hops !== DEFAULT_SUBGRAPH_VIEW.hops) setView(stored);
+    setViewHydrated(true);
   }, []);
 
   useEffect(() => {
@@ -271,7 +277,7 @@ export function WebGraph({
   // The view options become part of the query key so toggling refetches
   // automatically and the relating-dialog's mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, isPlaceholderData } = useQuery({
     queryKey: [...RELATION_SUBGRAPH_QUERY_KEY, view] as const,
     queryFn: () => fetchSubgraph(view),
     // The default view is prefetched server-side and dehydrated into
@@ -283,6 +289,17 @@ export function WebGraph({
     // the graph to the loading placeholder while the new key fetches.
     placeholderData: keepPreviousData,
   });
+
+  // Hold the first paint until the view reconciled from localStorage has its
+  // own data — otherwise the prefetched default (2 hops) flashes for a beat
+  // before a stored "1 hop" preference refetches and replaces it. isPlaceholderData
+  // is true while keepPreviousData is showing the stale 2-hop result, so we wait
+  // it out: a little extra latency in exchange for landing on the right layout.
+  // One-way latch — once the initial load settles it never re-gates, so later
+  // user toggles still get keepPreviousData's seamless swap.
+  useEffect(() => {
+    if (viewHydrated && !isPending && !isPlaceholderData) setInitialReady(true);
+  }, [viewHydrated, isPending, isPlaceholderData]);
 
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
@@ -301,11 +318,11 @@ export function WebGraph({
   // True once the user pans/zooms — auto-fitView during sim ticks
   // would otherwise yank the viewport back every ~250ms.
   const userMovedViewportRef = useRef(false);
-  // True once paintFromSim has run a one-shot fit against the
-  // normalized layout. ReactFlow's `fitView` prop fires too early
-  // (before the first paint) and would otherwise leave the viewport
-  // sized for the unnormalized random positions.
-  const initialPaintFittedRef = useRef(false);
+  // True once the initial layout has fully relaxed (the sim's first "end").
+  // Until then paintFromSim refits every paint so the viewport tracks the
+  // settling graph at the right scale; after it, only explicit fits run, so a
+  // later drag-induced re-warm doesn't yank the viewport around.
+  const initialSettleDoneRef = useRef(false);
 
   // Edges never change after the subgraph loads — derive instead of
   // duplicating into React state.
@@ -473,9 +490,14 @@ export function WebGraph({
         paintFromSim();
       })
       .on("end", () => {
+        // Final paint while per-paint fitting is still armed, so the last
+        // positions are fit before we latch the initial settle closed. After
+        // this, paintFromSim stops refitting; the explicit fit below covers a
+        // later drag-induced re-warm settling.
         paintFromSim();
-        // One-shot refit once the layout has fully relaxed, unless the
-        // user has already taken over the viewport.
+        initialSettleDoneRef.current = true;
+        // Refit once the layout has fully relaxed, unless the user has already
+        // taken over the viewport.
         if (!userMovedViewportRef.current) {
           requestAnimationFrame(() => {
             flowRef.current?.fitView({ padding: 0.15, duration: 200 });
@@ -523,19 +545,16 @@ export function WebGraph({
         return changed ? next : prev;
       });
 
-      // One-shot fit on the first normalized paint — ReactFlow's
-      // `fitView` prop fires before this runs, against the unnormalized
-      // 200-unit random layout, so without this the viewport stays
-      // zoomed in for the entire settling phase. After this initial
-      // fit, no periodic refits during settling (the normalization
-      // keeps the layout at a stable ~TARGET sim units). The sim's
-      // "end" handler does one more fit when the layout has fully
-      // relaxed.
-      if (!initialPaintFittedRef.current && !userMovedViewportRef.current) {
-        initialPaintFittedRef.current = true;
-        requestAnimationFrame(() => {
-          flowRef.current?.fitView({ padding: 0.15, duration: 0 });
-        });
+      // Refit every paint while the initial layout settles. Normalization pins
+      // the longer axis to NORMALIZATION_TARGET, so the fit is stable from the
+      // first painted frame — the viewport tracks the settling graph rather
+      // than snapping once at the end. A one-shot fit here used to fire (via
+      // rAF) before the normalized nodes reached ReactFlow's store, fitting the
+      // raw seed instead, which left the graph zoomed-out until the "end" fit
+      // visibly zoomed in. Skipped during a drag (we freeze normalization then)
+      // and once the user takes over the viewport; stops at initialSettleDone.
+      if (!initialSettleDoneRef.current && !userMovedViewportRef.current && !draggedNodeIdRef.current) {
+        flowRef.current?.fitView({ padding: 0.15, duration: 0 });
       }
     }
 
@@ -753,15 +772,18 @@ export function WebGraph({
 
   const empty = !data || data.nodes.length === 0;
 
-  if (isPending) {
-    return <p className="text-base text-muted-foreground">Loading your web…</p>;
-  }
   if (isError) {
     return (
       <p role="alert" className="text-base text-destructive">
         Couldn&apos;t load your web.
       </p>
     );
+  }
+  // !initialReady covers the first-load hold above; isPending covers a genuine
+  // empty cache. Errors are checked first so a failed refetch surfaces instead
+  // of latching here forever.
+  if (isPending || !initialReady) {
+    return <p className="text-base text-muted-foreground">Loading your web…</p>;
   }
   if (empty) {
     return (
