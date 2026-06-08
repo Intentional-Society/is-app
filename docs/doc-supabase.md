@@ -80,6 +80,14 @@ The `/**` wildcard covers the `emailRedirectTo` targets all three forms pass —
 - **Email (magic link):** enabled — primary sign-in path.
 - **Email + password:** enabled — backs the password-reset flow at `/forgot-password` and the change-password form in profile edit. Sign-in via password is also possible from `/signin` for any member who has set one.
 
+### Authentication → Email — "Confirm email" is off
+
+The **Confirm email** toggle (Authentication → Email provider) is **off** in prod, matching local (`supabase/config.toml` → `enable_confirmations = false`). With it on, a brand-new email at `/signup` received Supabase's stock, unstyled `confirmation` template instead of the branded `magic_link` one (#366).
+
+Off is safe here because account creation is OTP-only: `signInWithOtp` is the sole path to a user row, and clicking the emailed link both creates the account and sets `email_confirmed_at` — the click already proves inbox ownership, which is the whole job of a confirmation step. Every account lands confirmed regardless of the toggle, and the password surfaces (`signInWithPassword`, `updateUser({ password })`) only act on accounts already created — and thus already confirmed — via OTP.
+
+Supabase's [general-configuration guide](https://supabase.com/docs/guides/auth/general-configuration) advises keeping confirmations on; that guidance targets the `signUp({ email, password })` default, where a user could otherwise hold a session without proving email ownership. The app has no such path. Adding one is the single condition that flips this decision — re-enable the toggle and author a styled `confirmation.html` (`docs/design-emails.md` → Templates in scope) in that same change.
+
 ### Authentication → SMTP
 
 Production routes auth emails through custom SMTP (Resend). Configure under Authentication → SMTP Settings:
@@ -99,7 +107,7 @@ See `docs/doc-resend.md` for why Resend over alternatives, the sending-domain ra
 
 ### Authentication → Email templates
 
-Auth email templates (magic link, signup confirmation, password recovery) are **managed from the repo**, not the dashboard. Source files live in `supabase/templates/` with a manifest at `supabase/templates/templates.manifest.mjs`. The local stack picks them up via `[auth.email.template.*]` blocks in `supabase/config.toml`. To update prod, edit the files and run `npm run update_email_templates` — the script PATCHes the Supabase Management API and overwrites whatever's in the dashboard. Dashboard edits will be silently clobbered on the next push; the repo wins. `npm run download_email_templates` snapshots the current hosted state to the committed `supabase/templates/_remote-snapshot/` directory — run it before each push so the snapshot stays current and the PR diff shows exactly what's changing for recipients.
+Auth email templates (magic link, password recovery) are **managed from the repo**, not the dashboard. Source files live in `supabase/templates/` with a manifest at `supabase/templates/templates.manifest.mjs`. The local stack picks them up via `[auth.email.template.*]` blocks in `supabase/config.toml`. To update prod, edit the files and run `npm run update_email_templates` — the script PATCHes the Supabase Management API and overwrites whatever's in the dashboard. Dashboard edits will be silently clobbered on the next push; the repo wins. `npm run download_email_templates` snapshots the current hosted state to the committed `supabase/templates/_remote-snapshot/` directory — run it before each push so the snapshot stays current and the PR diff shows exactly what's changing for recipients.
 
 Design and rationale: `docs/design-emails.md`.
 

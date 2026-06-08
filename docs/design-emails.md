@@ -26,15 +26,25 @@ reachable:
 | `magic_link`      | `/signin` and `/signup` (both existing and new emails) |
 | `recovery`        | `/forgot-password`                              |
 
-**Verified in Inbucket during implementation:** the `confirmation` template
-(commonly assumed to fire for brand-new signups) is *not* reached by current
-flows. GoTrue's `/otp` endpoint sends the `magic_link` template for both
-existing and new users; `confirmation` only fires from `signUp({ email, password })`,
-which the app doesn't call anywhere. So a single magic-link template body
-needs to read naturally for both "sign in" and "first-time sign up" cases.
+`signInWithOtp` — the only account-creation path (`/signup`) — renders
+`magic_link` for both returning and brand-new emails, so one magic-link body
+has to read naturally as both "sign in" and "first-time sign up." This holds
+because **email confirmations are off** (prod dashboard → Authentication →
+Email; local `supabase/config.toml` → `enable_confirmations = false`). With
+confirmations *on*, a first-time email gets the `confirmation` template instead
+([discussion #28947](https://github.com/orgs/supabase/discussions/28947)) — the
+unstyled-signup-email bug (#366).
 
-The remaining templates (`invite`, `confirmation`, `email_change`,
-`reauthentication`) are unreachable from current UI and stay on Supabase
+Confirmations are off **by design**: account creation is OTP-only, so the link
+click already proves the recipient controls the inbox and sets
+`email_confirmed_at` — a separate confirmation step adds no security on this
+path. Adding a `signUp({ email, password })` flow is the one change that would
+flip the decision; that PR re-enables confirmations and authors a styled
+`confirmation.html`. Full rationale: `docs/doc-supabase.md` → Authentication →
+Email.
+
+The other templates (`invite`, `confirmation`, `email_change`,
+`reauthentication`) aren't reached by current flows and stay on Supabase
 defaults.
 
 ---
@@ -46,7 +56,6 @@ Template bodies live in the repo:
 ```
 supabase/templates/
   magic-link.html
-  confirmation.html
   recovery.html
   templates.manifest.mjs    # type → { subject, file }
 ```
@@ -55,7 +64,7 @@ The HTML files are the single source of truth. Subjects sit alongside them
 in `templates.manifest.mjs` because Supabase carries the subject as a
 separate config field, not as `<title>` on the body.
 
-Files are self-contained — no shared layout / partials. For three templates
+Files are self-contained — no shared layout / partials. For two templates
 the duplication is cheap; introducing a build step would be premature.
 If the count grows, the option is to compose at build time into a
 gitignored `supabase/templates/_generated/` directory that both the local
@@ -66,20 +75,16 @@ config and the prod sync read from.
 ## Local dev wiring
 
 `supabase/config.toml` already supports per-template overrides. Each template
-gets a block referencing the file by path relative to `supabase/`:
+gets a block referencing the file by path relative to the repo root:
 
 ```toml
 [auth.email.template.magic_link]
-subject = "Your Intentional Society sign-in link"
-content_path = "./templates/magic-link.html"
-
-[auth.email.template.confirmation]
-subject = "Confirm your Intentional Society account"
-content_path = "./templates/confirmation.html"
+subject = "Sign in to the IS Web App"
+content_path = "./supabase/templates/magic-link.html"
 
 [auth.email.template.recovery]
-subject = "Reset your Intentional Society password"
-content_path = "./templates/recovery.html"
+subject = "Reset your IS Web App password"
+content_path = "./supabase/templates/recovery.html"
 ```
 
 `supabase start` picks these up. Config changes are not hot-reloaded — a
@@ -107,8 +112,6 @@ Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}
 {
   "mailer_subjects_magic_link": "...",
   "mailer_templates_magic_link_content": "<html>...</html>",
-  "mailer_subjects_confirmation": "...",
-  "mailer_templates_confirmation_content": "<html>...</html>",
   "mailer_subjects_recovery": "...",
   "mailer_templates_recovery_content": "<html>...</html>"
 }
