@@ -2,7 +2,7 @@ import { randomInt } from "node:crypto";
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import { MIN_NOTE_LENGTH } from "@/lib/invite-limits";
+import { INVITE_CODE_LENGTH, MIN_NOTE_LENGTH } from "@/lib/invite-limits";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import { db } from "./db";
@@ -12,7 +12,6 @@ import { invites, profiles } from "./schema";
 // Alphabet: 24 uppercase letters (no I, O — visually confusable with
 // 1/0) plus 8 digits (no 0, 1 — same reason). 32 chars.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const CODE_LENGTH = 10;
 // 32^10 ≈ 1.1e15 — sparse enough that collisions are vanishingly rare;
 // the unique constraint is the real safety net.
 
@@ -37,7 +36,7 @@ export type InviteForCreator = {
 // random bytes, which is what CodeQL flags as a biasing operation.
 const generateInviteCode = (): string => {
   let out = "";
-  for (let i = 0; i < CODE_LENGTH; i++) {
+  for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
     out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   }
   return out;

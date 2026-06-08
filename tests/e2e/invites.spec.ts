@@ -78,8 +78,14 @@ test.describe("invites — authed member flow", () => {
 test.describe("/signup — unauthed invite flow", () => {
   test("invalid code shows a specific error message", async ({ page }) => {
     await page.goto("/signup");
+
+    // Link-first intro, and the submit button stays disabled
+    // ("Enter invite code…") until a full-length code is present.
+    await expect(page.getByText("You've been invited to join!")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Enter invite code…" })).toBeDisabled();
+
     await page.getByLabel("Invite code").fill("ZZZZZZZZZZ");
-    await page.getByRole("button", { name: "Check code" }).click();
+    await page.getByRole("button", { name: "Sign up!" }).click();
     await expect(page.getByText(/doesn't match any invite/)).toBeVisible();
   });
 
@@ -128,16 +134,18 @@ test.describe("/signup — unauthed invite flow", () => {
 
       await guestPage.goto("/signup");
       await guestPage.getByLabel("Invite code").fill(code);
-      await guestPage.getByRole("button", { name: "Check code" }).click();
+      await guestPage.getByRole("button", { name: "Sign up!" }).click();
 
       await expect(guestPage.getByText("e2e signup-flow invite — come on in")).toBeVisible();
 
       await guestPage.getByLabel("Display name").fill("Future Member");
       await guestPage.getByLabel("Email").fill("future-member@testfake.local");
-      await guestPage.getByRole("button", { name: "Send sign-in link" }).click();
+      await guestPage.getByRole("button", { name: "Verify your email" }).click();
 
       await expect(guestPage.getByText("future-member@testfake.local")).toBeVisible();
       await expect(guestPage.getByText(/Check.*for a sign-in link/)).toBeVisible();
+      // The intro line drops away once we switch to the "check your email" state.
+      await expect(guestPage.getByText("You've been invited to join!")).toBeHidden();
     } finally {
       await guestContext.close();
     }
