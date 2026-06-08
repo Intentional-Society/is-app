@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-07 | James | Visible blocker for outdated browsers (#365)
+
+A layout-level ES5 check (`public/legacy-check.js`) feature-detects old browser engines and reveals a plain-HTML `LegacyBrowserNotice`.
+
 ## 2026-06-07 | Benji | Homepage card categories
 
 Grouped the logged-in homepage cards into three labeled sections — Community (Programs, Member directory, Current intentions), Personal (My web, My profile), and System (Invite a friend, Give Feedback) — with small uppercase category headers. Keeps the 2-column responsive grid within each section.

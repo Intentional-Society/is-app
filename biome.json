@@ -13,6 +13,7 @@
       "!supabase/templates/**/*.html",
       "!docs/_temp-*",
       "!drizzle/meta",
+      "!public/legacy-check.js",
       "!tests/functional/server/__data__"
     ]
   },

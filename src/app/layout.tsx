@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Gudea, Ovo } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth-provider";
+import { LegacyBrowserNotice } from "@/components/legacy-browser-notice";
 import { NavigationHistory } from "@/components/navigation-history";
 import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
@@ -51,6 +52,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={cn("font-sans", gudea.variable, ovo.variable)}>
       <body className="antialiased">
+        <LegacyBrowserNotice />
         <AuthProvider initialUser={user}>
           <QueryProvider>
             <NavigationHistory />
