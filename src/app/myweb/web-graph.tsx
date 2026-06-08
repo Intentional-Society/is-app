@@ -30,8 +30,23 @@ import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 import { isRelationValue } from "@/lib/relation-value";
 
-import { DEFAULT_SUBGRAPH_VIEW, RELATION_SUBGRAPH_QUERY_KEY, type SubgraphViewOptions } from "./query-keys";
+import {
+  DEFAULT_SUBGRAPH_VIEW,
+  parseStoredView,
+  RELATION_SUBGRAPH_QUERY_KEY,
+  type SubgraphViewOptions,
+  VIEW_STORAGE_KEY,
+} from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
+import {
+  computeNormalization,
+  edgeAvoidance,
+  edgeStrokeOpacity,
+  edgeStrokeWidth,
+  linkDistance,
+  NORMALIZATION_TARGET,
+} from "./web-graph-layout";
+import { DIM_KEEP, decorateEdges, decorateNodes, pathToCenter, shortestPathTree } from "./web-graph-selection";
 
 type SubgraphNode = RelationSubgraph["nodes"][number];
 
@@ -75,41 +90,14 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   return res.json();
 };
 
-// 1..4 → edge thickness; chosen so a 4-rated friend reads visually
-// distinct from a 1-rated acquaintance without dominating the canvas.
-const edgeStrokeWidth = (value: number) => 1.5 + value * 1.25;
-
-// 1..4 → spring rest-length for the d3-force link constraint. Stronger
-// relations want to sit closer (230 → 110 across the range). Charge,
-// collide, and other-link tensions still resolve the layout, so this
-// biases without ranking nodes strictly by edge weight.
-const linkDistance = (value: number) => 270 - value * 40;
-
-// 1..4 → linear ramp from 0.4 to 0.8 over the theme foreground (so
-// ≈0.4/0.53/0.67/0.8). Reinforces the thickness signal without letting
-// the strongest edges read as full-black ink. Both light and dark
-// themes ride foreground, so each stays readable against its own
-// background.
-const edgeStrokeOpacity = (value: number) => 0.4 + ((value - 1) / 3) * 0.4;
-
 // Handles are required for ReactFlow to anchor edges; rendering both at
 // the same vertically-centered position with opacity 0 makes edges read
 // as center-to-center lines without showing connector dots.
 const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
-// A selection dims everything off the lit path by blending toward the canvas,
-// never by making content transparent (which would show edge endpoints through
-// an avatar). A dimmed element keeps this fraction of its own color: edge
-// strokes and the name via color-mix, the raster avatar via a (1 - this)-opaque
-// canvas wash. Reads as a ~30% dim; the path stays at full strength.
-const DIM_KEEP = 0.7;
-
-// Lift the lit path above the dimmed tangle. xyflow gives each edge its own
-// z-indexed <svg> and each node a z-indexed wrapper, both defaulting to 0 in the
-// viewport's stacking context — so a high zIndex clears the rest; node > edge
-// keeps avatars over their lines.
-const SELECTION_EDGE_Z = 1000;
-const SELECTION_NODE_Z = 1001;
+// DIM_KEEP (the fraction a dimmed element keeps) lives in web-graph-selection
+// alongside the decoration that applies it; MemberNode reuses it for the avatar
+// and name washes so the whole node dims by the same amount as its edges.
 
 // Carries the node selection to MemberNode (rendered via nodeTypes) without
 // baking it into node.data — that would force a setNodes pass per selection and
@@ -243,8 +231,6 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
 
 const edgeTypes = { numbered: NumberedEdge };
 
-const VIEW_STORAGE_KEY = "isweb-graph-view";
-
 // View<->edit canvas animation. View is a square whose height tracks the
 // measured width; edit collapses to EDIT_HEIGHT. Width never changes between
 // modes, so only the height animates — top-anchored, so the bottom edge
@@ -252,23 +238,6 @@ const VIEW_STORAGE_KEY = "isweb-graph-view";
 const EDIT_HEIGHT = 500;
 const MODE_ANIM_MS = 1000;
 const MODE_ANIM_EASE = "cubic-bezier(0.45, 0, 0.55, 1)"; // accelerate + decelerate
-
-// Permissive parser — any malformed/legacy payload falls back to the
-// default. Strict validation matters because the parsed shape feeds the
-// useQuery key and would otherwise produce a failing API request on
-// every mount.
-function parseStoredView(raw: string | null): SubgraphViewOptions | null {
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed === "object" && parsed !== null && "hops" in parsed && (parsed.hops === 1 || parsed.hops === 2)) {
-      return { hops: parsed.hops };
-    }
-  } catch {
-    // fall through to null
-  }
-  return null;
-}
 
 export function WebGraph({
   square,
@@ -444,35 +413,21 @@ export function WebGraph({
     // toward the pinned center, fighting the link-distance equilibrium
     // and causing them to bunch on top of the center.
     //
-    // Custom force: gently push nodes off the segments of edges they
-    // don't belong to. Stock forceCollide handles node-on-node overlap
-    // but doesn't know about edges, so without this a node can settle
-    // straight on top of someone else's line. Scaled by alpha (d3's
-    // simulation "heat") so it fades as the layout cools.
-    const AVOID_THRESHOLD = 70;
-    const AVOID_STRENGTH = 0.7;
+    // Custom force: push nodes off the segments of edges they don't belong to,
+    // so one doesn't settle straight on top of someone else's line (stock
+    // forceCollide only knows node-on-node overlap). edgeAvoidance computes the
+    // per-edge delta — scaled by alpha (d3's "heat") so it fades as the layout
+    // cools — and we accumulate it into the node's velocity.
     const forceAvoidEdges = (alpha: number) => {
       for (const n of simNodes) {
         for (const e of simEdges) {
           const a = e.source as SimNode;
           const b = e.target as SimNode;
           if (n === a || n === b) continue;
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const len2 = dx * dx + dy * dy;
-          if (len2 < 1) continue;
-          // t = projection of n onto the line through a,b, clamped to
-          // [0,1] so the closest point stays on the segment.
-          let t = ((n.x - a.x) * dx + (n.y - a.y) * dy) / len2;
-          if (t < 0) t = 0;
-          else if (t > 1) t = 1;
-          const rx = n.x - (a.x + t * dx);
-          const ry = n.y - (a.y + t * dy);
-          const dist = Math.sqrt(rx * rx + ry * ry);
-          if (dist >= AVOID_THRESHOLD || dist < 0.001) continue;
-          const push = ((AVOID_THRESHOLD - dist) / AVOID_THRESHOLD) * AVOID_STRENGTH * alpha;
-          n.vx = (n.vx ?? 0) + (rx / dist) * push;
-          n.vy = (n.vy ?? 0) + (ry / dist) * push;
+          const delta = edgeAvoidance(n.x, n.y, a.x, a.y, b.x, b.y, alpha);
+          if (!delta) continue;
+          n.vx = (n.vx ?? 0) + delta.dvx;
+          n.vy = (n.vy ?? 0) + delta.dvy;
         }
       }
     };
@@ -514,9 +469,10 @@ export function WebGraph({
       });
 
     // Paints React node positions from the live simNodes, normalized so
-    // the layout's longer axis spans TARGET sim units and is centered
-    // on the origin. Combined with a manual fitView refit, this makes
-    // the rendered graph fill the viewport regardless of node count.
+    // the layout's longer axis spans NORMALIZATION_TARGET sim units and is
+    // centered on the origin (see computeNormalization). Combined with a manual
+    // fitView refit, this makes the rendered graph fill the viewport regardless
+    // of node count.
     function paintFromSim() {
       if (simNodes.length === 0) return;
       // During a drag, freeze the normalization. Recomputing it would
@@ -528,23 +484,10 @@ export function WebGraph({
       if (draggedNodeIdRef.current && normRef.current) {
         ({ cx, cy, scale } = normRef.current);
       } else {
-        const TARGET = 600;
-        let minX = simNodes[0].x;
-        let maxX = minX;
-        let minY = simNodes[0].y;
-        let maxY = minY;
-        for (let i = 1; i < simNodes.length; i++) {
-          const sn = simNodes[i];
-          if (sn.x < minX) minX = sn.x;
-          else if (sn.x > maxX) maxX = sn.x;
-          if (sn.y < minY) minY = sn.y;
-          else if (sn.y > maxY) maxY = sn.y;
-        }
-        const longer = Math.max(maxX - minX, maxY - minY);
-        scale = longer > 1 ? TARGET / longer : 1;
-        cx = (maxX + minX) / 2;
-        cy = (maxY + minY) / 2;
-        normRef.current = { cx, cy, scale };
+        const norm = computeNormalization(simNodes, NORMALIZATION_TARGET);
+        if (!norm) return;
+        ({ cx, cy, scale } = norm);
+        normRef.current = norm;
       }
 
       setNodes((prev) => {
@@ -760,98 +703,38 @@ export function WebGraph({
   // Shortest-path tree from the center over the (undirected) edge set, rebuilt
   // once per subgraph. Selecting a node walks these parent pointers back to the
   // center to find the chain that should stay lit while the rest dims.
-  const parentByNode = useMemo(() => {
-    const parent = new Map<string, string | null>();
-    if (!data) return parent;
-    const adj = new Map<string, string[]>();
-    const link = (a: string, b: string) => {
-      const list = adj.get(a);
-      if (list) list.push(b);
-      else adj.set(a, [b]);
-    };
-    for (const e of data.edges) {
-      link(e.relatorId, e.relateeId);
-      link(e.relateeId, e.relatorId);
-    }
-    parent.set(data.centerId, null);
-    const queue = [data.centerId];
-    for (let i = 0; i < queue.length; i++) {
-      const cur = queue[i];
-      for (const nb of adj.get(cur) ?? []) {
-        if (!parent.has(nb)) {
-          parent.set(nb, cur);
-          queue.push(nb);
-        }
-      }
-    }
-    return parent;
-  }, [data]);
+  const parentByNode = useMemo(
+    () => (data ? shortestPathTree(data.edges, data.centerId) : new Map<string, string | null>()),
+    [data],
+  );
 
   // The node ids and edge ids on the selected node's path back to the center.
   // Edge ids are direction-stamped (`relator->relatee`) and we don't know which
   // way the real edge runs, so add both candidates and let set-membership pick
   // the one that exists.
-  const { pathNodeIds, pathEdgeIds } = useMemo(() => {
-    const pathNodeIds = new Set<string>();
-    const pathEdgeIds = new Set<string>();
-    if (selectedNodeId === null) return { pathNodeIds, pathEdgeIds };
-    let cur: string | null | undefined = selectedNodeId;
-    while (cur != null) {
-      pathNodeIds.add(cur);
-      const par = parentByNode.get(cur);
-      if (par == null) break;
-      pathEdgeIds.add(`${par}->${cur}`);
-      pathEdgeIds.add(`${cur}->${par}`);
-      cur = par;
-    }
-    return { pathNodeIds, pathEdgeIds };
-  }, [selectedNodeId, parentByNode]);
+  const { pathNodeIds, pathEdgeIds } = useMemo(
+    () => pathToCenter(selectedNodeId, parentByNode),
+    [selectedNodeId, parentByNode],
+  );
 
   const nodeInteraction = useMemo<NodeInteraction>(
     () => ({ selectedNodeId, pathNodeIds }),
     [selectedNodeId, pathNodeIds],
   );
 
-  // Per-selection edge decorations layered onto the base edges:
-  //   - cursor:pointer on a selected, editable edge — ReactFlow merges the
-  //     className onto the edge's <g>, and cursor inherits down to the visible
-  //     and the wider invisible interaction path, so the whole line signals it.
-  //   - paint the lit path success-green and lift it above the rest
-  //     (SELECTION_EDGE_Z); dim every other edge by blending its stroke toward
-  //     the canvas. The stroke transition (on the base style) eases both.
-  // Only touched edges are re-spread, so this stays a cheap per-selection diff.
-  const decoratedEdges = useMemo(() => {
-    const nodeSelected = selectedNodeId !== null;
-    return edges.map((e) => {
-      const cursor = e.id === selectedEdgeId && e.data?.isOutgoing === true;
-      const onPath = nodeSelected && pathEdgeIds.has(e.id);
-      const dim = nodeSelected && !onPath;
-      if (!cursor && !onPath && !dim) return e;
-      const next = { ...e };
-      if (cursor) next.className = "cursor-pointer";
-      if (onPath) {
-        next.style = { ...e.style, stroke: "var(--color-success)", strokeOpacity: 1 };
-        next.zIndex = SELECTION_EDGE_Z;
-      } else if (dim) {
-        // Same blend-toward-canvas dim as the nodes; for a stroke this is
-        // identical to lowering opacity over the canvas, so look-for-look but
-        // opacity-free.
-        next.style = {
-          ...e.style,
-          stroke: `color-mix(in srgb, var(--color-canvas-foreground) ${DIM_KEEP * 100}%, var(--color-canvas))`,
-        };
-      }
-      return next;
-    });
-  }, [edges, selectedEdgeId, selectedNodeId, pathEdgeIds]);
+  // Light the selected edge and the selected node's lit path; dim the rest. The
+  // stroke transition on the base style eases the recolor. See decorateEdges.
+  const decoratedEdges = useMemo(
+    () => decorateEdges(edges, { selectedNodeId, selectedEdgeId, pathEdgeIds }),
+    [edges, selectedEdgeId, selectedNodeId, pathEdgeIds],
+  );
 
-  // Lift the lit path above the dimmed graph (SELECTION_NODE_Z) so a highlight
-  // never sits under a dimmed node. Derived from the live `nodes` state so sim
-  // ticks and drags flow through untouched; same ref when nothing is selected.
-  const decoratedNodes = useMemo(() => {
-    if (selectedNodeId === null) return nodes;
-    return nodes.map((n) => (pathNodeIds.has(n.id) ? { ...n, zIndex: SELECTION_NODE_Z } : n));
-  }, [nodes, selectedNodeId, pathNodeIds]);
+  // Lift the selected node's path above the dimmed graph; derived from the live
+  // `nodes` state so sim ticks and drags flow through untouched. See decorateNodes.
+  const decoratedNodes = useMemo(
+    () => decorateNodes(nodes, { selectedNodeId, pathNodeIds }),
+    [nodes, selectedNodeId, pathNodeIds],
+  );
 
   const empty = !data || data.nodes.length === 0;
 
