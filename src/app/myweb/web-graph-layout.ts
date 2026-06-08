@@ -82,3 +82,112 @@ export function computeNormalization(
   const scale = longer > 1 ? target / longer : 1;
   return { cx: (maxX + minX) / 2, cy: (maxY + minY) / 2, scale };
 }
+
+// First-hop ring radius (sim units) and the gap added per additional hop. The
+// first ring sits near linkDistance's range (110..230) so the force layout
+// barely has to move it; normalization rescales the whole cloud to the viewport
+// afterward, so only the *relative* spacing here matters.
+export const SEED_FIRST_HOP_RADIUS = 220;
+export const SEED_RING_GAP = 200;
+
+// Deterministic radial seed for the force layout. A breadth-first walk from the
+// center assigns each node a hop depth and the parent it connects through; the
+// first ring is spaced evenly around you, and each deeper node is nestled into a
+// shrinking arc around its parent — so friends-of-friends cluster by the friend
+// they share rather than scattering. d3-force then only polishes a roughly-right
+// layout instead of untangling random noise, which kills edge crossings and
+// (because no Math.random feeds the first layout) renders the same web on every
+// load.
+//
+// Every level is ordered by id, so the result is independent of edge order. The
+// center lands at the origin. Nodes unreachable from the center (no edge path to
+// it) are spread on an outer ring, so they still get a finite, deterministic
+// spot rather than an undefined position.
+export function radialSeed(
+  nodeIds: ReadonlyArray<string>,
+  edges: ReadonlyArray<{ relatorId: string; relateeId: string }>,
+  centerId: string,
+  options?: { firstHopRadius?: number; ringGap?: number },
+): Map<string, { x: number; y: number }> {
+  const firstHopRadius = options?.firstHopRadius ?? SEED_FIRST_HOP_RADIUS;
+  const ringGap = options?.ringGap ?? SEED_RING_GAP;
+
+  // Undirected adjacency.
+  const adj = new Map<string, string[]>();
+  const link = (a: string, b: string) => {
+    const list = adj.get(a);
+    if (list) list.push(b);
+    else adj.set(a, [b]);
+  };
+  for (const e of edges) {
+    link(e.relatorId, e.relateeId);
+    link(e.relateeId, e.relatorId);
+  }
+
+  // BFS from the center → depth, parent, and each parent's children. Neighbors
+  // are visited in id order so the tree (and thus the angles) don't depend on
+  // edge order.
+  const depth = new Map<string, number>([[centerId, 0]]);
+  const childrenOf = new Map<string, string[]>();
+  const queue = [centerId];
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    const neighbors = (adj.get(cur) ?? []).slice().sort();
+    for (const nb of neighbors) {
+      if (depth.has(nb)) continue;
+      depth.set(nb, (depth.get(cur) ?? 0) + 1);
+      const kids = childrenOf.get(cur);
+      if (kids) kids.push(nb);
+      else childrenOf.set(cur, [nb]);
+      queue.push(nb);
+    }
+  }
+
+  // Angle + the angular wedge each node owns for its own children. The center
+  // spreads its children evenly over the full circle; every deeper parent fans
+  // its children within a shrunk arc centered on its own angle, so each subtree
+  // stays clustered.
+  const angle = new Map<string, number>([[centerId, 0]]);
+  const wedge = new Map<string, number>([[centerId, Math.PI * 2]]);
+  const rootKids = childrenOf.get(centerId) ?? [];
+  rootKids.forEach((id, j) => {
+    angle.set(id, (j * Math.PI * 2) / rootKids.length);
+    wedge.set(id, (Math.PI * 2) / rootKids.length);
+  });
+  // queue is in BFS order, so a parent's angle/wedge is always set before its
+  // children are reached. Depth 0 (center) and depth 1 (handled above) are
+  // skipped; this fans depth ≥ 2.
+  for (const cur of queue) {
+    if ((depth.get(cur) ?? 0) < 1) continue;
+    const kids = childrenOf.get(cur);
+    if (!kids?.length) continue;
+    const parentAngle = angle.get(cur) ?? 0;
+    const arc = (wedge.get(cur) ?? Math.PI / 2) * 0.6;
+    kids.forEach((id, j) => {
+      const offset = kids.length === 1 ? 0 : (j / (kids.length - 1) - 0.5) * arc;
+      angle.set(id, parentAngle + offset);
+      wedge.set(id, arc / kids.length);
+    });
+  }
+
+  const pos = new Map<string, { x: number; y: number }>([[centerId, { x: 0, y: 0 }]]);
+  let maxDepth = 0;
+  for (const [id, d] of depth) {
+    if (id === centerId) continue;
+    if (d > maxDepth) maxDepth = d;
+    const r = firstHopRadius + (d - 1) * ringGap;
+    const a = angle.get(id) ?? 0;
+    pos.set(id, { x: Math.cos(a) * r, y: Math.sin(a) * r });
+  }
+
+  // Anything the BFS never reached (an isolated node with no edges) lands on a
+  // ring just outside the deepest hop, id-ordered so it stays deterministic.
+  const unreached = nodeIds.filter((id) => !depth.has(id)).sort();
+  const outerR = firstHopRadius + maxDepth * ringGap;
+  unreached.forEach((id, j) => {
+    const a = (j * Math.PI * 2) / unreached.length;
+    pos.set(id, { x: Math.cos(a) * outerR, y: Math.sin(a) * outerR });
+  });
+
+  return pos;
+}

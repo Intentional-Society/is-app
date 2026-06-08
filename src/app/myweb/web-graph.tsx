@@ -45,6 +45,7 @@ import {
   edgeStrokeWidth,
   linkDistance,
   NORMALIZATION_TARGET,
+  radialSeed,
 } from "./web-graph-layout";
 import { DIM_KEEP, decorateEdges, decorateNodes, pathToCenter, shortestPathTree } from "./web-graph-selection";
 
@@ -355,12 +356,26 @@ export function WebGraph({
     // prior nodes) scatters randomly.
     const prevById = simNodesByIdRef.current;
     const isFirstLayout = prevById.size === 0;
+    // The first layout gets a deterministic radial seed (you at the origin, the
+    // first ring evenly around you, friends-of-friends nestled by their friend),
+    // so d3-force polishes a near-correct layout instead of untangling random
+    // scatter — same web every load, far fewer crossings. See radialSeed.
+    const seed = isFirstLayout
+      ? radialSeed(
+          data.nodes.map((n) => n.id),
+          data.edges,
+          centerId,
+        )
+      : null;
     const simNodes: SimNode[] = data.nodes.map((n) => {
       if (n.id === centerId) return { id: n.id, x: 0, y: 0, fx: 0, fy: 0 };
       const prev = prevById.get(n.id);
       if (prev) return { id: n.id, x: prev.x, y: prev.y, vx: prev.vx, vy: prev.vy, fx: null, fy: null };
-      const spread = isFirstLayout ? 200 : 12;
-      return { id: n.id, x: (Math.random() - 0.5) * spread, y: (Math.random() - 0.5) * spread, fx: null, fy: null };
+      const seeded = seed?.get(n.id);
+      if (seeded) return { id: n.id, x: seeded.x, y: seeded.y, fx: null, fy: null };
+      // A genuinely-new node on an incremental update emerges from the center —
+      // where the just-related card flies to — and the sim eases it out.
+      return { id: n.id, x: (Math.random() - 0.5) * 12, y: (Math.random() - 0.5) * 12, fx: null, fy: null };
     });
     // Lookup map kept around for paintFromSim — avoids an O(n²) .find
     // scan on every tick. Also exposed via simNodesByIdRef so the

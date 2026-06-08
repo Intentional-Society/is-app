@@ -7,6 +7,9 @@ import {
   edgeStrokeOpacity,
   edgeStrokeWidth,
   linkDistance,
+  radialSeed,
+  SEED_FIRST_HOP_RADIUS,
+  SEED_RING_GAP,
 } from "@/app/myweb/web-graph-layout";
 
 describe("edge visual encoding", () => {
@@ -123,5 +126,73 @@ describe("edgeAvoidance", () => {
     const hot = edgeAvoidance(0, 30, ax, ay, bx, by, 1);
     const cool = edgeAvoidance(0, 30, ax, ay, bx, by, 0.5);
     expect(cool?.dvy).toBeCloseTo((hot?.dvy ?? 0) / 2, 6);
+  });
+});
+
+describe("radialSeed", () => {
+  const edge = (relatorId: string, relateeId: string) => ({ relatorId, relateeId });
+  const radius = (p?: { x: number; y: number }) => (p ? Math.hypot(p.x, p.y) : Number.NaN);
+  const angleOf = (p?: { x: number; y: number }) => (p ? Math.atan2(p.y, p.x) : Number.NaN);
+
+  it("pins the center at the origin", () => {
+    expect(radialSeed(["C"], [], "C").get("C")).toEqual({ x: 0, y: 0 });
+  });
+
+  it("places a first-hop node on the first ring", () => {
+    const seed = radialSeed(["C", "A"], [edge("C", "A")], "C");
+    expect(radius(seed.get("A"))).toBeCloseTo(SEED_FIRST_HOP_RADIUS, 6);
+  });
+
+  it("spaces the first ring evenly around the center", () => {
+    // Four direct connections → quarters of the circle, id-ordered a,b,c,d.
+    const seed = radialSeed(
+      ["C", "a", "b", "c", "d"],
+      ["a", "b", "c", "d"].map((id) => edge("C", id)),
+      "C",
+    );
+    for (const id of ["a", "b", "c", "d"]) {
+      expect(radius(seed.get(id))).toBeCloseTo(SEED_FIRST_HOP_RADIUS, 6);
+    }
+    // a at 0, b at 90°, c at 180°, d at 270°.
+    expect(seed.get("a")?.x).toBeCloseTo(SEED_FIRST_HOP_RADIUS, 6);
+    expect(seed.get("b")?.y).toBeCloseTo(SEED_FIRST_HOP_RADIUS, 6);
+    expect(seed.get("c")?.x).toBeCloseTo(-SEED_FIRST_HOP_RADIUS, 6);
+    expect(seed.get("d")?.y).toBeCloseTo(-SEED_FIRST_HOP_RADIUS, 6);
+  });
+
+  it("is independent of edge order and edge direction", () => {
+    const ids = ["C", "A", "B", "Z"];
+    const a = radialSeed(ids, [edge("C", "A"), edge("C", "B"), edge("A", "Z")], "C");
+    // Same graph, edges shuffled and some stored relatee→relator.
+    const b = radialSeed(ids, [edge("Z", "A"), edge("B", "C"), edge("C", "A")], "C");
+    const dump = (m: Map<string, { x: number; y: number }>) => [...m.entries()].sort(([x], [y]) => x.localeCompare(y));
+    expect(dump(a)).toEqual(dump(b));
+  });
+
+  it("nestles deeper nodes in an arc around the friend they connect through", () => {
+    // C—A, C—B (first ring); A—W, A—Z (second ring, both hanging off A at angle 0).
+    const seed = radialSeed(
+      ["C", "A", "B", "W", "Z"],
+      [edge("C", "A"), edge("C", "B"), edge("A", "W"), edge("A", "Z")],
+      "C",
+    );
+    const aAngle = angleOf(seed.get("A"));
+    for (const id of ["W", "Z"]) {
+      // One hop deeper sits a full ring-gap further out…
+      expect(radius(seed.get(id))).toBeCloseTo(SEED_FIRST_HOP_RADIUS + SEED_RING_GAP, 6);
+      // …and stays within A's angular wedge (half the gap between A and B is π/2).
+      expect(Math.abs(angleOf(seed.get(id)) - aAngle)).toBeLessThan(Math.PI / 2);
+    }
+    // The two siblings fan to opposite sides of A, so they don't overlap.
+    expect(angleOf(seed.get("W"))).not.toBeCloseTo(angleOf(seed.get("Z")), 6);
+  });
+
+  it("gives an unreachable node a finite outer-ring spot", () => {
+    const seed = radialSeed(["C", "A", "X"], [edge("C", "A")], "C");
+    const x = seed.get("X");
+    expect(x).toBeDefined();
+    expect(Number.isFinite(radius(x))).toBe(true);
+    // Beyond the reachable graph's deepest ring.
+    expect(radius(x)).toBeGreaterThan(SEED_FIRST_HOP_RADIUS);
   });
 });
