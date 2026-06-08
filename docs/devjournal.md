@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-07 | James | Supabase config change: Irrelevant "Confirm email" setting is off (#366)
+
+Production Supabase **Confirm email** toggle is now off so new invitees get the branded `magic_link` — the path returning members already use. Re-enable only if a `signUp({ email, password })` path is ever added.
+
 ## 2026-06-07 | James | Visible blocker for outdated browsers (#365)
 
 A layout-level ES5 check (`public/legacy-check.js`) feature-detects old browser engines and reveals a plain-HTML `LegacyBrowserNotice`.
