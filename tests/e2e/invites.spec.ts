@@ -81,7 +81,7 @@ test.describe("/signup — unauthed invite flow", () => {
 
     // Link-first intro, and the submit button stays disabled
     // ("Enter invite code…") until a full-length code is present.
-    await expect(page.getByText("You've been invited to join the Intentional Society Web App.")).toBeVisible();
+    await expect(page.getByText("You've been invited to join!")).toBeVisible();
     await expect(page.getByRole("button", { name: "Enter invite code…" })).toBeDisabled();
 
     await page.getByLabel("Invite code").fill("ZZZZZZZZZZ");
@@ -145,7 +145,7 @@ test.describe("/signup — unauthed invite flow", () => {
       await expect(guestPage.getByText("future-member@testfake.local")).toBeVisible();
       await expect(guestPage.getByText(/Check.*for a sign-in link/)).toBeVisible();
       // The intro line drops away once we switch to the "check your email" state.
-      await expect(guestPage.getByText("You've been invited to join the Intentional Society Web App.")).toBeHidden();
+      await expect(guestPage.getByText("You've been invited to join!")).toBeHidden();
     } finally {
       await guestContext.close();
     }

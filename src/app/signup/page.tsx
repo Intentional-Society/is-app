@@ -26,7 +26,10 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <AppWordmark asLink />
-      <SignupForm initialCode={code ?? ""} intro="You've been invited to join the Intentional Society Web App." />
+      <SignupForm
+        initialCode={code ?? ""}
+        intro="You've been invited to join! If your link has prefilled the code below, just hit the 'Sign up!' button to get going. Otherwise, paste in the invite code."
+      />
       <p className="text-base text-muted-foreground">
         Already a member?{" "}
         <Link href="/signin" className="underline text-muted-foreground hover:text-foreground">
