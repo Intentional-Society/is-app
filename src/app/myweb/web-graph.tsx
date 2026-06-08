@@ -5,29 +5,20 @@ import "@xyflow/react/dist/style.css";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   applyNodeChanges,
-  BaseEdge,
   Controls,
   type Edge,
-  EdgeLabelRenderer,
-  type EdgeProps,
-  getStraightPath,
-  Handle,
   type Node,
   type NodeChange,
-  type NodeProps,
   Panel,
-  Position,
   ReactFlow,
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
 import { useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
-import type { RelationSubgraph } from "@/lib/api-types";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import {
@@ -53,13 +44,17 @@ import {
   NORMALIZATION_TARGET,
   radialSeed,
 } from "./web-graph-layout";
-import { DIM_KEEP, decorateEdges, decorateNodes, pathToCenter, shortestPathTree } from "./web-graph-selection";
-
-type SubgraphNode = RelationSubgraph["nodes"][number];
-
-type MemberNodeData = SubgraphNode & {
-  isCenter: boolean;
-};
+import {
+  type EdgeData,
+  type EdgeInteraction,
+  EdgeInteractionContext,
+  edgeTypes,
+  type MemberNodeData,
+  type NodeInteraction,
+  NodeInteractionContext,
+  nodeTypes,
+} from "./web-graph-renderers";
+import { decorateEdges, decorateNodes, pathToCenter, shortestPathTree } from "./web-graph-selection";
 
 // d3-force mutates these objects in place; ReactFlow's Node objects are
 // derived from them at each tick. Keeping the two shapes separate makes
@@ -80,13 +75,6 @@ type SimEdge = {
   value: number;
 };
 
-type EdgeData = {
-  isOutgoing: boolean;
-  value: number;
-  relateeId: string;
-  relateeName: string | null;
-};
-
 const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   const res = await apiClient.api.relations.subgraph.$get({
     query: {
@@ -96,147 +84,6 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   if (!res.ok) throw new Error(`relations/subgraph: ${res.status}`);
   return res.json();
 };
-
-// Handles are required for ReactFlow to anchor edges; rendering both at
-// the same vertically-centered position with opacity 0 makes edges read
-// as center-to-center lines without showing connector dots.
-const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
-
-// DIM_KEEP (the fraction a dimmed element keeps) lives in web-graph-selection
-// alongside the decoration that applies it; MemberNode reuses it for the avatar
-// and name washes so the whole node dims by the same amount as its edges.
-
-// Carries the node selection to MemberNode (rendered via nodeTypes) without
-// baking it into node.data — that would force a setNodes pass per selection and
-// tangle with the sim's position updates. Mirrors EdgeInteractionContext.
-type NodeInteraction = {
-  selectedNodeId: string | null;
-  // Node ids on the selected node's path back to the center; these stay lit.
-  pathNodeIds: Set<string>;
-};
-const NodeInteractionContext = createContext<NodeInteraction | null>(null);
-
-function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
-  const selection = useContext(NodeInteractionContext);
-  const isSelected = selection?.selectedNodeId === id;
-  // With a selection active, every node off the lit path dims (see DIM_KEEP);
-  // the selected node keeps the hover size so the click reads as "this one's it."
-  const isDimmed = selection != null && selection.selectedNodeId !== null && !selection.pathNodeIds.has(id);
-  // Every node on the lit path (selected, the steps, the root) gets the green
-  // border to match the links; otherwise the center is primary-teal, rest default.
-  const onLitPath = selection != null && selection.selectedNodeId !== null && selection.pathNodeIds.has(id);
-  const borderClass = onLitPath ? "border-success" : data.isCenter ? "border-primary" : "border-border";
-  return (
-    // Only the Avatar is a click target: the wrapper is pointer-events-none and
-    // .react-flow__node is !pointer-events-none (set per-node above), so clicks on
-    // the name and the corners around the round avatar fall through as inert.
-    <div className="pointer-events-none flex flex-col items-center gap-1">
-      <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
-      <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
-      {/* Avatar + its dim wash share this box so they scale together on
-          hover/select (no half-dimmed ring). */}
-      <div className={`relative transition-transform duration-150 hover:scale-110 ${isSelected ? "scale-110" : ""}`}>
-        <Avatar
-          name={data.displayName}
-          url={data.avatarUrl}
-          className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${
-            data.isCenter ? "h-16 w-16" : "h-12 w-12"
-          } ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
-        />
-        {/* Dim wash clipped to the avatar circle (rounded-full, never a square
-            over the edges behind), blended over the opaque avatar so endpoints
-            behind it stay hidden. pointer-events-none lets clicks reach it. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-full bg-canvas transition-opacity duration-150"
-          style={{ opacity: isDimmed ? 1 - DIM_KEEP : 0 }}
-        />
-      </div>
-      {/* The name dims by mixing its text color toward the canvas — color paints
-          only the glyphs, so no covering box (square) and no bleed-through. */}
-      <div
-        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-colors duration-150"
-        style={
-          isDimmed ? { color: `color-mix(in srgb, currentColor ${DIM_KEEP * 100}%, var(--color-canvas))` } : undefined
-        }
-      >
-        {data.displayName ?? "—"}
-      </div>
-    </div>
-  );
-}
-
-const nodeTypes = { member: MemberNode };
-
-// Carries edge-number reveal state + the relating callback to the
-// NumberedEdge instances without threading them through the edge data object
-// (which would defeat the edges useMemo). The Provider wraps ReactFlow so
-// context still reaches the edges registered via the edgeTypes prop.
-type EdgeInteraction = {
-  openRelating: (target: RelatingTarget) => void;
-  // Transient hover preview (desktop) and the selected edge (click/tap). A
-  // number shows when its id matches either.
-  hoverEdgeId: string | null;
-  selectedEdgeId: string | null;
-  previewEdge: (id: string) => void;
-  endPreviewSoon: () => void;
-};
-const EdgeInteractionContext = createContext<EdgeInteraction | null>(null);
-
-// Straight-line edge with an HTML circle label at the geometric midpoint
-// of the line between source and target. ReactFlow's default bezier
-// edges arc upward (both ends are Position.Top), so their parametric
-// midpoint sits above the visual line — using a straight edge keeps the
-// label on the line, and HTML labels (via EdgeLabelRenderer) give us a
-// real circular pill that an SVG <rect> can't.
-//
-// The number is hidden until its edge is active (hovered, or tapped within
-// the edge's interactionWidth). While hidden it's pointer-events-none so the
-// hover/tap falls through to the line; while shown it captures clicks to open
-// the relating dialog. onMouseEnter/Leave bridge the pointer's trip from the
-// line onto the number (paired with the parent's short hide delay).
-
-function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: EdgeProps<Edge<EdgeData>>) {
-  const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-  const interaction = useContext(EdgeInteractionContext);
-  const isClickable = data?.isOutgoing === true && interaction !== null;
-  const isVisible = interaction !== null && (interaction.hoverEdgeId === id || interaction.selectedEdgeId === id);
-  const handleClick = isClickable
-    ? () =>
-        interaction?.openRelating({
-          id: data.relateeId,
-          displayName: data.relateeName,
-          currentValue: isRelationValue(data.value) ? data.value : null,
-        })
-    : undefined;
-  return (
-    <>
-      <BaseEdge id={id} path={edgePath} style={style} />
-      <EdgeLabelRenderer>
-        <button
-          type="button"
-          onClick={handleClick}
-          onMouseEnter={() => interaction?.previewEdge(id)}
-          onMouseLeave={() => interaction?.endPreviewSoon()}
-          disabled={!isClickable}
-          aria-hidden={!isVisible}
-          aria-label={isClickable ? "Adjust this relationship" : undefined}
-          style={{
-            position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-          }}
-          className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/80 text-xs font-semibold text-canvas-foreground transition-opacity duration-150 ${
-            isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-          } ${isClickable ? "cursor-pointer hover:bg-canvas" : "cursor-default"}`}
-        >
-          {data?.value}
-        </button>
-      </EdgeLabelRenderer>
-    </>
-  );
-}
-
-const edgeTypes = { numbered: NumberedEdge };
 
 // View<->edit canvas animation. View is a square whose height tracks the
 // measured width; edit collapses to EDIT_HEIGHT. Width never changes between
