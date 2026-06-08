@@ -15,7 +15,7 @@ Intentional Society web application — an authenticated app for a small, global
 - `npm run lint` — Biome
 - `npm test` — run all test suites (functional + e2e)
 - `npm run test:functional` — Vitest only
-- `npm run test:e2e` — Playwright only (Chromium, uses port 3093)
+- `npm run test:e2e` — Playwright only (Chromium); reuses a running dev server, else starts one on the dev port (3000, or the lane's `LANE_DEV_PORT`)
 - `npm run watch` — Vitest watch mode
 - `npm run dev:db:stop` — stop local Supabase containers
 - `npm run dev:db:reset` — wipe local DB and reapply migrations
