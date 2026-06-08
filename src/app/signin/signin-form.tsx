@@ -146,6 +146,24 @@ export function SigninForm() {
     setState({ status: "sent", email });
   };
 
+  // Dev-only one-click sign-in as the seeded demo account (Aria Chen,
+  // password "password" — see scripts/seed-dev.ts). The whole panel is
+  // gated on NODE_ENV below, so this never ships to production.
+  const signInAsDemo = async () => {
+    setState({ status: "submitting" });
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: "aria.chen@example.com",
+      password: "password",
+    });
+    if (error) {
+      setState({ status: "error", message: error.message });
+      return;
+    }
+    router.push("/");
+    router.refresh();
+  };
+
   if (state.status === "sent") {
     return <SentView email={state.email} origin={window.location.origin} />;
   }
@@ -207,6 +225,18 @@ export function SigninForm() {
         <p role="alert" className="text-base text-destructive">
           {state.message}
         </p>
+      )}
+
+      {process.env.NODE_ENV === "development" && (
+        <div className="mt-2 flex flex-col gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-3">
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            <strong>Local dev</strong> — one-click sign-in as seeded member <code>aria.chen@example.com</code> (password{" "}
+            <code>password</code>).
+          </p>
+          <Button type="button" variant="secondary" onClick={signInAsDemo} disabled={state.status === "submitting"}>
+            Sign in as Aria Chen
+          </Button>
+        </div>
       )}
     </form>
   );

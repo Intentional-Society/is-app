@@ -29,13 +29,18 @@ export type RelatingTarget = {
 type Props = {
   target: RelatingTarget | null;
   onClose: () => void;
-  // Fires only after a relation is successfully committed. Used by
-  // /myweb to advance the welcome tour once the user completes the
-  // "add people" step's action.
-  onRelated?: () => void;
+  // Fires only after a relation is successfully committed, with the relatee
+  // id. Used by /myweb to advance the welcome tour and to animate the just-
+  // related card into the graph.
+  onRelated?: (relateeId: string) => void;
+  // When set, this dialog skips its own optimistic feed-drop and the
+  // candidates/subgraph invalidations — the caller commits those at the right
+  // moment (e.g. the end of the card-fly animation). The member-profile use
+  // leaves this off and gets the normal immediate behavior.
+  deferGraphCommit?: boolean;
 };
 
-export function RelatingDialog({ target, onClose, onRelated }: Props) {
+export function RelatingDialog({ target, onClose, onRelated, deferGraphCommit }: Props) {
   const queryClient = useQueryClient();
   const [pendingValue, setPendingValue] = useState<RelationValue | null>(null);
 
@@ -53,7 +58,10 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
     },
     // Optimistically drop the rated candidate from both feed sections so
     // the card vanishes before the round-trip lands. onError rolls back.
+    // Skipped under deferGraphCommit: the caller keeps the card in place to
+    // animate it, then drops it itself at the animation's end.
     onMutate: async ({ relateeId }) => {
+      if (deferGraphCommit) return undefined;
       await queryClient.cancelQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
       const previous = queryClient.getQueryData<RelationCandidatesFeed>(RELATION_CANDIDATES_QUERY_KEY);
       if (previous) {
@@ -72,9 +80,12 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
     onSettled: (_data, _err, { relateeId }) => {
       // Re-sync candidates and subgraph so any newly-revealed cards
       // (e.g. inviter's connections opened up by relating to them) appear
-      // and the graph picks up the new edge once it exists.
-      queryClient.invalidateQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: RELATION_SUBGRAPH_QUERY_KEY });
+      // and the graph picks up the new edge once it exists. Under
+      // deferGraphCommit the caller fires these at the fly's end instead.
+      if (!deferGraphCommit) {
+        queryClient.invalidateQueries({ queryKey: RELATION_CANDIDATES_QUERY_KEY });
+        queryClient.invalidateQueries({ queryKey: RELATION_SUBGRAPH_QUERY_KEY });
+      }
       // Refresh any per-member value reads (e.g. the member-profile control)
       // so the displayed strength reflects the edit.
       queryClient.invalidateQueries({ queryKey: relationValueQueryKey(relateeId) });
@@ -108,14 +119,15 @@ export function RelatingDialog({ target, onClose, onRelated }: Props) {
 
   const relate = (value: RelationValue) => {
     if (!target || busy) return;
+    const relateeId = target.id;
     setPendingValue(value);
     mutation.mutate(
-      { relateeId: target.id, value },
+      { relateeId, value },
       {
         onSuccess: () => {
           setPendingValue(null);
           onClose();
-          onRelated?.();
+          onRelated?.(relateeId);
         },
         onError: () => {
           setPendingValue(null);

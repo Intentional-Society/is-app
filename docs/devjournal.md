@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-08 | James | One-click dev sign-in as Aria Chen
+
+One-click sign-in as Aria Chen, now promoted to demo user in the dev-seed data.
+
 ## 2026-06-07 | James | Supabase config change: Irrelevant "Confirm email" setting is off (#366)
 
 Production Supabase **Confirm email** toggle is now off so new invitees get the branded `magic_link` — the path returning members already use. Re-enable only if a `signUp({ email, password })` path is ever added.

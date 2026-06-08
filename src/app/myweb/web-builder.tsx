@@ -42,7 +42,15 @@ const targetFromCandidate = (candidate: RelationCandidate): RelatingTarget => ({
   hintAttribution: buildHintAttribution(candidate),
 });
 
-export function WebBuilder({ onOpenRelating }: { onOpenRelating: (target: RelatingTarget) => void }) {
+export function WebBuilder({
+  onOpenRelating,
+  flyingId,
+}: {
+  onOpenRelating: (target: RelatingTarget) => void;
+  // The candidate currently flying into the graph: its slot is held open
+  // (visibility:hidden) so the grid doesn't reflow until the fly lands.
+  flyingId?: string | null;
+}) {
   const { data, isPending, isError } = useQuery({
     queryKey: RELATION_CANDIDATES_QUERY_KEY,
     queryFn: fetchCandidates,
@@ -78,7 +86,11 @@ export function WebBuilder({ onOpenRelating }: { onOpenRelating: (target: Relati
       {allCandidates.length > 0 ? (
         <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
           {allCandidates.map((candidate) => (
-            <li key={candidate.id}>
+            <li
+              key={candidate.id}
+              data-candidate-id={candidate.id}
+              className={candidate.id === flyingId ? "invisible" : undefined}
+            >
               <SuggestionCard candidate={candidate} onClick={openRelating} />
             </li>
           ))}

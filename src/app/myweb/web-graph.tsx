@@ -30,8 +30,23 @@ import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
 import { isRelationValue } from "@/lib/relation-value";
 
-import { DEFAULT_SUBGRAPH_VIEW, RELATION_SUBGRAPH_QUERY_KEY, type SubgraphViewOptions } from "./query-keys";
+import {
+  DEFAULT_SUBGRAPH_VIEW,
+  parseStoredView,
+  RELATION_SUBGRAPH_QUERY_KEY,
+  type SubgraphViewOptions,
+  VIEW_STORAGE_KEY,
+} from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
+import {
+  computeNormalization,
+  edgeAvoidance,
+  edgeStrokeOpacity,
+  edgeStrokeWidth,
+  linkDistance,
+  NORMALIZATION_TARGET,
+} from "./web-graph-layout";
+import { DIM_KEEP, decorateEdges, decorateNodes, pathToCenter, shortestPathTree } from "./web-graph-selection";
 
 type SubgraphNode = RelationSubgraph["nodes"][number];
 
@@ -75,58 +90,91 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   return res.json();
 };
 
-// 1..4 → edge thickness; chosen so a 4-rated friend reads visually
-// distinct from a 1-rated acquaintance without dominating the canvas.
-const edgeStrokeWidth = (value: number) => 1.5 + value * 1.25;
-
-// 1..4 → spring rest-length for the d3-force link constraint. Stronger
-// relations want to sit closer (230 → 110 across the range). Charge,
-// collide, and other-link tensions still resolve the layout, so this
-// biases without ranking nodes strictly by edge weight.
-const linkDistance = (value: number) => 270 - value * 40;
-
-// 1..4 → linear ramp from 0.4 to 0.8 over the theme foreground (so
-// ≈0.4/0.53/0.67/0.8). Reinforces the thickness signal without letting
-// the strongest edges read as full-black ink. Both light and dark
-// themes ride foreground, so each stays readable against its own
-// background.
-const edgeStrokeOpacity = (value: number) => 0.4 + ((value - 1) / 3) * 0.4;
-
 // Handles are required for ReactFlow to anchor edges; rendering both at
 // the same vertically-centered position with opacity 0 makes edges read
 // as center-to-center lines without showing connector dots.
 const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 
-function MemberNode({ data }: NodeProps<Node<MemberNodeData>>) {
+// DIM_KEEP (the fraction a dimmed element keeps) lives in web-graph-selection
+// alongside the decoration that applies it; MemberNode reuses it for the avatar
+// and name washes so the whole node dims by the same amount as its edges.
+
+// Carries the node selection to MemberNode (rendered via nodeTypes) without
+// baking it into node.data — that would force a setNodes pass per selection and
+// tangle with the sim's position updates. Mirrors EdgeInteractionContext.
+type NodeInteraction = {
+  selectedNodeId: string | null;
+  // Node ids on the selected node's path back to the center; these stay lit.
+  pathNodeIds: Set<string>;
+};
+const NodeInteractionContext = createContext<NodeInteraction | null>(null);
+
+function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
+  const selection = useContext(NodeInteractionContext);
+  const isSelected = selection?.selectedNodeId === id;
+  // With a selection active, every node off the lit path dims (see DIM_KEEP);
+  // the selected node keeps the hover size so the click reads as "this one's it."
+  const isDimmed = selection != null && selection.selectedNodeId !== null && !selection.pathNodeIds.has(id);
+  // Every node on the lit path (selected, the steps, the root) gets the green
+  // border to match the links; otherwise the center is primary-teal, rest default.
+  const onLitPath = selection != null && selection.selectedNodeId !== null && selection.pathNodeIds.has(id);
+  const borderClass = onLitPath ? "border-success" : data.isCenter ? "border-primary" : "border-border";
   return (
-    // pointer-events-none on the wrapper + the !pointer-events-none
-    // override on .react-flow__node (set per-node above) means only the
-    // Avatar (pointer-events-auto + clip-path:circle) is a click
-    // target. The name renders in flow below the avatar so the wrapper
-    // bounding box covers the full visible node, but its
-    // pointer-events-none keeps clicks on the name inert.
+    // Only the Avatar is a click target: the wrapper is pointer-events-none and
+    // .react-flow__node is !pointer-events-none (set per-node above), so clicks on
+    // the name and the corners around the round avatar fall through as inert.
     <div className="pointer-events-none flex flex-col items-center gap-1">
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" position={Position.Top} style={HANDLE_STYLE} />
-      <Avatar
-        name={data.displayName}
-        url={data.avatarUrl}
-        className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] transition-transform duration-150 hover:scale-110 ${
-          data.isCenter ? "h-16 w-16 border-primary" : "h-12 w-12 border-border"
-        } bg-muted text-base font-semibold text-muted-foreground`}
-      />
-      <div className="pointer-events-none max-w-[8rem] truncate text-sm font-medium">{data.displayName ?? "—"}</div>
+      {/* Avatar + its dim wash share this box so they scale together on
+          hover/select (no half-dimmed ring). */}
+      <div className={`relative transition-transform duration-150 hover:scale-110 ${isSelected ? "scale-110" : ""}`}>
+        <Avatar
+          name={data.displayName}
+          url={data.avatarUrl}
+          className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${
+            data.isCenter ? "h-16 w-16" : "h-12 w-12"
+          } ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
+        />
+        {/* Dim wash clipped to the avatar circle (rounded-full, never a square
+            over the edges behind), blended over the opaque avatar so endpoints
+            behind it stay hidden. pointer-events-none lets clicks reach it. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-full bg-canvas transition-opacity duration-150"
+          style={{ opacity: isDimmed ? 1 - DIM_KEEP : 0 }}
+        />
+      </div>
+      {/* The name dims by mixing its text color toward the canvas — color paints
+          only the glyphs, so no covering box (square) and no bleed-through. */}
+      <div
+        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-colors duration-150"
+        style={
+          isDimmed ? { color: `color-mix(in srgb, currentColor ${DIM_KEEP * 100}%, var(--color-canvas))` } : undefined
+        }
+      >
+        {data.displayName ?? "—"}
+      </div>
     </div>
   );
 }
 
 const nodeTypes = { member: MemberNode };
 
-// Lets the edge label pop the relating dialog without threading a
-// callback through the edge data object (which would defeat the edges
-// useMemo). NumberedEdge is registered via ReactFlow's edgeTypes prop;
-// the Provider wraps ReactFlow so context still propagates to it.
-const EdgeRelatingContext = createContext<((target: RelatingTarget) => void) | null>(null);
+// Carries edge-number reveal state + the relating callback to the
+// NumberedEdge instances without threading them through the edge data object
+// (which would defeat the edges useMemo). The Provider wraps ReactFlow so
+// context still reaches the edges registered via the edgeTypes prop.
+type EdgeInteraction = {
+  openRelating: (target: RelatingTarget) => void;
+  // Transient hover preview (desktop) and the selected edge (click/tap). A
+  // number shows when its id matches either.
+  hoverEdgeId: string | null;
+  selectedEdgeId: string | null;
+  previewEdge: (id: string) => void;
+  endPreviewSoon: () => void;
+};
+const EdgeInteractionContext = createContext<EdgeInteraction | null>(null);
 
 // Straight-line edge with an HTML circle label at the geometric midpoint
 // of the line between source and target. ReactFlow's default bezier
@@ -134,14 +182,21 @@ const EdgeRelatingContext = createContext<((target: RelatingTarget) => void) | n
 // midpoint sits above the visual line — using a straight edge keeps the
 // label on the line, and HTML labels (via EdgeLabelRenderer) give us a
 // real circular pill that an SVG <rect> can't.
+//
+// The number is hidden until its edge is active (hovered, or tapped within
+// the edge's interactionWidth). While hidden it's pointer-events-none so the
+// hover/tap falls through to the line; while shown it captures clicks to open
+// the relating dialog. onMouseEnter/Leave bridge the pointer's trip from the
+// line onto the number (paired with the parent's short hide delay).
 
 function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: EdgeProps<Edge<EdgeData>>) {
   const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-  const openRelating = useContext(EdgeRelatingContext);
-  const isClickable = data?.isOutgoing === true && openRelating !== null;
+  const interaction = useContext(EdgeInteractionContext);
+  const isClickable = data?.isOutgoing === true && interaction !== null;
+  const isVisible = interaction !== null && (interaction.hoverEdgeId === id || interaction.selectedEdgeId === id);
   const handleClick = isClickable
     ? () =>
-        openRelating?.({
+        interaction?.openRelating({
           id: data.relateeId,
           displayName: data.relateeName,
           currentValue: isRelationValue(data.value) ? data.value : null,
@@ -154,18 +209,18 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
         <button
           type="button"
           onClick={handleClick}
+          onMouseEnter={() => interaction?.previewEdge(id)}
+          onMouseLeave={() => interaction?.endPreviewSoon()}
           disabled={!isClickable}
+          aria-hidden={!isVisible}
           aria-label={isClickable ? "Adjust this relationship" : undefined}
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            // Restore pointer events so the label catches clicks; the
-            // SVG edge path underneath only covers a few px of the line.
-            pointerEvents: "auto",
           }}
-          className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/60 text-xs font-semibold text-canvas-foreground ${
-            isClickable ? "cursor-pointer hover:bg-canvas/90" : "cursor-default"
-          }`}
+          className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/80 text-xs font-semibold text-canvas-foreground transition-opacity duration-150 ${
+            isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+          } ${isClickable ? "cursor-pointer hover:bg-canvas" : "cursor-default"}`}
         >
           {data?.value}
         </button>
@@ -176,29 +231,22 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
 
 const edgeTypes = { numbered: NumberedEdge };
 
-const VIEW_STORAGE_KEY = "isweb-graph-view";
-
-// Permissive parser — any malformed/legacy payload falls back to the
-// default. Strict validation matters because the parsed shape feeds the
-// useQuery key and would otherwise produce a failing API request on
-// every mount.
-function parseStoredView(raw: string | null): SubgraphViewOptions | null {
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed === "object" && parsed !== null && "hops" in parsed && (parsed.hops === 1 || parsed.hops === 2)) {
-      return { hops: parsed.hops };
-    }
-  } catch {
-    // fall through to null
-  }
-  return null;
-}
+// View<->edit canvas animation. View is a square whose height tracks the
+// measured width; edit collapses to EDIT_HEIGHT. Width never changes between
+// modes, so only the height animates — top-anchored, so the bottom edge
+// travels while ReactFlow re-fits each frame to scale the graph with the box.
+const EDIT_HEIGHT = 500;
+const MODE_ANIM_MS = 1000;
+const MODE_ANIM_EASE = "cubic-bezier(0.45, 0, 0.55, 1)"; // accelerate + decelerate
 
 export function WebGraph({
+  square,
   onOpenRelating,
   onReplayTour,
 }: {
+  // View mode renders a tall, centered square canvas; edit mode keeps the
+  // shorter landscape strip so the suggestion feed below stays in view.
+  square: boolean;
   onOpenRelating: (target: RelatingTarget) => void;
   onReplayTour: () => void;
 }) {
@@ -272,10 +320,16 @@ export function WebGraph({
         source: e.relatorId,
         target: e.relateeId,
         type: "numbered",
+        // ±5px invisible hit area around the thin line, so hover (desktop) or
+        // a tap within 5px (mobile) reveals the number.
+        interactionWidth: 10,
         style: {
           stroke: "var(--color-canvas-foreground)",
           strokeOpacity: edgeStrokeOpacity(e.value),
           strokeWidth: edgeStrokeWidth(e.value),
+          // Eases the stroke recolor when a node selection dims edges off the
+          // lit path (blend toward canvas) or paints them success-green on it.
+          transition: "stroke 150ms ease",
         },
         data: {
           isOutgoing,
@@ -294,15 +348,19 @@ export function WebGraph({
     if (!data) return;
     const centerId = data.centerId;
 
+    // Preserve positions across data changes (a new relation, a hops toggle)
+    // so the web doesn't reshuffle. Existing nodes keep their last position;
+    // new non-center nodes emerge from the center — where a just-related card
+    // flies to — and the sim eases them out. Only a true first layout (no
+    // prior nodes) scatters randomly.
+    const prevById = simNodesByIdRef.current;
+    const isFirstLayout = prevById.size === 0;
     const simNodes: SimNode[] = data.nodes.map((n) => {
-      const isCenter = n.id === centerId;
-      return {
-        id: n.id,
-        x: isCenter ? 0 : (Math.random() - 0.5) * 200,
-        y: isCenter ? 0 : (Math.random() - 0.5) * 200,
-        fx: isCenter ? 0 : null,
-        fy: isCenter ? 0 : null,
-      };
+      if (n.id === centerId) return { id: n.id, x: 0, y: 0, fx: 0, fy: 0 };
+      const prev = prevById.get(n.id);
+      if (prev) return { id: n.id, x: prev.x, y: prev.y, vx: prev.vx, vy: prev.vy, fx: null, fy: null };
+      const spread = isFirstLayout ? 200 : 12;
+      return { id: n.id, x: (Math.random() - 0.5) * spread, y: (Math.random() - 0.5) * spread, fx: null, fy: null };
     });
     // Lookup map kept around for paintFromSim — avoids an O(n²) .find
     // scan on every tick. Also exposed via simNodesByIdRef so the
@@ -316,13 +374,19 @@ export function WebGraph({
       value: e.value,
     }));
 
+    // Seed React node positions in render space (the same normalization
+    // paintFromSim applies), so preserved nodes start at their rendered spot
+    // rather than jumping to raw sim coords for a frame before the first tick.
+    const norm = normRef.current;
+    const toRender = (x: number, y: number) =>
+      norm ? { x: (x - norm.cx) * norm.scale, y: (y - norm.cy) * norm.scale } : { x, y };
     setNodes(
       data.nodes.map((n) => {
         const sn = simNodeById.get(n.id);
         return {
           id: n.id,
           type: "member",
-          position: { x: sn?.x ?? 0, y: sn?.y ?? 0 },
+          position: toRender(sn?.x ?? 0, sn?.y ?? 0),
           data: { ...n, isCenter: n.id === centerId },
           // Center node is fx/fy-pinned at the origin; letting the user
           // drag it would either fight the pin or move "yourself" on
@@ -349,40 +413,29 @@ export function WebGraph({
     // toward the pinned center, fighting the link-distance equilibrium
     // and causing them to bunch on top of the center.
     //
-    // Custom force: gently push nodes off the segments of edges they
-    // don't belong to. Stock forceCollide handles node-on-node overlap
-    // but doesn't know about edges, so without this a node can settle
-    // straight on top of someone else's line. Scaled by alpha (d3's
-    // simulation "heat") so it fades as the layout cools.
-    const AVOID_THRESHOLD = 70;
-    const AVOID_STRENGTH = 0.7;
+    // Custom force: push nodes off the segments of edges they don't belong to,
+    // so one doesn't settle straight on top of someone else's line (stock
+    // forceCollide only knows node-on-node overlap). edgeAvoidance computes the
+    // per-edge delta — scaled by alpha (d3's "heat") so it fades as the layout
+    // cools — and we accumulate it into the node's velocity.
     const forceAvoidEdges = (alpha: number) => {
       for (const n of simNodes) {
         for (const e of simEdges) {
           const a = e.source as SimNode;
           const b = e.target as SimNode;
           if (n === a || n === b) continue;
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const len2 = dx * dx + dy * dy;
-          if (len2 < 1) continue;
-          // t = projection of n onto the line through a,b, clamped to
-          // [0,1] so the closest point stays on the segment.
-          let t = ((n.x - a.x) * dx + (n.y - a.y) * dy) / len2;
-          if (t < 0) t = 0;
-          else if (t > 1) t = 1;
-          const rx = n.x - (a.x + t * dx);
-          const ry = n.y - (a.y + t * dy);
-          const dist = Math.sqrt(rx * rx + ry * ry);
-          if (dist >= AVOID_THRESHOLD || dist < 0.001) continue;
-          const push = ((AVOID_THRESHOLD - dist) / AVOID_THRESHOLD) * AVOID_STRENGTH * alpha;
-          n.vx = (n.vx ?? 0) + (rx / dist) * push;
-          n.vy = (n.vy ?? 0) + (ry / dist) * push;
+          const delta = edgeAvoidance(n.x, n.y, a.x, a.y, b.x, b.y, alpha);
+          if (!delta) continue;
+          n.vx = (n.vx ?? 0) + delta.dvx;
+          n.vy = (n.vy ?? 0) + delta.dvy;
         }
       }
     };
 
     const sim = forceSimulation(simNodes)
+      // Gentle re-warm on an incremental update (existing nodes are already at
+      // rest, so they barely move); full heat only for a fresh first layout.
+      .alpha(isFirstLayout ? 1 : 0.6)
       // Default alphaMin is 0.001, which combined with the default
       // alphaDecay drags the sim out to ~5s with the last ~3.2s being
       // sub-pixel motion no one can see. Bumping alphaMin cuts the
@@ -416,9 +469,10 @@ export function WebGraph({
       });
 
     // Paints React node positions from the live simNodes, normalized so
-    // the layout's longer axis spans TARGET sim units and is centered
-    // on the origin. Combined with a manual fitView refit, this makes
-    // the rendered graph fill the viewport regardless of node count.
+    // the layout's longer axis spans NORMALIZATION_TARGET sim units and is
+    // centered on the origin (see computeNormalization). Combined with a manual
+    // fitView refit, this makes the rendered graph fill the viewport regardless
+    // of node count.
     function paintFromSim() {
       if (simNodes.length === 0) return;
       // During a drag, freeze the normalization. Recomputing it would
@@ -430,23 +484,10 @@ export function WebGraph({
       if (draggedNodeIdRef.current && normRef.current) {
         ({ cx, cy, scale } = normRef.current);
       } else {
-        const TARGET = 600;
-        let minX = simNodes[0].x;
-        let maxX = minX;
-        let minY = simNodes[0].y;
-        let maxY = minY;
-        for (let i = 1; i < simNodes.length; i++) {
-          const sn = simNodes[i];
-          if (sn.x < minX) minX = sn.x;
-          else if (sn.x > maxX) maxX = sn.x;
-          if (sn.y < minY) minY = sn.y;
-          else if (sn.y > maxY) maxY = sn.y;
-        }
-        const longer = Math.max(maxX - minX, maxY - minY);
-        scale = longer > 1 ? TARGET / longer : 1;
-        cx = (maxX + minX) / 2;
-        cy = (maxY + minY) / 2;
-        normRef.current = { cx, cy, scale };
+        const norm = computeNormalization(simNodes, NORMALIZATION_TARGET);
+        if (!norm) return;
+        ({ cx, cy, scale } = norm);
+        normRef.current = norm;
       }
 
       setNodes((prev) => {
@@ -544,6 +585,157 @@ export function WebGraph({
     draggedNodeIdRef.current = null;
   }, []);
 
+  // Canvas height animation. Width is CSS-driven (w-full, capped to the
+  // viewport height); we measure the resulting width and use it as the
+  // square's height in view mode, collapsing to EDIT_HEIGHT in edit mode.
+  const [graphWidth, setGraphWidth] = useState(0);
+  const lastWidthRef = useRef(0);
+  // Transition is armed for mode toggles but disarmed for the initial measure
+  // and for resizes, so the box tracks the window instantly rather than easing.
+  const [animateHeight, setAnimateHeight] = useState(false);
+  const resizeObsRef = useRef<ResizeObserver | null>(null);
+  // Callback ref: attach the observer once the graph element mounts (it only
+  // renders after the loading/empty early-returns below).
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
+    resizeObsRef.current?.disconnect();
+    if (!el) {
+      resizeObsRef.current = null;
+      return;
+    }
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0].contentRect.width;
+      // Ignore height-only changes (our own animation); only width changes
+      // (resize) re-derive the square's height, and should do so instantly.
+      if (Math.abs(w - lastWidthRef.current) < 0.5) return;
+      lastWidthRef.current = w;
+      setAnimateHeight(false);
+      setGraphWidth(w);
+    });
+    ro.observe(el);
+    resizeObsRef.current = ro;
+  }, []);
+
+  // Re-arm the transition one frame after the initial measure or a resize, so
+  // the next mode toggle eases but the size change that just committed didn't.
+  useEffect(() => {
+    if (graphWidth > 0 && !animateHeight) {
+      const id = requestAnimationFrame(() => setAnimateHeight(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [graphWidth, animateHeight]);
+
+  // On a mode toggle, re-fit every frame for the duration of the height
+  // transition so the graph zooms to match the shrinking/growing box. The
+  // height eases via CSS, so fitting to the current box each frame inherits
+  // that easing. Skips the first run (initial mount fits via the sim).
+  const firstModeRef = useRef(true);
+  // `square` is the trigger, not a read value — the effect must re-run each
+  // time the mode flips so the fit follows the height transition.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: square triggers the per-toggle re-fit
+  useEffect(() => {
+    if (firstModeRef.current) {
+      firstModeRef.current = false;
+      return;
+    }
+    const start = performance.now();
+    let raf = requestAnimationFrame(function tick(now: number) {
+      flowRef.current?.fitView({ padding: 0.15, duration: 0 });
+      raf = now - start < MODE_ANIM_MS + 60 ? requestAnimationFrame(tick) : 0;
+    });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [square]);
+
+  // Edge-number reveal. Numbers stay hidden until shown one of two ways:
+  //   - hover (desktop): a transient preview while the pointer is on the line
+  //     or the number, cleared on leave. Suppressed while an edge is selected,
+  //     so a selection doesn't spawn previews as you move around.
+  //   - selection (click/tap): clicking a line selects it and shows its number
+  //     until a click on the pane, a node, or another line. A second click on
+  //     the selected line — or a click on the number — opens the relating dialog.
+  // endPreviewSoon defers the hover hide briefly so the pointer can travel
+  // from the line onto the number; previewEdge (the number's own mouseenter)
+  // cancels that pending hide.
+  const [hoverEdgeId, setHoverEdgeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  // Node selection (click/tap a circle). Independent of edge selection but
+  // mutually exclusive in practice: selecting one clears the other.
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // Mirror of selectedEdgeId for the stable previewEdge callback to read
+  // without re-creating each time the selection changes.
+  const selectedEdgeRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedEdgeRef.current = selectedEdgeId;
+  }, [selectedEdgeId]);
+  const previewTimer = useRef<number | null>(null);
+  const clearPreviewTimer = useCallback(() => {
+    if (previewTimer.current !== null) {
+      clearTimeout(previewTimer.current);
+      previewTimer.current = null;
+    }
+  }, []);
+  const previewEdge = useCallback(
+    (edgeId: string) => {
+      if (selectedEdgeRef.current !== null) return; // hover off while an edge is selected
+      clearPreviewTimer();
+      setHoverEdgeId(edgeId);
+    },
+    [clearPreviewTimer],
+  );
+  const endPreviewSoon = useCallback(() => {
+    clearPreviewTimer();
+    previewTimer.current = window.setTimeout(() => setHoverEdgeId(null), 120);
+  }, [clearPreviewTimer]);
+  const clearSelection = useCallback(() => {
+    clearPreviewTimer();
+    setHoverEdgeId(null);
+    setSelectedEdgeId(null);
+    setSelectedNodeId(null);
+  }, [clearPreviewTimer]);
+  useEffect(() => clearPreviewTimer, [clearPreviewTimer]);
+
+  const edgeInteraction = useMemo<EdgeInteraction>(
+    () => ({ openRelating: onOpenRelating, hoverEdgeId, selectedEdgeId, previewEdge, endPreviewSoon }),
+    [onOpenRelating, hoverEdgeId, selectedEdgeId, previewEdge, endPreviewSoon],
+  );
+
+  // Shortest-path tree from the center over the (undirected) edge set, rebuilt
+  // once per subgraph. Selecting a node walks these parent pointers back to the
+  // center to find the chain that should stay lit while the rest dims.
+  const parentByNode = useMemo(
+    () => (data ? shortestPathTree(data.edges, data.centerId) : new Map<string, string | null>()),
+    [data],
+  );
+
+  // The node ids and edge ids on the selected node's path back to the center.
+  // Edge ids are direction-stamped (`relator->relatee`) and we don't know which
+  // way the real edge runs, so add both candidates and let set-membership pick
+  // the one that exists.
+  const { pathNodeIds, pathEdgeIds } = useMemo(
+    () => pathToCenter(selectedNodeId, parentByNode),
+    [selectedNodeId, parentByNode],
+  );
+
+  const nodeInteraction = useMemo<NodeInteraction>(
+    () => ({ selectedNodeId, pathNodeIds }),
+    [selectedNodeId, pathNodeIds],
+  );
+
+  // Light the selected edge and the selected node's lit path; dim the rest. The
+  // stroke transition on the base style eases the recolor. See decorateEdges.
+  const decoratedEdges = useMemo(
+    () => decorateEdges(edges, { selectedNodeId, selectedEdgeId, pathEdgeIds }),
+    [edges, selectedEdgeId, selectedNodeId, pathEdgeIds],
+  );
+
+  // Lift the selected node's path above the dimmed graph; derived from the live
+  // `nodes` state so sim ticks and drags flow through untouched. See decorateNodes.
+  const decoratedNodes = useMemo(
+    () => decorateNodes(nodes, { selectedNodeId, pathNodeIds }),
+    [nodes, selectedNodeId, pathNodeIds],
+  );
+
   const empty = !data || data.nodes.length === 0;
 
   if (isPending) {
@@ -564,110 +756,149 @@ export function WebGraph({
     );
   }
 
+  // Width is identical in both modes — w-full capped to the viewport height,
+  // free of the page's max-w-5xl wrapper so on tall displays the square grows
+  // past 1024px. Only the height differs: the measured width (a square) in
+  // view mode, EDIT_HEIGHT in edit mode. Animating just the height keeps the
+  // box from ever widening on the toggle; the top stays put, so the bottom
+  // edge is what travels.
+  const heightPx = graphWidth > 0 ? (square ? graphWidth : Math.min(graphWidth, EDIT_HEIGHT)) : undefined;
+
   return (
     <div
+      ref={measureRef}
       data-tour="graph"
-      className="h-[500px] w-full overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
+      style={{
+        height: heightPx ? `${heightPx}px` : undefined,
+        transition: animateHeight ? `height ${MODE_ANIM_MS}ms ${MODE_ANIM_EASE}` : undefined,
+      }}
+      className="mx-auto w-full max-w-[calc(100vh_-_12rem)] overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
     >
-      <EdgeRelatingContext.Provider value={onOpenRelating}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.15 }}
-          onInit={(instance) => {
-            flowRef.current = instance;
-          }}
-          onMove={(event) => {
-            // Programmatic fitView calls pass event=null; only flip the
-            // flag on user gestures (MouseEvent / TouchEvent / Wheel).
-            if (event !== null) userMovedViewportRef.current = true;
-          }}
-          onNodesChange={onNodesChange}
-          onNodeDragStart={onNodeDragStart}
-          onNodeDrag={onNodeDrag}
-          onNodeDragStop={onNodeDragStop}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          proOptions={{ hideAttribution: true }}
-          onNodeClick={(_event, node) => {
-            // Re-center the viewport on the clicked node so members can
-            // explore the graph without navigating away. Double-click
-            // navigates to the member's profile page.
-            flowRef.current?.setCenter(node.position.x, node.position.y, {
-              zoom: flowRef.current.getZoom(),
-              duration: 400,
-            });
-          }}
-          onNodeDoubleClick={(_event, node) => {
-            const slug = node.data.slug ?? node.data.id;
-            router.push(`/members/${slug}`);
-          }}
-        >
-          {/* Built-in +/-/fit-view buttons for users who can't or don't
-           * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
-           * is hidden — selection and connection are already disabled. */}
-          <Controls position="top-left" showInteractive={false} />
-          <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
-            {/* Click-to-toggle (not hover) so the hints stay reachable on
-             * touch devices where hover doesn't exist. */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
-              aria-expanded={hintOpen}
-              aria-controls="web-graph-hints"
-              onClick={() => setHintOpen((h) => !h)}
-              className="rounded-full border border-border bg-background/90 font-bold"
-            >
-              ?
-            </Button>
-            {hintOpen && (
-              <div
-                id="web-graph-hints"
-                className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
-              >
-                <ul className="flex flex-col gap-1">
-                  <li>Drag the background to pan.</li>
-                  <li>Drag a circle to reposition it.</li>
-                  <li>Scroll or pinch to zoom.</li>
-                  <li>Single-click a circle to center the view on it.</li>
-                  <li>Double-click a circle to open their profile.</li>
-                  <li>
-                    <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
-                  </li>
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHintOpen(false);
-                    onReplayTour();
-                  }}
-                  className="self-start text-foreground underline underline-offset-2 hover:text-primary"
-                >
-                  Replay guided tour
-                </button>
-              </div>
-            )}
-          </Panel>
-          <Panel
-            position="top-right"
-            className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+      <EdgeInteractionContext.Provider value={edgeInteraction}>
+        <NodeInteractionContext.Provider value={nodeInteraction}>
+          <ReactFlow
+            nodes={decoratedNodes}
+            edges={decoratedEdges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.15 }}
+            onInit={(instance) => {
+              flowRef.current = instance;
+            }}
+            // Hover previews a number on desktop (off while an edge is selected).
+            onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
+            onEdgeMouseLeave={() => endPreviewSoon()}
+            // Click/tap a line selects it and shows its number; a second click on
+            // the selected line opens the relating dialog (clicking the number
+            // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
+            onEdgeClick={(_event, edge) => {
+              clearPreviewTimer();
+              // Selecting an edge supersedes any node selection.
+              setSelectedNodeId(null);
+              if (selectedEdgeId === edge.id) {
+                const d = edge.data;
+                if (d?.isOutgoing) {
+                  onOpenRelating({
+                    id: d.relateeId,
+                    displayName: d.relateeName,
+                    currentValue: isRelationValue(d.value) ? d.value : null,
+                  });
+                }
+                return;
+              }
+              setSelectedEdgeId(edge.id);
+            }}
+            onPaneClick={() => clearSelection()}
+            onMove={(event) => {
+              // Programmatic fitView calls pass event=null; only flip the
+              // flag on user gestures (MouseEvent / TouchEvent / Wheel).
+              if (event !== null) userMovedViewportRef.current = true;
+            }}
+            onNodesChange={onNodesChange}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDrag={onNodeDrag}
+            onNodeDragStop={onNodeDragStop}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            proOptions={{ hideAttribution: true }}
+            onNodeClick={(_event, node) => {
+              // Select the node (re-click toggles off): lights its path back to
+              // you and dims the rest. No viewport pan; clears any edge
+              // selection. Double-click still opens the member's profile.
+              clearPreviewTimer();
+              setHoverEdgeId(null);
+              setSelectedEdgeId(null);
+              setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
+            }}
+            onNodeDoubleClick={(_event, node) => {
+              const slug = node.data.slug ?? node.data.id;
+              router.push(`/members/${slug}`);
+            }}
           >
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={view.hops === 2}
-                onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
-              />
-              2 hops
-            </label>
-          </Panel>
-        </ReactFlow>
-      </EdgeRelatingContext.Provider>
+            {/* Built-in +/-/fit-view buttons for users who can't or don't
+             * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+             * is hidden — selection and connection are already disabled. */}
+            <Controls position="top-left" showInteractive={false} />
+            <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+              {/* Click-to-toggle (not hover) so the hints stay reachable on
+               * touch devices where hover doesn't exist. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+                aria-expanded={hintOpen}
+                aria-controls="web-graph-hints"
+                onClick={() => setHintOpen((h) => !h)}
+                className="rounded-full border border-border bg-background/90 font-bold"
+              >
+                ?
+              </Button>
+              {hintOpen && (
+                <div
+                  id="web-graph-hints"
+                  className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+                >
+                  <ul className="flex flex-col gap-1">
+                    <li>Drag the background to pan.</li>
+                    <li>Drag a circle to reposition it.</li>
+                    <li>Scroll or pinch to zoom.</li>
+                    <li>Single-click a circle to highlight its path to you.</li>
+                    <li>Double-click a circle to open their profile.</li>
+                    <li>
+                      <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
+                    </li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHintOpen(false);
+                      onReplayTour();
+                    }}
+                    className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+                  >
+                    Replay guided tour
+                  </button>
+                </div>
+              )}
+            </Panel>
+            <Panel
+              position="top-right"
+              className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+            >
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={view.hops === 2}
+                  onChange={(e) => setView((v) => ({ ...v, hops: e.target.checked ? 2 : 1 }))}
+                />
+                2 hops
+              </label>
+            </Panel>
+          </ReactFlow>
+        </NodeInteractionContext.Provider>
+      </EdgeInteractionContext.Provider>
     </div>
   );
 }
