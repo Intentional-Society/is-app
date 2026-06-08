@@ -28,16 +28,21 @@ import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationSubgraph } from "@/lib/api-types";
-import { isRelationValue } from "@/lib/relation-value";
+import { isRelationValue, RELATION_VALUE_LABELS, RELATION_VALUES, type RelationValue } from "@/lib/relation-value";
 
 import {
   DEFAULT_SUBGRAPH_VIEW,
+  defaultValueFilter,
+  parseStoredValueFilter,
   parseStoredView,
   RELATION_SUBGRAPH_QUERY_KEY,
+  type RelationValueFilter,
   type SubgraphViewOptions,
+  VALUE_FILTER_STORAGE_KEY,
   VIEW_STORAGE_KEY,
 } from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
+import { filterSubgraphByValue } from "./web-graph-filtering";
 import {
   computeNormalization,
   edgeAvoidance,
@@ -265,6 +270,10 @@ export function WebGraph({
   // the first paint (see the initialReady latch below).
   const [viewHydrated, setViewHydrated] = useState(false);
   const [initialReady, setInitialReady] = useState(false);
+  // Which relation depths (1..4) are drawn. A client-side cull over the fetched
+  // subgraph (see the `filtered` memo), so toggling re-filters instantly with no
+  // refetch. Lazy init so the default Set isn't a shared module singleton.
+  const [valueFilter, setValueFilter] = useState<RelationValueFilter>(defaultValueFilter);
 
   // Restore the user's last filter choice across reloads. Done in an
   // effect rather than the useState initializer so SSR-rendered markup
@@ -274,12 +283,18 @@ export function WebGraph({
   useEffect(() => {
     const stored = parseStoredView(window.localStorage.getItem(VIEW_STORAGE_KEY));
     if (stored && stored.hops !== DEFAULT_SUBGRAPH_VIEW.hops) setView(stored);
+    const storedFilter = parseStoredValueFilter(window.localStorage.getItem(VALUE_FILTER_STORAGE_KEY));
+    if (storedFilter) setValueFilter(storedFilter);
     setViewHydrated(true);
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
   }, [view]);
+
+  useEffect(() => {
+    window.localStorage.setItem(VALUE_FILTER_STORAGE_KEY, JSON.stringify([...valueFilter]));
+  }, [valueFilter]);
   // The view options become part of the query key so toggling refetches
   // automatically and the relating-dialog's mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
@@ -330,13 +345,34 @@ export function WebGraph({
   // later drag-induced re-warm doesn't yank the viewport around.
   const initialSettleDoneRef = useRef(false);
 
-  // Edges never change after the subgraph loads — derive instead of
-  // duplicating into React state.
+  // The relation-depth cull, applied before anything downstream reads the
+  // subgraph: the layout, the rendered edges, and the selection path tree all
+  // operate on this filtered view, so hiding a depth genuinely thins the web
+  // (nodes the cull orphans leave) rather than just hiding lines. Shaped like
+  // `data` so consumers swap straight over. See filterSubgraphByValue.
+  const filtered = useMemo(() => {
+    if (!data) return null;
+    const sub = filterSubgraphByValue(data.nodes, data.edges, data.centerId, valueFilter);
+    return { centerId: data.centerId, nodes: sub.nodes, edges: sub.edges };
+  }, [data, valueFilter]);
+
+  // Flip one depth in/out of the filter. Each toggle is independent (not a
+  // threshold) and a new Set keeps the state update immutable.
+  const toggleValue = useCallback((value: RelationValue) => {
+    setValueFilter((cur) => {
+      const next = new Set(cur);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }, []);
+
+  // Derived edges for ReactFlow — rebuilt whenever the filtered subgraph changes.
   const edges = useMemo<Edge<EdgeData>[]>(() => {
-    if (!data) return [];
-    const centerId = data.centerId;
-    const nodeById = new Map(data.nodes.map((n) => [n.id, n]));
-    return data.edges.map((e) => {
+    if (!filtered) return [];
+    const centerId = filtered.centerId;
+    const nodeById = new Map(filtered.nodes.map((n) => [n.id, n]));
+    return filtered.edges.map((e) => {
       const isOutgoing = e.relatorId === centerId;
       const relatee = nodeById.get(e.relateeId);
       return {
@@ -363,20 +399,21 @@ export function WebGraph({
         },
       };
     });
-  }, [data]);
+  }, [filtered]);
 
   // Build (or rebuild) the d3-force simulation whenever the subgraph
   // changes. The viewing member is pinned at the origin so the layout
   // always orients around them.
   useEffect(() => {
-    if (!data) return;
-    const centerId = data.centerId;
+    if (!filtered) return;
+    const { centerId, nodes: subNodes, edges: subEdges } = filtered;
 
-    // Preserve positions across data changes (a new relation, a hops toggle)
-    // so the web doesn't reshuffle. Existing nodes keep their last position;
-    // new non-center nodes emerge from the center — where a just-related card
-    // flies to — and the sim eases them out. Only a true first layout (no
-    // prior nodes) scatters randomly.
+    // Preserve positions across data changes (a new relation, a hops toggle,
+    // a depth-filter toggle) so the web doesn't reshuffle. Existing nodes keep
+    // their last position; nodes the cull removed simply drop out of the sim;
+    // genuinely-new non-center nodes emerge from the center — where a
+    // just-related card flies to — and the sim eases them out. Only a true
+    // first layout (no prior nodes) gets the radial seed.
     const prevById = simNodesByIdRef.current;
     const isFirstLayout = prevById.size === 0;
     // The first layout gets a deterministic radial seed (you at the origin, the
@@ -385,12 +422,12 @@ export function WebGraph({
     // scatter — same web every load, far fewer crossings. See radialSeed.
     const seed = isFirstLayout
       ? radialSeed(
-          data.nodes.map((n) => n.id),
-          data.edges,
+          subNodes.map((n) => n.id),
+          subEdges,
           centerId,
         )
       : null;
-    const simNodes: SimNode[] = data.nodes.map((n) => {
+    const simNodes: SimNode[] = subNodes.map((n) => {
       if (n.id === centerId) return { id: n.id, x: 0, y: 0, fx: 0, fy: 0 };
       const prev = prevById.get(n.id);
       if (prev) return { id: n.id, x: prev.x, y: prev.y, vx: prev.vx, vy: prev.vy, fx: null, fy: null };
@@ -406,7 +443,7 @@ export function WebGraph({
     // the dragged node.
     const simNodeById = new Map(simNodes.map((n) => [n.id, n]));
     simNodesByIdRef.current = simNodeById;
-    const simEdges: SimEdge[] = data.edges.map((e) => ({
+    const simEdges: SimEdge[] = subEdges.map((e) => ({
       source: e.relatorId,
       target: e.relateeId,
       value: e.value,
@@ -419,7 +456,7 @@ export function WebGraph({
     const toRender = (x: number, y: number) =>
       norm ? { x: (x - norm.cx) * norm.scale, y: (y - norm.cy) * norm.scale } : { x, y };
     setNodes(
-      data.nodes.map((n) => {
+      subNodes.map((n) => {
         const sn = simNodeById.get(n.id);
         return {
           id: n.id,
@@ -570,7 +607,7 @@ export function WebGraph({
     return () => {
       sim.stop();
     };
-  }, [data]);
+  }, [filtered]);
 
   // Required for ReactFlow's drag to actually update positions in our
   // controlled `nodes` state; without it, drag fires events that go
@@ -744,8 +781,8 @@ export function WebGraph({
   // once per subgraph. Selecting a node walks these parent pointers back to the
   // center to find the chain that should stay lit while the rest dims.
   const parentByNode = useMemo(
-    () => (data ? shortestPathTree(data.edges, data.centerId) : new Map<string, string | null>()),
-    [data],
+    () => (filtered ? shortestPathTree(filtered.edges, filtered.centerId) : new Map<string, string | null>()),
+    [filtered],
   );
 
   // The node ids and edge ids on the selected node's path back to the center.
@@ -912,6 +949,10 @@ export function WebGraph({
                     <li>
                       <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
                     </li>
+                    <li>
+                      Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship
+                      depths.
+                    </li>
                   </ul>
                   <button
                     type="button"
@@ -928,7 +969,7 @@ export function WebGraph({
             </Panel>
             <Panel
               position="top-right"
-              className="flex flex-col gap-1 rounded border border-border bg-background/90 p-2 text-sm"
+              className="flex flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm"
             >
               <label className="flex cursor-pointer items-center gap-2">
                 <input
@@ -938,6 +979,34 @@ export function WebGraph({
                 />
                 2 hops
               </label>
+              {/* Independent depth toggles (filled = shown). Reuses the 1–4
+               * vocabulary from the relating dialog; culling a depth thins the
+               * web to the ties that matter. */}
+              <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
+                <legend className="p-0 text-xs text-muted-foreground">Relationship depth</legend>
+                <div className="flex gap-1">
+                  {RELATION_VALUES.map((v) => {
+                    const on = valueFilter.has(v);
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={on}
+                        aria-label={`Depth ${v}: ${RELATION_VALUE_LABELS[v].headline}`}
+                        title={RELATION_VALUE_LABELS[v].headline}
+                        onClick={() => toggleValue(v)}
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${
+                          on
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-transparent text-muted-foreground hover:border-foreground"
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
             </Panel>
           </ReactFlow>
         </NodeInteractionContext.Provider>
