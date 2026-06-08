@@ -240,6 +240,12 @@ const EDIT_HEIGHT = 500;
 const MODE_ANIM_MS = 1000;
 const MODE_ANIM_EASE = "cubic-bezier(0.45, 0, 0.55, 1)"; // accelerate + decelerate
 
+// Fraction of the canvas left as breathing room around the graph on every
+// fitView. Shared by the initial fit, the per-paint settle fits, and the
+// mode-toggle refit so they all frame the web identically — a mismatch would
+// re-introduce a zoom shift between them.
+const FIT_VIEW_PADDING = 0.1;
+
 export function WebGraph({
   square,
   onOpenRelating,
@@ -500,7 +506,7 @@ export function WebGraph({
         // taken over the viewport.
         if (!userMovedViewportRef.current) {
           requestAnimationFrame(() => {
-            flowRef.current?.fitView({ padding: 0.15, duration: 200 });
+            flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 200 });
           });
         }
       });
@@ -554,7 +560,7 @@ export function WebGraph({
       // visibly zoomed in. Skipped during a drag (we freeze normalization then)
       // and once the user takes over the viewport; stops at initialSettleDone.
       if (!initialSettleDoneRef.current && !userMovedViewportRef.current && !draggedNodeIdRef.current) {
-        flowRef.current?.fitView({ padding: 0.15, duration: 0 });
+        flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 0 });
       }
     }
 
@@ -673,7 +679,7 @@ export function WebGraph({
     }
     const start = performance.now();
     let raf = requestAnimationFrame(function tick(now: number) {
-      flowRef.current?.fitView({ padding: 0.15, duration: 0 });
+      flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 0 });
       raf = now - start < MODE_ANIM_MS + 60 ? requestAnimationFrame(tick) : 0;
     });
     return () => {
@@ -819,7 +825,7 @@ export function WebGraph({
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
-            fitViewOptions={{ padding: 0.15 }}
+            fitViewOptions={{ padding: FIT_VIEW_PADDING }}
             onInit={(instance) => {
               flowRef.current = instance;
             }}
