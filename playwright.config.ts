@@ -7,10 +7,13 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", quiet: true });
 
 const isCI = !!process.env.CI;
-// Lane-aware port: `npm run make_lane_inside_worktree` writes E2E_PORT into a
-// worktree's .env.local so parallel lanes don't collide on one web server.
-// Defaults to 3093 for the base worktree / CI. See docs/strategy-worktree-lanes.md.
-const e2ePort = process.env.E2E_PORT || "3093";
+// Target the local dev server's port so `reuseExistingServer` finds a running
+// `npm run dev` and runs against it, rather than starting a second `next dev`
+// (two can't coexist in one worktree — they'd share one `.next`). A lane writes
+// LANE_DEV_PORT into its .env.local; the base worktree has neither var and falls
+// back to 3000, matching plain `npm run dev`. E2E_PORT stays as an explicit
+// override. See docs/strategy-worktree-lanes.md.
+const e2ePort = process.env.LANE_DEV_PORT || process.env.E2E_PORT || "3000";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${e2ePort}`;
 
 export default defineConfig({
@@ -58,12 +61,18 @@ export default defineConfig({
       use: { browserName: "chromium" },
     },
   ],
-  // Local dev: spin up a Next.js server. CI: tests run against Vercel preview URL.
+  // Local dev: reuse a running dev server, or spin one up. CI: tests run
+  // against the Vercel preview URL.
   webServer: isCI
     ? undefined
     : {
         command: `npm run dev -- --port ${e2ePort}`,
         url: `http://localhost:${e2ePort}`,
         reuseExistingServer: true,
+        // Start-fresh path only: `npm run dev` runs dev:db (Supabase ensure +
+        // migrate + seed) then a Turbopack compile, which can exceed the 60s
+        // default and trip the "bound but not serving" timeout. The reuse path
+        // skips the command entirely, so this costs nothing when a server is up.
+        timeout: 180_000,
       },
 });

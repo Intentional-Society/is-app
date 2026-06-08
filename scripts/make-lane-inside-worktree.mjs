@@ -4,10 +4,10 @@
 // parallel without clobbering each other's database, auth, or ports.
 //
 // Background: the local Supabase stack is a singleton keyed by `project_id`
-// (config.toml) on fixed host ports, and e2e binds a fixed web-server port
-// and wipes the DB via /api/_test/reset. Two worktrees sharing one stack
-// therefore step on each other. GoTrue/Storage can't be multi-tenanted, so
-// the only true isolation is one full stack per worktree — that's a "lane".
+// (config.toml) on fixed host ports, and e2e wipes the DB via
+// /api/_test/reset. Two worktrees sharing one stack therefore step on each
+// other. GoTrue/Storage can't be multi-tenanted, so the only true isolation
+// is one full stack per worktree — that's a "lane".
 //
 // A lane is derived from the worktree directory name:
 //   is-app      -> lane 0 (the base worktree; left untouched)
@@ -24,8 +24,9 @@
 //     then `git update-index --skip-worktree` so the local edit never shows
 //     as a diff or gets committed. The base text is taken from `git show
 //     HEAD:supabase/config.toml`, so re-running always re-derives cleanly.
-//   - .env.local           : the Supabase API + DATABASE_URL ports, plus an
-//     E2E_PORT line that playwright.config.ts reads for its web server.
+//   - .env.local           : the Supabase API + DATABASE_URL ports, plus
+//     LANE_DEV_PORT — the port `npm run dev` binds, which the e2e suite reuses
+//     (playwright.config.ts targets it instead of starting a second server).
 //
 // Local Supabase keys are deterministic across stacks (fixed demo JWT
 // secret), so only URLs/ports change — never the keys.
@@ -44,7 +45,7 @@ const dryRun = args.includes("--dry-run");
 const nameOverride = args.find((a) => a.startsWith("--name="))?.slice("--name=".length);
 
 // Base port assignments straight out of supabase/config.toml + the app's
-// dev (3000) and Playwright web-server (3093) ports. Lane N adds N*100.
+// dev (3000) port. Lane N adds N*100.
 const SUPABASE_PORTS = {
   api: { key: "port", base: 54321 },
   db: { key: "port", base: 54322 },
@@ -55,7 +56,7 @@ const SUPABASE_PORTS = {
   analytics: { key: "port", base: 54327 },
   inspector: { key: "inspector_port", base: 8083 },
 };
-const APP_PORTS = { dev: 3000, e2e: 3093 };
+const APP_PORTS = { dev: 3000 };
 const LANE_STRIDE = 100;
 const MAX_LANE = 9; // N*100 keeps the 5432x block inside 543xx–544xx..552xx
 
@@ -103,7 +104,6 @@ const dbPort = port(SUPABASE_PORTS.db);
 const studioPort = port(SUPABASE_PORTS.studio);
 const inbucketPort = port(SUPABASE_PORTS.inbucket);
 const devPort = APP_PORTS.dev + off;
-const e2ePort = APP_PORTS.e2e + off;
 
 // --- supabase/config.toml -------------------------------------------------
 // Re-derive from the committed version so repeated runs are idempotent and
@@ -129,9 +129,9 @@ function buildConfig() {
   text = text.replace(/^(\s*project_id\s*=\s*)"[^"]*"/m, `$1"${worktreeName}"`);
   for (const def of Object.values(SUPABASE_PORTS)) text = setPort(text, def);
   // Auth redirect allow-list + site_url point at the dev server; shift them
-  // to this lane's dev port so interactive auth flows resolve. (e2e runs on
-  // e2ePort and, like the base stack on :3093, doesn't depend on the
-  // allow-list for the password-login flows the suite exercises.)
+  // to this lane's dev port so interactive auth flows resolve. (e2e reuses
+  // that same dev server and doesn't depend on the allow-list for the
+  // password-login flows the suite exercises.)
   text = text.replaceAll(":3000", `:${devPort}`);
   return text;
 }
@@ -153,7 +153,6 @@ function buildEnv() {
   let text = readFileSync(envPath, "utf8");
   text = setEnvLine(text, "NEXT_PUBLIC_SUPABASE_URL", `http://127.0.0.1:${apiPort}`);
   text = setEnvLine(text, "DATABASE_URL", `postgresql://postgres:postgres@127.0.0.1:${dbPort}/postgres`);
-  text = setEnvLine(text, "E2E_PORT", String(e2ePort));
   text = setEnvLine(text, "LANE_DEV_PORT", String(devPort));
   return { envPath, text };
 }
@@ -169,14 +168,13 @@ const portRows = [
   ["Studio", studioPort],
   ["Inbucket (email)", inbucketPort],
   ["next dev", devPort],
-  ["e2e web server", e2ePort],
 ];
 const summary =
   `Lane ${lane}  (project_id "${worktreeName}", port offset +${off})\n` +
   portRows.map(([label, p]) => `  ${label.padEnd(22)} ${p}`).join("\n") +
   `\n  Studio:        http://127.0.0.1:${studioPort}` +
   `\n  Interactive:   npm run dev        (auto-uses LANE_DEV_PORT=${devPort})` +
-  `\n  e2e:           npm run test:e2e   (auto-uses E2E_PORT=${e2ePort})`;
+  `\n  e2e:           npm run test:e2e   (reuses the dev server on ${devPort})`;
 
 if (dryRun) {
   process.stdout.write(`[dry-run] ${summary}\n\n[dry-run] would rewrite supabase/config.toml and ${envPath}\n`);

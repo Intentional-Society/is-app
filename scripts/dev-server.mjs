@@ -6,9 +6,9 @@
 // and this passes it through as --port.
 //
 // An explicit --port/-p always wins (e.g. Playwright's web server runs
-// `npm run dev -- --port <E2E_PORT>`); in that case we forward it untouched
-// and add nothing. The base worktree has no LANE_DEV_PORT, so plain
-// `npm run dev` behaves exactly as before (port 3000).
+// `npm run dev -- --port <dev port>` when it has to start a server itself);
+// in that case we forward it untouched and add nothing. The base worktree has
+// no LANE_DEV_PORT, so plain `npm run dev` behaves exactly as before (port 3000).
 
 import { spawn } from "node:child_process";
 import { config } from "dotenv";

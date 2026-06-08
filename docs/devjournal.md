@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-08 | James | Local e2e reuses the running dev server (#372)
+
+Playwright now targets the dev port and reuses a running `npm run dev` (via `reuseExistingServer`), so you no longer stop your dev server to run e2e; lanes set only `LANE_DEV_PORT` and the separate `E2E_PORT` is retired (stale lines in existing lane `.env.local`s are ignored). Tradeoff: an e2e run resets and drives the seeded `@testfake.local` users in your dev DB. Reference: docs/strategy-worktree-lanes.md.
+
 ## 2026-06-08 | James | One-click dev sign-in as Aria Chen
 
 One-click sign-in as Aria Chen, now promoted to demo user in the dev-seed data.
