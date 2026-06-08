@@ -29,18 +29,20 @@ const WARMUP_FIRST_NAV_TIMEOUT_MS = 30_000;
 const WARMUP_RETRY_NAV_TIMEOUT_MS = 8_000;
 const WARMUP_ATTEMPTS = 2;
 
-// Hard ceiling on the whole route-warming phase, shared across all routes:
-// once it's spent, warm-up gives up loudly instead of grinding through every
-// remaining route's retries. This — not the per-attempt windows — is what
-// bounds the worst case when the network browns out mid-run. A persistent
-// brownout still recovers via CI's project-level `retries: 2`, which re-runs
-// the whole setup test later.
+// Hard ceilings on each warm-up phase — the routes loop and the sign-in
+// respectively. Once a phase's budget is spent it gives up loudly instead of
+// grinding through every remaining retry. These — not the per-attempt windows
+// — are what bound the worst case when the network browns out mid-run. A
+// persistent brownout still recovers via CI's project-level `retries: 2`,
+// which re-runs the whole setup test later.
 const WARMUP_ROUTES_BUDGET_MS = 75_000;
+const WARMUP_SIGN_IN_BUDGET_MS = 25_000;
 
-// Generous backstop above the route budget + sign-in warm-up, so the named
-// budget/attempt errors below fire first. Playwright's 30s default test
-// timeout is far too tight for a cold first hit, and would trip with an
-// opaque message before the retry logic could run.
+// The setup test timeout sits above both phase budgets plus waitForURL slack
+// (75s + 25s + ~12s), so the named budget/attempt errors below always fire
+// before Playwright's opaque "Test timeout exceeded" message. Its 30s default
+// is far too tight for a cold first hit, and would trip before the retry logic
+// could run.
 const WARMUP_TEST_TIMEOUT_MS = 120_000;
 
 // Navigate to a route with one short retry, bounded by both its per-attempt
@@ -88,11 +90,21 @@ setup("warm up the page-serving path", async ({ page }) => {
   }
 
   // Warm the authed landing through a real sign-in, retrying on the same
-  // cold/brownout terms. signInAs's own waitForURL runs on the 12s TIMEOUT_MS;
-  // a first attempt that misses a cold landing usually warms it enough for the
-  // retry to land.
+  // cold/brownout terms. signInAs carries no explicit timeout on its goto or
+  // form actions, and Playwright Test defaults navigationTimeout/actionTimeout
+  // to 0 — so those operations would otherwise fall back to the whole remaining
+  // test budget, letting one hung goto trip the opaque test timeout. Cap every
+  // navigation/action to the remaining sign-in budget so this phase fails with
+  // the named error below instead. (signInAs's waitForURL keeps its own 12s.)
+  const signInDeadline = Date.now() + WARMUP_SIGN_IN_BUDGET_MS;
   let lastError: unknown;
   for (let attempt = 1; attempt <= WARMUP_ATTEMPTS; attempt++) {
+    const remaining = signInDeadline - Date.now();
+    if (remaining <= 0) {
+      break;
+    }
+    page.setDefaultNavigationTimeout(remaining);
+    page.setDefaultTimeout(remaining);
     try {
       await signInAs(page, "regular");
       return;
