@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api";
+import { INVITE_CODE_LENGTH } from "@/lib/invite-limits";
 import { createClient } from "@/lib/supabase/client";
 
 type Step =
@@ -23,7 +24,7 @@ const REASON_MESSAGES: Record<string, string> = {
   redeemed: "That invite has already been used.",
 };
 
-export function SignupForm({ initialCode }: { initialCode: string }) {
+export function SignupForm({ initialCode, intro }: { initialCode: string; intro: string }) {
   const [step, setStep] = useState<Step>({ kind: "enter-code" });
   const [codeInput, setCodeInput] = useState(initialCode);
   const [email, setEmail] = useState("");
@@ -93,20 +94,19 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
     }
   };
 
+  let content: React.ReactNode;
   if (step.kind === "sent") {
-    return (
+    content = (
       <p className="max-w-sm text-center text-base text-foreground">
         Check <span className="font-semibold">{step.email}</span> for a sign-in link. It expires in 15 minutes.
       </p>
     );
-  }
-
-  if (step.kind === "code-valid" || step.kind === "submitting" || step.kind === "error") {
+  } else if (step.kind === "code-valid" || step.kind === "submitting" || step.kind === "error") {
     const submitting = step.kind === "submitting";
-    return (
-      <form onSubmit={sendMagicLink} className="flex w-full max-w-sm flex-col gap-3">
+    content = (
+      <form onSubmit={sendMagicLink} className="flex w-full flex-col gap-3">
         <p className="rounded border border-border bg-muted p-3 text-base text-foreground">
-          <span className="block text-sm uppercase tracking-wide text-muted-foreground">Your invite note</span>
+          <span className="block text-sm uppercase tracking-wide text-muted-foreground">This invitation is for…</span>
           {step.note}
         </p>
         <Label htmlFor="displayName">Display name</Label>
@@ -130,7 +130,7 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
           disabled={submitting}
         />
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Sending…" : "Send sign-in link"}
+          {submitting ? "Sending…" : "Verify your email"}
         </Button>
         {step.kind === "error" && (
           <p role="alert" className="text-base text-destructive">
@@ -139,32 +139,40 @@ export function SignupForm({ initialCode }: { initialCode: string }) {
         )}
       </form>
     );
+  } else {
+    const checking = step.kind === "code-checking";
+    const ready = codeInput.trim().length === INVITE_CODE_LENGTH;
+    content = (
+      <form onSubmit={checkCode} className="flex w-full flex-col gap-3">
+        <Label htmlFor="code">Invite code</Label>
+        <Input
+          id="code"
+          type="text"
+          required
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          value={codeInput}
+          onChange={(event) => setCodeInput(event.target.value)}
+          disabled={checking}
+          className="font-mono uppercase"
+        />
+        <Button type="submit" disabled={checking || !ready}>
+          {checking ? "Checking…" : ready ? "Sign up!" : "Enter invite code…"}
+        </Button>
+        {step.kind === "enter-code" && step.error && (
+          <p role="alert" className="text-base text-destructive">
+            {step.error}
+          </p>
+        )}
+      </form>
+    );
   }
 
-  const checking = step.kind === "code-checking";
   return (
-    <form onSubmit={checkCode} className="flex w-full max-w-sm flex-col gap-3">
-      <Label htmlFor="code">Invite code</Label>
-      <Input
-        id="code"
-        type="text"
-        required
-        autoComplete="off"
-        autoCapitalize="characters"
-        spellCheck={false}
-        value={codeInput}
-        onChange={(event) => setCodeInput(event.target.value)}
-        disabled={checking}
-        className="font-mono uppercase"
-      />
-      <Button type="submit" disabled={checking}>
-        {checking ? "Checking…" : "Check code"}
-      </Button>
-      {step.kind === "enter-code" && step.error && (
-        <p role="alert" className="text-base text-destructive">
-          {step.error}
-        </p>
-      )}
-    </form>
+    <div className="flex w-full max-w-sm flex-col items-center gap-6">
+      {step.kind !== "sent" && <p className="text-center text-base text-muted-foreground">{intro}</p>}
+      {content}
+    </div>
   );
 }

@@ -7,7 +7,7 @@
  * (optional chaining, nullish coalescing), so on an older engine — Safari ≤10,
  * IE 11, legacy Edge, a dated Android/Chrome — the bundle throws a SyntaxError,
  * React never hydrates, and interactive controls silently fall back to native
- * behavior (e.g. the signup "Check code" button does a bare form submit that
+ * behavior (e.g. the signup "Sign up!" button does a bare form submit that
  * wipes the field). We can't catch that from inside the bundle, so we detect it
  * out here and reveal a plain-HTML notice instead.
  *
