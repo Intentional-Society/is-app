@@ -56,9 +56,13 @@ type WebGraphCanvasProps = {
   // (cursor:pointer). Both null in read-only views like the mini-map.
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
-  // Edge-number reveal + relating-dialog wiring. Built by the wrapper because
-  // it owns the hover/selection state machine.
-  edgeInteraction: EdgeInteraction;
+  // Marks one node with a small "You" cue (the mini-map's viewer at the end of
+  // the lit path). Null in the full graph, where you're obviously the center.
+  viewerCueNodeId?: string | null;
+  // Edge-number reveal + relating-dialog wiring. Built by the wrapper that owns
+  // the hover/selection state machine; null in read-only views (no numbers, no
+  // editing).
+  edgeInteraction?: EdgeInteraction | null;
   // Fraction of the canvas kept as breathing room on every fitView.
   fitViewPadding?: number;
   // When false, pan/zoom/drag are locked (the mini-map never hijacks page
@@ -87,7 +91,8 @@ export function WebGraphCanvas({
   dimUnlit,
   selectedNodeId,
   selectedEdgeId,
-  edgeInteraction,
+  viewerCueNodeId = null,
+  edgeInteraction = null,
   fitViewPadding = FIT_VIEW_PADDING,
   interactive = true,
   onReady,
@@ -137,7 +142,7 @@ export function WebGraphCanvas({
   // normalized render positions into `nodes`, fits the viewport as it settles,
   // and integrates node dragging. See useWebGraphSimulation.
   const { nodes, onNodesChange, onNodeDragStart, onNodeDrag, onNodeDragStop, registerFlow, markUserMoved, fitView } =
-    useWebGraphSimulation(subgraph);
+    useWebGraphSimulation(subgraph, fitViewPadding);
 
   // Surface fitView to the wrapper once (the hook returns a stable callback).
   useEffect(() => onReady?.(fitView), [onReady, fitView]);
@@ -145,8 +150,8 @@ export function WebGraphCanvas({
   // Carries the node decoration to MemberNode via context (kept out of node.data
   // so a selection doesn't trigger a setNodes pass). See NodeInteraction.
   const nodeInteraction = useMemo<NodeInteraction>(
-    () => ({ litNodeIds, dimUnlit, selectedNodeId }),
-    [litNodeIds, dimUnlit, selectedNodeId],
+    () => ({ litNodeIds, dimUnlit, selectedNodeId, viewerCueNodeId }),
+    [litNodeIds, dimUnlit, selectedNodeId, viewerCueNodeId],
   );
 
   // Light the selected edge and the lit path; dim the rest when asked. The
@@ -160,8 +165,11 @@ export function WebGraphCanvas({
   // state so sim ticks and drags flow through untouched. See decorateNodes.
   const decoratedNodes = useMemo(() => decorateNodes(nodes, { litNodeIds }), [nodes, litNodeIds]);
 
-  // Lock gestures for read-only embeds so the canvas never steals page scroll;
-  // omitted entirely when interactive, leaving ReactFlow's defaults intact.
+  // Read-only embed config: lock every gesture so the canvas never steals page
+  // scroll, and drop minZoom well below ReactFlow's 0.5 default so fitView can
+  // zoom out far enough to honor the (roomier) padding — otherwise a small, wide
+  // graph in a narrow box bottoms out at 0.5 and fills the frame edge-to-edge.
+  // Omitted entirely when interactive, leaving ReactFlow's defaults intact.
   const lockProps = interactive
     ? undefined
     : {
@@ -171,6 +179,7 @@ export function WebGraphCanvas({
         panOnDrag: false,
         panOnScroll: false,
         nodesDraggable: false,
+        minZoom: 0.1,
       };
 
   return (

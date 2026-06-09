@@ -80,8 +80,17 @@ type WebGraphSimulation = {
 // it the filtered subgraph and the ReactFlow instance (via registerFlow) and
 // renders the `nodes` it returns; everything stateful about the physics — the
 // sim, the normalization, the drag pins — lives here.
-export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebGraphSimulation {
+export function useWebGraphSimulation(
+  filtered: SimulationSubgraph | null,
+  fitPadding: number = FIT_VIEW_PADDING,
+): WebGraphSimulation {
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
+  // The fit padding every internal refit uses (settle fits, the "end" fit, and
+  // the exposed fitView). Held in a ref so the stable fitView callback and the
+  // sim-build effect read the latest without re-subscribing. The mini-map runs
+  // roomier than the full graph (fixed-size nodes need margin in a small box).
+  const fitPaddingRef = useRef(fitPadding);
+  fitPaddingRef.current = fitPadding;
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
   // Captured via ReactFlow's onInit so we can refit the viewport every
   // time node positions change — fitView only auto-fires on first
@@ -248,7 +257,7 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
         // taken over the viewport.
         if (!userMovedViewportRef.current) {
           requestAnimationFrame(() => {
-            flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 200 });
+            flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 200 });
           });
         }
       });
@@ -302,7 +311,7 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
       // visibly zoomed in. Skipped during a drag (we freeze normalization then)
       // and once the user takes over the viewport; stops at initialSettleDone.
       if (!initialSettleDoneRef.current && !userMovedViewportRef.current && !draggedNodeIdRef.current) {
-        flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 0 });
+        flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 0 });
       }
     }
 
@@ -374,7 +383,7 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
     userMovedViewportRef.current = true;
   }, []);
   const fitView = useCallback(() => {
-    flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 0 });
+    flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 0 });
   }, []);
 
   return {
