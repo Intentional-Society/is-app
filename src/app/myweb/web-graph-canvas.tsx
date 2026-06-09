@@ -56,8 +56,9 @@ type WebGraphCanvasProps = {
   // (cursor:pointer). Both null in read-only views like the mini-map.
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
-  // Marks one node with a small "You" cue (the mini-map's viewer at the end of
-  // the lit path). Null in the full graph, where you're obviously the center.
+  // The viewer's node — its name label reads "You" (the mini-map's viewer at the
+  // end of the lit path). Null in the full graph, where you're obviously the
+  // center.
   viewerCueNodeId?: string | null;
   // Edge-number reveal + relating-dialog wiring. Built by the wrapper that owns
   // the hover/selection state machine; null in read-only views (no numbers, no
@@ -65,6 +66,11 @@ type WebGraphCanvasProps = {
   edgeInteraction?: EdgeInteraction | null;
   // Fraction of the canvas kept as breathing room on every fitView.
   fitViewPadding?: number;
+  // Sim-unit span the settled layout's longer axis normalizes to before fitView
+  // frames it — the map's zoom knob. Smaller ⇒ fitView zooms in ⇒ avatars,
+  // labels, and link gaps all render larger (the mini-map runs tighter than the
+  // full graph). Defaults to the full-graph target.
+  normalizationTarget?: number;
   // When false, pan/zoom/drag are locked (the mini-map never hijacks page
   // scroll). Defaults to the fully-interactive full graph.
   interactive?: boolean;
@@ -94,6 +100,7 @@ export function WebGraphCanvas({
   viewerCueNodeId = null,
   edgeInteraction = null,
   fitViewPadding = FIT_VIEW_PADDING,
+  normalizationTarget,
   interactive = true,
   onReady,
   onEdgeMouseEnter,
@@ -142,7 +149,7 @@ export function WebGraphCanvas({
   // normalized render positions into `nodes`, fits the viewport as it settles,
   // and integrates node dragging. See useWebGraphSimulation.
   const { nodes, onNodesChange, onNodeDragStart, onNodeDrag, onNodeDragStop, registerFlow, markUserMoved, fitView } =
-    useWebGraphSimulation(subgraph, fitViewPadding);
+    useWebGraphSimulation(subgraph, fitViewPadding, normalizationTarget);
 
   // Surface fitView to the wrapper once (the hook returns a stable callback).
   useEffect(() => onReady?.(fitView), [onReady, fitView]);

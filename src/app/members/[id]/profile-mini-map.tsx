@@ -17,7 +17,12 @@ import type { RelationMiniMap } from "@/lib/api-types";
 // Roomier than the full graph's 0.10: nodes render at a fixed pixel size that
 // fitView's padding doesn't scale, so a wide path at a narrow (mobile) width
 // needs extra margin to keep the end avatars and their labels off the edges.
-const MINI_MAP_FIT_PADDING = 0.32;
+const MINI_MAP_FIT_PADDING = 0.12;
+
+// Tighter than the full graph's 600: the longer axis normalizes to fewer sim
+// units, so fitView zooms in and the fixed-px avatars and names render larger in
+// this small embed. Trades a little link breathing room for legibility.
+const MINI_MAP_NORMALIZATION_TARGET = 280;
 
 const fetchMiniMap = async (profileId: string): Promise<RelationMiniMap> => {
   const res = await apiClient.api.relations["mini-map"][":profileId"].$get({ param: { profileId } });
@@ -99,6 +104,7 @@ export function ProfileMiniMap({ profileId, memberName }: { profileId: string; m
         viewerCueNodeId={subgraph.viewerId}
         interactive={false}
         fitViewPadding={MINI_MAP_FIT_PADDING}
+        normalizationTarget={MINI_MAP_NORMALIZATION_TARGET}
         // Read-only: a click opens the member's profile (no selection state).
         onNodeClick={(_event, node) => {
           const slug = node.data.slug ?? node.data.id;

@@ -83,6 +83,7 @@ type WebGraphSimulation = {
 export function useWebGraphSimulation(
   filtered: SimulationSubgraph | null,
   fitPadding: number = FIT_VIEW_PADDING,
+  normalizationTarget: number = NORMALIZATION_TARGET,
 ): WebGraphSimulation {
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
   // The fit padding every internal refit uses (settle fits, the "end" fit, and
@@ -91,6 +92,12 @@ export function useWebGraphSimulation(
   // roomier than the full graph (fixed-size nodes need margin in a small box).
   const fitPaddingRef = useRef(fitPadding);
   fitPaddingRef.current = fitPadding;
+  // The longer-axis span the settled layout normalizes to before fitView frames
+  // it — the map's zoom knob (smaller ⇒ fitView zooms in ⇒ everything renders
+  // larger). Held in a ref for the same reason as the padding. The mini-map runs
+  // tighter than the full graph so its fixed-px avatars and labels read larger.
+  const normalizationTargetRef = useRef(normalizationTarget);
+  normalizationTargetRef.current = normalizationTarget;
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
   // Captured via ReactFlow's onInit so we can refit the viewport every
   // time node positions change — fitView only auto-fires on first
@@ -278,7 +285,7 @@ export function useWebGraphSimulation(
       if (draggedNodeIdRef.current && normRef.current) {
         ({ cx, cy, scale } = normRef.current);
       } else {
-        const norm = computeNormalization(simNodes, NORMALIZATION_TARGET);
+        const norm = computeNormalization(simNodes, normalizationTargetRef.current);
         if (!norm) return;
         ({ cx, cy, scale } = norm);
         normRef.current = norm;
