@@ -53,12 +53,13 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
         </div>
 
         {isOwnProfile ? (
+          // Square, the same footprint as the mini-map on others' profiles.
           <Avatar
             name={profile.displayName}
             url={profile.avatarUrl}
-            sizes="224px"
+            sizes="304px"
             priority
-            className="flex h-44 w-44 items-center justify-center overflow-hidden rounded-full bg-muted text-5xl font-semibold text-muted-foreground sm:h-56 sm:w-56"
+            className="flex aspect-square w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-sm bg-muted text-5xl font-semibold text-muted-foreground"
           />
         ) : (
           // Photo + mini-map as one unit: stacked on phones, side-by-side on
