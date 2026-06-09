@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { and, asc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
-import { toSlug } from "@/lib/slug";
+import { nextSlug, toSlug } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isUuid } from "./auth-middleware";
@@ -87,6 +87,38 @@ export const parseEditableProfile = (body: unknown): EditableProfileInput | { er
   return out;
 };
 
+export const isSlugUniqueViolation = (err: unknown): boolean => {
+  const cause = (err as { cause?: { code?: string; constraint_name?: string } }).cause;
+  return cause?.code === "23505" && cause.constraint_name === "profiles_slug_unique";
+};
+
+// Permutation attempts before giving up on a readable URL. The cap
+// only matters under a pathological pile-up of same-name members.
+const MAX_SLUG_ATTEMPTS = 9;
+
+// Runs `write` with the given derived slug, permuting (-2, -3, …) on
+// each slug clash so a display-name twin still gets a readable URL
+// (#188); past the cap it writes with a null slug (UUID URL) and the
+// member can pick a custom one in settings. Both slug-deriving writes
+// — the sign-in upsert and PUT /me's backfill — share this policy.
+// Explicitly chosen slugs never come through here; their clash is the
+// member's to resolve (409).
+export const withSlugPermutation = async <T>(slug: string, write: (slug: string | null) => Promise<T>): Promise<T> => {
+  // A name that normalizes to nothing gets no slug at all — permuting
+  // "" would make "-2" the member's whole URL.
+  if (slug === "") return write(null);
+  let candidate = slug;
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    try {
+      return await write(candidate);
+    } catch (err) {
+      if (!isSlugUniqueViolation(err)) throw err;
+      candidate = nextSlug(candidate);
+    }
+  }
+  return write(null);
+};
+
 // Returns { created: true } only when a brand-new profile row was
 // inserted. Callers (notably /auth/callback) use this to gate
 // once-per-member side effects like auto-subscribing to the weekly web
@@ -96,24 +128,14 @@ export const upsertProfile = async (user: User): Promise<{ created: boolean }> =
   const displayName = (user.user_metadata?.displayName as string | undefined) ?? null;
   const slug = displayName ? toSlug(displayName) || null : null;
 
-  const insert = (values: { id: string; displayName: string | null; slug: string | null }) =>
-    db.insert(profiles).values(values).onConflictDoNothing({ target: profiles.id }).returning({ id: profiles.id });
+  const insert = (s: string | null) =>
+    db
+      .insert(profiles)
+      .values({ id: user.id, displayName, slug: s })
+      .onConflictDoNothing({ target: profiles.id })
+      .returning({ id: profiles.id });
 
-  let rows: { id: string }[];
-  try {
-    rows = await insert({ id: user.id, displayName, slug });
-  } catch (err) {
-    // Display names may legitimately repeat; only slugs are unique. A
-    // derived-slug clash must not break sign-in — insert without a slug
-    // and let the member pick one in settings (#188).
-    const cause = (err as { cause?: { constraint_name?: string } }).cause;
-    if (slug !== null && cause?.constraint_name === "profiles_slug_unique") {
-      rows = await insert({ id: user.id, displayName, slug: null });
-    } else {
-      throw err;
-    }
-  }
-
+  const rows = slug === null ? await insert(null) : await withSlugPermutation(slug, insert);
   return { created: rows.length > 0 };
 };
 

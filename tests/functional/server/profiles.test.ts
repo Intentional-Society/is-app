@@ -13,6 +13,7 @@ import {
   listMembers,
   setProfileHidden,
   upsertProfile,
+  withSlugPermutation,
 } from "@/server/profiles";
 import { profiles } from "@/server/schema";
 
@@ -90,9 +91,9 @@ describe("upsertProfile", () => {
     expect(rows[0]?.displayName).toBeNull();
   });
 
-  it("falls back to a null slug when the derived slug is already taken", async () => {
+  it("permutes the slug when the derived slug is already taken", async () => {
     // A sign-in must not break on a display-name twin (#188) — the
-    // newcomer just starts without a profile URL.
+    // newcomer gets the next free permutation of the shared name.
     const otherId = randomUUID();
     await db.execute(
       sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${otherId}::uuid, false, false)`,
@@ -113,11 +114,53 @@ describe("upsertProfile", () => {
       const rows = await db.select().from(profiles).where(eq(profiles.id, testUserId));
       expect(rows).toHaveLength(1);
       expect(rows[0]?.displayName).toBe(TEST_DISPLAY_NAME);
-      expect(rows[0]?.slug).toBeNull();
+      expect(rows[0]?.slug).toBe(`${toSlug(TEST_DISPLAY_NAME)}-2`);
     } finally {
       await db.delete(profiles).where(eq(profiles.id, otherId));
       await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);
     }
+  });
+});
+
+describe("withSlugPermutation", () => {
+  // A write that fails with a slug-unique violation for every slug in
+  // `taken`, recording what it was asked to write.
+  const fakeWrite = (taken: string[], calls: (string | null)[]) => async (slug: string | null) => {
+    calls.push(slug);
+    if (slug !== null && taken.includes(slug)) {
+      throw Object.assign(new Error("duplicate key"), {
+        cause: { code: "23505", constraint_name: "profiles_slug_unique" },
+      });
+    }
+    return slug;
+  };
+
+  it("writes a null slug when the input normalizes to nothing", async () => {
+    // Permuting "" would make "-2" the member's whole URL.
+    const calls: (string | null)[] = [];
+    expect(await withSlugPermutation("", fakeWrite([], calls))).toBeNull();
+    expect(calls).toEqual([null]);
+  });
+
+  it("permutes through taken slugs to the first free one", async () => {
+    const calls: (string | null)[] = [];
+    expect(await withSlugPermutation("aria-chen", fakeWrite(["aria-chen", "aria-chen-2"], calls))).toBe("aria-chen-3");
+    expect(calls).toEqual(["aria-chen", "aria-chen-2", "aria-chen-3"]);
+  });
+
+  it("falls back to a null slug when every permutation is taken", async () => {
+    const taken = ["aria-chen", ...Array.from({ length: 20 }, (_, i) => `aria-chen-${i + 2}`)];
+    const calls: (string | null)[] = [];
+    expect(await withSlugPermutation("aria-chen", fakeWrite(taken, calls))).toBeNull();
+    expect(calls.at(-1)).toBeNull();
+  });
+
+  it("rethrows non-slug-clash errors", async () => {
+    await expect(
+      withSlugPermutation("aria-chen", async () => {
+        throw new Error("connection lost");
+      }),
+    ).rejects.toThrow("connection lost");
   });
 });
 
