@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-08 | James | Profile mini-map reuses the My Web renderer
+
+The profile mini-map reuses My Web's renderer rather than a second one: `WebGraph` split into a presentational `WebGraphCanvas` (now with a read-only embed mode) plus focused layout/selection/simulation modules, and `relations.ts` into `relations-personal` and `relations-mini-map`. Edit the shared canvas with both surfaces in mind.
+
 ## 2026-06-08 | James | Local e2e reuses the running dev server (#372)
 
 Playwright now targets the dev port and reuses a running `npm run dev` (via `reuseExistingServer`), so you no longer stop your dev server to run e2e; lanes set only `LANE_DEV_PORT` and the separate `E2E_PORT` is retired (stale lines in existing lane `.env.local`s are ignored). Tradeoff: an e2e run resets and drives the seeded `@testfake.local` users in your dev DB. Reference: docs/strategy-worktree-lanes.md.
