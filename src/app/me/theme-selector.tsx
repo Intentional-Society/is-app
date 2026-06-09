@@ -1,7 +1,9 @@
 "use client";
 
+import { useLogger } from "next-axiom";
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { applyThemePreference, readThemePreference, type ThemePreference } from "@/lib/theme";
 
@@ -16,6 +18,8 @@ export function ThemeSelector() {
   // see — start unselected and read it after mount so server and client
   // render the same initial markup.
   const [pref, setPref] = useState<ThemePreference | null>(null);
+  const { user } = useAuth();
+  const log = useLogger();
 
   useEffect(() => {
     setPref(readThemePreference());
@@ -24,6 +28,9 @@ export function ThemeSelector() {
   const select = (next: ThemePreference) => {
     applyThemePreference(next);
     setPref(next);
+    // userId is the pseudonymous auth UUID (same field as the api
+    // request log), so adoption is countable per-person, not per-click.
+    log.info("theme-selected", { theme: next, userId: user?.id ?? null });
   };
 
   return (
