@@ -208,6 +208,7 @@ describe("getProfileForSelf", () => {
         "intentionUpdatedAt",
         "deactivatedAt",
         "isAdmin",
+        "hidden",
         "lastSignedAgreements",
         "lastUpdatedProfile",
         "lastReviewedPrograms",
@@ -300,6 +301,11 @@ describe("profiles.hidden", () => {
   it("defaults to false on insert", async () => {
     const [row] = await db.select({ hidden: profiles.hidden }).from(profiles).where(eq(profiles.id, visibleId));
     expect(row.hidden).toBe(false);
+  });
+
+  it("getProfileForSelf surfaces hidden, so /me can tell the member", async () => {
+    const profile = await getProfileForSelf(hiddenId);
+    expect(profile?.hidden).toBe(true);
   });
 
   it("listMembers excludes hidden by default and includes when includeHidden=true", async () => {

@@ -183,6 +183,7 @@ export type ProfileForSelf = {
   intentionUpdatedAt: Date | null;
   deactivatedAt: Date | null;
   isAdmin: boolean;
+  hidden: boolean;
   lastSignedAgreements: Date | null;
   lastUpdatedProfile: Date | null;
   lastReviewedPrograms: Date | null;
@@ -210,6 +211,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
       isAdmin: profiles.isAdmin,
+      hidden: profiles.hidden,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
       lastReviewedPrograms: profiles.lastReviewedPrograms,
@@ -267,6 +269,7 @@ export const getProfileForSelfWithProbe = async (
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
       isAdmin: profiles.isAdmin,
+      hidden: profiles.hidden,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
       lastReviewedPrograms: profiles.lastReviewedPrograms,

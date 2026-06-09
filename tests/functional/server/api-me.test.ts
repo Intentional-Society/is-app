@@ -115,6 +115,7 @@ describe("GET /api/me", () => {
         intentionUpdatedAt: null,
         deactivatedAt: null,
         isAdmin: false,
+        hidden: false,
         lastSignedAgreements: null,
         lastUpdatedProfile: null,
         lastReviewedPrograms: null,

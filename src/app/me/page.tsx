@@ -22,6 +22,16 @@ export default async function MePage() {
         <BreadcrumbLink fallback="/" />
       </div>
 
+      {me.profile.hidden && (
+        <p role="alert" className="w-full max-w-md rounded-md border border-border bg-muted px-4 py-3 text-sm">
+          Your account is marked as hidden, and won&apos;t show in the Directory or Webs. Please reach out to{" "}
+          <a href="mailto:devteam@mail.intentionalsociety.org" className="underline hover:text-muted-foreground">
+            devteam@mail.intentionalsociety.org
+          </a>{" "}
+          if you don&apos;t know why.
+        </p>
+      )}
+
       <MeTabs profile={me.profile} />
     </main>
   );
