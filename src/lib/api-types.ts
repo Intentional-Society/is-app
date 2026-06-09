@@ -45,6 +45,11 @@ export type RelationCandidate = RelationCandidatesFeed["suggestions"][number];
 
 export type RelationSubgraph = InferResponseType<(typeof apiClient.api.relations.subgraph)["$get"], 200>;
 
+export type RelationMiniMap = InferResponseType<
+  (typeof apiClient.api.relations)["mini-map"][":profileId"]["$get"],
+  200
+>;
+
 export type AdminMembersResponse = InferResponseType<(typeof apiClient.api.admin.members)["$get"], 200>;
 
 export type AdminMember = AdminMembersResponse["members"][number];
