@@ -22,7 +22,13 @@ describe("changelog data", () => {
       expect(entry.date).toMatch(ISO_DATE);
       expect(Number.isNaN(Date.parse(entry.date))).toBe(false);
       expect(entry.title.trim().length).toBeGreaterThan(0);
-      expect(entry.description.trim().length).toBeGreaterThan(0);
+      // Descriptions are strings or JSX; emptiness is only checkable
+      // for the string kind.
+      if (typeof entry.description === "string") {
+        expect(entry.description.trim().length).toBeGreaterThan(0);
+      } else {
+        expect(entry.description).toBeTruthy();
+      }
     }
   });
 });

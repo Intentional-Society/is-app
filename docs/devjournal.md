@@ -6,9 +6,9 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-06-09 | James | /me replaces /profile; stable, member-owned slugs (#376, #188)
 
-`/profile` and `/profile/edit` merged into `/me` — anchor-linked Profile (editing-first) and Settings tabs. Settings now holds the theme selector (light/dark/system, see docs/strategy-ui.md), the profile URL, emergency contact (moved out of the profile form, including the welcome step, since it's private), password, and deactivation. Slugs are intentionally stable: set once (derived on first save, or backfilled when null), never moved by a rename, changed only via the Profile URL setting — so shared profile links survive display-name changes, and display names may now repeat.
+`/profile` and `/profile/edit` merged into `/me` (Profile + Settings tabs); Settings holds the theme selector (docs/strategy-ui.md), profile URL, emergency contact, password, and deactivation. Slugs no longer track display-name changes: derived once, then edited only in Settings; display names may repeat, with name twins getting `-2`-style slug permutations.
 
-
+## 2026-06-08 | James | Profile mini-map reuses the My Web renderer
 
 The profile mini-map reuses My Web's renderer rather than a second one: `WebGraph` split into a presentational `WebGraphCanvas` (now with a read-only embed mode) plus focused layout/selection/simulation modules, and `relations.ts` into `relations-personal` and `relations-mini-map`. Edit the shared canvas with both surfaces in mind.
 
