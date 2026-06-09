@@ -63,8 +63,9 @@ export type NodeInteraction = {
   // The clicked node, kept at hover size so a selection reads as "this one's it."
   // Null in read-only views (the mini-map navigates on click instead).
   selectedNodeId: string | null;
-  // The node to tag with a small "You" cue (the mini-map's viewer). Null in the
-  // full graph, where you're the obvious center.
+  // The viewer's node — its name label reads "You" in place of the member name
+  // (how the mini-map marks you). Null in the full graph, where you're the
+  // obvious center.
   viewerCueNodeId: string | null;
 };
 export const NodeInteractionContext = createContext<NodeInteraction | null>(null);
@@ -104,23 +105,17 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
           className="pointer-events-none absolute inset-0 rounded-full bg-canvas transition-opacity duration-150"
           style={{ opacity: isDimmed ? 1 - DIM_KEEP : 0 }}
         />
-        {/* "You" cue at the end of the lit path (mini-map only). Green to match
-            the path; sits on the avatar's lower edge so it reads as a label. */}
-        {isViewer && (
-          <div className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-success bg-canvas px-1.5 text-[0.625rem] font-semibold leading-tight text-success">
-            You
-          </div>
-        )}
       </div>
       {/* The name dims by mixing its text color toward the canvas — color paints
-          only the glyphs, so no covering box (square) and no bleed-through. */}
+          only the glyphs, so no covering box (square) and no bleed-through. The
+          viewer's own node reads "You" in place of their name (mini-map cue). */}
       <div
         className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-colors duration-150"
         style={
           isDimmed ? { color: `color-mix(in srgb, currentColor ${DIM_KEEP * 100}%, var(--color-canvas))` } : undefined
         }
       >
-        {data.displayName ?? "—"}
+        {isViewer ? "You" : (data.displayName ?? "—")}
       </div>
     </div>
   );
