@@ -42,8 +42,12 @@ test("tabs switch between profile and settings, and a theme choice persists", as
   await expect(page.locator("html")).not.toHaveClass(/dark/);
 });
 
+// Runs as the admin user: the seeded accounts are hidden in the prod
+// DB that previews share, and /members/[id] resolves hidden profiles
+// only for admin viewers — a regular seeded user would get "Member
+// not found" on their own page in CI.
 test("a member can change their profile URL from settings", async ({ page }) => {
-  await signInAs(page, "regular");
+  await signInAs(page, "admin");
   // Distinct bio per completeWelcome caller — see the #149 probe.
   await completeWelcome(page, { displayName: "Slug Tester", bio: "e2e bio · me.spec · slug" });
 
