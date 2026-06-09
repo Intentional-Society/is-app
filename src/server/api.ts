@@ -5,6 +5,7 @@ import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
 import { isRelationValue } from "@/lib/relation-value";
+import { toSlug } from "@/lib/slug";
 
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
@@ -42,7 +43,6 @@ import {
   reactivateProfile,
   setProfileHidden,
   syncDisplayNameToAuthMetadata,
-  toSlug,
   upsertProfile,
 } from "./profiles";
 import {
@@ -364,9 +364,12 @@ const api = new Hono<{ Variables: ApiVariables }>()
 
     // Ensure a row exists before updating — same self-heal guarantee
     // GET /me has, since a client can PUT /me before ever calling GET.
-    const existing = await getProfileForSelf(user.id);
+    // Re-read after the upsert so the slug-backfill check below sees
+    // any slug the upsert just derived from auth metadata.
+    let existing = await getProfileForSelf(user.id);
     if (!existing) {
       await upsertProfile(user);
+      existing = await getProfileForSelf(user.id);
     }
 
     // Inline first-profile-save detection: lastUpdatedProfile being
@@ -376,9 +379,16 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const isFirstSave = !existing?.lastUpdatedProfile && Object.keys(parsed).length > 0;
 
     if (Object.keys(parsed).length > 0) {
+      // Slugs are stable (#188): a displayName edit never rewrites an
+      // existing slug, so old profile links keep working. The slug
+      // changes through exactly two paths — an explicit `slug` in the
+      // body (the settings page), or a one-time derivation from
+      // displayName while the slug is still null (first profile save).
+      const backfillSlug =
+        parsed.slug === undefined && !existing?.slug && parsed.displayName ? toSlug(parsed.displayName) || null : null;
       const update = {
         ...parsed,
-        ...(parsed.displayName !== undefined ? { slug: parsed.displayName ? toSlug(parsed.displayName) : null } : {}),
+        ...(backfillSlug ? { slug: backfillSlug } : {}),
         // Stamp the intention's own timestamp only when its text actually
         // changes — the /intentions cloud orders "freshest on top" by it,
         // so an unrelated profile edit must not float a stale intention up.
@@ -390,13 +400,21 @@ const api = new Hono<{ Variables: ApiVariables }>()
       try {
         await db.update(profiles).set(update).where(eq(profiles.id, user.id));
       } catch (err) {
-        // Display name maps to a unique slug; a clash means another member
-        // already uses this name. Surface it instead of a generic 500.
         const cause = (err as { cause?: { code?: string; constraint_name?: string } }).cause;
         if (cause?.code === "23505" && cause.constraint_name === "profiles_slug_unique") {
-          return c.json({ error: "That display name is already taken. Please choose a different one." }, 409);
+          // An explicitly chosen slug that clashes is the member's to
+          // fix; surface it instead of a generic 500.
+          if (parsed.slug !== undefined) {
+            return c.json({ error: "That profile URL is already taken. Please choose a different one." }, 409);
+          }
+          // A derived-slug clash must not block the profile save —
+          // display names may repeat. Save without the slug; the member
+          // can pick a custom URL in settings.
+          const { slug: _clashed, ...withoutSlug } = update;
+          await db.update(profiles).set(withoutSlug).where(eq(profiles.id, user.id));
+        } else {
+          throw err;
         }
-        throw err;
       }
 
       // Mirror a displayName edit into auth.users.user_metadata so auth

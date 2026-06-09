@@ -26,6 +26,7 @@ vi.mock("@sentry/nextjs", () => ({
 import * as Sentry from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
+import { toSlug } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import app from "@/server/api";
 import { db } from "@/server/db";
@@ -101,6 +102,7 @@ describe("GET /api/me", () => {
       profile: {
         id: testUserId,
         displayName: TEST_DISPLAY_NAME,
+        slug: toSlug(TEST_DISPLAY_NAME),
         bio: null,
         keywords: [],
         location: null,
@@ -188,26 +190,85 @@ describe("GET /api/me", () => {
     expect(res.status).toBe(400);
   });
 
-  it("PUT /me returns 409 when the display name's slug is already taken", async () => {
-    // Seed another member who already owns the slug "member-name".
+  // Slugs are stable once set (#188): renames and clears must not move
+  // a member's profile URL out from under previously shared links.
+  it.each([
+    ["changes", { displayName: "Renamed Member" }],
+    ["is cleared", { displayName: null }],
+  ])("PUT /me keeps the existing slug when displayName %s", async (_label, body) => {
+    // Self-heal creates the profile with the metadata-derived slug.
+    await app.request("/api/me");
+
+    const res = await putMe(body);
+    expect(res.status).toBe(200);
+    expect((await res.json()).profile.slug).toBe(toSlug(TEST_DISPLAY_NAME));
+  });
+
+  it("PUT /me backfills a null slug from the displayName", async () => {
+    await db.insert(profiles).values({ id: testUserId, displayName: null, slug: null });
+
+    const res = await putMe({ displayName: `Backfilled ${TEST_DISPLAY_NAME}` });
+    expect(res.status).toBe(200);
+    expect((await res.json()).profile.slug).toBe(toSlug(`Backfilled ${TEST_DISPLAY_NAME}`));
+  });
+
+  it("PUT /me saves the displayName and leaves slug null when the derived slug is taken", async () => {
+    // Another member already owns the slug this displayName derives to.
     const otherId = randomUUID();
     await db.execute(
       sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${otherId}::uuid, 'slug-clash@testfake.local', false, false)`,
     );
-    await db.insert(profiles).values({ id: otherId, displayName: "Member Name", slug: "member-name" });
+    await db.insert(profiles).values({ id: otherId, displayName: TEST_DISPLAY_NAME, slug: toSlug(TEST_DISPLAY_NAME) });
+    await db.insert(profiles).values({ id: testUserId, displayName: null, slug: null });
 
     try {
-      const res = await putMe({ displayName: "Member Name" });
+      const res = await putMe({ displayName: TEST_DISPLAY_NAME });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      // Display names may repeat; only the URL is unique. The save goes
+      // through and the member keeps a UUID URL until they pick a
+      // custom slug in settings.
+      expect(body.profile.displayName).toBe(TEST_DISPLAY_NAME);
+      expect(body.profile.slug).toBeNull();
+    } finally {
+      await db.delete(profiles).where(eq(profiles.id, otherId));
+      await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);
+    }
+  });
+
+  it("PUT /me sets an explicitly chosen slug, normalized", async () => {
+    await app.request("/api/me");
+
+    const res = await putMe({ slug: `My Custom URL ${testUserId.slice(0, 8)}!` });
+    expect(res.status).toBe(200);
+    expect((await res.json()).profile.slug).toBe(`my-custom-url-${testUserId.slice(0, 8)}`);
+  });
+
+  it.each([
+    ["null", null],
+    ["empty", ""],
+    ["punctuation-only", "!!!"],
+  ])("PUT /me rejects an invalid slug: %s", async (_label, slug) => {
+    const res = await putMe({ slug });
+    expect(res.status).toBe(400);
+  });
+
+  it("PUT /me returns 409 when an explicitly chosen slug is already taken", async () => {
+    const otherId = randomUUID();
+    const takenSlug = `taken-${otherId.slice(0, 8)}`;
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${otherId}::uuid, 'slug-409@testfake.local', false, false)`,
+    );
+    await db.insert(profiles).values({ id: otherId, displayName: "Slug Owner", slug: takenSlug });
+
+    try {
+      const res = await putMe({ slug: takenSlug });
       expect(res.status).toBe(409);
       expect((await res.json()).error).toMatch(/already taken/i);
 
       // The failed update must leave the caller's own slug untouched.
       const [row] = await db.select().from(profiles).where(eq(profiles.id, testUserId));
-      expect(row?.slug).not.toBe("member-name");
-
-      // A clash short-circuits before the metadata sync, so profiles and
-      // user_metadata never disagree about the name.
-      expect(mockUpdateUserById).not.toHaveBeenCalled();
+      expect(row?.slug).not.toBe(takenSlug);
     } finally {
       await db.delete(profiles).where(eq(profiles.id, otherId));
       await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);

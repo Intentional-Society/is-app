@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { and, asc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
+import { toSlug } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isUuid } from "./auth-middleware";
@@ -14,6 +15,7 @@ import { authUsers, profiles } from "./schema";
 // here. The column it maps to is `avatarPath`, a Storage object path.
 export const EDITABLE_PROFILE_FIELDS = [
   "displayName",
+  "slug",
   "bio",
   "keywords",
   "location",
@@ -26,6 +28,7 @@ type EditableField = (typeof EDITABLE_PROFILE_FIELDS)[number];
 
 export type EditableProfileInput = Partial<{
   displayName: string | null;
+  slug: string;
   bio: string | null;
   keywords: string[];
   location: string | null;
@@ -64,22 +67,25 @@ export const parseEditableProfile = (body: unknown): EditableProfileInput | { er
         return { error: "keywords must be an array of strings" };
       }
       out.keywords = [...new Set(value)];
+    } else if (key === "slug") {
+      // Slugs are normalized server-side so a hand-typed "Aria Chen!"
+      // still lands as "aria-chen". A slug that normalizes to nothing
+      // is rejected rather than nulled — a member can't lose their URL
+      // by accident, only change it.
+      if (typeof value !== "string" || toSlug(value) === "") {
+        return { error: "slug must contain at least one letter or number" };
+      }
+      out.slug = toSlug(value);
     } else {
       if (!isNullableString(value)) {
         return { error: `${key} must be a string or null` };
       }
-      out[key as Exclude<EditableField, "keywords">] = value;
+      out[key as Exclude<EditableField, "keywords" | "slug">] = value;
     }
   }
 
   return out;
 };
-
-export const toSlug = (displayName: string): string =>
-  displayName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 
 // Returns { created: true } only when a brand-new profile row was
 // inserted. Callers (notably /auth/callback) use this to gate
@@ -88,13 +94,25 @@ export const toSlug = (displayName: string): string =>
 // RETURNING means "this was a first-time sign-in".
 export const upsertProfile = async (user: User): Promise<{ created: boolean }> => {
   const displayName = (user.user_metadata?.displayName as string | undefined) ?? null;
-  const slug = displayName ? toSlug(displayName) : null;
+  const slug = displayName ? toSlug(displayName) || null : null;
 
-  const rows = await db
-    .insert(profiles)
-    .values({ id: user.id, displayName, slug })
-    .onConflictDoNothing({ target: profiles.id })
-    .returning({ id: profiles.id });
+  const insert = (values: { id: string; displayName: string | null; slug: string | null }) =>
+    db.insert(profiles).values(values).onConflictDoNothing({ target: profiles.id }).returning({ id: profiles.id });
+
+  let rows: { id: string }[];
+  try {
+    rows = await insert({ id: user.id, displayName, slug });
+  } catch (err) {
+    // Display names may legitimately repeat; only slugs are unique. A
+    // derived-slug clash must not break sign-in — insert without a slug
+    // and let the member pick one in settings (#188).
+    const cause = (err as { cause?: { constraint_name?: string } }).cause;
+    if (slug !== null && cause?.constraint_name === "profiles_slug_unique") {
+      rows = await insert({ id: user.id, displayName, slug: null });
+    } else {
+      throw err;
+    }
+  }
 
   return { created: rows.length > 0 };
 };
@@ -130,6 +148,7 @@ export const syncDisplayNameToAuthMetadata = async (
 export type ProfileForSelf = {
   id: string;
   displayName: string | null;
+  slug: string | null;
   bio: string | null;
   keywords: string[];
   location: string | null;
@@ -155,6 +174,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
     .select({
       id: profiles.id,
       displayName: profiles.displayName,
+      slug: profiles.slug,
       bio: profiles.bio,
       keywords: profiles.keywords,
       location: profiles.location,
@@ -211,6 +231,7 @@ export const getProfileForSelfWithProbe = async (
     .select({
       id: profiles.id,
       displayName: profiles.displayName,
+      slug: profiles.slug,
       bio: profiles.bio,
       keywords: profiles.keywords,
       location: profiles.location,

@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { toSlug } from "@/lib/slug";
 import { db } from "@/server/db";
 import {
   getProfileForAdmin,
@@ -88,6 +89,36 @@ describe("upsertProfile", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.displayName).toBeNull();
   });
+
+  it("falls back to a null slug when the derived slug is already taken", async () => {
+    // A sign-in must not break on a display-name twin (#188) — the
+    // newcomer just starts without a profile URL.
+    const otherId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${otherId}::uuid, false, false)`,
+    );
+    await db.insert(profiles).values({ id: otherId, displayName: TEST_DISPLAY_NAME, slug: toSlug(TEST_DISPLAY_NAME) });
+
+    try {
+      const user = {
+        id: testUserId,
+        user_metadata: { displayName: TEST_DISPLAY_NAME },
+        app_metadata: {},
+        aud: "authenticated",
+        created_at: "2026-01-01T00:00:00Z",
+      } as User;
+
+      expect(await upsertProfile(user)).toEqual({ created: true });
+
+      const rows = await db.select().from(profiles).where(eq(profiles.id, testUserId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.displayName).toBe(TEST_DISPLAY_NAME);
+      expect(rows[0]?.slug).toBeNull();
+    } finally {
+      await db.delete(profiles).where(eq(profiles.id, otherId));
+      await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);
+    }
+  });
 });
 
 describe("getProfileForSelf", () => {
@@ -121,6 +152,7 @@ describe("getProfileForSelf", () => {
       [
         "id",
         "displayName",
+        "slug",
         "bio",
         "keywords",
         "location",
