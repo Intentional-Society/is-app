@@ -3,7 +3,7 @@
 import "@xyflow/react/dist/style.css";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Controls, type Edge, Panel, ReactFlow } from "@xyflow/react";
+import { Controls, Panel } from "@xyflow/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -23,20 +23,11 @@ import {
   VIEW_STORAGE_KEY,
 } from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
-import { FIT_VIEW_PADDING, useWebGraphSimulation } from "./use-web-graph-simulation";
+import { WebGraphCanvas } from "./web-graph-canvas";
 import { WebGraphControls } from "./web-graph-controls";
 import { filterSubgraphByValue } from "./web-graph-filtering";
-import { edgeStrokeOpacity, edgeStrokeWidth } from "./web-graph-layout";
-import {
-  type EdgeData,
-  type EdgeInteraction,
-  EdgeInteractionContext,
-  edgeTypes,
-  type NodeInteraction,
-  NodeInteractionContext,
-  nodeTypes,
-} from "./web-graph-renderers";
-import { decorateEdges, decorateNodes, pathToCenter, shortestPathTree } from "./web-graph-selection";
+import type { EdgeInteraction } from "./web-graph-renderers";
+import { pathToCenter, shortestPathTree } from "./web-graph-selection";
 
 const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   const res = await apiClient.api.relations.subgraph.$get({
@@ -135,10 +126,12 @@ export function WebGraph({
   const filtered = useMemo(() => {
     if (!data) return null;
     const sub = filterSubgraphByValue(data.nodes, data.edges, data.centerId, valueFilter);
-    // You play all three layout roles here — the radial-seed root, the pinned
-    // origin, and the emphasized (larger) node. The mini-map will split them.
+    // You are the viewer and play all three layout roles — the radial-seed root,
+    // the pinned origin, and the emphasized (larger) node. The mini-map splits
+    // these (you stay the viewer; the profile member is root + emphasis).
     return {
       centerId: data.centerId,
+      viewerId: data.centerId,
       nodes: sub.nodes,
       edges: sub.edges,
       rootId: data.centerId,
@@ -158,45 +151,13 @@ export function WebGraph({
     });
   }, []);
 
-  // Derived edges for ReactFlow — rebuilt whenever the filtered subgraph changes.
-  const edges = useMemo<Edge<EdgeData>[]>(() => {
-    if (!filtered) return [];
-    const centerId = filtered.centerId;
-    const nodeById = new Map(filtered.nodes.map((n) => [n.id, n]));
-    return filtered.edges.map((e) => {
-      const isOutgoing = e.relatorId === centerId;
-      const relatee = nodeById.get(e.relateeId);
-      return {
-        id: `${e.relatorId}->${e.relateeId}`,
-        source: e.relatorId,
-        target: e.relateeId,
-        type: "numbered",
-        // ±5px invisible hit area around the thin line, so hover (desktop) or
-        // a tap within 5px (mobile) reveals the number.
-        interactionWidth: 10,
-        style: {
-          stroke: "var(--color-canvas-foreground)",
-          strokeOpacity: edgeStrokeOpacity(e.value),
-          strokeWidth: edgeStrokeWidth(e.value),
-          // Eases the stroke recolor when a node selection dims edges off the
-          // lit path (blend toward canvas) or paints them success-green on it.
-          transition: "stroke 150ms ease",
-        },
-        data: {
-          isOutgoing,
-          value: e.value,
-          relateeId: e.relateeId,
-          relateeName: relatee?.displayName ?? null,
-        },
-      };
-    });
-  }, [filtered]);
-
-  // The d3-force layout: builds the simulation over the filtered subgraph,
-  // paints normalized render positions into `nodes`, fits the viewport as it
-  // settles, and integrates node dragging. See useWebGraphSimulation.
-  const { nodes, onNodesChange, onNodeDragStart, onNodeDrag, onNodeDragStop, registerFlow, markUserMoved, fitView } =
-    useWebGraphSimulation(filtered);
+  // The canvas owns the d3-force layout and hands us its fitView on mount (see
+  // onReady), so the view↔edit height animation below can refit each frame as
+  // the box resizes. Null until the canvas mounts past the guards.
+  const fitViewRef = useRef<(() => void) | null>(null);
+  const handleCanvasReady = useCallback((fitView: () => void) => {
+    fitViewRef.current = fitView;
+  }, []);
 
   // Canvas height animation. Width is CSS-driven (w-full, capped to the
   // viewport height); we measure the resulting width and use it as the
@@ -252,7 +213,7 @@ export function WebGraph({
     }
     const start = performance.now();
     let raf = requestAnimationFrame(function tick(now: number) {
-      fitView();
+      fitViewRef.current?.();
       raf = now - start < MODE_ANIM_MS + 60 ? requestAnimationFrame(tick) : 0;
     });
     return () => {
@@ -332,24 +293,9 @@ export function WebGraph({
 
   // A node selection lights its path back to you and dims everything off it; an
   // edge selection just reveals a number, no dimming. So dimming keys off a node
-  // being selected, and the lit sets are that node's path (empty otherwise).
+  // being selected, and the lit sets are that node's path (empty otherwise). The
+  // canvas applies these to the rendered nodes/edges.
   const dimUnlit = selectedNodeId !== null;
-
-  const nodeInteraction = useMemo<NodeInteraction>(
-    () => ({ litNodeIds: pathNodeIds, dimUnlit, selectedNodeId }),
-    [pathNodeIds, dimUnlit, selectedNodeId],
-  );
-
-  // Light the selected edge and the selected node's lit path; dim the rest. The
-  // stroke transition on the base style eases the recolor. See decorateEdges.
-  const decoratedEdges = useMemo(
-    () => decorateEdges(edges, { litEdgeIds: pathEdgeIds, dimUnlit, selectedEdgeId }),
-    [edges, pathEdgeIds, dimUnlit, selectedEdgeId],
-  );
-
-  // Lift the selected node's path above the dimmed graph; derived from the live
-  // `nodes` state so sim ticks and drags flow through untouched. See decorateNodes.
-  const decoratedNodes = useMemo(() => decorateNodes(nodes, { litNodeIds: pathNodeIds }), [nodes, pathNodeIds]);
 
   const empty = !data || data.nodes.length === 0;
 
@@ -373,6 +319,9 @@ export function WebGraph({
       </p>
     );
   }
+  // Data is present past the guards above, so the filtered subgraph is too; this
+  // narrows the nullable memo for the canvas below.
+  if (!filtered) return null;
 
   // Width is identical in both modes — w-full capped to the viewport height,
   // free of the page's max-w-5xl wrapper so on tall displays the square grows
@@ -392,127 +341,112 @@ export function WebGraph({
       }}
       className="mx-auto w-full max-w-[calc(100vh_-_12rem)] overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
     >
-      <EdgeInteractionContext.Provider value={edgeInteraction}>
-        <NodeInteractionContext.Provider value={nodeInteraction}>
-          <ReactFlow
-            nodes={decoratedNodes}
-            edges={decoratedEdges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            fitView
-            fitViewOptions={{ padding: FIT_VIEW_PADDING }}
-            onInit={registerFlow}
-            // Hover previews a number on desktop (off while an edge is selected).
-            onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
-            onEdgeMouseLeave={() => endPreviewSoon()}
-            // Click/tap a line selects it and shows its number; a second click on
-            // the selected line opens the relating dialog (clicking the number
-            // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
-            onEdgeClick={(_event, edge) => {
-              clearPreviewTimer();
-              // Selecting an edge supersedes any node selection.
-              setSelectedNodeId(null);
-              if (selectedEdgeId === edge.id) {
-                const d = edge.data;
-                if (d?.isOutgoing) {
-                  onOpenRelating({
-                    id: d.relateeId,
-                    displayName: d.relateeName,
-                    currentValue: isRelationValue(d.value) ? d.value : null,
-                  });
-                }
-                return;
-              }
-              setSelectedEdgeId(edge.id);
-            }}
-            onPaneClick={() => clearSelection()}
-            onMove={(event) => {
-              // Programmatic fitView calls pass event=null; only flag a user
-              // gesture (MouseEvent / TouchEvent / Wheel).
-              if (event !== null) markUserMoved();
-            }}
-            onNodesChange={onNodesChange}
-            onNodeDragStart={onNodeDragStart}
-            onNodeDrag={onNodeDrag}
-            onNodeDragStop={onNodeDragStop}
-            nodesConnectable={false}
-            elementsSelectable={false}
-            proOptions={{ hideAttribution: true }}
-            onNodeClick={(_event, node) => {
-              // Select the node (re-click toggles off): lights its path back to
-              // you and dims the rest. No viewport pan; clears any edge
-              // selection. Double-click still opens the member's profile.
-              clearPreviewTimer();
-              setHoverEdgeId(null);
-              setSelectedEdgeId(null);
-              setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
-            }}
-            onNodeDoubleClick={(_event, node) => {
-              const slug = node.data.slug ?? node.data.id;
-              router.push(`/members/${slug}`);
-            }}
+      <WebGraphCanvas
+        subgraph={filtered}
+        litNodeIds={pathNodeIds}
+        litEdgeIds={pathEdgeIds}
+        dimUnlit={dimUnlit}
+        selectedNodeId={selectedNodeId}
+        selectedEdgeId={selectedEdgeId}
+        edgeInteraction={edgeInteraction}
+        onReady={handleCanvasReady}
+        // Hover previews a number on desktop (off while an edge is selected).
+        onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
+        onEdgeMouseLeave={() => endPreviewSoon()}
+        // Click/tap a line selects it and shows its number; a second click on
+        // the selected line opens the relating dialog (clicking the number
+        // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
+        onEdgeClick={(_event, edge) => {
+          clearPreviewTimer();
+          // Selecting an edge supersedes any node selection.
+          setSelectedNodeId(null);
+          if (selectedEdgeId === edge.id) {
+            const d = edge.data;
+            if (d?.isOutgoing) {
+              onOpenRelating({
+                id: d.relateeId,
+                displayName: d.relateeName,
+                currentValue: isRelationValue(d.value) ? d.value : null,
+              });
+            }
+            return;
+          }
+          setSelectedEdgeId(edge.id);
+        }}
+        onPaneClick={() => clearSelection()}
+        onNodeClick={(_event, node) => {
+          // Select the node (re-click toggles off): lights its path back to
+          // you and dims the rest. No viewport pan; clears any edge
+          // selection. Double-click still opens the member's profile.
+          clearPreviewTimer();
+          setHoverEdgeId(null);
+          setSelectedEdgeId(null);
+          setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
+        }}
+        onNodeDoubleClick={(_event, node) => {
+          const slug = node.data.slug ?? node.data.id;
+          router.push(`/members/${slug}`);
+        }}
+      >
+        {/* Built-in +/-/fit-view buttons for users who can't or don't
+         * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+         * is hidden — selection and connection are already disabled. */}
+        <Controls position="top-left" showInteractive={false} />
+        <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+          {/* Click-to-toggle (not hover) so the hints stay reachable on
+           * touch devices where hover doesn't exist. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+            aria-expanded={hintOpen}
+            aria-controls="web-graph-hints"
+            onClick={() => setHintOpen((h) => !h)}
+            className="rounded-full border border-border bg-background/90 font-bold"
           >
-            {/* Built-in +/-/fit-view buttons for users who can't or don't
-             * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
-             * is hidden — selection and connection are already disabled. */}
-            <Controls position="top-left" showInteractive={false} />
-            <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
-              {/* Click-to-toggle (not hover) so the hints stay reachable on
-               * touch devices where hover doesn't exist. */}
-              <Button
+            ?
+          </Button>
+          {hintOpen && (
+            <div
+              id="web-graph-hints"
+              className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+            >
+              <ul className="flex flex-col gap-1">
+                <li>Drag the background to pan.</li>
+                <li>Drag a circle to reposition it.</li>
+                <li>Scroll or pinch to zoom.</li>
+                <li>Single-click a circle to highlight its path to you.</li>
+                <li>Double-click a circle to open their profile.</li>
+                <li>
+                  <span className="font-medium text-foreground">Friends-of-friends</span> adds your connections&apos;
+                  connections.
+                </li>
+                <li>
+                  Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship
+                  depths.
+                </li>
+              </ul>
+              <button
                 type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
-                aria-expanded={hintOpen}
-                aria-controls="web-graph-hints"
-                onClick={() => setHintOpen((h) => !h)}
-                className="rounded-full border border-border bg-background/90 font-bold"
+                onClick={() => {
+                  setHintOpen(false);
+                  onReplayTour();
+                }}
+                className="self-start text-foreground underline underline-offset-2 hover:text-primary"
               >
-                ?
-              </Button>
-              {hintOpen && (
-                <div
-                  id="web-graph-hints"
-                  className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
-                >
-                  <ul className="flex flex-col gap-1">
-                    <li>Drag the background to pan.</li>
-                    <li>Drag a circle to reposition it.</li>
-                    <li>Scroll or pinch to zoom.</li>
-                    <li>Single-click a circle to highlight its path to you.</li>
-                    <li>Double-click a circle to open their profile.</li>
-                    <li>
-                      <span className="font-medium text-foreground">Friends-of-friends</span> adds your
-                      connections&apos; connections.
-                    </li>
-                    <li>
-                      Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship
-                      depths.
-                    </li>
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHintOpen(false);
-                      onReplayTour();
-                    }}
-                    className="self-start text-foreground underline underline-offset-2 hover:text-primary"
-                  >
-                    Replay guided tour
-                  </button>
-                </div>
-              )}
-            </Panel>
-            <WebGraphControls
-              hops={view.hops}
-              onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
-              valueFilter={valueFilter}
-              onToggleValue={toggleValue}
-            />
-          </ReactFlow>
-        </NodeInteractionContext.Provider>
-      </EdgeInteractionContext.Provider>
+                Replay guided tour
+              </button>
+            </div>
+          )}
+        </Panel>
+        <WebGraphControls
+          hops={view.hops}
+          onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
+          valueFilter={valueFilter}
+          onToggleValue={toggleValue}
+        />
+      </WebGraphCanvas>
     </div>
   );
 }
