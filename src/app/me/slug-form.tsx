@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,14 @@ export function SlugForm({ initialSlug }: { initialSlug: string | null }) {
   const router = useRouter();
   const [value, setValue] = useState(initialSlug ?? "");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+
+  // Adopt an externally changed slug — the welcome step's backfill, or
+  // our own save round-tripping through router.refresh(). An effect
+  // (not a key-based remount) so the status line survives the refresh
+  // instead of flashing away with the old component instance.
+  useEffect(() => {
+    setValue(initialSlug ?? "");
+  }, [initialSlug]);
 
   // Live preview of the server-side normalization, so "Aria Chen!"
   // shows as /members/aria-chen before saving.

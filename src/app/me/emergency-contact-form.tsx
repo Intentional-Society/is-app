@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,13 @@ export function EmergencyContactForm({ initial }: { initial: string }) {
   const [value, setValue] = useState(initial);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const disabled = status.kind === "submitting";
+
+  // Adopt the server's value after our own save round-trips through
+  // router.refresh() — an effect (not a key-based remount) so the
+  // status line survives the refresh instead of flashing away.
+  useEffect(() => {
+    setValue(initial);
+  }, [initial]);
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -70,11 +70,15 @@ export const completeWelcome = async (page: Page, opts: { displayName?: string; 
   await page.waitForURL((url) => url.pathname === "/welcome/agreements", { timeout: TIMEOUT_MS });
   await page.getByRole("button", { name: "I agree" }).click();
 
-  // Step 2 — profile.
+  // Step 2 — profile. Saving reveals the one-step settings tour and the
+  // Continue button; dismiss the tour (its overlay blocks other clicks),
+  // then continue.
   await page.waitForURL((url) => url.pathname === "/welcome/profile", { timeout: TIMEOUT_MS });
   await page.getByLabel("Display name").fill(opts.displayName ?? "E2E User");
   await page.getByLabel("Bio").fill(opts.bio ?? "Short bio to clear the welcome redirect.");
   await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Got it" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
 
   // Step 3 — programs.
   await page.waitForURL((url) => url.pathname === "/welcome/programs", { timeout: TIMEOUT_MS });

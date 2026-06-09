@@ -64,6 +64,16 @@ test("fresh user completes the welcome flow end to end", async ({ page }) => {
   await page.getByLabel("Location").fill("Lisbon");
   await page.getByRole("button", { name: "Save" }).click();
 
+  // Saving reveals the one-step settings tour (its title doubles as the
+  // save confirmation); the spotlighted Settings tab holds the welcome
+  // variant of the /me settings (no deactivate).
+  await expect(page.getByText("Profile saved!")).toBeVisible();
+  await page.getByRole("button", { name: "Got it" }).click();
+  await page.getByRole("tab", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Theme" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Deactivate account" })).toBeHidden();
+  await page.getByRole("button", { name: "Continue" }).click();
+
   // Step 3 — programs.
   await page.waitForURL((u) => u.pathname === "/welcome/programs", { timeout: TIMEOUT_MS });
   await page.getByRole("button", { name: "Done", exact: true }).click();
