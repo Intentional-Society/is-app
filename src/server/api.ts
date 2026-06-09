@@ -64,13 +64,14 @@ import {
   createRelationHint,
   deleteRelationHint,
   deleteRelationValue,
-  getPersonalWeb,
   getRelationSuggestions,
   getRelationValue,
   listPendingHints,
   parseOptionalRelationValue,
   updateRelationValue,
 } from "./relations";
+import { getProfileMiniMap } from "./relations-mini-map";
+import { getPersonalWeb } from "./relations-personal";
 import { profiles } from "./schema";
 import { getSystemMetrics } from "./system-metrics";
 import { resetE2EUsers } from "./test-reset";
@@ -655,6 +656,17 @@ const api = new Hono<{ Variables: ApiVariables }>()
       includeHidden,
     });
     return c.json(subgraph);
+  })
+  // Read-only mini-map for a member's profile page: the profile member, their
+  // strong connections, and the caller's shortest path back to them. Mirrors
+  // /relations/subgraph's admin → includeHidden rule.
+  .get("/relations/mini-map/:profileId", async (c) => {
+    const user = c.get("user");
+    const profileId = c.req.param("profileId");
+    if (!isUuid(profileId)) return c.json({ error: "profileId must be a UUID" }, 400);
+    const includeHidden = await isAdmin(user.id);
+    const miniMap = await getProfileMiniMap({ viewerId: user.id, profileId, includeHidden });
+    return c.json(miniMap);
   })
   .get("/relations/value/:relateeId", async (c) => {
     const user = c.get("user");

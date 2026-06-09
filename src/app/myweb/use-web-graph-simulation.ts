@@ -39,12 +39,21 @@ type SimEdge = {
 // fitView prop (initial fit + the Controls fit button) frames it the same way.
 export const FIT_VIEW_PADDING = 0.1;
 
-// The filtered subgraph the layout runs over: the center plus the nodes and
-// edges that survived the depth cull.
+// The filtered subgraph the layout runs over: the nodes and edges that survived
+// the depth cull, plus the three node roles the layout used to conflate into one
+// "center". WebGraph passes the same id for all three (you); the mini-map will
+// split them (root + emphasis = them, nothing pinned).
 type SimulationSubgraph = {
-  centerId: string;
   nodes: readonly SubgraphNode[];
   edges: readonly { relatorId: string; relateeId: string; value: number }[];
+  // The radial seed's BFS origin — seeded at {0,0} so the layout fans out around
+  // it. Always present (the seed needs a root even when nothing is pinned).
+  rootId: string;
+  // Fixed at the origin via fx/fy and made non-draggable, or null to let the
+  // whole cloud float (normalization re-centers it either way).
+  pinnedNodeId: string | null;
+  // Drawn as the larger avatar (see MemberNode); purely visual.
+  emphasizedNodeId: string | null;
 };
 
 type FlowInstance = ReactFlowInstance<Node<MemberNodeData>, Edge<EdgeData>>;
@@ -71,8 +80,24 @@ type WebGraphSimulation = {
 // it the filtered subgraph and the ReactFlow instance (via registerFlow) and
 // renders the `nodes` it returns; everything stateful about the physics — the
 // sim, the normalization, the drag pins — lives here.
-export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebGraphSimulation {
+export function useWebGraphSimulation(
+  filtered: SimulationSubgraph | null,
+  fitPadding: number = FIT_VIEW_PADDING,
+  normalizationTarget: number = NORMALIZATION_TARGET,
+): WebGraphSimulation {
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
+  // The fit padding every internal refit uses (settle fits, the "end" fit, and
+  // the exposed fitView). Held in a ref so the stable fitView callback and the
+  // sim-build effect read the latest without re-subscribing. The mini-map runs
+  // roomier than the full graph (fixed-size nodes need margin in a small box).
+  const fitPaddingRef = useRef(fitPadding);
+  fitPaddingRef.current = fitPadding;
+  // The longer-axis span the settled layout normalizes to before fitView frames
+  // it — the map's zoom knob (smaller ⇒ fitView zooms in ⇒ everything renders
+  // larger). Held in a ref for the same reason as the padding. The mini-map runs
+  // tighter than the full graph so its fixed-px avatars and labels read larger.
+  const normalizationTargetRef = useRef(normalizationTarget);
+  normalizationTargetRef.current = normalizationTarget;
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
   // Captured via ReactFlow's onInit so we can refit the viewport every
   // time node positions change — fitView only auto-fires on first
@@ -96,11 +121,11 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
   const initialSettleDoneRef = useRef(false);
 
   // Build (or rebuild) the d3-force simulation whenever the subgraph
-  // changes. The viewing member is pinned at the origin so the layout
-  // always orients around them.
+  // changes. A pinned node (if any) holds the origin so the layout
+  // orients around it; the root seeds the radial fan-out.
   useEffect(() => {
     if (!filtered) return;
-    const { centerId, nodes: subNodes, edges: subEdges } = filtered;
+    const { rootId, pinnedNodeId, emphasizedNodeId, nodes: subNodes, edges: subEdges } = filtered;
 
     // Preserve positions across data changes (a new relation, a hops toggle,
     // a depth-filter toggle) so the web doesn't reshuffle. Existing nodes keep
@@ -118,11 +143,13 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
       ? radialSeed(
           subNodes.map((n) => n.id),
           subEdges,
-          centerId,
+          rootId,
         )
       : null;
     const simNodes: SimNode[] = subNodes.map((n) => {
-      if (n.id === centerId) return { id: n.id, x: 0, y: 0, fx: 0, fy: 0 };
+      // Pin holds the origin and overrides any preserved/seeded position; when
+      // nothing is pinned the cloud floats and normalization re-centers it.
+      if (n.id === pinnedNodeId) return { id: n.id, x: 0, y: 0, fx: 0, fy: 0 };
       const prev = prevById.get(n.id);
       if (prev) return { id: n.id, x: prev.x, y: prev.y, vx: prev.vx, vy: prev.vy, fx: null, fy: null };
       const seeded = seed?.get(n.id);
@@ -156,11 +183,11 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
           id: n.id,
           type: "member",
           position: toRender(sn?.x ?? 0, sn?.y ?? 0),
-          data: { ...n, isCenter: n.id === centerId },
-          // Center node is fx/fy-pinned at the origin; letting the user
-          // drag it would either fight the pin or move "yourself" on
-          // your own web, neither of which is the intent.
-          draggable: n.id !== centerId,
+          data: { ...n, emphasized: n.id === emphasizedNodeId },
+          // The pinned node is fx/fy-held at the origin; letting the user drag it
+          // would either fight the pin or move "yourself" on your own web,
+          // neither of which is the intent. Unpinned graphs are fully draggable.
+          draggable: n.id !== pinnedNodeId,
           // Override ReactFlow's default ".react-flow__node{pointer-events: all}"
           // so only the Avatar (pointer-events-auto + clip-path:circle) is a
           // click target. The corners around the round avatar no longer count
@@ -237,7 +264,7 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
         // taken over the viewport.
         if (!userMovedViewportRef.current) {
           requestAnimationFrame(() => {
-            flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 200 });
+            flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 200 });
           });
         }
       });
@@ -258,7 +285,7 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
       if (draggedNodeIdRef.current && normRef.current) {
         ({ cx, cy, scale } = normRef.current);
       } else {
-        const norm = computeNormalization(simNodes, NORMALIZATION_TARGET);
+        const norm = computeNormalization(simNodes, normalizationTargetRef.current);
         if (!norm) return;
         ({ cx, cy, scale } = norm);
         normRef.current = norm;
@@ -291,7 +318,7 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
       // visibly zoomed in. Skipped during a drag (we freeze normalization then)
       // and once the user takes over the viewport; stops at initialSettleDone.
       if (!initialSettleDoneRef.current && !userMovedViewportRef.current && !draggedNodeIdRef.current) {
-        flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 0 });
+        flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 0 });
       }
     }
 
@@ -363,7 +390,7 @@ export function useWebGraphSimulation(filtered: SimulationSubgraph | null): WebG
     userMovedViewportRef.current = true;
   }, []);
   const fitView = useCallback(() => {
-    flowRef.current?.fitView({ padding: FIT_VIEW_PADDING, duration: 0 });
+    flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 0 });
   }, []);
 
   return {

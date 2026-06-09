@@ -6,6 +6,7 @@ import { QueryProvider } from "@/components/query-provider";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberProfile } from "@/lib/api-types";
 
+import { ProfileMiniMap } from "./profile-mini-map";
 import { MemberRelationControl } from "./relation-control";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -51,15 +52,36 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
           <BreadcrumbLink fallback="/members" />
         </div>
 
-        <Avatar
-          name={profile.displayName}
-          url={profile.avatarUrl}
-          sizes="128px"
-          priority
-          className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
-        />
-
-        {!isOwnProfile && <MemberRelationControl memberId={profile.id} memberName={profile.displayName} />}
+        {isOwnProfile ? (
+          // Square, the same footprint as the mini-map on others' profiles.
+          <Avatar
+            name={profile.displayName}
+            url={profile.avatarUrl}
+            sizes="304px"
+            priority
+            className="flex aspect-square w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-sm bg-muted text-5xl font-semibold text-muted-foreground"
+          />
+        ) : (
+          // Photo + mini-map as one unit: stacked on phones, side-by-side on
+          // desktop as two equal squares (the photo matches the map's footprint
+          // at every width). The relation control sits below the map.
+          <div className="flex w-full max-w-2xl flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-center">
+            <Avatar
+              name={profile.displayName}
+              url={profile.avatarUrl}
+              sizes="304px"
+              priority
+              // Square, the exact size of the mini-map: same sizing as the map's
+              // column (aspect-square w-full, capped at max-w-[19rem]).
+              className="flex aspect-square w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-sm bg-muted text-5xl font-semibold text-muted-foreground sm:flex-1"
+            />
+            {/* Column capped narrow so the mini-map reads as a header accent, not its focus. */}
+            <div className="flex w-full max-w-[19rem] flex-col gap-3 sm:flex-1">
+              <ProfileMiniMap profileId={profile.id} memberName={profile.displayName} />
+              <MemberRelationControl memberId={profile.id} memberName={profile.displayName} />
+            </div>
+          </div>
+        )}
 
         <dl className="flex w-full max-w-md flex-col gap-4">
           <Field label="Bio">{profile.bio}</Field>

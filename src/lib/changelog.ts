@@ -31,6 +31,17 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-06-08",
+    title: "See how you're connected",
+    description: "Each member's profile now shows a small relational map of the shortest paths linking you and them.",
+  },
+  {
+    date: "2026-06-08",
+    title: "Filter your Web",
+    description:
+      "You can now filter My Web by relationship depth — toggle the depths on or off to see different subsets.",
+  },
+  {
     date: "2026-06-05",
     title: "See how the network is growing",
     description: "The About page now has a System Metrics section with member and activity stats.",

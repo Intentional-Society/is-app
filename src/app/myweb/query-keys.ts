@@ -5,6 +5,8 @@ export const RELATION_SUBGRAPH_QUERY_KEY = ["relations", "subgraph"] as const;
 
 export const relationValueQueryKey = (relateeId: string) => ["relations", "value", relateeId] as const;
 
+export const relationMiniMapQueryKey = (profileId: string) => ["relations", "mini-map", profileId] as const;
+
 export type SubgraphViewOptions = {
   hops: 1 | 2;
 };

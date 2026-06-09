@@ -38,12 +38,13 @@ export default async function ProfilePage() {
         <BreadcrumbLink fallback="/" />
       </div>
 
+      {/* Square, the same footprint as the photos on member profiles. */}
       <Avatar
         name={profile.displayName}
         url={profile.avatarUrl}
-        sizes="128px"
+        sizes="304px"
         priority
-        className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-muted text-3xl font-semibold text-muted-foreground"
+        className="flex aspect-square w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-sm bg-muted text-5xl font-semibold text-muted-foreground"
       />
 
       <dl className="flex w-full max-w-md flex-col gap-4">
