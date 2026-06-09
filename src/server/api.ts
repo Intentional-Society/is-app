@@ -64,14 +64,14 @@ import {
   createRelationHint,
   deleteRelationHint,
   deleteRelationValue,
-  getPersonalWeb,
-  getProfileMiniMap,
   getRelationSuggestions,
   getRelationValue,
   listPendingHints,
   parseOptionalRelationValue,
   updateRelationValue,
 } from "./relations";
+import { getProfileMiniMap } from "./relations-mini-map";
+import { getPersonalWeb } from "./relations-personal";
 import { profiles } from "./schema";
 import { getSystemMetrics } from "./system-metrics";
 import { resetE2EUsers } from "./test-reset";

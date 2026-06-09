@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import type { User } from "@supabase/supabase-js";
 import { and, eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,15 +6,11 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(),
 }));
 
-import { createServerClient } from "@supabase/ssr";
-
 import app from "@/server/api";
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
 import {
   deleteRelationValue,
-  getPersonalWeb,
-  getProfileMiniMap,
   getRelationSuggestions,
   getRelationValue,
   materializeInviteRelations,
@@ -23,48 +18,7 @@ import {
 } from "@/server/relations";
 import { inviteHints, invites, profiles, relations } from "@/server/schema";
 
-const mockCreateServerClient = vi.mocked(createServerClient);
-
-const fakeUser = (id: string): User =>
-  ({
-    id,
-    email: `${id}@testfake.local`,
-    user_metadata: {},
-    app_metadata: {},
-    aud: "authenticated",
-    created_at: "2026-01-01T00:00:00Z",
-  }) as User;
-
-const authAs = (userId: string) => {
-  mockCreateServerClient.mockReturnValue({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: fakeUser(userId) },
-        error: null,
-      }),
-    },
-    // biome-ignore lint/suspicious/noExplicitAny: test mock shape
-  } as any);
-};
-
-const insertUserAndProfile = async (id: string, opts: { displayName?: string; isAdmin?: boolean } = {}) => {
-  await db.execute(
-    sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${id}::uuid, ${`${id}@testfake.local`}, false, false)`,
-  );
-  await db.insert(profiles).values({
-    id,
-    displayName: opts.displayName ?? null,
-    isAdmin: opts.isAdmin ?? false,
-  });
-};
-
-const deleteUserAndProfile = async (id: string) => {
-  await db.delete(relations).where(eq(relations.relatorId, id));
-  await db.delete(relations).where(eq(relations.relateeId, id));
-  await db.delete(invites).where(eq(invites.createdBy, id));
-  await db.delete(profiles).where(eq(profiles.id, id));
-  await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
-};
+import { authAs, deleteUserAndProfile, insertUserAndProfile, resetAuth } from "./relation-helpers";
 
 describe("updateRelationValue", () => {
   let relatorId: string;
@@ -398,176 +352,6 @@ describe("getRelationSuggestions", () => {
   });
 });
 
-describe("getPersonalWeb", () => {
-  let center: string;
-  let a: string;
-  let b: string;
-
-  beforeEach(async () => {
-    center = randomUUID();
-    a = randomUUID();
-    b = randomUUID();
-    await insertUserAndProfile(center, { displayName: "Center" });
-    await insertUserAndProfile(a, { displayName: "A" });
-    await insertUserAndProfile(b, { displayName: "B" });
-  });
-
-  afterEach(async () => {
-    await deleteUserAndProfile(center);
-    await deleteUserAndProfile(a);
-    await deleteUserAndProfile(b);
-  });
-
-  it("hops=1, outgoing only, no edges → just the center node", async () => {
-    const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
-    expect(sub.nodes.map((n) => n.id)).toEqual([center]);
-    expect(sub.edges).toEqual([]);
-  });
-
-  it("hops=1, outgoing only — returns my relationships", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
-    const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
-    expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a, b]));
-    expect(sub.edges).toHaveLength(2);
-    expect(sub.edges.every((e) => e.relatorId === center)).toBe(true);
-  });
-
-  it("hops=1, incoming only — returns relationships pointing at me", async () => {
-    await updateRelationValue({ relatorId: a, relateeId: center, value: 3 });
-    const sub = await getPersonalWeb({ centerId: center, includeIncoming: true, includeOutgoing: false, hops: 1 });
-    expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a]));
-    expect(sub.edges).toHaveLength(1);
-    expect(sub.edges[0]).toMatchObject({ relatorId: a, relateeId: center, value: 3 });
-  });
-
-  it("paired counter-edges render asymmetry as two rows", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await updateRelationValue({ relatorId: a, relateeId: center, value: 1 });
-    const sub = await getPersonalWeb({ centerId: center, includeIncoming: true, includeOutgoing: true, hops: 1 });
-    expect(sub.edges).toHaveLength(2);
-    const values = sub.edges.map((e) => `${e.relatorId === center ? "out" : "in"}:${e.value}`).sort();
-    expect(values).toEqual(["in:1", "out:3"]);
-  });
-
-  it("filters out hint rows entirely", async () => {
-    await db.insert(relations).values({
-      relatorId: center,
-      relateeId: a,
-      value: null,
-      isHint: true,
-      hintedBy: b,
-    });
-    const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 1 });
-    expect(sub.edges).toEqual([]);
-    expect(sub.nodes.map((n) => n.id)).toEqual([center]);
-  });
-
-  it("hops=2 includes second-degree neighbors and their edges", async () => {
-    const c = randomUUID();
-    await insertUserAndProfile(c, { displayName: "C" });
-    try {
-      await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-      await updateRelationValue({ relatorId: a, relateeId: c, value: 4 });
-      const sub = await getPersonalWeb({ centerId: center, includeIncoming: false, includeOutgoing: true, hops: 2 });
-      const nodeIds = new Set(sub.nodes.map((n) => n.id));
-      expect(nodeIds.has(c)).toBe(true);
-      expect(sub.edges.some((e) => e.relatorId === a && e.relateeId === c)).toBe(true);
-    } finally {
-      await deleteUserAndProfile(c);
-    }
-  });
-
-  it("renders gracefully at N=1 (just self, no edges)", async () => {
-    const sub = await getPersonalWeb({ centerId: center, includeIncoming: true, includeOutgoing: true, hops: 2 });
-    expect(sub.nodes).toHaveLength(1);
-    expect(sub.edges).toEqual([]);
-  });
-
-  it("drops hidden nodes and any edge touching one (non-admin viewer)", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
-    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, b));
-
-    const sub = await getPersonalWeb({
-      centerId: center,
-      includeIncoming: false,
-      includeOutgoing: true,
-      hops: 1,
-    });
-    expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a]));
-    expect(sub.edges).toHaveLength(1);
-    expect(sub.edges[0]).toMatchObject({ relatorId: center, relateeId: a });
-  });
-
-  it("includeHidden=true keeps hidden nodes and their edges (admin viewer)", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
-    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, b));
-
-    const sub = await getPersonalWeb({
-      centerId: center,
-      includeIncoming: false,
-      includeOutgoing: true,
-      hops: 1,
-      includeHidden: true,
-    });
-    expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a, b]));
-    expect(sub.edges).toHaveLength(2);
-  });
-
-  it("hops=2 drops a hidden second-degree neighbor and the edge that reaches it", async () => {
-    const c = randomUUID();
-    await insertUserAndProfile(c, { displayName: "C" });
-    try {
-      await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-      await updateRelationValue({ relatorId: a, relateeId: c, value: 4 });
-      await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, c));
-
-      const sub = await getPersonalWeb({
-        centerId: center,
-        includeIncoming: false,
-        includeOutgoing: true,
-        hops: 2,
-      });
-      expect(sub.nodes.map((n) => n.id).includes(c)).toBe(false);
-      expect(sub.edges.some((e) => e.relateeId === c)).toBe(false);
-    } finally {
-      await deleteUserAndProfile(c);
-    }
-  });
-
-  it("drops a deactivated neighbor and their edge from the map", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
-    await db.update(profiles).set({ deactivatedAt: new Date() }).where(eq(profiles.id, b));
-
-    const sub = await getPersonalWeb({
-      centerId: center,
-      includeIncoming: false,
-      includeOutgoing: true,
-      hops: 1,
-    });
-    expect(sub.nodes.map((n) => n.id).includes(b)).toBe(false);
-    expect(sub.edges.some((e) => e.relateeId === b)).toBe(false);
-    expect(sub.nodes.map((n) => n.id).includes(a)).toBe(true);
-  });
-
-  it("includeHidden=true still drops deactivated neighbors (admin viewer)", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await db.update(profiles).set({ deactivatedAt: new Date() }).where(eq(profiles.id, a));
-
-    const sub = await getPersonalWeb({
-      centerId: center,
-      includeIncoming: false,
-      includeOutgoing: true,
-      hops: 1,
-      includeHidden: true,
-    });
-    expect(sub.nodes.map((n) => n.id).includes(a)).toBe(false);
-  });
-});
-
 describe("getRelationSuggestions — hidden filter", () => {
   let me: string;
   let visibleOther: string;
@@ -781,7 +565,7 @@ describe("GET /api/relations/value/:relateeId", () => {
   });
 
   afterEach(async () => {
-    mockCreateServerClient.mockReset();
+    resetAuth();
     await deleteUserAndProfile(me);
     await deleteUserAndProfile(other);
   });
@@ -819,7 +603,7 @@ describe("PUT /api/relations/value/:relateeId", () => {
   });
 
   afterEach(async () => {
-    mockCreateServerClient.mockReset();
+    resetAuth();
     await deleteUserAndProfile(me);
     await deleteUserAndProfile(other);
   });
@@ -875,7 +659,7 @@ describe("DELETE /api/relations/value/:relateeId", () => {
   });
 
   afterEach(async () => {
-    mockCreateServerClient.mockReset();
+    resetAuth();
     await deleteUserAndProfile(me);
     await deleteUserAndProfile(other);
   });
@@ -928,7 +712,7 @@ describe("GET /api/relations/candidates", () => {
   });
 
   afterEach(async () => {
-    mockCreateServerClient.mockReset();
+    resetAuth();
     await deleteUserAndProfile(me);
     await deleteUserAndProfile(them);
   });
@@ -942,43 +726,6 @@ describe("GET /api/relations/candidates", () => {
     expect(card?.reason).toEqual({ type: "addedYou" });
     // No value field anywhere on the soft-hidden card.
     expect(JSON.stringify(card)).not.toContain('"value"');
-  });
-});
-
-describe("GET /api/relations/subgraph", () => {
-  let me: string;
-  let other: string;
-
-  beforeEach(async () => {
-    me = randomUUID();
-    other = randomUUID();
-    await insertUserAndProfile(me);
-    await insertUserAndProfile(other, { displayName: "Other" });
-    authAs(me);
-  });
-
-  afterEach(async () => {
-    mockCreateServerClient.mockReset();
-    await deleteUserAndProfile(me);
-    await deleteUserAndProfile(other);
-  });
-
-  it("default returns my outgoing first-hop subgraph", async () => {
-    await updateRelationValue({ relatorId: me, relateeId: other, value: 2 });
-    const res = await app.request("/api/relations/subgraph");
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.centerId).toBe(me);
-    expect(body.edges).toHaveLength(1);
-    expect(body.edges[0]).toMatchObject({ relatorId: me, relateeId: other, value: 2 });
-  });
-
-  it("query params widen the view", async () => {
-    await updateRelationValue({ relatorId: me, relateeId: other, value: 2 });
-    await updateRelationValue({ relatorId: other, relateeId: me, value: 4 });
-    const res = await app.request("/api/relations/subgraph?in=true&hops=1");
-    const body = await res.json();
-    expect(body.edges).toHaveLength(2);
   });
 });
 
@@ -1000,7 +747,7 @@ describe("POST /api/relations/hint (admin-only)", () => {
   });
 
   afterEach(async () => {
-    mockCreateServerClient.mockReset();
+    resetAuth();
     await deleteUserAndProfile(admin);
     await deleteUserAndProfile(nonAdmin);
     await deleteUserAndProfile(target);
@@ -1061,7 +808,7 @@ describe("DELETE /api/relations/hint/:relatorId/:relateeId (admin-only)", () => 
   });
 
   afterEach(async () => {
-    mockCreateServerClient.mockReset();
+    resetAuth();
     await deleteUserAndProfile(admin);
     await deleteUserAndProfile(nonAdmin);
     await deleteUserAndProfile(relator);
@@ -1103,192 +850,5 @@ describe("DELETE /api/relations/hint/:relatorId/:relateeId (admin-only)", () => 
     authAs(nonAdmin);
     const res = await app.request(`/api/relations/hint/${relator}/${target}`, { method: "DELETE" });
     expect(res.status).toBe(404);
-  });
-});
-
-describe("getProfileMiniMap", () => {
-  let viewer: string;
-  let them: string;
-  let created: string[];
-
-  // Creates a member, tracks it for teardown, and returns its id.
-  const mk = async (displayName: string): Promise<string> => {
-    const id = randomUUID();
-    await insertUserAndProfile(id, { displayName });
-    created.push(id);
-    return id;
-  };
-
-  // n fresh members each related FROM `them` at `value` — strong-connection
-  // fodder for the budget tests.
-  const mkTier = async (prefix: string, n: number, value: 1 | 2 | 3 | 4): Promise<string[]> => {
-    const ids: string[] = [];
-    for (let i = 0; i < n; i++) {
-      const id = await mk(`${prefix}${i}`);
-      await updateRelationValue({ relatorId: them, relateeId: id, value });
-      ids.push(id);
-    }
-    return ids;
-  };
-
-  beforeEach(async () => {
-    created = [];
-    viewer = await mk("Viewer");
-    them = await mk("Them");
-  });
-
-  afterEach(async () => {
-    for (const id of created) await deleteUserAndProfile(id);
-  });
-
-  it("finds the shortest path from the profile member back to the viewer", async () => {
-    const x = await mk("X");
-    await updateRelationValue({ relatorId: them, relateeId: x, value: 4 });
-    await updateRelationValue({ relatorId: x, relateeId: viewer, value: 3 });
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them });
-    expect(map.emphasizedId).toBe(them);
-    expect(map.viewerId).toBe(viewer);
-    expect(map.pathToViewer).toEqual([them, x, viewer]);
-    expect(new Set(map.nodes.map((n) => n.id))).toEqual(new Set([them, x, viewer]));
-  });
-
-  it("renders just the member (no viewer node) when no path reaches the viewer", async () => {
-    const a = await mk("A");
-    await updateRelationValue({ relatorId: them, relateeId: a, value: 4 });
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them });
-    expect(map.pathToViewer).toEqual([]);
-    const ids = new Set(map.nodes.map((n) => n.id));
-    expect(ids.has(viewer)).toBe(false);
-    expect(ids.has(them)).toBe(true);
-    expect(ids.has(a)).toBe(true);
-  });
-
-  it("includes 4/3/2 strong-connection tiers that fit the budget", async () => {
-    const four = await mk("Four");
-    const three = await mk("Three");
-    const two = await mk("Two");
-    await updateRelationValue({ relatorId: them, relateeId: four, value: 4 });
-    await updateRelationValue({ relatorId: them, relateeId: three, value: 3 });
-    await updateRelationValue({ relatorId: them, relateeId: two, value: 2 });
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them });
-    expect(new Set(map.nodes.map((n) => n.id))).toEqual(new Set([them, four, three, two]));
-  });
-
-  it("never counts value-1 relations as strong connections", async () => {
-    const one = await mk("One");
-    await updateRelationValue({ relatorId: them, relateeId: one, value: 1 });
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them });
-    expect(map.nodes.map((n) => n.id)).toEqual([them]);
-  });
-
-  it("stops at the tier that would overflow the budget, skipping weaker tiers", async () => {
-    const fours = await mkTier("F", 2, 4); // 4s fit: them + 2 = 3 nodes
-    const threes = await mkTier("T", 9, 3); // 3s would push to 12 > 10 → stop
-    const two = await mk("Two");
-    await updateRelationValue({ relatorId: them, relateeId: two, value: 2 });
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them, maxNodes: 10 });
-    const ids = new Set(map.nodes.map((n) => n.id));
-    expect(ids).toEqual(new Set([them, ...fours]));
-    expect(threes.some((t) => ids.has(t))).toBe(false);
-    expect(ids.has(two)).toBe(false);
-  });
-
-  it("always includes every 4 even when 4s alone exceed the budget", async () => {
-    const fours = await mkTier("F", 12, 4);
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them, maxNodes: 10 });
-    const ids = new Set(map.nodes.map((n) => n.id));
-    for (const f of fours) expect(ids.has(f)).toBe(true);
-    expect(ids.size).toBe(13); // them + 12 fours
-  });
-
-  it("prunes a hidden strong connection for a non-admin viewer", async () => {
-    const hidden = await mk("Hidden");
-    await updateRelationValue({ relatorId: them, relateeId: hidden, value: 4 });
-    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, hidden));
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them });
-    expect(map.nodes.map((n) => n.id)).toEqual([them]);
-  });
-
-  it("includeHidden keeps a hidden strong connection (admin viewer)", async () => {
-    const hidden = await mk("Hidden");
-    await updateRelationValue({ relatorId: them, relateeId: hidden, value: 4 });
-    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, hidden));
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them, includeHidden: true });
-    expect(new Set(map.nodes.map((n) => n.id))).toEqual(new Set([them, hidden]));
-  });
-
-  it("returns both path edges and strong-connection edges among the node set", async () => {
-    const x = await mk("X");
-    await updateRelationValue({ relatorId: them, relateeId: x, value: 4 }); // path + strong
-    await updateRelationValue({ relatorId: x, relateeId: viewer, value: 3 }); // path
-
-    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them });
-    expect(map.edges).toHaveLength(2);
-    expect(map.edges.some((e) => e.relatorId === them && e.relateeId === x)).toBe(true);
-    expect(map.edges.some((e) => e.relatorId === x && e.relateeId === viewer)).toBe(true);
-  });
-});
-
-describe("GET /api/relations/mini-map/:profileId", () => {
-  let viewer: string;
-  let them: string;
-  let admin: string;
-  let hidden: string;
-
-  beforeEach(async () => {
-    viewer = randomUUID();
-    them = randomUUID();
-    admin = randomUUID();
-    hidden = randomUUID();
-    await insertUserAndProfile(viewer, { displayName: "Viewer" });
-    await insertUserAndProfile(them, { displayName: "Them" });
-    await insertUserAndProfile(admin, { displayName: "Admin", isAdmin: true });
-    await insertUserAndProfile(hidden, { displayName: "Hidden" });
-  });
-
-  afterEach(async () => {
-    mockCreateServerClient.mockReset();
-    await deleteUserAndProfile(viewer);
-    await deleteUserAndProfile(them);
-    await deleteUserAndProfile(admin);
-    await deleteUserAndProfile(hidden);
-  });
-
-  it("returns the mini-map for the profile member", async () => {
-    await updateRelationValue({ relatorId: them, relateeId: viewer, value: 3 });
-    authAs(viewer);
-    const res = await app.request(`/api/relations/mini-map/${them}`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.emphasizedId).toBe(them);
-    expect(body.viewerId).toBe(viewer);
-    expect(body.pathToViewer).toEqual([them, viewer]);
-  });
-
-  it("400s on a non-UUID profile id", async () => {
-    authAs(viewer);
-    const res = await app.request("/api/relations/mini-map/not-a-uuid");
-    expect(res.status).toBe(400);
-  });
-
-  it("prunes a hidden node for a non-admin but keeps it for an admin", async () => {
-    await updateRelationValue({ relatorId: them, relateeId: hidden, value: 4 });
-    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, hidden));
-
-    authAs(viewer);
-    const nonAdminBody = await (await app.request(`/api/relations/mini-map/${them}`)).json();
-    expect(nonAdminBody.nodes.map((n: { id: string }) => n.id)).not.toContain(hidden);
-
-    authAs(admin);
-    const adminBody = await (await app.request(`/api/relations/mini-map/${them}`)).json();
-    expect(adminBody.nodes.map((n: { id: string }) => n.id)).toContain(hidden);
   });
 });
