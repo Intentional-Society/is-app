@@ -32,7 +32,7 @@ export function MemberRelationControl({ memberId, memberName }: Props) {
 
   return (
     <>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-center gap-3">
         <span className="text-sm text-muted-foreground">
           {isLoading
             ? "Loading…"
@@ -40,12 +40,12 @@ export function MemberRelationControl({ memberId, memberName }: Props) {
               ? "Couldn't load connection"
               : value !== null
                 ? `Connected · ${RELATION_VALUE_LABELS[value].headline}`
-                : "Not yet connected"}
+                : "Not connected"}
         </span>
         <button
           type="button"
           onClick={() => setDialogTarget({ id: memberId, displayName: memberName, currentValue: value })}
-          className="text-sm text-muted-foreground underline hover:no-underline"
+          className="cursor-pointer text-sm text-muted-foreground underline hover:no-underline"
         >
           {value !== null ? "Edit" : "Connect"}
         </button>

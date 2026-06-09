@@ -51,7 +51,7 @@ describe("MemberRelationControl", () => {
     mockValue(null);
     renderControl(<MemberRelationControl memberId="m1" memberName="Ada" />);
 
-    expect(await screen.findByText("Not yet connected")).toBeVisible();
+    expect(await screen.findByText("Not connected")).toBeVisible();
     expect(screen.getByRole("button", { name: "Connect" })).toBeVisible();
   });
 
