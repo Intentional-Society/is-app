@@ -13,10 +13,10 @@ export function ProfileForm({ initial }: { initial: ProfileFormValues }) {
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const ok = await submit();
-    if (ok) {
-      router.push("/profile");
-      router.refresh();
-    }
+    // Stay on /me — the inline "Profile saved." status is the feedback,
+    // and refresh() re-renders the server page so the public-profile
+    // link picks up a freshly backfilled slug.
+    if (ok) router.refresh();
   };
 
   return (

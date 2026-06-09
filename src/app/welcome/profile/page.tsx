@@ -1,7 +1,7 @@
+import { AvatarUploader } from "@/components/avatar-uploader";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
 
-import { AvatarUploader } from "../../profile/avatar-uploader";
 import { WelcomeForm } from "./welcome-form";
 
 // Step 2 of the welcome flow: fill in or review profile data. Saving the
@@ -24,7 +24,6 @@ export default async function WelcomeProfilePage() {
           keywords: profile?.keywords ?? [],
           location: profile?.location ?? "",
           supplementaryInfo: profile?.supplementaryInfo ?? "",
-          emergencyContact: profile?.emergencyContact ?? "",
           currentIntention: profile?.currentIntention ?? "",
         }}
       />

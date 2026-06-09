@@ -82,6 +82,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  // /profile and /profile/edit merged into /me (#376). Temporary (307)
+  // rather than permanent so the URLs stay reusable later.
+  async redirects() {
+    return [
+      { source: "/profile", destination: "/me", permanent: false },
+      { source: "/profile/edit", destination: "/me", permanent: false },
+    ];
+  },
 };
 
 export default withSentryConfig(withAxiom(nextConfig), {
