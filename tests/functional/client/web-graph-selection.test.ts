@@ -87,18 +87,18 @@ describe("decorateEdges", () => {
     data: { isOutgoing },
   });
 
-  it("returns edges untouched when nothing is selected", () => {
+  it("returns edges untouched when nothing is lit or dimmed", () => {
     const edges = [mk("e1"), mk("e2")];
-    const out = decorateEdges(edges, { selectedNodeId: null, selectedEdgeId: null, pathEdgeIds: new Set() });
+    const out = decorateEdges(edges, { litEdgeIds: new Set(), dimUnlit: false, selectedEdgeId: null });
     expect(out[0]).toBe(edges[0]);
     expect(out[1]).toBe(edges[1]);
   });
 
-  it("lights on-path edges green and lifts them, dims the rest", () => {
+  it("lights lit edges green and lifts them, dims the rest when dimUnlit", () => {
     const out = decorateEdges([mk("on"), mk("off")], {
-      selectedNodeId: "B",
+      litEdgeIds: new Set(["on"]),
+      dimUnlit: true,
       selectedEdgeId: null,
-      pathEdgeIds: new Set(["on"]),
     });
     expect(out[0].style?.stroke).toBe("var(--color-success)");
     expect(out[0].zIndex).toBe(SELECTION_EDGE_Z);
@@ -106,16 +106,27 @@ describe("decorateEdges", () => {
     expect(out[1].zIndex).toBeUndefined();
   });
 
+  it("lights lit edges without dimming the rest when dimUnlit is false (mini-map)", () => {
+    const out = decorateEdges([mk("on"), mk("off")], {
+      litEdgeIds: new Set(["on"]),
+      dimUnlit: false,
+      selectedEdgeId: null,
+    });
+    expect(out[0].style?.stroke).toBe("var(--color-success)");
+    // The off-path edge is returned untouched — no dim wash.
+    expect(out[1].style?.stroke).toBeUndefined();
+  });
+
   it("marks a selected outgoing edge as clickable", () => {
-    const out = decorateEdges([mk("e1", true)], { selectedNodeId: null, selectedEdgeId: "e1", pathEdgeIds: new Set() });
+    const out = decorateEdges([mk("e1", true)], { litEdgeIds: new Set(), dimUnlit: false, selectedEdgeId: "e1" });
     expect(out[0].className).toBe("cursor-pointer");
   });
 
   it("leaves a selected incoming edge unclickable", () => {
     const out = decorateEdges([mk("e1", false)], {
-      selectedNodeId: null,
+      litEdgeIds: new Set(),
+      dimUnlit: false,
       selectedEdgeId: "e1",
-      pathEdgeIds: new Set(),
     });
     expect(out[0].className).toBeUndefined();
   });
@@ -124,14 +135,14 @@ describe("decorateEdges", () => {
 describe("decorateNodes", () => {
   const mk = (id: string): Node => ({ id, position: { x: 0, y: 0 }, data: {} });
 
-  it("returns the same array reference when nothing is selected", () => {
+  it("returns the same array reference when nothing is lit", () => {
     const nodes = [mk("a"), mk("b")];
-    expect(decorateNodes(nodes, { selectedNodeId: null, pathNodeIds: new Set() })).toBe(nodes);
+    expect(decorateNodes(nodes, { litNodeIds: new Set() })).toBe(nodes);
   });
 
-  it("lifts on-path nodes and leaves the rest untouched", () => {
+  it("lifts lit nodes and leaves the rest untouched", () => {
     const offPath = mk("b");
-    const out = decorateNodes([mk("a"), offPath], { selectedNodeId: "a", pathNodeIds: new Set(["a"]) });
+    const out = decorateNodes([mk("a"), offPath], { litNodeIds: new Set(["a"]) });
     expect(out[0].zIndex).toBe(SELECTION_NODE_Z);
     expect(out[1]).toBe(offPath);
     expect(out[1].zIndex).toBeUndefined();

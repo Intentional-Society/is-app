@@ -29,7 +29,9 @@ import { DIM_KEEP } from "./web-graph-selection";
 export type SubgraphNode = RelationSubgraph["nodes"][number];
 
 export type MemberNodeData = SubgraphNode & {
-  isCenter: boolean;
+  // Drawn larger with a primary-colored border. WebGraph emphasizes you; the
+  // mini-map will emphasize the profile member.
+  emphasized: boolean;
 };
 
 export type EdgeData = {
@@ -48,26 +50,31 @@ const HANDLE_STYLE = { opacity: 0, top: "50%", pointerEvents: "none" as const };
 // alongside the decoration that applies it; MemberNode reuses it for the avatar
 // and name washes so a node dims by the same amount as its edges.
 
-// Carries the node selection to MemberNode (rendered via nodeTypes) without
-// baking it into node.data — that would force a setNodes pass per selection and
+// Carries the node decoration to MemberNode (rendered via nodeTypes) without
+// baking it into node.data — that would force a setNodes pass per change and
 // tangle with the sim's position updates. Mirrors EdgeInteractionContext.
 export type NodeInteraction = {
+  // Nodes drawn lit (success-green border). WebGraph passes the clicked node's
+  // path back to you; the mini-map passes the server's path-to-you.
+  litNodeIds: ReadonlySet<string>;
+  // Dim every node not in litNodeIds (see DIM_KEEP). WebGraph dims off-path on a
+  // click; the mini-map leaves the rest at full strength.
+  dimUnlit: boolean;
+  // The clicked node, kept at hover size so a selection reads as "this one's it."
+  // Null in read-only views (the mini-map navigates on click instead).
   selectedNodeId: string | null;
-  // Node ids on the selected node's path back to the center; these stay lit.
-  pathNodeIds: Set<string>;
 };
 export const NodeInteractionContext = createContext<NodeInteraction | null>(null);
 
 function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
   const selection = useContext(NodeInteractionContext);
   const isSelected = selection?.selectedNodeId === id;
-  // With a selection active, every node off the lit path dims (see DIM_KEEP);
-  // the selected node keeps the hover size so the click reads as "this one's it."
-  const isDimmed = selection != null && selection.selectedNodeId !== null && !selection.pathNodeIds.has(id);
-  // Every node on the lit path (selected, the steps, the root) gets the green
-  // border to match the links; otherwise the center is primary-teal, rest default.
-  const onLitPath = selection != null && selection.selectedNodeId !== null && selection.pathNodeIds.has(id);
-  const borderClass = onLitPath ? "border-success" : data.isCenter ? "border-primary" : "border-border";
+  // When dimming is on, every node off the lit set dims (see DIM_KEEP).
+  const isDimmed = selection?.dimUnlit === true && !selection.litNodeIds.has(id);
+  // Every lit node gets the green border to match the links; otherwise the
+  // emphasized node is primary-teal, rest default.
+  const onLitPath = selection?.litNodeIds.has(id) === true;
+  const borderClass = onLitPath ? "border-success" : data.emphasized ? "border-primary" : "border-border";
   return (
     // Only the Avatar is a click target: the wrapper is pointer-events-none and
     // .react-flow__node is !pointer-events-none (set per-node above), so clicks on
@@ -82,7 +89,7 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
           name={data.displayName}
           url={data.avatarUrl}
           className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${
-            data.isCenter ? "h-16 w-16" : "h-12 w-12"
+            data.emphasized ? "h-16 w-16" : "h-12 w-12"
           } ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
         />
         {/* Dim wash clipped to the avatar circle (rounded-full, never a square

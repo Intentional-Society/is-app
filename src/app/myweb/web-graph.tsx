@@ -135,7 +135,16 @@ export function WebGraph({
   const filtered = useMemo(() => {
     if (!data) return null;
     const sub = filterSubgraphByValue(data.nodes, data.edges, data.centerId, valueFilter);
-    return { centerId: data.centerId, nodes: sub.nodes, edges: sub.edges };
+    // You play all three layout roles here — the radial-seed root, the pinned
+    // origin, and the emphasized (larger) node. The mini-map will split them.
+    return {
+      centerId: data.centerId,
+      nodes: sub.nodes,
+      edges: sub.edges,
+      rootId: data.centerId,
+      pinnedNodeId: data.centerId,
+      emphasizedNodeId: data.centerId,
+    };
   }, [data, valueFilter]);
 
   // Flip one depth in/out of the filter. Each toggle is independent (not a
@@ -321,24 +330,26 @@ export function WebGraph({
     [selectedNodeId, parentByNode],
   );
 
+  // A node selection lights its path back to you and dims everything off it; an
+  // edge selection just reveals a number, no dimming. So dimming keys off a node
+  // being selected, and the lit sets are that node's path (empty otherwise).
+  const dimUnlit = selectedNodeId !== null;
+
   const nodeInteraction = useMemo<NodeInteraction>(
-    () => ({ selectedNodeId, pathNodeIds }),
-    [selectedNodeId, pathNodeIds],
+    () => ({ litNodeIds: pathNodeIds, dimUnlit, selectedNodeId }),
+    [pathNodeIds, dimUnlit, selectedNodeId],
   );
 
   // Light the selected edge and the selected node's lit path; dim the rest. The
   // stroke transition on the base style eases the recolor. See decorateEdges.
   const decoratedEdges = useMemo(
-    () => decorateEdges(edges, { selectedNodeId, selectedEdgeId, pathEdgeIds }),
-    [edges, selectedEdgeId, selectedNodeId, pathEdgeIds],
+    () => decorateEdges(edges, { litEdgeIds: pathEdgeIds, dimUnlit, selectedEdgeId }),
+    [edges, pathEdgeIds, dimUnlit, selectedEdgeId],
   );
 
   // Lift the selected node's path above the dimmed graph; derived from the live
   // `nodes` state so sim ticks and drags flow through untouched. See decorateNodes.
-  const decoratedNodes = useMemo(
-    () => decorateNodes(nodes, { selectedNodeId, pathNodeIds }),
-    [nodes, selectedNodeId, pathNodeIds],
-  );
+  const decoratedNodes = useMemo(() => decorateNodes(nodes, { litNodeIds: pathNodeIds }), [nodes, pathNodeIds]);
 
   const empty = !data || data.nodes.length === 0;
 

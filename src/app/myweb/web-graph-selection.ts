@@ -75,26 +75,32 @@ export function pathToCenter(
   return { pathNodeIds, pathEdgeIds };
 }
 
-type EdgeSelection = {
-  selectedNodeId: string | null;
+type EdgeDecoration = {
+  // Edges painted success-green and lifted above the rest. WebGraph passes the
+  // clicked node's path back to you; the mini-map passes the server's path.
+  litEdgeIds: ReadonlySet<string>;
+  // Dim every edge not in litEdgeIds by blending its stroke toward the canvas.
+  // WebGraph dims off-path on a click; the mini-map leaves the rest at full
+  // strength (the lit path is co-equal content, not a spotlight).
+  dimUnlit: boolean;
+  // The edge to mark cursor:pointer because it's selected and editable. Null in
+  // read-only views (the mini-map doesn't edit edges).
   selectedEdgeId: string | null;
-  pathEdgeIds: ReadonlySet<string>;
 };
 
-// Per-selection edge decorations layered onto the base edges: cursor:pointer on
-// a selected editable (outgoing) edge; the lit path painted success-green and
-// lifted above the rest; every other edge dimmed by blending its stroke toward
-// the canvas. Untouched edges are returned by reference, so this stays a cheap
-// per-selection diff. Generic so callers keep their concrete edge type.
+// Edge decorations layered onto the base edges: cursor:pointer on a selected
+// editable (outgoing) edge; the lit edges painted success-green and lifted above
+// the rest; every other edge dimmed by blending its stroke toward the canvas
+// when dimUnlit is set. Untouched edges are returned by reference, so this stays
+// a cheap diff. Generic so callers keep their concrete edge type.
 export function decorateEdges<E extends Edge<{ isOutgoing?: boolean }>>(
   edges: readonly E[],
-  { selectedNodeId, selectedEdgeId, pathEdgeIds }: EdgeSelection,
+  { litEdgeIds, dimUnlit, selectedEdgeId }: EdgeDecoration,
 ): E[] {
-  const nodeSelected = selectedNodeId !== null;
   return edges.map((e) => {
     const cursor = e.id === selectedEdgeId && e.data?.isOutgoing === true;
-    const onPath = nodeSelected && pathEdgeIds.has(e.id);
-    const dim = nodeSelected && !onPath;
+    const onPath = litEdgeIds.has(e.id);
+    const dim = dimUnlit && !onPath;
     if (!cursor && !onPath && !dim) return e;
     const next = { ...e } as E;
     if (cursor) {
@@ -118,14 +124,10 @@ export function decorateEdges<E extends Edge<{ isOutgoing?: boolean }>>(
   });
 }
 
-// Lift the selected node's path above the dimmed graph so a highlight never
-// sits under a dimmed node. Returns the same array reference when nothing is
-// selected, so the caller's memo stays stable. Generic so callers keep their
-// concrete node type.
-export function decorateNodes<N extends Node>(
-  nodes: N[],
-  { selectedNodeId, pathNodeIds }: { selectedNodeId: string | null; pathNodeIds: ReadonlySet<string> },
-): N[] {
-  if (selectedNodeId === null) return nodes;
-  return nodes.map((n) => (pathNodeIds.has(n.id) ? ({ ...n, zIndex: SELECTION_NODE_Z } as N) : n));
+// Lift the lit nodes above the rest so a highlight never sits under a dimmed
+// node. Returns the same array reference when nothing is lit, so the caller's
+// memo stays stable. Generic so callers keep their concrete node type.
+export function decorateNodes<N extends Node>(nodes: N[], { litNodeIds }: { litNodeIds: ReadonlySet<string> }): N[] {
+  if (litNodeIds.size === 0) return nodes;
+  return nodes.map((n) => (litNodeIds.has(n.id) ? ({ ...n, zIndex: SELECTION_NODE_Z } as N) : n));
 }
