@@ -26,7 +26,7 @@ import { DIM_KEEP } from "./web-graph-selection";
 // which keeps per-selection / per-hover state out of the node/edge data objects
 // (and so out of the memos that build them).
 
-type SubgraphNode = RelationSubgraph["nodes"][number];
+export type SubgraphNode = RelationSubgraph["nodes"][number];
 
 export type MemberNodeData = SubgraphNode & {
   isCenter: boolean;
