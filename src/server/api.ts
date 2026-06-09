@@ -5,7 +5,7 @@ import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
 import { isRelationValue } from "@/lib/relation-value";
-import { toSlug } from "@/lib/slug";
+import { nextSlug, toSlug } from "@/lib/slug";
 
 import { getAppSettings } from "./app-settings";
 import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
@@ -397,23 +397,47 @@ const api = new Hono<{ Variables: ApiVariables }>()
           : {}),
         lastUpdatedProfile: sql`now()`,
       };
+      const isSlugClash = (err: unknown): boolean => {
+        const cause = (err as { cause?: { code?: string; constraint_name?: string } }).cause;
+        return cause?.code === "23505" && cause.constraint_name === "profiles_slug_unique";
+      };
+
+      // Permutation attempts before giving up on a readable URL. The
+      // cap only matters under a pathological pile-up of same-name
+      // members; past it we save without a slug (UUID URL) and the
+      // member can pick a custom one in settings.
+      const MAX_SLUG_ATTEMPTS = 9;
+
       try {
         await db.update(profiles).set(update).where(eq(profiles.id, user.id));
       } catch (err) {
-        const cause = (err as { cause?: { code?: string; constraint_name?: string } }).cause;
-        if (cause?.code === "23505" && cause.constraint_name === "profiles_slug_unique") {
-          // An explicitly chosen slug that clashes is the member's to
-          // fix; surface it instead of a generic 500.
-          if (parsed.slug !== undefined) {
-            return c.json({ error: "That profile URL is already taken. Please choose a different one." }, 409);
+        if (!isSlugClash(err)) throw err;
+        // An explicitly chosen slug that clashes is the member's to
+        // fix; surface it instead of a generic 500.
+        if (parsed.slug !== undefined) {
+          return c.json({ error: "That profile URL is already taken. Please choose a different one." }, 409);
+        }
+        // A derived-slug clash must not block the profile save —
+        // display names may repeat. Permute the slug (-2, -3, …) until
+        // one is free, so a name twin still gets a readable URL. Only
+        // the backfilled slug can clash here, so it's non-null.
+        let saved = false;
+        let candidate = backfillSlug as string;
+        for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS && !saved; attempt++) {
+          candidate = nextSlug(candidate);
+          try {
+            await db
+              .update(profiles)
+              .set({ ...update, slug: candidate })
+              .where(eq(profiles.id, user.id));
+            saved = true;
+          } catch (retryErr) {
+            if (!isSlugClash(retryErr)) throw retryErr;
           }
-          // A derived-slug clash must not block the profile save —
-          // display names may repeat. Save without the slug; the member
-          // can pick a custom URL in settings.
+        }
+        if (!saved) {
           const { slug: _clashed, ...withoutSlug } = update;
           await db.update(profiles).set(withoutSlug).where(eq(profiles.id, user.id));
-        } else {
-          throw err;
         }
       }
 

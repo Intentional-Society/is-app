@@ -212,27 +212,36 @@ describe("GET /api/me", () => {
     expect((await res.json()).profile.slug).toBe(toSlug(`Backfilled ${TEST_DISPLAY_NAME}`));
   });
 
-  it("PUT /me saves the displayName and leaves slug null when the derived slug is taken", async () => {
-    // Another member already owns the slug this displayName derives to.
-    const otherId = randomUUID();
-    await db.execute(
-      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${otherId}::uuid, 'slug-clash@testfake.local', false, false)`,
-    );
-    await db.insert(profiles).values({ id: otherId, displayName: TEST_DISPLAY_NAME, slug: toSlug(TEST_DISPLAY_NAME) });
+  // Display names may repeat; only the URL is unique. A derived-slug
+  // clash permutes (-2, then increments) so a name twin still gets a
+  // readable URL.
+  it.each([
+    ["second member gets -2", [""], "-2"],
+    ["third member increments past -2", ["", "-2"], "-3"],
+  ])("PUT /me permutes a taken derived slug: %s", async (_label, takenSuffixes, expectedSuffix) => {
+    const base = toSlug(TEST_DISPLAY_NAME);
+    const otherIds: string[] = [];
+    for (const suffix of takenSuffixes) {
+      const otherId = randomUUID();
+      otherIds.push(otherId);
+      await db.execute(
+        sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${otherId}::uuid, ${`slug-clash-${otherId}@testfake.local`}, false, false)`,
+      );
+      await db.insert(profiles).values({ id: otherId, displayName: TEST_DISPLAY_NAME, slug: `${base}${suffix}` });
+    }
     await db.insert(profiles).values({ id: testUserId, displayName: null, slug: null });
 
     try {
       const res = await putMe({ displayName: TEST_DISPLAY_NAME });
       expect(res.status).toBe(200);
       const body = await res.json();
-      // Display names may repeat; only the URL is unique. The save goes
-      // through and the member keeps a UUID URL until they pick a
-      // custom slug in settings.
       expect(body.profile.displayName).toBe(TEST_DISPLAY_NAME);
-      expect(body.profile.slug).toBeNull();
+      expect(body.profile.slug).toBe(`${base}${expectedSuffix}`);
     } finally {
-      await db.delete(profiles).where(eq(profiles.id, otherId));
-      await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);
+      for (const otherId of otherIds) {
+        await db.delete(profiles).where(eq(profiles.id, otherId));
+        await db.execute(sql`DELETE FROM auth.users WHERE id = ${otherId}::uuid`);
+      }
     }
   });
 
