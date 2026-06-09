@@ -24,13 +24,13 @@ const makeProps = (
 describe("WebGraphControls", () => {
   it("reflects the current hops in the checkbox", () => {
     render(<WebGraphControls {...makeProps({ hops: 1 })} />);
-    expect(screen.getByRole("checkbox", { name: "2 hops" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Friends-of-friends" })).not.toBeChecked();
   });
 
   it("reports a hops change when the checkbox is toggled", () => {
     const onHopsChange = vi.fn();
     render(<WebGraphControls {...makeProps({ hops: 1, onHopsChange })} />);
-    fireEvent.click(screen.getByRole("checkbox", { name: "2 hops" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Friends-of-friends" }));
     expect(onHopsChange).toHaveBeenCalledWith(2);
   });
 

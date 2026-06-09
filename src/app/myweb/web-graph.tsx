@@ -472,7 +472,8 @@ export function WebGraph({
                     <li>Single-click a circle to highlight its path to you.</li>
                     <li>Double-click a circle to open their profile.</li>
                     <li>
-                      <span className="font-medium text-foreground">2 hops</span> adds friends-of-friends.
+                      <span className="font-medium text-foreground">Friends-of-friends</span> adds your
+                      connections&apos; connections.
                     </li>
                     <li>
                       Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship

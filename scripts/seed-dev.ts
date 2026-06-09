@@ -228,7 +228,7 @@ async function seedInvites(): Promise<SeedResult> {
 //     members Aria is NOT directly tied to (so the 2-hop view pulls them
 //     in), plus a rotating window of 6 inner first-degree peers (cross-links
 //     within the inner ring). Hubs are first-degree to Aria, so their
-//     relations surface as the second ring when the "2 hops" toggle is on.
+//     relations surface as the second ring when the "Friends-of-friends" toggle is on.
 //
 // All rows are confirmed relations (isHint=false, value 1..4) among seed
 // profiles only, so the e2e reset never disturbs them. Idempotent via

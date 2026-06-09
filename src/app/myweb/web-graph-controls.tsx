@@ -24,7 +24,8 @@ export function WebGraphControls({
       className="flex flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm"
     >
       <label className="flex cursor-pointer items-center gap-2">
-        <input type="checkbox" checked={hops === 2} onChange={(e) => onHopsChange(e.target.checked ? 2 : 1)} />2 hops
+        <input type="checkbox" checked={hops === 2} onChange={(e) => onHopsChange(e.target.checked ? 2 : 1)} />
+        Friends-of-friends
       </label>
       {/* Independent depth toggles (filled = shown). Reuses the 1–4 vocabulary
        * from the relating dialog; culling a depth thins the web to the ties

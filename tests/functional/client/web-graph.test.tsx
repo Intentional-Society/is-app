@@ -119,7 +119,7 @@ describe("WebGraph — hops toggle", () => {
     $get.mockResolvedValue(okResponse(populatedWeb));
     renderGraph();
 
-    const toggle = await screen.findByRole("checkbox", { name: "2 hops" });
+    const toggle = await screen.findByRole("checkbox", { name: "Friends-of-friends" });
     expect(toggle).toBeChecked(); // default view is 2 hops
     await waitFor(() => expect($get).toHaveBeenCalledWith({ query: { hops: "2" } }));
 
