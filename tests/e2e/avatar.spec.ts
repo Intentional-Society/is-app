@@ -25,7 +25,7 @@ test("a member can upload, crop, and see their profile picture", async ({ page }
   await signInAs(page, "regular");
   await completeWelcome(page, { displayName: "Avatar Tester" });
 
-  await page.goto("/profile/edit");
+  await page.goto("/me");
   await expect(page.getByRole("button", { name: "Upload photo" })).toBeVisible();
 
   // The file input is hidden and click-triggered; setInputFiles drives
@@ -45,10 +45,10 @@ test("a member can upload, crop, and see their profile picture", async ({ page }
   // On success the modal closes and the action flips to "Change photo".
   await expect(page.getByRole("button", { name: "Change photo" })).toBeVisible();
 
-  // The picture renders on the profile page too — and actually loads
+  // The picture renders on a fresh page load too — and actually loads
   // (naturalWidth > 0), which would catch the optimizer rejecting the
   // upstream image.
-  await page.goto("/profile");
+  await page.goto("/me");
   const avatarImg = page.locator("main img").first();
   await expect(avatarImg).toBeVisible();
   await expect.poll(() => avatarImg.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);

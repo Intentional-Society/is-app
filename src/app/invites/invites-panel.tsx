@@ -15,6 +15,7 @@ import {
   RELATION_VALUES,
   type RelationValue,
 } from "@/lib/relation-value";
+import { cn } from "@/lib/utils";
 
 type InviteRow = {
   code: string;
@@ -288,7 +289,13 @@ function RelationValuePicker({
                 <span className="text-lg font-bold tabular-nums">{v}</span>
                 <span className="flex min-w-0 flex-col">
                   <span className="font-semibold">{headline}</span>
-                  <span className="text-sm text-muted-foreground">{detail}</span>
+                  {/* The selected value renders as `secondary` (teal fill),
+                      where muted-foreground is unreadable; switch the detail
+                      line to the on-fill color in that state — same fix as
+                      relating-dialog.tsx. */}
+                  <span className={cn("text-sm", selected ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                    {detail}
+                  </span>
                 </span>
               </Button>
             );

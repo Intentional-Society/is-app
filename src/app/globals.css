@@ -181,6 +181,19 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* React Flow's zoom controls (the only xyflow chrome we render) follow
+   the app tokens instead of the library's light defaults. xyflow's own
+   dark variant is keyed to its colorMode prop, which we don't use — our
+   dark mode is the .dark class. Custom properties resolve at usage, so
+   these token references flip with the theme automatically. */
+.react-flow__controls {
+  --xy-controls-button-background-color: var(--popover);
+  --xy-controls-button-background-color-hover: var(--muted);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-color-hover: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

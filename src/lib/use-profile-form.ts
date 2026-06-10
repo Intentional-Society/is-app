@@ -10,7 +10,6 @@ export type ProfileFormValues = {
   keywords: string[];
   location: string;
   supplementaryInfo: string;
-  emergencyContact: string;
   currentIntention: string;
 };
 
@@ -26,7 +25,6 @@ export function useProfileForm(initial: ProfileFormValues) {
   const [keywordsText, setKeywordsText] = useState(initial.keywords.join(", "));
   const [location, setLocation] = useState(initial.location);
   const [supplementaryInfo, setSupplementaryInfo] = useState(initial.supplementaryInfo);
-  const [emergencyContact, setEmergencyContact] = useState(initial.emergencyContact);
   const [currentIntention, setCurrentIntention] = useState(initial.currentIntention);
   const [status, setStatus] = useState<ProfileFormStatus>({ kind: "idle" });
 
@@ -45,7 +43,6 @@ export function useProfileForm(initial: ProfileFormValues) {
           keywords,
           location: location.trim() || null,
           supplementaryInfo: supplementaryInfo.trim() || null,
-          emergencyContact: emergencyContact.trim() || null,
           currentIntention: currentIntention.trim() || null,
         },
       });
@@ -68,14 +65,13 @@ export function useProfileForm(initial: ProfileFormValues) {
   };
 
   return {
-    fields: { displayName, bio, keywordsText, location, supplementaryInfo, emergencyContact, currentIntention },
+    fields: { displayName, bio, keywordsText, location, supplementaryInfo, currentIntention },
     setters: {
       setDisplayName,
       setBio,
       setKeywordsText,
       setLocation,
       setSupplementaryInfo,
-      setEmergencyContact,
       setCurrentIntention,
     },
     status,

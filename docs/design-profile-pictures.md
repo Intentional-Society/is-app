@@ -273,7 +273,7 @@ avatar a new path, so a replace shows immediately.
 
 ### Client
 
-7. **`AvatarUploader`** component (`src/app/profile/`): an avatar
+7. **`AvatarUploader`** component (`src/components/`): an avatar
    preview with an "Upload photo" button → file picker → crop modal
    (`react-easy-crop`, circular `cropShape`) → canvas export → POST.
    Shows progress and errors; a "Remove photo" action when one is set.
