@@ -60,7 +60,7 @@ export function IntentionsCloud({ intentions }: { intentions: Intention[] }) {
         <p className="text-base text-muted-foreground">No current intentions yet.</p>
         <p className="text-sm text-muted-foreground">
           Set yours on{" "}
-          <Link href="/profile/edit" className="underline hover:text-foreground">
+          <Link href="/me" className="underline hover:text-foreground">
             your profile
           </Link>{" "}
           and it&apos;ll show up here.

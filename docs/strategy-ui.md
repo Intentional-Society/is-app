@@ -13,7 +13,7 @@ The palette draws from `www.intentionalsociety.org`:
 - **Success**: sage rather than pure green, same reason.
 - **Border / input / ring**: low-chroma teal in the primary family, so chrome reads as "interactive UI" rather than flat gray.
 
-Dark mode (`.dark { … }` block in the same file) mirrors the palette with values inverted in lightness — same hues, same roles. Activate by adding `class="dark"` to any wrapper.
+Dark mode (`.dark { … }` block in the same file) mirrors the palette with values inverted in lightness — same hues, same roles. It activates via a `dark` class on `<html>`, driven by the member's light/dark/system preference: the selector on `/me#settings` writes it to localStorage (`isweb-theme`) and applies it live (`src/lib/theme.ts`), and an inline `<head>` script (`src/components/theme-script.tsx`) re-applies it before first paint on every load so there's no light flash. "System" follows `prefers-color-scheme`, including live OS changes. For a one-off dark subtree (e.g. a component demo), adding `class="dark"` to any wrapper still works.
 
 `--card`, `--chart-1..5`, and `--sidebar-*` are defined but currently unused. They're kept because they're part of the shadcn token surface — future component installs will rely on them.
 

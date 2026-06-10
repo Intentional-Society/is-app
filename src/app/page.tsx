@@ -112,7 +112,7 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <NavCard href="/myweb" title="My web" description="Build your relational map by adding connections!" />
-            <NavCard href="/profile" title="My profile" description="View and edit your profile information." />
+            <NavCard href="/me" title="My page" description="Edit your profile and app settings." />
           </div>
         </section>
 

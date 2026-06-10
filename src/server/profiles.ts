@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { and, asc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
+import { nextSlug, toSlug } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { isUuid } from "./auth-middleware";
@@ -14,6 +15,7 @@ import { authUsers, profiles } from "./schema";
 // here. The column it maps to is `avatarPath`, a Storage object path.
 export const EDITABLE_PROFILE_FIELDS = [
   "displayName",
+  "slug",
   "bio",
   "keywords",
   "location",
@@ -26,6 +28,7 @@ type EditableField = (typeof EDITABLE_PROFILE_FIELDS)[number];
 
 export type EditableProfileInput = Partial<{
   displayName: string | null;
+  slug: string;
   bio: string | null;
   keywords: string[];
   location: string | null;
@@ -64,22 +67,57 @@ export const parseEditableProfile = (body: unknown): EditableProfileInput | { er
         return { error: "keywords must be an array of strings" };
       }
       out.keywords = [...new Set(value)];
+    } else if (key === "slug") {
+      // Slugs are normalized server-side so a hand-typed "Aria Chen!"
+      // still lands as "aria-chen". A slug that normalizes to nothing
+      // is rejected rather than nulled — a member can't lose their URL
+      // by accident, only change it.
+      if (typeof value !== "string" || toSlug(value) === "") {
+        return { error: "slug must contain at least one letter or number" };
+      }
+      out.slug = toSlug(value);
     } else {
       if (!isNullableString(value)) {
         return { error: `${key} must be a string or null` };
       }
-      out[key as Exclude<EditableField, "keywords">] = value;
+      out[key as Exclude<EditableField, "keywords" | "slug">] = value;
     }
   }
 
   return out;
 };
 
-export const toSlug = (displayName: string): string =>
-  displayName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+export const isSlugUniqueViolation = (err: unknown): boolean => {
+  const cause = (err as { cause?: { code?: string; constraint_name?: string } }).cause;
+  return cause?.code === "23505" && cause.constraint_name === "profiles_slug_unique";
+};
+
+// Permutation attempts before giving up on a readable URL. The cap
+// only matters under a pathological pile-up of same-name members.
+const MAX_SLUG_ATTEMPTS = 9;
+
+// Runs `write` with the given derived slug, permuting (-2, -3, …) on
+// each slug clash so a display-name twin still gets a readable URL
+// (#188); past the cap it writes with a null slug (UUID URL) and the
+// member can pick a custom one in settings. Both slug-deriving writes
+// — the sign-in upsert and PUT /me's backfill — share this policy.
+// Explicitly chosen slugs never come through here; their clash is the
+// member's to resolve (409).
+export const withSlugPermutation = async <T>(slug: string, write: (slug: string | null) => Promise<T>): Promise<T> => {
+  // A name that normalizes to nothing gets no slug at all — permuting
+  // "" would make "-2" the member's whole URL.
+  if (slug === "") return write(null);
+  let candidate = slug;
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    try {
+      return await write(candidate);
+    } catch (err) {
+      if (!isSlugUniqueViolation(err)) throw err;
+      candidate = nextSlug(candidate);
+    }
+  }
+  return write(null);
+};
 
 // Returns { created: true } only when a brand-new profile row was
 // inserted. Callers (notably /auth/callback) use this to gate
@@ -88,14 +126,16 @@ export const toSlug = (displayName: string): string =>
 // RETURNING means "this was a first-time sign-in".
 export const upsertProfile = async (user: User): Promise<{ created: boolean }> => {
   const displayName = (user.user_metadata?.displayName as string | undefined) ?? null;
-  const slug = displayName ? toSlug(displayName) : null;
+  const slug = displayName ? toSlug(displayName) || null : null;
 
-  const rows = await db
-    .insert(profiles)
-    .values({ id: user.id, displayName, slug })
-    .onConflictDoNothing({ target: profiles.id })
-    .returning({ id: profiles.id });
+  const insert = (s: string | null) =>
+    db
+      .insert(profiles)
+      .values({ id: user.id, displayName, slug: s })
+      .onConflictDoNothing({ target: profiles.id })
+      .returning({ id: profiles.id });
 
+  const rows = slug === null ? await insert(null) : await withSlugPermutation(slug, insert);
   return { created: rows.length > 0 };
 };
 
@@ -130,6 +170,7 @@ export const syncDisplayNameToAuthMetadata = async (
 export type ProfileForSelf = {
   id: string;
   displayName: string | null;
+  slug: string | null;
   bio: string | null;
   keywords: string[];
   location: string | null;
@@ -142,6 +183,7 @@ export type ProfileForSelf = {
   intentionUpdatedAt: Date | null;
   deactivatedAt: Date | null;
   isAdmin: boolean;
+  hidden: boolean;
   lastSignedAgreements: Date | null;
   lastUpdatedProfile: Date | null;
   lastReviewedPrograms: Date | null;
@@ -155,6 +197,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
     .select({
       id: profiles.id,
       displayName: profiles.displayName,
+      slug: profiles.slug,
       bio: profiles.bio,
       keywords: profiles.keywords,
       location: profiles.location,
@@ -168,6 +211,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
       isAdmin: profiles.isAdmin,
+      hidden: profiles.hidden,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
       lastReviewedPrograms: profiles.lastReviewedPrograms,
@@ -211,6 +255,7 @@ export const getProfileForSelfWithProbe = async (
     .select({
       id: profiles.id,
       displayName: profiles.displayName,
+      slug: profiles.slug,
       bio: profiles.bio,
       keywords: profiles.keywords,
       location: profiles.location,
@@ -224,6 +269,7 @@ export const getProfileForSelfWithProbe = async (
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
       isAdmin: profiles.isAdmin,
+      hidden: profiles.hidden,
       lastSignedAgreements: profiles.lastSignedAgreements,
       lastUpdatedProfile: profiles.lastUpdatedProfile,
       lastReviewedPrograms: profiles.lastReviewedPrograms,
