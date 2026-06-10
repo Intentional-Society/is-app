@@ -15,6 +15,8 @@
 // The app "version" shown on /about is just the date of the newest
 // entry below (see `appVersion`).
 
+import type { ReactNode } from "react";
+
 // Loose shape check on the date literals; the test owns calendar validity.
 type ISODate = `${number}-${number}-${number}`;
 
@@ -23,13 +25,31 @@ export type ChangelogEntry = {
   date: ISODate;
   /** Short, member-facing headline. */
   title: string;
-  /** One or two plain-language sentences. */
-  description: string;
+  /**
+   * One or two plain-language sentences. Plain strings for most
+   * entries; JSX (in a fragment) when one needs inline markup, e.g.
+   * <i>My page</i> for an in-app page name.
+   */
+  description: string | ReactNode;
 };
 
 // Newest first. The /about page and `appVersion` both rely on this
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
+  {
+    date: "2026-06-09",
+    title: "Dark mode",
+    description: "Pick light, dark, or match-your-system — the setting sticks on each device.",
+  },
+  {
+    date: "2026-06-09",
+    title: "My page: profile and settings together",
+    description: (
+      <>
+        <i>My profile</i> is now <i>My page</i>, with tabs for editing your profile and your settings.
+      </>
+    ),
+  },
   {
     date: "2026-06-08",
     title: "See how you're connected",
