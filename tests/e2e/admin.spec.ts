@@ -20,16 +20,35 @@ test.beforeEach(async ({ baseURL }) => {
   await resetSeededUsers(baseURL);
 });
 
+// React 19.2's Component Performance Track instruments renders with
+// performance.measure() calls (names prefixed by a U+200B zero-width
+// space) that can be handed a start time earlier than the document's
+// timeOrigin after a client navigation, making measure() throw
+// "...cannot have a negative time stamp." It is emitted only by
+// react-dom's *development* build, so it surfaces locally (the reused
+// dev server, #372) yet never on CI, which runs e2e against a Vercel
+// production preview that strips this instrumentation. No production
+// code path can hit it, and there is no upstream fix yet
+// (vercel/next.js#86060). Dropping it keeps the assertion focused on
+// real app crashes; see #378.
+function isReactDevPerfTrackNoise(message: string): boolean {
+  return /Failed to execute 'measure' on 'Performance':.*cannot have a negative time stamp/.test(message);
+}
+
 // Records console errors and uncaught page exceptions from the moment it
 // is attached. Attach it after sign-in so the listener only sees the
 // page under test, not sign-in/redirect noise.
 function collectPageErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (msg) => {
-    if (msg.type() === "error") errors.push(`console.error: ${msg.text()}`);
+    if (msg.type() === "error" && !isReactDevPerfTrackNoise(msg.text())) {
+      errors.push(`console.error: ${msg.text()}`);
+    }
   });
   page.on("pageerror", (err) => {
-    errors.push(`pageerror: ${err.message}`);
+    if (!isReactDevPerfTrackNoise(err.message)) {
+      errors.push(`pageerror: ${err.message}`);
+    }
   });
   return errors;
 }
