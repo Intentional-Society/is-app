@@ -1,8 +1,15 @@
 "use client";
 
-import { applyNodeChanges, type Edge, type Node, type NodeChange, type ReactFlowInstance } from "@xyflow/react";
+import {
+  applyNodeChanges,
+  type Edge,
+  type Node,
+  type NodeChange,
+  type OnNodeDrag,
+  type ReactFlowInstance,
+} from "@xyflow/react";
 import { forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
-import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   computeNormalization,
@@ -61,9 +68,9 @@ type FlowInstance = ReactFlowInstance<Node<MemberNodeData>, Edge<EdgeData>>;
 type WebGraphSimulation = {
   nodes: Node<MemberNodeData>[];
   onNodesChange: (changes: NodeChange<Node<MemberNodeData>>[]) => void;
-  onNodeDragStart: (event: MouseEvent, node: Node<MemberNodeData>) => void;
-  onNodeDrag: (event: MouseEvent, node: Node<MemberNodeData>) => void;
-  onNodeDragStop: (event: MouseEvent, node: Node<MemberNodeData>) => void;
+  onNodeDragStart: OnNodeDrag<Node<MemberNodeData>>;
+  onNodeDrag: OnNodeDrag<Node<MemberNodeData>>;
+  onNodeDragStop: OnNodeDrag<Node<MemberNodeData>>;
   // Register the ReactFlow instance (via onInit) so the layout can fit the
   // viewport as it settles.
   registerFlow: (instance: FlowInstance) => void;
@@ -347,7 +354,7 @@ export function useWebGraphSimulation(
     return { x: flow.x / norm.scale + norm.cx, y: flow.y / norm.scale + norm.cy };
   }, []);
   const onNodeDragStart = useCallback(
-    (_event: MouseEvent, node: Node<MemberNodeData>) => {
+    (_event: MouseEvent | TouchEvent, node: Node<MemberNodeData>) => {
       const simNode = simNodesByIdRef.current.get(node.id);
       const sim = flowPositionToSim(node.position);
       if (!simNode || !sim) return;
@@ -363,7 +370,7 @@ export function useWebGraphSimulation(
     [flowPositionToSim],
   );
   const onNodeDrag = useCallback(
-    (_event: MouseEvent, node: Node<MemberNodeData>) => {
+    (_event: MouseEvent | TouchEvent, node: Node<MemberNodeData>) => {
       const simNode = simNodesByIdRef.current.get(node.id);
       const sim = flowPositionToSim(node.position);
       if (!simNode || !sim) return;
@@ -372,7 +379,7 @@ export function useWebGraphSimulation(
     },
     [flowPositionToSim],
   );
-  const onNodeDragStop = useCallback((_event: MouseEvent, node: Node<MemberNodeData>) => {
+  const onNodeDragStop = useCallback((_event: MouseEvent | TouchEvent, node: Node<MemberNodeData>) => {
     const simNode = simNodesByIdRef.current.get(node.id);
     if (simNode) {
       simNode.fx = null;
