@@ -57,3 +57,7 @@ export type AdminMember = AdminMembersResponse["members"][number];
 export type AdminInvitesResponse = InferResponseType<(typeof apiClient.api.admin.invites)["$get"], 200>;
 
 export type AdminInvite = AdminInvitesResponse["invites"][number];
+
+export type AdminSigninsResponse = InferResponseType<(typeof apiClient.api.admin.signins)["$get"], 200>;
+
+export type AdminSignin = AdminSigninsResponse["signins"][number];
