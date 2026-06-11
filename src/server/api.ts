@@ -75,6 +75,7 @@ import {
 import { getProfileMiniMap } from "./relations-mini-map";
 import { getPersonalWeb } from "./relations-personal";
 import { profiles } from "./schema";
+import { listSigninsAdmin } from "./signins-admin";
 import { getSystemMetrics } from "./system-metrics";
 import { resetE2EUsers } from "./test-reset";
 
@@ -234,6 +235,10 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/members", async (c) => {
     const members = await listMembersAdmin();
     return c.json({ members });
+  })
+  .get("/signins", async (c) => {
+    const signins = await listSigninsAdmin();
+    return c.json({ signins });
   })
   .patch(
     "/members/:id/admin",

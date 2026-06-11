@@ -64,6 +64,12 @@ export default async function AdminPage() {
         >
           Manage members →
         </Link>
+        <Link
+          href="/admin/signins"
+          className="text-sm text-muted-foreground underline hover:text-foreground hover:no-underline"
+        >
+          View sign-ins →
+        </Link>
       </section>
 
       <section className="flex w-full max-w-xl flex-col gap-2">
