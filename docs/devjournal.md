@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-10 | James | Sentry now prod-only; replay only when ?debug-replay=1; tunnel renamed to /error-handling
+
+Sentry is `enabled` only when `VERCEL_ENV=production`. Session replay records only when a session carries `?debug-replay=1` (see docs/doc-sentry.md). Tunnel route moved from `/monitoring` to `/error-handling` to read more honestly in devtools.
+
 ## 2026-06-09 | James | /me replaces /profile; stable, member-owned slugs (#376, #188)
 
 `/profile` and `/profile/edit` merged into `/me` (Profile + Settings tabs); Settings holds the theme selector (docs/strategy-ui.md), profile URL, emergency contact, password, and deactivation. Slugs no longer track display-name changes: derived once, then edited only in Settings; display names may repeat, with name twins getting `-2`-style slug permutations.

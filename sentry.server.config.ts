@@ -4,7 +4,10 @@ import { scrubServerEvent } from "@/lib/sentry-scrub";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-  tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
+  // Report from production deploys only — mirrors the client gate in
+  // instrumentation-client.ts.
+  enabled: process.env.VERCEL_ENV === "production",
+  tracesSampleRate: 0.1,
   includeLocalVariables: true,
   beforeSend: scrubServerEvent,
 });

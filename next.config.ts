@@ -38,7 +38,7 @@ const securityHeaders = [
       // Supabase auth: signin/signup forms and the AuthProvider's token refresh
       // call GoTrue directly from the browser. Database queries go through Hono
       // ('self'), so PostgREST is not listed. Realtime is not used.
-      // Sentry ingest goes through the /monitoring tunnel and next-axiom proxies
+      // Sentry ingest goes through the /error-handling tunnel and next-axiom proxies
       // client telemetry through /_axiom — both covered by 'self'.
       connectSrc,
       "img-src 'self' data: blob: https:",
@@ -71,6 +71,10 @@ if (!isProd) {
 }
 
 const nextConfig: NextConfig = {
+  // Inlines the deploy environment into the client bundle so
+  // instrumentation-client.ts can gate Sentry to production deploys,
+  // independent of Vercel's "expose system env vars" dashboard toggle.
+  env: { NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "" },
   typedRoutes: true,
   images: {
     remotePatterns,
@@ -97,7 +101,9 @@ export default withSentryConfig(withAxiom(nextConfig), {
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
   widenClientFileUpload: true,
-  tunnelRoute: "/monitoring",
+  // Same-origin proxy for all browser-side Sentry traffic. Named to read
+  // honestly in devtools and to dodge blocklist rules that match /monitoring.
+  tunnelRoute: "/error-handling",
   silent: !process.env.CI,
   sourcemaps: { disable: process.env.VERCEL_ENV !== "production" },
 });
