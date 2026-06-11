@@ -77,7 +77,7 @@ Outbound XHR/fetch/WebSocket destinations.
 
 The two entries:
 
-- **`'self'`** covers our Hono API routes (all database access), the Sentry tunnel at `/monitoring` (configured via `tunnelRoute` in `next.config.ts`), and the next-axiom client proxy at `/_axiom/*`. Both observability tools route browser telemetry through our own origin, which is why this list is short.
+- **`'self'`** covers our Hono API routes (all database access), the Sentry tunnel at `/error-handling` (configured via `tunnelRoute` in `next.config.ts`), and the next-axiom client proxy at `/_axiom/*`. Both observability tools route browser telemetry through our own origin, which is why this list is short.
 - **`https://*.supabase.co`** is required because Supabase Auth (GoTrue) is the only Supabase service we call directly from the browser. The signin/signup forms call `supabase.auth.signInWith*` and `updateUser`; the `AuthProvider` subscribes to `onAuthStateChange`, which performs background token refreshes against `https://<project>.supabase.co/auth/v1/token`. Database queries do **not** go to Supabase from the browser — they go through Hono.
 
 The dev-only `http://127.0.0.1:54321` entry exists because `npm run dev` points the browser auth client at the local Supabase stack (`NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321`). Without it in dev, every signin/signup/token-refresh call would be CSP-blocked. The branch is keyed on `process.env.NODE_ENV` so the URL never appears in production response headers.
