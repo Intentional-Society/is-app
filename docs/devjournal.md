@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-11 | James | Admin sign-in report; copyable member email list
+
+/admin/signins shows each member's last sign-in and live-session activity; /admin/members now ends with a list of active member emails for pasting into Google Calendar.
+
 ## 2026-06-10 | James | Sentry now prod-only; replay only when ?debug-replay=1; tunnel renamed to /error-handling
 
 Sentry is `enabled` only when `VERCEL_ENV=production`. Session replay records only when a session carries `?debug-replay=1` (see docs/doc-sentry.md). Tunnel route moved from `/monitoring` to `/error-handling` to read more honestly in devtools.

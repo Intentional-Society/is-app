@@ -1,8 +1,9 @@
-import { asc, count, eq } from "drizzle-orm";
+import { asc, count, eq, sql } from "drizzle-orm";
 
 import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
 import { profiles } from "./schema";
+import { E2E_EMAILS } from "./test-reset";
 
 export type AdminMember = {
   id: string;
@@ -30,6 +31,28 @@ export const listMembersAdmin = async (): Promise<AdminMember[]> => {
 
   const withUrls = await attachAvatarUrls(rows);
   return withUrls.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+};
+
+// Recipient list for the admin members page: every member who should
+// receive mail — hidden profiles, deactivated profiles, and the seeded
+// e2e accounts are excluded. Email lives on auth.users, which schema.ts
+// maps only partially (id + email, for FKs), so the query is raw SQL —
+// same approach as signins-admin.ts.
+export const listActiveMemberEmails = async (): Promise<string[]> => {
+  const e2eList = sql.join(
+    E2E_EMAILS.map((e) => sql`${e}`),
+    sql`, `,
+  );
+  const rows = (await db.execute(sql`
+    SELECT u.email
+    FROM auth.users u
+    JOIN public.profiles p ON p.id = u.id
+    WHERE p.hidden = false
+      AND p.deactivated_at IS NULL
+      AND u.email NOT IN (${e2eList})
+    ORDER BY lower(u.email), u.email
+  `)) as unknown as { email: string }[];
+  return rows.map((r) => r.email);
 };
 
 export const setAdminStatus = async (

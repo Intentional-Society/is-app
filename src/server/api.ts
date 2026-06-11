@@ -25,7 +25,7 @@ import {
   revokeInvite,
   validateNote,
 } from "./invites";
-import { listMembersAdmin, setAdminStatus } from "./members-admin";
+import { listActiveMemberEmails, listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
   deactivateProfile,
   getProfileForMember,
@@ -239,6 +239,10 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/signins", async (c) => {
     const signins = await listSigninsAdmin();
     return c.json({ signins });
+  })
+  .get("/member-emails", async (c) => {
+    const emails = await listActiveMemberEmails();
+    return c.json({ emails });
   })
   .patch(
     "/members/:id/admin",

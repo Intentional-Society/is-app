@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { requireUser } from "@/lib/api-server";
 
+import { MemberEmailsPanel } from "./member-emails-panel";
 import { MembersAdminPanel } from "./members-admin-panel";
 
 export default async function AdminMembersPage() {
@@ -19,6 +20,11 @@ export default async function AdminMembersPage() {
         </Link>
       </div>
       <MembersAdminPanel currentUserId={me.profile.id} />
+
+      <section className="flex w-full max-w-xl flex-col gap-2">
+        <h2 className="text-lg font-semibold">Email addresses</h2>
+        <MemberEmailsPanel />
+      </section>
     </main>
   );
 }
