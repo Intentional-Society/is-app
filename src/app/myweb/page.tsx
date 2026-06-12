@@ -1,6 +1,5 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 
-import { BreadcrumbLink } from "@/components/breadcrumb-link";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 
 import { MyWeb } from "./my-web";
@@ -34,10 +33,6 @@ export default async function MyWebPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <div className="flex w-full max-w-5xl items-center justify-between">
-        <h1 className="text-2xl font-bold">My web</h1>
-        <BreadcrumbLink fallback="/" />
-      </div>
       <HydrationBoundary state={dehydrate(queryClient)}>
         <MyWeb initialLastUpdatedWeb={initialLastUpdatedWeb} />
       </HydrationBoundary>

@@ -20,8 +20,16 @@ Onboarding is four ordered steps:
 4. **Personal web** — build the relational web on `/myweb`.
 
 Steps 1–3 live under `/welcome`. Step 4 is the existing `/myweb` page; the
-welcome flow simply hands off to it at the end. The `/myweb` joyride tour is
-unchanged and remains gated by its own marker (see below).
+welcome flow hands off to it at the end. The `/myweb` joyride tour remains
+gated by its own marker (see below).
+
+- The first "Done" click on `/myweb` runs a farewell capstone — a one-step
+  tour spotlighting the top bar, lighting the home icon and the menu
+  together (joyride takes one target per step, so `SiteHeader` carries an
+  invisible full-width strip as the spotlight target) — giving onboarding
+  an explicit end. During the `/welcome` steps `SiteHeader` renders
+  nothing at all — no home link, no menu — so the guided sequence stays
+  exit-free.
 
 ## Route structure
 

@@ -16,30 +16,31 @@ import { WelcomeSettingsTour } from "./welcome-settings-tour";
 type TabId = "profile" | "settings";
 
 // The welcome profile step wears the same tabs as /me, so members meet
-// the page shape they'll use from then on. Saving the profile reveals
-// a one-step tour pointing at Settings plus the Continue button that
-// advances the flow — tabs only swap panels here (no URL change), so
-// they're buttons, not anchors.
+// the page shape they'll use from then on. Saving the profile opens the
+// Settings tab itself — members told "your settings live here" weren't
+// finding the tab (#399) — and fires a one-step tour over the revealed
+// panel, plus the Continue button that advances the flow. Tabs only
+// swap panels here (no URL change), so they're buttons, not anchors.
 export function WelcomeTabs({ profile }: { profile: Me["profile"] }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("profile");
   const [saved, setSaved] = useState(false);
   const [tourDismissed, setTourDismissed] = useState(false);
 
-  const openSettings = () => {
-    setTab("settings");
-    // Clicking the spotlighted tab is the tour's point made — don't
-    // leave the tooltip hanging over the settings panel.
+  // A manual tab switch while the tour is up means the member is already
+  // navigating — don't leave the tooltip hanging over the wrong panel.
+  const switchTab = (id: TabId) => {
+    setTab(id);
     setTourDismissed(true);
   };
 
   return (
     <>
       <TabBar ariaLabel="Profile and settings">
-        <Tab active={tab === "profile"} onClick={() => setTab("profile")}>
+        <Tab active={tab === "profile"} onClick={() => switchTab("profile")}>
           Profile
         </Tab>
-        <Tab active={tab === "settings"} onClick={openSettings} data-tour="settings-tab">
+        <Tab active={tab === "settings"} onClick={() => switchTab("settings")}>
           Settings
         </Tab>
       </TabBar>
@@ -58,12 +59,16 @@ export function WelcomeTabs({ profile }: { profile: Me["profile"] }) {
             supplementaryInfo: profile?.supplementaryInfo ?? "",
             currentIntention: profile?.currentIntention ?? "",
           }}
-          onSaved={() => setSaved(true)}
+          onSaved={() => {
+            setSaved(true);
+            setTab("settings");
+          }}
         />
       </section>
 
       <section
         aria-label="Settings"
+        data-tour="settings-panel"
         className={cn("w-full max-w-md flex-col gap-6", tab === "settings" ? "flex" : "hidden")}
       >
         <SettingsSections

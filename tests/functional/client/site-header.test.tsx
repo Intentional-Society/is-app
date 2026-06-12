@@ -1,8 +1,16 @@
 import type { User } from "@supabase/supabase-js";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SiteHeader } from "@/components/site-header";
+
+// jsdom renders outside a Next router, where usePathname() is null;
+// SiteHeader branches on it (all header chrome hidden during /welcome).
+let mockPathname = "/";
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  usePathname: () => mockPathname,
+}));
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
@@ -19,6 +27,33 @@ import { AuthProvider } from "@/components/auth-provider";
 const user = { id: "u1", email: "a@b.c" } as unknown as User;
 
 describe("SiteHeader", () => {
+  beforeEach(() => {
+    mockPathname = "/";
+  });
+
+  it("shows the home icon and menu outside /welcome", () => {
+    mockPathname = "/members";
+    render(
+      <AuthProvider initialUser={user}>
+        <SiteHeader displayName={null} isAdmin={false} />
+      </AuthProvider>,
+    );
+    const home = screen.getByRole("link", { name: "Home" });
+    expect(home).toBeVisible();
+    expect(home).toHaveAttribute("href", "/");
+    expect(screen.getByRole("button", { name: /open menu/i })).toBeVisible();
+  });
+
+  it("renders nothing during the welcome flow", () => {
+    mockPathname = "/welcome/profile";
+    const { container } = render(
+      <AuthProvider initialUser={user}>
+        <SiteHeader displayName={null} isAdmin={false} />
+      </AuthProvider>,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("renders nothing when there is no user", () => {
     const { container } = render(
       <AuthProvider initialUser={null}>

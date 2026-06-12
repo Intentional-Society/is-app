@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-12 | James | Home link + Onboarding gets an explicit ending
+
+A home icon sits top-left on every page, the whole header (home + menu) hides during `/welcome`, profile-save now opens the Settings tab itself, and the first Done on /myweb runs a farewell capstone lighting up the home icon and menu icon together.
+
 ## 2026-06-11 | James | Buttondown cutover complete
 
 `BUTTONDOWN_SYNC_WRITE=1` is live in prod, the Apps Script trigger is disabled, and the Google Form is retired — the app is the sole writer of program tags. (#261, docs/design-buttondown.md)

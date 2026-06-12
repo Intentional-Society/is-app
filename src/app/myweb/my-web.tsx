@@ -3,10 +3,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
+import { BreadcrumbLink } from "@/components/breadcrumb-link";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
+import { cn } from "@/lib/utils";
 
+import { FarewellTour } from "./farewell-tour";
 import { FlyCard } from "./fly-card";
 import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
 import { RelatingDialog, type RelatingTarget } from "./relating-dialog";
@@ -67,12 +70,25 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
   // Bumped after a successful relation so the tour advances past the
   // "click anyone here" step automatically.
   const [tourAdvanceToken, setTourAdvanceToken] = useState(0);
+  // The first Done click of a first-time visit earns a farewell capstone
+  // — the explicit "onboarding is over" moment (#399). Eligibility is
+  // decided at mount alongside the tour, so dismissing the tour mid-way
+  // (which writes the session flag) doesn't cancel the goodbye.
+  const [farewellEligible, setFarewellEligible] = useState(false);
+  const [farewellRun, setFarewellRun] = useState(false);
   useEffect(() => {
     if (initialLastUpdatedWeb !== null) return;
     if (window.sessionStorage.getItem(TOUR_DISMISSED_KEY) === "1") return;
     setTourRun(true);
+    setFarewellEligible(true);
   }, [initialLastUpdatedWeb]);
-  const markDone = useMarkDone(() => setMode("view"));
+  const markDone = useMarkDone(() => {
+    setMode("view");
+    if (farewellEligible) {
+      setFarewellEligible(false);
+      setFarewellRun(true);
+    }
+  });
 
   const queryClient = useQueryClient();
   // The suggestion card currently flying into the graph (null when idle).
@@ -151,8 +167,17 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
+      {/* The title row lives here rather than page.tsx so the farewell
+       * capstone can hide it: "My web" and the breadcrumb sit inside the
+       * spotlit top strip and would compete with the icons being
+       * introduced. visibility (not display) keeps the layout stable
+       * under the tooltip. */}
+      <div className={cn("flex w-full max-w-5xl items-center justify-between", farewellRun && "invisible")}>
+        <h1 className="text-2xl font-bold">My web</h1>
+        <BreadcrumbLink fallback="/" />
+      </div>
       {/* Below 600px the graph breaks out of the page's horizontal padding to
-       * go edge-to-edge; the title/breadcrumb (page) and the Edit/Done row +
+       * go edge-to-edge; the title/breadcrumb (above) and the Edit/Done row +
        * feed (below) keep their padding. The negative margin equals -(50vw -
        * half the container), the canonical full-bleed within a padded parent. */}
       <div className="w-full max-[600px]:mx-[calc(50%_-_50vw)] max-[600px]:w-screen">
@@ -203,6 +228,7 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
         />
       )}
       <WelcomeTour key={tourKey} run={tourRun} advanceToken={tourAdvanceToken} onClose={dismissTour} />
+      <FarewellTour run={farewellRun} onClose={() => setFarewellRun(false)} />
     </div>
   );
 }
