@@ -1,6 +1,6 @@
 # Design — Buttondown sync
 
-Status: design captured 2026-05-22. Not yet implemented. Author: collaborative interview between James and Claude.
+Status: design captured 2026-05-22; implemented in #280 and fully cut over 2026-06-12 — the app is the sole writer of program tags. Author: collaborative interview between James and Claude.
 
 This is a design doc — concrete decisions, schema, and flows for one feature, with rationale for future-us. It sits below `architecture-appstack.md` and above the code.
 
@@ -8,11 +8,11 @@ This is a design doc — concrete decisions, schema, and flows for one feature, 
 
 Some IS programs *are* a newsletter — most obviously `weekly-web-updates`, where the program description will read as "join this and receive a weekly email." Buttondown is where those emails are composed and sent. This document describes how the app keeps the relevant Buttondown subscriber tags in step with current program membership, without members ever needing to know Buttondown exists.
 
-## Context: replacing the Apps Script flow
+## Context: the Apps Script flow this replaced
 
 Before the app existed, IS Web signups were collected via a Google Form. A Google Apps Script triggered on each Form submission to upsert the respondent into Buttondown and tag them. That pipeline tagged every Form-filler `new` (joined IS Web fresh) or `returning` (was an IS member predating IS Web who later signed up for IS Web). The audience also includes a larger non-member population who subscribed to the newsletter directly through Buttondown — these people are not in our profiles table and were never touched by the Apps Script.
 
-The app's sync **replaces** the Apps Script as the writer of program tags. The Form path is retired in favor of the app's invite/signup flow. The new sync inherits the existing tag names and the `new`/`returning` vocabulary; nothing in Buttondown needs to be rewritten on cutover.
+The app's sync **replaced** the Apps Script as the writer of program tags; the cutover completed 2026-06-12 with the Apps Script trigger disabled and the Form retired in favor of the app's invite/signup flow. The sync inherited the existing tag names and the `new`/`returning` vocabulary, so nothing in Buttondown needed rewriting on cutover.
 
 ## The invariant
 
@@ -227,10 +227,10 @@ A one-shot script reconciled the app's CSV-imported memberships against Buttondo
 1. **Land the schema** (`programs.buttondownTag`, `profiles.buttondownSubscriberId`, `sync_locks` table) via expand-step. Add the `buttondownTag` field to the `/admin/programs` edit UI but leave every program's value null.
 2. **Land the sync code** with `BUTTONDOWN_SYNC_WRITE` unset in prod. Cron starts firing daily at 08:00 UTC and logs diffs (filterable in Axiom by `source: "buttondown-sync"`).
 3. **Set `BUTTONDOWN_API_KEY` and `CRON_SECRET`** in the prod env scope only.
-4. **Set `buttondownTag` on the relevant programs** (e.g., `weekly-web-updates` → the same string the Apps Script writes today) via `/admin/programs`. The dry-run cron now produces a realistic diff against real data.
+4. **Set `buttondownTag` on the relevant programs** (e.g., `weekly-web-updates` → the same string the Apps Script wrote) via `/admin/programs`. The dry-run cron now produces a realistic diff against real data.
 5. **Verify the dry-run output** over one or two daily cycles in Axiom: numbers look plausible, the diff doesn't propose touching the non-member newsletter audience, no surprises.
 6. **One-shot bootstrap reconciliation** *(completed and deleted 2026-05-25)*. See the dedicated section above.
-7. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** in the same window. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. Retire the Form itself in the same step if its only purpose was newsletter signup.
+7. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** *(completed 2026-06-12)*. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. The Form was retired in the same step.
 8. **Wire the inline first-profile-save hook** *(completed 2026-05-25 in PR #280)*. Lowest priority — purely latency. The cron covers correctness once step 7 lands.
 
 ## Future work
