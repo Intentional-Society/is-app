@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { BreadcrumbLink } from "@/components/breadcrumb-link";
+import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
 import { appVersion, changelog, formatChangelogDate } from "@/lib/changelog";
 
@@ -13,11 +13,8 @@ export default async function AboutPage() {
   await requireUser();
 
   return (
-    <main className="flex min-h-screen flex-col items-center gap-8 p-8">
-      <div className="flex w-full max-w-2xl items-center justify-between">
-        <h1 className="text-2xl font-bold">About</h1>
-        <BreadcrumbLink fallback="/" />
-      </div>
+    <main className="flex min-h-screen flex-col items-center gap-8 px-8 pb-8 pt-3">
+      <PageHeader title="About" />
 
       <CollapsibleSection title="System Metrics">
         <SystemMetrics />

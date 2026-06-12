@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { BreadcrumbLink } from "@/components/breadcrumb-link";
+import { PageHeader } from "@/components/page-header";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 
 import { AdminHidden } from "./admin-hidden";
@@ -19,11 +19,8 @@ export default async function AdminPage() {
   const { appSettings } = await res.json();
 
   return (
-    <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <div className="flex w-full max-w-xl items-center justify-between">
-        <h1 className="text-2xl font-bold">Admin</h1>
-        <BreadcrumbLink fallback="/" />
-      </div>
+    <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
+      <PageHeader title="Admin" />
 
       <section className="flex w-full max-w-xl flex-col gap-2">
         <h2 className="text-lg font-semibold">App settings</h2>

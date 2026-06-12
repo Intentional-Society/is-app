@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { Avatar } from "@/components/avatar";
-import { BreadcrumbLink } from "@/components/breadcrumb-link";
+import { PageHeader } from "@/components/page-header";
 import { QueryProvider } from "@/components/query-provider";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberProfile } from "@/lib/api-types";
@@ -27,11 +27,8 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
 
   if (res.status === 404) {
     return (
-      <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-        <div className="flex w-full max-w-md items-center justify-between">
-          <h1 className="text-2xl font-bold">Member not found</h1>
-          <BreadcrumbLink fallback="/members" />
-        </div>
+      <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
+        <PageHeader title="Member not found" fallback="/members" />
         <p className="text-muted-foreground">We couldn&apos;t find a member with that name or ID.</p>
       </main>
     );
@@ -43,14 +40,12 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
 
   return (
     <QueryProvider>
-      <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-        <div className="flex w-full max-w-md items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{profile.displayName ?? "Member"}</h1>
-            <p className="text-sm text-muted-foreground">Member since {memberSince}</p>
-          </div>
-          <BreadcrumbLink fallback="/members" />
-        </div>
+      <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
+        <PageHeader
+          title={profile.displayName ?? "Member"}
+          subtitle={<p className="text-sm text-muted-foreground">Member since {memberSince}</p>}
+          fallback="/members"
+        />
 
         {isOwnProfile ? (
           // Square, the same footprint as the mini-map on others' profiles.

@@ -3,11 +3,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
-import { BreadcrumbLink } from "@/components/breadcrumb-link";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
-import { cn } from "@/lib/utils";
 
 import { FarewellTour } from "./farewell-tour";
 import { FlyCard } from "./fly-card";
@@ -167,15 +166,12 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
-      {/* The title row lives here rather than page.tsx so the farewell
+      {/* The header lives here rather than page.tsx so the farewell
        * capstone can hide it: "My web" and the breadcrumb sit inside the
        * spotlit top strip and would compete with the icons being
        * introduced. visibility (not display) keeps the layout stable
        * under the tooltip. */}
-      <div className={cn("flex w-full max-w-5xl items-center justify-between", farewellRun && "invisible")}>
-        <h1 className="text-2xl font-bold">My web</h1>
-        <BreadcrumbLink fallback="/" />
-      </div>
+      <PageHeader title="My web" className={farewellRun ? "invisible" : undefined} />
       {/* Below 600px the graph breaks out of the page's horizontal padding to
        * go edge-to-edge; the title/breadcrumb (above) and the Edit/Done row +
        * feed (below) keep their padding. The negative margin equals -(50vw -

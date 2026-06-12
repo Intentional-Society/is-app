@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-12 | James | Unified top bar
+
+Page titles and breadcrumbs now share one band with the fixed home/menu icons, via a shared `PageHeader` (full-width row, `pt-3` mains).
+
 ## 2026-06-12 | James | Home link + Onboarding gets an explicit ending
 
 A home icon sits top-left on every page, the whole header (home + menu) hides during `/welcome`, profile-save now opens the Settings tab itself, and the first Done on /myweb runs a farewell capstone lighting up the home icon and menu icon together.
