@@ -117,7 +117,7 @@ Design and rationale: `docs/design-emails.md`.
 
 - **Generate at:** https://supabase.com/dashboard/account/tokens. Any descriptive name is fine; we use one named for the script that consumes it.
 - **Purpose:** lets the operator push email templates from the repo to the hosted project's auth config via `PATCH /v1/projects/{ref}/config/auth`, and download the current state for snapshotting. No app code path uses it.
-- **Storage:** read from `.env.prod` (gitignored via `.env.*`) as `SUPABASE_ACCESS_TOKEN`, matching the prod-targeting convention used by `scripts/normalize-referrals.ts`. Treat the file as temporary — create it with the token, run the script, delete the file. Never commit, never set in Vercel, never put in CI.
+- **Storage:** read from `.env.prod` (gitignored via `.env.*`) as `SUPABASE_ACCESS_TOKEN` — the prod-targeting convention for operator scripts. Treat the file as temporary — create it with the token, run the script, delete the file. Never commit, never set in Vercel, never put in CI.
 - **Blast radius if leaked:** broad — a personal access token can do anything the issuing account can do across every Supabase project that account belongs to, including reading API keys, mutating auth config, and managing databases. Revoke at the same URL and regenerate if exposed.
 - **Rotation:** revoke + regenerate at the dashboard. No app-side coordination needed; the next script run reads the new value from `.env.prod`.
 

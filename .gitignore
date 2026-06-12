@@ -51,6 +51,5 @@ test-results/
 # agent scratch notes — emergent design decisions, working memory
 .scratch/
 
-# operator-script source data and run logs — contain member PII, never commit
+# operator-script source data — contains member PII, never commit
 scripts/*.csv
-scripts/.import-logs/
