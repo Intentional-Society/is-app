@@ -2,7 +2,7 @@
 
 **Tracking:** [#166](https://github.com/Intentional-Society/is-app/issues/166)
 
-**Context:** Every member — new signup or CSV-imported — passes through a guided
+**Context:** Every member passes through a guided
 onboarding sequence the first time they reach the app. Today that sequence is a
 single profile form at `/welcome`. This document describes the expanded
 multi-step flow.

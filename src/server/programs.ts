@@ -8,8 +8,7 @@ import { profilePrograms, profiles, programs } from "./schema";
 
 // Slugs of programs every new member is enrolled in automatically on
 // first sign-in. The welcome flow's "We added one for you" copy on
-// /welcome/programs points at this list. Mirrors the same constant in
-// scripts/import-members-csv.ts — keep them in sync.
+// /welcome/programs points at this list.
 const AUTO_SUBSCRIBE_SLUGS = ["weekly-web-updates"] as const;
 
 // Best-effort: subscribe a freshly-created member to the auto-subscribe

@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-11 | James | CSV member importer retired
+
+The final 3 transition-window signups were imported to prod; the one-off importer (`scripts/import-members-csv.ts`, #141) is deleted now that the Google Form signup path is closing. Implementation lives in git history.
+
 ## 2026-06-11 | James | Admin sign-in report; copyable member email list
 
 /admin/signins shows each member's last sign-in and live-session activity; /admin/members now ends with a list of active member emails for pasting into Google Calendar.
