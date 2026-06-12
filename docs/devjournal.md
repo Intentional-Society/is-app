@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-11 | James | Buttondown cutover complete
+
+`BUTTONDOWN_SYNC_WRITE=1` is live in prod, the Apps Script trigger is disabled, and the Google Form is retired — the app is the sole writer of program tags. (#261, docs/design-buttondown.md)
+
 ## 2026-06-11 | James | Directory hides members who haven't set up their profile
 
 `listMembers` now requires a non-empty bio — the existing "has set up their profile" marker (the form requires it, CSV signups already have one) — so not-fully-onboarded signups stay out of the Member Directory until they finish the welcome/profile step.
