@@ -1,10 +1,11 @@
 "use client";
 
-import { Menu, ShieldCheck } from "lucide-react";
+import { House, Menu, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/auth-provider";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { clearNavHistory } from "@/lib/route-labels";
 import { cn } from "@/lib/utils";
@@ -33,13 +34,29 @@ function MenuLink({
   );
 }
 
-export function SiteHeader({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
-  const { user } = useAuth();
-
-  if (!user) return null;
-
+// The top-left corner: a home link styled as an icon button. Plain
+// anchor + buttonVariants rather than <Button render>: Base UI stamps
+// role="button" on rendered anchors, and this one should announce as
+// the link it is.
+function HomeLink() {
   return (
-    <header className="fixed top-0 right-0 z-40 p-3">
+    <div className="fixed top-0 left-0 z-40 p-3" data-tour="home-icon">
+      <Link
+        href="/"
+        aria-label="Home"
+        onClick={clearNavHistory}
+        className={buttonVariants({ variant: "ghost", size: "icon" })}
+      >
+        <House />
+      </Link>
+    </div>
+  );
+}
+
+// The top-right corner: the hamburger trigger and the nav sheet it opens.
+function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
+  return (
+    <div className="fixed top-0 right-0 z-40 p-3">
       <Sheet>
         <SheetTrigger render={<Button variant="ghost" size="icon" aria-label="Open menu" />}>
           <Menu />
@@ -84,6 +101,27 @@ export function SiteHeader({ displayName, isAdmin }: { displayName: string | nul
           </nav>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+export function SiteHeader({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
+  const { user } = useAuth();
+  const pathname = usePathname();
+
+  if (!user) return null;
+  // The /welcome steps stay free of exits — no home link, no menu — so
+  // members finish the sequence (#399).
+  if (pathname.startsWith("/welcome")) return null;
+
+  return (
+    <header>
+      {/* Invisible spotlight target for the /myweb farewell tour: one
+       * strip covering the home icon and the menu (joyride steps take a
+       * single target), sized to the icons' box (size-8 + p-3). */}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 h-14" data-tour="top-bar" />
+      <HomeLink />
+      <MenuSheet displayName={displayName} isAdmin={isAdmin} />
     </header>
   );
 }

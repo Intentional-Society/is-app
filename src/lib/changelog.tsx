@@ -37,6 +37,11 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-06-12",
+    title: "Home button",
+    description: "There's no place like home... (house icon at the top-left)",
+  },
+  {
     date: "2026-06-09",
     title: "Dark mode",
     description: "Pick light, dark, or match-your-system — the setting sticks on each device.",

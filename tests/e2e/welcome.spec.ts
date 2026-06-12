@@ -56,29 +56,34 @@ test("fresh user completes the welcome flow end to end", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Welcome" })).toBeVisible();
   await page.getByRole("button", { name: "I agree" }).click();
 
-  // Step 2 — profile.
+  // Step 2 — profile. The /welcome steps render no header chrome (home
+  // icon, menu) — the guided sequence keeps members moving forward (#399).
   await page.waitForURL((u) => u.pathname === "/welcome/profile", { timeout: TIMEOUT_MS });
+  await expect(page.locator("[data-tour='home-icon']")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open menu" })).toHaveCount(0);
   await page.getByLabel("Display name").fill("Welcome Tester");
   await page.getByLabel("Bio").fill("Loves writing, hikes, long coffees.");
   await page.getByLabel("Keywords (comma-separated)").fill("writing, coffee, hiking");
   await page.getByLabel("Location").fill("Lisbon");
   await page.getByRole("button", { name: "Save" }).click();
 
-  // Saving reveals the one-step settings tour (its title doubles as the
-  // save confirmation); the spotlighted Settings tab holds the welcome
-  // variant of the /me settings (no deactivate).
+  // Saving auto-opens the Settings tab (#399) and fires the one-step
+  // settings tour over the panel (its title doubles as the save
+  // confirmation); the panel holds the welcome variant of the /me
+  // settings (no deactivate).
   await expect(page.getByText("Profile saved!")).toBeVisible();
-  await page.getByRole("button", { name: "Got it" }).click();
-  await page.getByRole("tab", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Theme" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Deactivate account" })).toBeHidden();
+  await page.getByRole("button", { name: "Got it" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Step 3 — programs.
   await page.waitForURL((u) => u.pathname === "/welcome/programs", { timeout: TIMEOUT_MS });
   await page.getByRole("button", { name: "Done", exact: true }).click();
 
-  // Onboarding complete — the flow hands off to /myweb.
+  // Onboarding complete — the flow hands off to /myweb, where the home
+  // icon is back.
   await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
   await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
+  await expect(page.locator("[data-tour='home-icon']")).toBeVisible();
 });

@@ -38,8 +38,11 @@ const mockCaptureException = vi.mocked(Sentry.captureException);
 
 // Unique per run: upsertProfile derives the profile slug via toSlug,
 // which hits a global unique constraint, and parallel test files share
-// one DB — a fixed "Test User" collides with profiles.test.ts.
-const TEST_DISPLAY_NAME = `Test User ${randomUUID().slice(0, 8)}`;
+// one DB — a fixed "Test User" collides with profiles.test.ts. The
+// trailing letter keeps the slug from ending in digits: nextSlug
+// increments a trailing number ("…-639" → "…-640") instead of
+// appending the -2/-3 the permutation tests assert.
+const TEST_DISPLAY_NAME = `Test User ${randomUUID().slice(0, 8)}z`;
 
 const makeUser = (id: string, email: string): User =>
   ({

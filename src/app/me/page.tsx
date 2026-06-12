@@ -1,4 +1,4 @@
-import { BreadcrumbLink } from "@/components/breadcrumb-link";
+import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
 
@@ -16,11 +16,8 @@ export default async function MePage() {
   if (!me.profile) throw new Error("authenticated user has no profile");
 
   return (
-    <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <div className="flex w-full max-w-md items-center justify-between">
-        <h1 className="text-2xl font-bold">My page</h1>
-        <BreadcrumbLink fallback="/" />
-      </div>
+    <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
+      <PageHeader title="My page" />
 
       {me.profile.hidden && (
         <p role="alert" className="w-full max-w-md rounded-md border border-border bg-muted px-4 py-3 text-sm">

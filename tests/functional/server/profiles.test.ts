@@ -19,8 +19,11 @@ import { profiles } from "@/server/schema";
 
 // Unique per run: toSlug(displayName) feeds the global profiles slug
 // unique constraint, and parallel test files share one DB — a fixed
-// "Test User" collides with api-me.test.ts on the derived slug.
-const TEST_DISPLAY_NAME = `Test User ${randomUUID().slice(0, 8)}`;
+// "Test User" collides with api-me.test.ts on the derived slug. The
+// trailing letter keeps the slug from ending in digits: nextSlug
+// increments a trailing number ("…-639" → "…-640") instead of
+// appending the -2 these tests assert.
+const TEST_DISPLAY_NAME = `Test User ${randomUUID().slice(0, 8)}z`;
 
 describe("upsertProfile", () => {
   let testUserId: string;

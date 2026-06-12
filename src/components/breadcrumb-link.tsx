@@ -12,7 +12,9 @@ type Props = {
   className?: string;
 };
 
-const DEFAULT_CLASSES = "text-base text-muted-foreground hover:text-foreground";
+// shrink-0 + nowrap: the link sits in tight justify-between title rows
+// and must not wrap "← Label" onto two lines when the title is long.
+const DEFAULT_CLASSES = "shrink-0 whitespace-nowrap text-base text-muted-foreground hover:text-foreground";
 
 // History-aware breadcrumb link. On first render (and on the server)
 // it shows the per-page fallback so SSR and hydration agree; a client

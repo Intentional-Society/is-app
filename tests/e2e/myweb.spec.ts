@@ -65,4 +65,28 @@ test.describe("/myweb — first-time welcome tour", () => {
     await page.getByRole("button", { name: /^Dismiss tour$/ }).click();
     await expect(page.getByText("Mapping your relational web")).toBeHidden();
   });
+
+  test("first Done shows the farewell capstone over the home icon, then stays on /myweb", async ({ page }) => {
+    await signInAs(page, "regular");
+    // Distinct bio per completeWelcome caller — see the #149 probe.
+    await completeWelcome(page, { bio: "e2e bio · myweb.spec · farewell" });
+    await page.getByRole("link", { name: "My web" }).click();
+    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
+
+    // Farewell eligibility is decided at mount, so dismissing the
+    // welcome tour mid-way still earns the goodbye.
+    await expect(page.getByText("Mapping your relational web")).toBeVisible({ timeout: 5_000 });
+    await page.getByRole("button", { name: /^Dismiss tour$/ }).click();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+
+    await expect(page.getByText("You're all set!")).toBeVisible();
+    // The title row hides while the capstone spotlights the top strip —
+    // "My web" and the breadcrumb sit inside it and would compete with
+    // the icons — and returns on dismissal.
+    await expect(page.getByRole("heading", { name: "My web" })).toBeHidden();
+    await page.getByRole("button", { name: "Thanks!" }).click();
+    await expect(page.getByText("You're all set!")).toBeHidden();
+    await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/myweb");
+  });
 });
