@@ -287,7 +287,7 @@ describe("profiles.hidden", () => {
     for (const id of [visibleId, hiddenId]) {
       await db.execute(sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${id}::uuid, false, false)`);
     }
-    await db.insert(profiles).values({ id: visibleId, displayName: "Visible Vera" });
+    await db.insert(profiles).values({ id: visibleId, displayName: "Visible Vera", bio: "Here to be seen" });
     await db.insert(profiles).values({ id: hiddenId, displayName: "Hidden Henry", hidden: true });
   });
 
@@ -335,5 +335,42 @@ describe("profiles.hidden", () => {
     expect(await setProfileHidden({ profileId: visibleId, hidden: false })).toEqual({ ok: true });
     expect(await getProfileForMember(visibleId)).not.toBeNull();
     expect(await setProfileHidden({ profileId: randomUUID(), hidden: true })).toEqual({ error: "not_found" });
+  });
+});
+
+describe("directory onboarding gate", () => {
+  let pendingId: string;
+
+  beforeEach(async () => {
+    pendingId = randomUUID();
+    await db.execute(
+      sql`INSERT INTO auth.users (id, is_sso_user, is_anonymous) VALUES (${pendingId}::uuid, false, false)`,
+    );
+    // The state an invite signup is in before the welcome profile step:
+    // displayName from auth metadata, no bio yet.
+    await db.insert(profiles).values({ id: pendingId, displayName: "Pending Pete" });
+  });
+
+  afterEach(async () => {
+    await db.delete(profiles).where(eq(profiles.id, pendingId));
+    await db.execute(sql`DELETE FROM auth.users WHERE id = ${pendingId}::uuid`);
+  });
+
+  it("listMembers omits a member who has not set up their profile yet", async () => {
+    const visible = await listMembers();
+    expect(visible.find((m) => m.id === pendingId)).toBeUndefined();
+  });
+
+  it("admins still see mid-onboarding members via includeHidden", async () => {
+    const all = await listMembers({ includeHidden: true });
+    expect(all.find((m) => m.id === pendingId)).toBeDefined();
+  });
+
+  it("a saved bio makes the member visible (whitespace alone does not)", async () => {
+    await db.update(profiles).set({ bio: "   " }).where(eq(profiles.id, pendingId));
+    expect((await listMembers()).find((m) => m.id === pendingId)).toBeUndefined();
+
+    await db.update(profiles).set({ bio: "Hello, I exist now" }).where(eq(profiles.id, pendingId));
+    expect((await listMembers()).find((m) => m.id === pendingId)).toBeDefined();
   });
 });
