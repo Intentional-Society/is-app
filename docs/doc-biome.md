@@ -32,5 +32,7 @@ recommended rules.
   and `scripts/`.
 - **Excluded paths** — the `files.includes` negations skip generated or vendored
   trees Biome shouldn't touch: `.next`, `next-env.d.ts`, Supabase email
-  templates, `docs/_temp-*`, `drizzle/meta`, and the functional-test
-  `__data__` fixtures.
+  templates, `docs/_temp-*`, `drizzle/meta`, the functional-test
+  `__data__` fixtures, and the vendored upstream skill-creator skill
+  (`.claude/skills/skill-creator/` — verbatim Anthropic copy, see
+  docs/doc-skill-creator.md).

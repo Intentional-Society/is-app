@@ -71,6 +71,8 @@ Three Claude Code Skills live at `.claude/skills/` and encode the team's check-i
 
 Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-ai-procedures.md).
 
+A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the Skills above; model-invokable, unlike the three above), is vendored verbatim at `.claude/skills/skill-creator/`, pinned to an upstream commit. Check/refresh via `node scripts/update-skill-creator.mjs --check`. See [docs/doc-skill-creator.md](docs/doc-skill-creator.md).
+
 ## Key docs
 
 - `docs/strategy-branching.md` — branching strategy and rationale
@@ -92,5 +94,6 @@ Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-a
 - `docs/doc-sentry.md` — Sentry error tracking and performance monitoring
 - `docs/doc-axiom.md` — Axiom logging and Web Vitals
 - `docs/doc-biome.md` — Biome lint/format config rationale and the version-bump policy
+- `docs/doc-skill-creator.md` — the vendored upstream skill-creator skill (pin, refresh, evals)
 - `docs/setup-dev-machine.md` — system prerequisites (Node.js, Docker, etc.)
 - `docs/devjournal.md` — development decision log (most recent first)

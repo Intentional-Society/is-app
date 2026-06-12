@@ -12,6 +12,10 @@ Page titles and breadcrumbs now share one band with the fixed home/menu icons, v
 
 A home icon sits top-left on every page, the whole header (home + menu) hides during `/welcome`, profile-save now opens the Settings tab itself, and the first Done on /myweb runs a farewell capstone lighting up the home icon and menu icon together.
 
+## 2026-06-12 | Blake | Anthropic's skill-creator skill vendored at .claude/skills/skill-creator/
+
+Vendored verbatim and pinned to an upstream commit so every teammate can build/test our Skills on clone — no more per-user manual copies. Refresh via `node scripts/update-skill-creator.mjs`; acceptance evals in `evals/skill-creator.evals.json`; see docs/doc-skill-creator.md and docs/plan-skill-creator-vendoring.md.
+
 ## 2026-06-11 | James | Buttondown cutover complete
 
 `BUTTONDOWN_SYNC_WRITE=1` is live in prod, the Apps Script trigger is disabled, and the Google Form is retired — the app is the sole writer of program tags. (#261, docs/design-buttondown.md)

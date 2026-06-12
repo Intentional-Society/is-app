@@ -1,0 +1,33 @@
+{
+  "$comment": "Acceptance evals for the VENDORED upstream skill-creator skill (.claude/skills/skill-creator/, pinned in its UPSTREAM.md). Run these after vendoring or refreshing the copy; capture results in the commit's Test Plan. These prove the vendored copy works in this repo — they are not CI gates and are separate from evals/evals.json, which holds the spec acceptance evals for the team's own /commit, /pr, /ship Skills. See docs/plan-skill-creator-vendoring.md (PR 1) and docs/doc-skill-creator.md.",
+  "skills": [
+    {
+      "skill_name": "skill-creator",
+      "skill_path": ".claude/skills/skill-creator/SKILL.md",
+      "spec_section": "docs/plan-skill-creator-vendoring.md PR 1",
+      "evals": [
+        {
+          "id": "sc-1-load-and-invoke",
+          "eval_name": "smoke-skill-loads-and-starts-workflow",
+          "prompt": "/skill-creator",
+          "preconditions": "Fresh clone of the repo (or any checkout containing .claude/skills/skill-creator/); a Claude Code session started at the repo root; no per-user skill-creator copy mounted.",
+          "expected_output": "Claude Code recognizes the project-level skill (it appears in the session's available-skills list) and invoking it starts skill-creator's intake/interview workflow. During the run it can read its bundled resources (agents/, assets/, references/, eval-viewer/) without missing-file errors. Proves the vendored bundle is complete and auto-loaded with zero per-user setup."
+        },
+        {
+          "id": "sc-2-scripts-run",
+          "eval_name": "deterministic-bundled-validator-self-validates",
+          "prompt": "python .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/skill-creator",
+          "preconditions": "Python 3.x with PyYAML installed (python -m pip install --user pyyaml). Note the argument is the skill DIRECTORY, not the SKILL.md path.",
+          "expected_output": "Prints 'Skill is valid!' and exits 0 — proves the vendored Python machinery is intact and runnable in this repo. Known divergence, expected and accepted: running this validator against a team skill whose frontmatter carries the Claude Code key disable-model-invocation (e.g. /ship) exits 1 with 'Unexpected key(s) in SKILL.md frontmatter' — upstream's validator has a strict key allowlist. This is why the repo's CI gate is its own Vitest structural test (plan PR 2), not this script."
+        },
+        {
+          "id": "sc-3-end-to-end-authoring",
+          "eval_name": "behavioral-create-trivial-throwaway-skill",
+          "prompt": "/skill-creator — create a trivial throwaway skill named hello-throwaway that echoes a greeting; skip evals and description optimization; this is a vendoring acceptance test and will be deleted immediately.",
+          "preconditions": "Same as sc-1; the human running it deletes .claude/skills/hello-throwaway/ afterwards (it must never be committed).",
+          "expected_output": "skill-creator produces .claude/skills/hello-throwaway/SKILL.md that is well-formed: YAML frontmatter parses with name and description present; coherent imperative body; under 500 lines. Graded manually against this checklist until the plan's PR 2 structural gate exists, after which 'the generated skill passes the gate's generic checks' is the criterion. The throwaway is then deleted. Proves end-to-end authoring works, not just file presence."
+        }
+      ]
+    }
+  ]
+}
