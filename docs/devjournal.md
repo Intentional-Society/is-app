@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-11 | James | Directory hides members who haven't set up their profile
+
+`listMembers` now requires a non-empty bio — the existing "has set up their profile" marker (the form requires it, CSV signups already have one) — so not-fully-onboarded signups stay out of the Member Directory until they finish the welcome/profile step.
+
 ## 2026-06-11 | James | API logs now flush before the Vercel function freezes
 
 next-axiom's buffered push was racing the serverless freeze and losing log events. The API middleware now ends every request with `waitUntil(log.flush())`.

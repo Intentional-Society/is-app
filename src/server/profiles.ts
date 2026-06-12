@@ -397,11 +397,20 @@ export type MemberSummary = {
   avatarUrl: string | null;
 };
 
+// Invite signups get a profile row + displayName at first sign-in,
+// before the welcome profile step fills in any content — a row with no
+// bio is a member mid-onboarding, not a directory entry. A non-empty
+// bio is the "has set up their profile" marker: the profile form
+// requires it, and welcome/agreements keys on the same signal. Older
+// CSV-imported members carry bios without ever saving in-app, so this
+// gates on content, not on lastUpdatedProfile.
+const hasSetUpProfile = sql`btrim(coalesce(${profiles.bio}, '')) <> ''`;
+
 // includeHidden=true returns hidden profiles too — admins only.
 export const listMembers = async (options: { includeHidden?: boolean } = {}): Promise<MemberSummary[]> => {
   const where = options.includeHidden
     ? isNotNull(profiles.displayName)
-    : and(isNotNull(profiles.displayName), eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
+    : and(isNotNull(profiles.displayName), hasSetUpProfile, eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
   const rows = await db
     .select({
       id: profiles.id,
