@@ -9,7 +9,7 @@
 
 Axiom receives logs through two channels:
 
-- **Vercel Log Drain** — all serverless function stdout/stderr is streamed to Axiom automatically via the Vercel marketplace integration. No SDK or API key needed for this.
+- **Vercel Log Drain** — all serverless function stdout/stderr is streamed to Axiom automatically via the Vercel marketplace integration. No SDK or API key needed for this. Shipped platform-side, so it records that a request ran regardless of anything that happened inside the function — the authoritative invocation history.
 - **next-axiom** — the `next-axiom` package wraps `next.config.ts` and provides:
   - `log.info()` / `log.warn()` / `log.error()` / `log.debug()` for structured logging from client and server
   - Automatic Web Vitals reporting
@@ -23,7 +23,10 @@ Two rules keep logs queryable in Axiom:
 
 This is enforced by Biome's `suspicious/noConsole` rule, with per-path `off` overrides in `biome.json` for the legitimate helpers above. To add app telemetry, reach for `log.<level>` — if Biome flags a `console` call, that's the signal.
 
-One caveat: `next-axiom`'s `log` buffers and flushes on a throttle, and Route Handlers drain it as a side effect of the request. A **Server Component has no such wrapper**, so `await log.flush()` after logging there (as `src/app/page.tsx` does) to guarantee the event is sent before the function freezes.
+One caveat: `next-axiom`'s `log` buffers in-process and sends on a 1s throttle. A frozen serverless instance silently loses any unsent batch, and a failed send is dropped by the library, not retried — so events are only delivered reliably where something flushes before the function freezes:
+
+- **API requests** — the Hono logging middleware (`src/server/api.ts`) ends every request with `waitUntil(log.flush())`, which keeps the instance alive until the batch lands without delaying the response.
+- **Server Components** — no middleware runs, so `await log.flush()` after logging (as `src/app/page.tsx` does).
 
 ## Request Logging
 
@@ -66,5 +69,8 @@ The sync emits two message families: `"buttondown sync"` (structured events with
   Distribution of `attempts` across runs. `1` means no contention; `>1` means a retry succeeded. Pair with `skipped-lock-held` count (retries exhausted) to size the budget.
 - **One specific run (all events, by runId):**
   `["vercel"] | where message == "buttondown sync" and ['fields.runId'] == "<runId>"`
+- **Authoritative invocation history (did the cron fire at all):**
+  `["vercel"] | where ['request.path'] == "/api/cron/buttondown-sync" | project _time, ['request.statusCode'] | sort by _time desc`
+  Vercel log-drain records, independent of the in-process flush — present even for a run whose `next-axiom` events never arrived. When a cron run seems missing, this query distinguishes "didn't run" from "didn't log".
 
 Sentry surfaces the page-worthy events: `buttondown.sync_profile_error` (one per failing profile, tagged with `errorKind`), `buttondown.sync_lock_held` (cron overlap), and `buttondown.unsubscribed_member` (member-with-active-program who unsubscribed). Each Sentry issue's `runId` tag links back to the Axiom query above.

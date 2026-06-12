@@ -149,7 +149,7 @@ export const classifyError = (err: unknown): SyncErrorKind => {
 
 /** Structured event the sync emits to the caller's logger. */
 export type SyncLogEvent =
-  | ({ action: "summary"; runId: string } & Omit<SyncRunSummary, "runId" | "write">)
+  | ({ action: "summary"; runId: string } & Omit<SyncRunSummary, "runId">)
   | { action: "subscriber-created"; runId: string; profileId: string; subscriberId: string | null; dryRun: boolean }
   | {
       action: "tags-updated";
@@ -463,7 +463,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
       message: err instanceof Error ? err.message : String(err),
       errorKind: classifyError(err),
     });
-    log({ action: "summary", runId, ...summaryWithoutMeta(summary) });
+    log({ action: "summary", runId, ...summaryWithoutRunId(summary) });
     return summary;
   }
 
@@ -494,12 +494,15 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
   }
 
   summary.durationMs = Date.now() - startedAt;
-  log({ action: "summary", runId, ...summaryWithoutMeta(summary) });
+  log({ action: "summary", runId, ...summaryWithoutRunId(summary) });
   return summary;
 };
 
-const summaryWithoutMeta = (s: SyncRunSummary) => {
-  const { runId: _r, write: _w, ...rest } = s;
+// runId is passed explicitly by the emitter; everything else —
+// including `write`, which doc-axiom's dry-run/write split queries —
+// rides along on the summary event.
+const summaryWithoutRunId = (s: SyncRunSummary) => {
+  const { runId: _r, ...rest } = s;
   return rest;
 };
 

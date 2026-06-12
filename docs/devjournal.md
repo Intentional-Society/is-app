@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-11 | James | API logs now flush before the Vercel function freezes
+
+next-axiom's buffered push was racing the serverless freeze and losing log events. The API middleware now ends every request with `waitUntil(log.flush())`.
+
 ## 2026-06-11 | James | CSV member importer retired
 
 The final 3 Google Form signups were imported to prod; the importer (`scripts/import-members-csv.ts` and `scripts/normalize-referrals.ts`) is gone. Implementations live in git history.

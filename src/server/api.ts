@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { waitUntil } from "@vercel/functions";
 import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -300,6 +301,13 @@ const api = new Hono<{ Variables: ApiVariables }>()
       // requests it never authenticates. See docs/doc-axiom.md.
       userId: (c.get("user") as User | undefined)?.id ?? null,
     });
+    // next-axiom buffers events in-process and sends on a 1s throttle;
+    // a frozen serverless instance silently loses any unsent batch
+    // (whole cron runs went missing from Axiom this way — see
+    // docs/doc-axiom.md). waitUntil keeps the instance alive until the
+    // batch is delivered without delaying the response. Outside Vercel
+    // it no-ops and the long-lived process delivers on the throttle.
+    waitUntil(log.flush());
   })
   .use("*", requireAuth)
   .get("/hello", (c) => {
