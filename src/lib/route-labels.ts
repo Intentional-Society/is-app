@@ -34,6 +34,9 @@ const EXACT_LABELS: Record<string, string> = {
   "/about": "About",
   "/admin": "Admin",
   "/admin/programs": "Admin programs",
+  "/admin/invites": "Admin invites",
+  "/admin/signins": "Admin sign-ins",
+  "/admin/members": "Admin members",
 };
 const PREFIX_LABELS: Record<string, string> = {
   "/admin/programs/": "Admin programs",

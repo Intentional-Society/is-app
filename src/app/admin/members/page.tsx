@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
@@ -14,17 +13,7 @@ export default async function AdminMembersPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
-      <PageHeader
-        title="Members"
-        right={
-          <Link
-            href="/admin"
-            className="shrink-0 whitespace-nowrap text-base text-muted-foreground hover:text-foreground"
-          >
-            ← Admin
-          </Link>
-        }
-      />
+      <PageHeader title="Members" fallback="/admin" />
       <MembersAdminPanel currentUserId={me.profile.id} />
 
       <section className="flex w-full max-w-xl flex-col gap-2">

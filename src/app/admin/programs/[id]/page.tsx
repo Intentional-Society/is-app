@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
@@ -14,17 +13,7 @@ export default async function AdminProgramDetailPage({ params }: { params: Promi
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
-      <PageHeader
-        title="Program"
-        right={
-          <Link
-            href="/admin/programs"
-            className="shrink-0 whitespace-nowrap text-base text-muted-foreground hover:text-foreground"
-          >
-            ← Programs
-          </Link>
-        }
-      />
+      <PageHeader title="Program" fallback="/admin/programs" />
       <ProgramDetail programId={id} />
     </main>
   );
