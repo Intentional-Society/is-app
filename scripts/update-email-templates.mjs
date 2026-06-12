@@ -17,8 +17,7 @@
 // pre-customization content), then run without flags to push.
 //
 // SUPABASE_ACCESS_TOKEN is read from .env.prod (gitignored via .env.*),
-// matching the prod-targeting convention used by scripts/import-members-csv.ts
-// and scripts/normalize-referrals.ts. Workflow:
+// the prod-targeting convention for operator scripts. Workflow:
 //
 //   1. Generate a token at https://supabase.com/dashboard/account/tokens.
 //   2. Create .env.prod in the repo root with:

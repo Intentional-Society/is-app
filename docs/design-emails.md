@@ -130,9 +130,9 @@ Shape and conventions mirror `scripts/update-main-branch-protection.mjs`:
   to the repo: it doubles as a known-good rollback target without
   needing ops-token access, and the PR diff of snapshot vs source files
   is exactly what's changing for recipients.
-- Reads `SUPABASE_ACCESS_TOKEN` from `.env.prod` (gitignored), matching
-  the prod-targeting convention used by `import-members-csv.ts` and
-  `normalize-referrals.ts`. Refuses to run if unset (except `--dry-run`,
+- Reads `SUPABASE_ACCESS_TOKEN` from `.env.prod` (gitignored) — the
+  prod-targeting convention for operator scripts: create the file,
+  run, delete it. Refuses to run if unset (except `--dry-run`,
   which needs no token). The token is an ops-time secret — see
   `doc-supabase.md` → "Personal access token (Management API)" for the
   create-temporarily / delete-after-run workflow and blast radius.

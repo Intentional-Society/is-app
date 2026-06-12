@@ -107,7 +107,7 @@ Output a structured summary to the dedicated Axiom dataset (see [Logging](#loggi
 
 ### Why not inline-on-every-membership-change
 
-Considered and rejected for v1. Every join/leave would need a Buttondown call, every failure would need a retry queue, and out-of-band changes (the CSV importer, admin SQL fixes, the `addParticipant` admin path) would each need to remember the call. The cron handles all of those cases uniformly. If a latency need below "one day" surfaces, add an inline call to `joinProgram` / `leaveProgram` as a fast path; the cron is still the safety net.
+Considered and rejected for v1. Every join/leave would need a Buttondown call, every failure would need a retry queue, and out-of-band changes (admin SQL fixes, the `addParticipant` admin path) would each need to remember the call. The cron handles all of those cases uniformly. If a latency need below "one day" surfaces, add an inline call to `joinProgram` / `leaveProgram` as a fast path; the cron is still the safety net.
 
 ## Unsubscribe handling
 
