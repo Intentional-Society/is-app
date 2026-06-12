@@ -188,17 +188,17 @@ function parseCSV(text: string): Record<string, string>[] {
   });
 }
 
-// Parses the Google Forms signup timestamp ("M/D/YYYY H:MM:SS", US
+// Parses the Google Forms signup timestamp ("M/D/YYYY H:MM[:SS]", US
 // locale, 24-hour, no leading zeros) into a Date. Returns null when the
 // cell is empty or malformed, so the caller can fall back to the column
 // default. Interpreted as UTC so the stored instant is identical no
 // matter which machine runs the import — the hour is immaterial for a
 // join date, only the day/year is ever surfaced.
 function parseSignupDate(raw: string): Date | null {
-  const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+  const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (!m) return null;
   const [, mo, d, y, h, mi, s] = m;
-  return new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +s));
+  return new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +(s ?? "0")));
 }
 
 function toSlug(name: string): string {
