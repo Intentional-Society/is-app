@@ -1,13 +1,15 @@
 "use client";
 
-import { House, Menu, ShieldCheck } from "lucide-react";
+import { House, Menu, Moon, Settings, ShieldCheck, Sun, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { clearNavHistory } from "@/lib/route-labels";
+import { applyThemePreference, readThemePreference, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 // Internal nav links share one shape: a SheetClose (so the menu closes
@@ -55,16 +57,98 @@ function HomeLink() {
 
 // The top-right corner: the hamburger trigger and the nav sheet it opens.
 function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
+  const [isDark, setIsDark] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const pref = readThemePreference();
+    if (pref === "dark") {
+      setIsDark(true);
+    } else if (pref === "system") {
+      const prefersDark =
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setIsDark(prefersDark);
+    } else {
+      setIsDark(false);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next: ThemePreference = isDark ? "light" : "dark";
+    applyThemePreference(next);
+    setIsDark(!isDark);
+  };
+
   return (
     <div className="fixed top-0 right-0 z-40 p-3">
       <Sheet>
         <SheetTrigger render={<Button variant="ghost" size="icon" aria-label="Open menu" />}>
           <Menu />
         </SheetTrigger>
-        <SheetContent side="right" className="data-[side=right]:w-[40%] data-[side=right]:sm:max-w-[12.5rem]">
+        <SheetContent
+          side="right"
+          showCloseButton={false}
+          className="data-[side=right]:w-[40%] data-[side=right]:sm:max-w-[12.5rem]"
+        >
           <SheetHeader>
-            <SheetTitle>Menu</SheetTitle>
-            {displayName ? <p className="font-serif italic text-sm text-muted-foreground">{displayName}</p> : null}
+            <div className="flex items-center gap-1">
+              <SheetTitle className="mr-auto">Menu</SheetTitle>
+              <SheetClose
+                render={
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded p-1.5 hover:bg-muted"
+                    aria-label="Settings"
+                    onClick={() => {
+                      clearNavHistory();
+                      window.location.assign("/me#settings");
+                    }}
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                }
+              />
+              {mounted ? (
+                <button
+                  type="button"
+                  className="cursor-pointer rounded p-1.5 hover:bg-muted"
+                  aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                  onClick={toggleTheme}
+                >
+                  {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                </button>
+              ) : (
+                <span className="p-1.5">
+                  <span className="block h-4 w-4" />
+                </span>
+              )}
+              <SheetClose
+                render={
+                  <button type="button" className="cursor-pointer rounded p-1.5 hover:bg-muted" aria-label="Close">
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                }
+              />
+            </div>
+            {displayName ? (
+              <SheetClose
+                render={
+                  <button
+                    type="button"
+                    className="cursor-pointer text-left font-serif italic text-sm text-muted-foreground hover:underline"
+                    onClick={() => {
+                      clearNavHistory();
+                      window.location.assign("/me#profile");
+                    }}
+                  >
+                    {displayName}
+                  </button>
+                }
+              />
+            ) : null}
           </SheetHeader>
           <nav className="flex flex-col gap-1 px-4 pb-4">
             <MenuLink href="/">Home</MenuLink>
@@ -72,7 +156,6 @@ function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdm
             <MenuLink href="/members">Member directory</MenuLink>
             <MenuLink href="/intentions">Current intentions</MenuLink>
             <MenuLink href="/myweb">My web</MenuLink>
-            <MenuLink href="/me">My page</MenuLink>
             <MenuLink href="/invites">Invite a friend</MenuLink>
             <MenuLink href="/about">About</MenuLink>
             <a
