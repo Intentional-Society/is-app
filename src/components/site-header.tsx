@@ -91,7 +91,7 @@ function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdm
         <SheetContent
           side="right"
           showCloseButton={false}
-          className="data-[side=right]:w-[40%] data-[side=right]:sm:max-w-[12.5rem]"
+          className="data-[side=right]:w-[45%] data-[side=right]:sm:max-w-[14rem] gap-2"
         >
           <SheetHeader>
             <div className="flex items-center gap-1">
@@ -150,7 +150,7 @@ function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdm
               />
             ) : null}
           </SheetHeader>
-          <nav className="flex flex-col gap-1 px-4 pb-4">
+          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 pb-4">
             <MenuLink href="/">Home</MenuLink>
             <MenuLink href="/programs">Programs</MenuLink>
             <MenuLink href="/members">Member directory</MenuLink>
