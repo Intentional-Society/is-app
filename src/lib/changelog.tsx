@@ -175,6 +175,19 @@ export const changelog: ChangelogEntry[] = [
 // The "version" shown on /about: the date of the most recent change.
 export const appVersion = changelog[0]?.date ?? "";
 
+// The instant of the most recent urgent deploy — a fix that older
+// clients must stop running (active breakage or a security exposure).
+// The update banner forces an immediate, non-dismissible reload on any
+// open tab whose build predates this; see docs/strategy-deployment.md.
+//
+// To escalate a deploy to the urgent tier, set this to the current time
+// in the same PR as the fix; otherwise leave it. It is a full ISO 8601
+// timestamp, not a plain date like appVersion, so two urgent deploys on
+// the same day still compare strictly (the tab tests
+// NEXT_PUBLIC_BUILD_TIME < urgentReleasedAt). The epoch baseline means
+// "no urgent deploy on record."
+export const urgentReleasedAt = "1970-01-01T00:00:00.000Z";
+
 // Format an entry's "YYYY-MM-DD" date as e.g. "May 29, 2026". Pinned to
 // UTC so the rendered date matches the string regardless of the
 // server's timezone.
