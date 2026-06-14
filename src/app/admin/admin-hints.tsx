@@ -31,6 +31,7 @@ export function AdminHints() {
   const [relator, setRelator] = useState<MemberSummary | null>(null);
   const [relatee, setRelatee] = useState<MemberSummary | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [noOpMessage, setNoOpMessage] = useState<string | null>(null);
 
   const hintsQuery = useQuery({ queryKey: HINTS_QUERY_KEY, queryFn: fetchHints });
 
@@ -41,15 +42,21 @@ export function AdminHints() {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `relations/hint: ${res.status}`);
       }
-      return res.json();
+      return res.json() as Promise<{ ok: true; created: boolean }>;
     },
-    onSuccess: () => {
-      setRelator(null);
-      setRelatee(null);
+    onSuccess: (data) => {
       setErrorMessage(null);
-      queryClient.invalidateQueries({ queryKey: HINTS_QUERY_KEY });
+      if (data.created) {
+        setRelator(null);
+        setRelatee(null);
+        setNoOpMessage(null);
+        queryClient.invalidateQueries({ queryKey: HINTS_QUERY_KEY });
+      } else {
+        setNoOpMessage("Already related or already hinted — nothing was added.");
+      }
     },
     onError: (err) => {
+      setNoOpMessage(null);
       setErrorMessage(err instanceof Error ? err.message : "Failed to create hint.");
     },
   });
@@ -110,6 +117,7 @@ export function AdminHints() {
         <Button type="button" variant="secondary" disabled={submitDisabled} onClick={submit} className="self-start">
           {createMutation.isPending ? "Creating…" : "Create hint"}
         </Button>
+        {noOpMessage && <p className="text-sm text-muted-foreground">{noOpMessage}</p>}
         {errorMessage && (
           <p role="alert" className="text-sm text-destructive">
             {errorMessage}

@@ -77,10 +77,14 @@ export function MemberTypeahead({
             </Button>
           }
         />
-        <PopoverContent align="start" className="w-(--anchor-width) p-0">
+        <PopoverContent
+          align="start"
+          className="w-(--anchor-width) p-0"
+          style={{ maxHeight: "var(--available-height)" }}
+        >
           <Command filter={memberSearchFilter}>
             <CommandInput placeholder="Search members…" />
-            <CommandList>
+            <CommandList className="max-h-[min(300px,calc(var(--available-height)-52px))] overflow-y-auto">
               <CommandEmpty>{isPending ? "Loading…" : "No member found."}</CommandEmpty>
               <CommandGroup>
                 {visible.map((m) => (
