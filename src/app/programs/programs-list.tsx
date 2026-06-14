@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { Program } from "@/lib/api-types";
+import { formatDate } from "@/lib/format-date";
 
 type ListState = { kind: "loading" } | { kind: "loaded"; programs: Program[] } | { kind: "error"; message: string };
 
@@ -185,12 +186,4 @@ export function ProgramsList() {
       </ul>
     </div>
   );
-}
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  } catch {
-    return iso;
-  }
 }

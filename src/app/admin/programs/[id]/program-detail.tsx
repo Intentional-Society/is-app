@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
 import type { AdminProgramDetail } from "@/lib/api-types";
+import { formatDate } from "@/lib/format-date";
 
 const programQueryKey = (id: string) => ["admin", "programs", id] as const;
 
@@ -283,7 +284,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
               <span className="font-medium">Archived</span>{" "}
               <span className="text-muted-foreground">
                 {program.archivedAt
-                  ? `— hidden from /programs since ${new Date(program.archivedAt).toLocaleDateString()}`
+                  ? `— hidden from /programs since ${formatDate(program.archivedAt)}`
                   : "— visible to members on /programs"}
               </span>
             </span>
