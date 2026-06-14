@@ -68,6 +68,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     mutationFn: async (vars: {
       name?: string;
       slug?: string;
+      blurb?: string | null;
       description?: string | null;
       archived?: boolean;
       signupsOpen?: boolean;
