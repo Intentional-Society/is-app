@@ -77,6 +77,7 @@ export const programs = pgTable("programs", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
+  blurb: text("blurb"),
   description: text("description"),
   // Archived programs are hidden from member-facing listings (admins
   // still see them in /admin/programs). Set the timestamp instead of

@@ -85,15 +85,14 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
     <div className="flex w-full max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-2">
         <h2 className="text-3xl font-semibold">{program.name}</h2>
+        {program.blurb && <p className="font-serif text-base text-muted-foreground">{program.blurb}</p>}
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
           {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}
         </p>
       </header>
 
-      {program.description && (
-        <p className="font-serif text-base text-muted-foreground leading-relaxed">{program.description}</p>
-      )}
+      {program.description && <p className="font-serif text-base leading-relaxed">{program.description}</p>}
 
       <div className="flex items-center gap-3">
         {program.joined ? (
