@@ -11,6 +11,7 @@
       "!.next",
       "!next-env.d.ts",
       "!supabase/templates/**/*.html",
+      "!.claude/skills/skill-creator",
       "!docs/_temp-*",
       "!drizzle/meta",
       "!public/legacy-check.js",

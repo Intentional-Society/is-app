@@ -46,6 +46,9 @@ test-results/
 !.claude/skills/
 # per-machine Skill state (team-cache, etc.) — never commit
 .claude/skills/**/.team-cache.json
+# skill-creator generated run artifacts (Python bytecode, packaged .skill files) — never commit
+.claude/skills/skill-creator/**/__pycache__/
+.claude/skills/**/*.skill
 .vercel
 
 # agent scratch notes — emergent design decisions, working memory
