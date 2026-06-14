@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "@sentry/nextjs";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { log } from "next-axiom";
@@ -17,7 +17,7 @@ const tryAutoSubscribe = async (userId: string): Promise<void> => {
   try {
     await autoSubscribeNewMember(userId);
   } catch (err) {
-    Sentry.captureException(err);
+    captureException(err);
   }
 };
 
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       result = await upsertProfile(data.user);
     } catch (err) {
-      Sentry.captureException(err, {
+      captureException(err, {
         tags: { feature: "auth-callback", path: "profile-upsert" },
         extra: { userId: data.user.id },
       });
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // "did a redemption ever fail in prod?" question has no answer there.
     // `pgCode` surfaces the SQLSTATE (e.g. 25P02) the #149 pooler hazard
     // would raise.
-    Sentry.captureException(err, {
+    captureException(err, {
       tags: { feature: "auth-callback", path: "invite-redemption" },
       extra: { inviteCode: invite, userId },
     });

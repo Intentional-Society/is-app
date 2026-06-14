@@ -23,7 +23,7 @@ vi.mock("@sentry/nextjs", () => ({
   captureMessage: vi.fn(),
 }));
 
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
 import { toSlug } from "@/lib/slug";
@@ -34,7 +34,7 @@ import { profiles } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 const mockUpdateUserById = vi.mocked(supabaseAdmin.auth.admin.updateUserById);
-const mockCaptureException = vi.mocked(Sentry.captureException);
+const mockCaptureException = vi.mocked(captureException);
 
 // Unique per run: upsertProfile derives the profile slug via toSlug,
 // which hits a global unique constraint, and parallel test files share

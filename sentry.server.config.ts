@@ -1,8 +1,8 @@
-import * as Sentry from "@sentry/nextjs";
+import { init } from "@sentry/nextjs";
 
 import { scrubServerEvent } from "@/lib/sentry-scrub";
 
-Sentry.init({
+init({
   dsn: process.env.SENTRY_DSN,
   // Report from production deploys only — mirrors the client gate in
   // instrumentation-client.ts.

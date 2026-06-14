@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "@sentry/nextjs";
 import { and, asc, desc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
@@ -26,7 +26,7 @@ export const autoSubscribeNewMember = async (userId: string): Promise<void> => {
   const found = new Set(rows.map((r) => r.slug));
   for (const slug of AUTO_SUBSCRIBE_SLUGS) {
     if (!found.has(slug)) {
-      Sentry.captureException(new Error(`autoSubscribeNewMember: program slug "${slug}" not found in database`));
+      captureException(new Error(`autoSubscribeNewMember: program slug "${slug}" not found in database`));
     }
   }
 

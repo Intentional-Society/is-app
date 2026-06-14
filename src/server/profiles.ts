@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { and, asc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
@@ -160,7 +160,7 @@ export const syncDisplayNameToAuthMetadata = async (
     });
     if (error) throw error;
   } catch (err) {
-    Sentry.captureException(err, {
+    captureException(err, {
       tags: { area: "profile.metadata_sync" },
       extra: { userId },
     });

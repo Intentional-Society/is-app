@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "@sentry/nextjs";
 
 import { serverApiClient } from "@/lib/api-server";
 
@@ -117,7 +117,7 @@ export async function SystemMetrics() {
       </div>
     );
   } catch (err) {
-    Sentry.captureException(err);
+    captureException(err);
     return <p className="text-sm text-muted-foreground">System metrics unavailable.</p>;
   }
 }
