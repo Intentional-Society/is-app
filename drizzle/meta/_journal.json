@@ -99,6 +99,13 @@
       "when": 1780506291419,
       "tag": "0013_add_profile_deactivated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781438861129,
+      "tag": "0014_mean_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }

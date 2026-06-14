@@ -210,6 +210,7 @@ describe("getProfileForSelf", () => {
         "currentIntention",
         "intentionUpdatedAt",
         "deactivatedAt",
+        "hasPassword",
         "isAdmin",
         "hidden",
         "lastSignedAgreements",
