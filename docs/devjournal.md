@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-14 | Ola | Remove password option (#212)
+
+Members can now remove their password from /me settings, reverting to magic-link-only sign-in. The "Remove password" button is only shown when `profiles.has_password` is true — set whenever a password is saved, cleared on removal. Removal uses `supabase.auth.admin.updateUserById` to replace the password with an unguessable random value (the only supported server-side path; direct `auth.users` mutation is intentionally avoided). Migration 0014 adds the `has_password` boolean column (default false).
+
 ## 2026-06-12 | James | Unified top bar
 
 Page titles and breadcrumbs now share one band with the fixed home/menu icons, via a shared `PageHeader` (full-width row, `pt-3` mains).
