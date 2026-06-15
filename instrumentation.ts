@@ -1,4 +1,4 @@
-import { captureRequestError } from "@sentry/nextjs";
+import { captureRequestError as Sentry_captureRequestError } from "@sentry/nextjs";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -6,4 +6,4 @@ export async function register() {
   }
 }
 
-export const onRequestError = captureRequestError;
+export const onRequestError = Sentry_captureRequestError;

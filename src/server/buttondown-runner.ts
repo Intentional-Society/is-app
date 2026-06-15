@@ -6,7 +6,7 @@
 // `acquiredBy` per scheduled run) and the admin "Sync now" buttons
 // (one per click, identified by the admin's profile id).
 
-import { captureException, captureMessage } from "@sentry/nextjs";
+import { captureException as Sentry_captureException, captureMessage as Sentry_captureMessage } from "@sentry/nextjs";
 import { log } from "next-axiom";
 
 import { createButtondownClient } from "./buttondown";
@@ -87,7 +87,7 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
     // that's a real signal, not just noise. Send it to Sentry so it
     // pages; the fingerprint stays stable so an operator sees one
     // issue per ongoing overlap, not one per cron.
-    captureMessage("buttondown.sync_lock_held", {
+    Sentry_captureMessage("buttondown.sync_lock_held", {
       level: "warning",
       tags: { feature: "buttondown-sync", action: "skipped-lock-held", acquiredBy: runId },
       extra: { attempts, waitedMs },
@@ -127,7 +127,7 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
         // and we re-raise here as a Sentry exception so the alert
         // story doesn't depend on parsing Axiom logs.
         if (event.action === "error") {
-          captureException(new Error("buttondown.sync_profile_error"), {
+          Sentry_captureException(new Error("buttondown.sync_profile_error"), {
             tags: {
               feature: "buttondown-sync",
               action: "sync-error",
@@ -142,7 +142,7 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
         // Captured as an exception so Sentry's email-on-error alerting
         // fires; the fingerprint stays stable across runs so an admin
         // sees one issue per affected member rather than per cron.
-        captureException(new Error("buttondown.unsubscribed_member"), {
+        Sentry_captureException(new Error("buttondown.unsubscribed_member"), {
           extra: {
             profileId: alert.profileId,
             email: alert.email,
@@ -186,7 +186,7 @@ export const runFirstProfileSaveForServer = async (params: {
       email: params.email,
       client,
       raiseUnsubscribeAlert: (alert: UnsubscribeAlert) => {
-        captureException(new Error("buttondown.unsubscribed_member"), {
+        Sentry_captureException(new Error("buttondown.unsubscribed_member"), {
           extra: {
             profileId: alert.profileId,
             email: alert.email,
@@ -210,7 +210,7 @@ export const runFirstProfileSaveForServer = async (params: {
       runId,
       message: err instanceof Error ? err.message : String(err),
     });
-    captureException(err, {
+    Sentry_captureException(err, {
       tags: { feature: "buttondown-sync", path: "first-profile-save", runId },
       extra: { profileId: params.profileId },
     });
@@ -266,7 +266,7 @@ export const runProfileResyncForServer = async (params: {
       reason: params.reason,
       message: err instanceof Error ? err.message : String(err),
     });
-    captureException(err, {
+    Sentry_captureException(err, {
       tags: { feature: "buttondown-sync", path: "profile-resync", reason: params.reason },
       extra: { profileId: params.profileId },
     });

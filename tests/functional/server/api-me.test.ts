@@ -23,7 +23,7 @@ vi.mock("@sentry/nextjs", () => ({
   captureMessage: vi.fn(),
 }));
 
-import { captureException } from "@sentry/nextjs";
+import { captureException as Sentry_captureException } from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
 import { toSlug } from "@/lib/slug";

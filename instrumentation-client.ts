@@ -1,4 +1,8 @@
-import { captureRouterTransitionStart, init, replayIntegration } from "@sentry/nextjs";
+import {
+  captureRouterTransitionStart as Sentry_captureRouterTransitionStart,
+  init as Sentry_init,
+  replayIntegration as Sentry_replayIntegration,
+} from "@sentry/nextjs";
 
 import { scrubClientEvent } from "@/lib/sentry-scrub";
 
@@ -18,7 +22,7 @@ const debugReplay = (() => {
   }
 })();
 
-init({
+Sentry_init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   // Report from production deploys only: preview e2e runs were sending
   // thousands of tunnel POSTs per run (Vercel traffic-spike alerts), and
@@ -30,7 +34,7 @@ init({
   replaysOnErrorSampleRate: debugReplay ? 1.0 : 0,
   integrations: debugReplay
     ? [
-        replayIntegration({
+        Sentry_replayIntegration({
           maskAllText: true,
           blockAllMedia: true,
         }),
@@ -39,4 +43,4 @@ init({
   beforeSend: scrubClientEvent,
 });
 
-export const onRouterTransitionStart = captureRouterTransitionStart;
+export const onRouterTransitionStart = Sentry_captureRouterTransitionStart;
