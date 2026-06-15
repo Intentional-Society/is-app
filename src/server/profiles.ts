@@ -535,7 +535,7 @@ export const removePassword = async (userId: string): Promise<{ ok: true } | { e
     password: crypto.randomUUID(),
   });
   if (error) return { error: error.message };
-  await db.update(profiles).set({ hasPassword: false }).where(eq(profiles.id, userId));
+  await setPasswordFlag(userId, false);
   return { ok: true };
 };
 
