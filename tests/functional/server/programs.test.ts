@@ -14,7 +14,6 @@ vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
 
-import { captureException as Sentry_captureException } from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
 import app from "@/server/api";
