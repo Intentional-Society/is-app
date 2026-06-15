@@ -14,6 +14,7 @@ vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
 
+import { captureException as Sentry_captureException } from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
 import app from "@/server/api";
@@ -404,7 +405,7 @@ describe("autoSubscribeNewMember", () => {
     await db.delete(programs).where(eq(programs.id, weeklyProgramId));
 
     try {
-      const captureMock = vi.mocked(captureException);
+      const captureMock = vi.mocked(Sentry_captureException);
       captureMock.mockClear();
 
       await expect(autoSubscribeNewMember(userId)).resolves.toBeUndefined();
