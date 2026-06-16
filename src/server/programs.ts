@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { and, asc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -110,7 +110,7 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
           .from(profilePrograms)
           .innerJoin(profiles, eq(profiles.id, profilePrograms.profileId))
           .where(and(inArray(profilePrograms.programId, programIds), isNull(profilePrograms.leftAt)))
-          .orderBy(asc(profilePrograms.assignedAt))
+          .orderBy(desc(profilePrograms.assignedAt))
       : [];
 
   const withAvatarUrls = await attachAvatarUrls(avatarRows);
