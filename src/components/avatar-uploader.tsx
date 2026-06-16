@@ -41,7 +41,7 @@ const boundSource = async (file: File): Promise<string> => {
   bitmap.close();
 
   // The bounded image is both what the cropper displays and what
-  // cropToWebp extracts the final crop from, so its quality is a real
+  // cropToUpload extracts the final crop from, so its quality is a real
   // link in the chain — but it only needs to sit above the final
   // encode (0.88) to not be the limiting generation; higher just grows
   // the blob. The object URL is revoked when the modal closes.
@@ -58,17 +58,34 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     img.src = src;
   });
 
-// Draws the chosen crop rectangle into a square OUTPUT_DIMENSION canvas
-// and exports it as a WebP blob. `area` is in the bounded source's
+// Exports a canvas, but resolves null unless the browser actually
+// produced the requested type. canvas.toBlob silently substitutes PNG
+// when it can't encode the type asked for, so comparing blob.type is
+// the only way to notice — and the null signal lets the caller fall
+// back rather than ship a surprise PNG.
+const encodeCanvas = (canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> =>
+  new Promise((resolve) => canvas.toBlob((blob) => resolve(blob?.type === type ? blob : null), type, quality));
+
+// Draws the chosen crop into a square OUTPUT_DIMENSION canvas and
+// returns a compact upload blob. `area` is in the bounded source's
 // pixel space, so it lines up with the image loaded here.
-const cropToWebp = async (src: string, area: Area): Promise<Blob> => {
+//
+// We want WebP, but some browsers (Safari/iOS historically) can't
+// encode it via canvas.toBlob and fall back to PNG — and a 1024² photo
+// as PNG is several MB, which the upload cap then rejects as "too
+// large", however small the source was. So when WebP doesn't come
+// back, encode JPEG instead: small, lossy, universally supported. The
+// server re-encodes to WebP regardless (docs/design-profile-pictures.md),
+// so the wire format only has to be compact and decodable.
+const cropToUpload = async (src: string, area: Area): Promise<Blob> => {
   const img = await loadImage(src);
   const canvas = document.createElement("canvas");
   canvas.width = OUTPUT_DIMENSION;
   canvas.height = OUTPUT_DIMENSION;
   getContext(canvas).drawImage(img, area.x, area.y, area.width, area.height, 0, 0, OUTPUT_DIMENSION, OUTPUT_DIMENSION);
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.88));
-  if (!blob) throw new Error("could not encode image");
+
+  const blob = (await encodeCanvas(canvas, "image/webp", 0.88)) ?? (await encodeCanvas(canvas, "image/jpeg", 0.85));
+  if (!blob) throw new Error("We couldn't process that photo. Please try another image.");
   return blob;
 };
 
@@ -109,7 +126,7 @@ export function AvatarUploader({ name, initialUrl }: { name: string | null; init
       setArea(null);
       setCropSrc(bounded);
     } catch {
-      setStatus({ kind: "error", message: "Couldn't read that image. Try a PNG or JPEG." });
+      setStatus({ kind: "error", message: "We couldn't read that image. Please try a JPEG or PNG." });
     }
   };
 
@@ -117,14 +134,18 @@ export function AvatarUploader({ name, initialUrl }: { name: string | null; init
     if (!cropSrc || !area) return;
     setStatus({ kind: "busy" });
     try {
-      const blob = await cropToWebp(cropSrc, area);
+      const blob = await cropToUpload(cropSrc, area);
       const form = new FormData();
-      form.append("file", blob, "avatar.webp");
+      const ext = blob.type === "image/webp" ? "webp" : "jpg";
+      form.append("file", blob, `avatar.${ext}`);
 
       const res = await fetch("/api/me/avatar", { method: "POST", body: form, credentials: "include" });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "Upload failed.");
+        throw new Error(
+          body.error ??
+            "Something went wrong saving your photo. Try once more — if it keeps failing, please let us know with the Give Feedback link in the menu.",
+        );
       }
       const { avatarUrl } = (await res.json()) as { avatarUrl: string };
 
@@ -132,7 +153,13 @@ export function AvatarUploader({ name, initialUrl }: { name: string | null; init
       setStatus({ kind: "idle" });
       closeCropper();
     } catch (err) {
-      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Upload failed." });
+      setStatus({
+        kind: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong saving your photo. Try once more — if it keeps failing, please let us know with the Give Feedback link in the menu.",
+      });
     }
   };
 
@@ -140,11 +167,20 @@ export function AvatarUploader({ name, initialUrl }: { name: string | null; init
     setStatus({ kind: "busy" });
     try {
       const res = await fetch("/api/me/avatar", { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error("Couldn't remove the photo.");
+      if (!res.ok)
+        throw new Error(
+          "Something went wrong removing your photo. Try once more — if it keeps failing, please let us know with the Give Feedback link in the menu.",
+        );
       setUrl(null);
       setStatus({ kind: "idle" });
     } catch (err) {
-      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Couldn't remove the photo." });
+      setStatus({
+        kind: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong removing your photo. Try once more — if it keeps failing, please let us know with the Give Feedback link in the menu.",
+      });
     }
   };
 
