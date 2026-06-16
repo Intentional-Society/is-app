@@ -188,7 +188,7 @@ The same banner component renders all three tiers; the tier controls *when* it a
 and whether it can be dismissed. Reload always calls `window.location.reload()` — a full
 document navigation, so it pulls the latest production assets.
 
-- **Patch:** a dismissible banner — *"A new version is available — Reload."* — held back
+- **Patch:** a dismissible banner — *"A new version is available."* — held back
   until the session is worth interrupting. It does **not** appear the moment a patch
   lands. It waits until the running build is at least **12 hours old**, then shows at
   most **once per 12 hours** (a dismissal is remembered in `localStorage`). An
@@ -197,9 +197,9 @@ document navigation, so it pulls the latest production assets.
 - **Feature:** the same dismissible banner, but **immediately** — the member-facing
   change is the whole reason to tell them. Persistent, not a modal: they finish what
   they are doing and reload at a safe stopping point.
-- **Urgent:** a non-dismissible banner — *"An important update is ready. Reload to
-  continue."* — **immediately**. Still member-initiated (one click, never automatic),
-  but it cannot be dismissed.
+- **Urgent:** a non-dismissible banner — *"An important update is ready."* —
+  **immediately**. Still member-initiated (one click, never automatic), but it cannot
+  be dismissed.
 
 The patch clock is the running build's own age (`NEXT_PUBLIC_BUILD_TIME`), not the
 moment a newer patch happened to land. Measuring from when the member's build *shipped*,
@@ -210,15 +210,17 @@ window sits far inside the 7-day Skew Protection Max Age (see above), so the gen
 nudge reliably reaches a patch-only tab long before its pin could lapse into a hard
 reload.
 
-The banner is a client component mounted in the root layout. It reuses the visual
-language of `src/components/help-hint.tsx` (border, `bg-background`, muted text) so
-it reads as part of the app, not a system chrome intrusion.
+The banner is a client component mounted in the root layout: a persistent card pinned
+to the bottom of the viewport (never a modal — it doesn't block the page), carrying the
+message and a Reload button, plus a dismiss control on the non-urgent tiers. It uses the
+app's theme tokens (`bg-card`, `border`, `text-foreground`) so it reads as part of the
+app; the urgent tier firms up the border to match its weight.
 
 ### Why never force-refresh
 
-The pattern of auto-reloading the page the instant a new deploy is detected is
-rejected. A forced reload discards unsaved client state, and this app is mostly input
-surfaces where that is real damage:
+Auto-reloading the page the instant a new deploy is detected is rejected **on any
+surface a member is working in**. A forced reload discards unsaved client state, and
+this app is mostly input surfaces where that is real damage:
 
 - Profile **Edit mode** — an unsaved bio / keywords
 - The **My Web** canvas and relation dialog (`src/app/myweb/`)
@@ -229,6 +231,28 @@ Getting a member onto the latest build thirty seconds sooner is not worth deleti
 half-written profile. Even the urgent path stays member-initiated — we make the
 prompt impossible to ignore (non-dismissible) rather than impossible to avoid
 (automatic).
+
+### The home page: an active safe-refresh point
+
+The one place we *do* reload automatically is the home page (`/`). The rule above
+guards unsaved input; home has none at the moment a member lands on it. It is reached
+either by a fresh document load (already current) or by an in-app `<Link>` navigation
+(pinned to the old bundle), and in both cases nothing has been typed yet — so a small
+client component checks the live version on mount and, if the tab is stale, reloads
+immediately, bypassing the patch hold. (`window.location.reload()`, not
+`router.refresh()`: a soft refresh re-runs server components but stays pinned to the old
+deployment, so it would never pull the new bundle.)
+
+This turns home into an *active* version of the passive document-navigation reload — it
+catches the SPA navigator (gap #2) the built-in reload misses. Because members pass
+through home routinely, most self-heal to current there and never see the banner; the
+banner becomes the safety net for members who stay deep in the input surfaces.
+
+The safety rests on firing *before interaction*, not on home staying input-free. The
+check is an async fetch, so a keystroke can land in the sub-second window after mount;
+if one does, the reload is skipped and the banner takes over. A short `sessionStorage`
+cooldown guards against a reload loop if the version endpoint ever flaps. Home can hold
+inputs freely — only the reload's *timing* carries the guarantee.
 
 ## Relationship to the changelog
 
@@ -248,7 +272,9 @@ to an immediate one. Writing the entry and choosing the tier are one action.
 
 ## Rejected alternatives
 
-- **Automatic force-refresh** — discards unsaved work; see above.
+- **Automatic force-refresh on a working surface** — discards unsaved work; see "Why
+  never force-refresh." The home page is the deliberate exception — a safe-refresh point
+  that reloads pre-interaction, see above.
 - **Notifying equally on every deploy** — rejected as notification fatigue. Most
   deploys are patches nobody is waiting on; interrupting an active session for each one
   trains members to ignore the banner, blunting it for the feature and urgent deploys
