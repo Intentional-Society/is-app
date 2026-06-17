@@ -32,6 +32,10 @@ Root layout sets `title.template = "IS Web: %s"`. Per-page titles live in one `s
 
 A directory browse prefetched every member card, and each prefetch render made separate Supabase Storage call; that exhausted Storage's DB pool (429), which `resolveAvatarUrls` rethrew into a page 500. Signing is now best-effort — it logs `avatar sign failed` and falls back to initials — and member cards no longer prefetch. First test example of shipping an `urgentReleasedAt` update.
 
+## 2026-06-17 | Blake | /commit and /pr are now natural-language-invocable; every merge prompts a human
+
+`/commit` and `/pr` no longer set `disable-model-invocation` — saying "commit this" or "open a PR" now routes through the Skill, which confirms intent once (Step 0) unless you create the gitignored `.claude/skip-nl-confirm-commit-pr.local` (the prompt's "don't ask again" option makes it; delete it to re-enable). `/ship` stays explicit-only, and a new checked-in `.claude/settings.json` `ask` rule means every `gh pr merge` prompts a human regardless of local `allow`/bypass settings. (#353; design in docs/plan-skill-nl-invocation.md)
+
 ## 2026-06-16 | James | Update handling for active sessions
 
 The home page auto-reloads a stale tab, everywhere else a persistent bottom banner offers a member-initiated reload. Deploys now fall into one of three tiers: patch (default, notif held until the running build is 6h old, then once per 8h), feature (held until build is 2h old, then once per 8h, dismissible — whenever a changelog is added), urgent (immediate, non-dismissible — gated by `urgentReleasedAt` marker in code).  Full rationale: docs/strategy-deployment.md.

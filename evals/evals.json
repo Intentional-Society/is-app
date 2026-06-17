@@ -26,6 +26,20 @@
           "prompt": "/commit #142",
           "preconditions": "Issue 142 is open and describes a schema change. Two sub-scenarios are evaluated under this id:\n  (a) Payload contains only an expand change to `src/server/schema.ts` and a new `drizzle/0019_add_column.sql`. Expected: Skill correctly identifies the expand phase, surfaces in the approval block that `/ship` will need to run `npm run prod:db:expand` after PR creation (with the `prod-db` maintainer-approval gate) and that the post-deploy `e2e.yml` must pass before merge, then proceeds normally through `npm test` + approval + commit + push.\n  (b) Payload contains an expand change AND a contract change to `src/server/schema.ts` in the same commit (a column added and a different column dropped). Expected: Skill refuses with `Refuse combined expand+contract payloads`, asks the human to split into two commits in deploy order (expand first, contract second).",
           "expected_output": "(a) Expand-only: schema-expand wait narration appears in the approval block; commit proceeds normally. (b) Combined: hard refusal naming both phases; no commit happens."
+        },
+        {
+          "id": "commit-4-nl-intent-gate-routes-and-confirms",
+          "eval_name": "nl-commit-intent-routes-through-skill-with-step-0",
+          "prompt": "let's commit this",
+          "preconditions": "Dirty feature branch (not main) with a few related edits; no .env or generated artifacts; gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local` opt-out file; not a delegated call (no `.claude/.nl-delegation-active` marker); invoked by natural language (model/Skill-tool invocation, not a typed `/commit`).",
+          "expected_output": "The /commit Skill is invoked (the model routes the NL intent through the Skill rather than running an ad-hoc git sequence). Its FIRST action is the Step 0 intent gate via AskUserQuestion (\"Run /commit with: <detected context>?\") — no `gh auth`, no `git` commands run before it. Choosing Stop ends with zero side effects (no branch created, nothing staged, `git status` unchanged). Choosing Proceed continues into step 1 onward."
+        },
+        {
+          "id": "commit-5-nl-step-0-skip-conditions",
+          "eval_name": "step-0-skips-on-slash-delegation-and-opt-out",
+          "prompt": "(three sub-scenarios — see preconditions)",
+          "preconditions": "Dirty feature branch; gh authenticated. Three sub-scenarios:\n  (a) Explicit slash: the human types `/commit` (a `<command-name>` tag is present in the turn).\n  (b) Delegation: `/pr` (or `/ship`->`/pr`) delegated here and created `.claude/.nl-delegation-active` immediately before the call.\n  (c) Opt-out: `.claude/skip-nl-confirm-commit-pr.local` exists; invoked by natural language.",
+          "expected_output": "In all three sub-scenarios the Step 0 intent confirmation does NOT fire and the Skill begins at step 1. In (b) the Skill deletes `.claude/.nl-delegation-active` on read (clear-on-read) so it cannot leak into a later standalone NL invocation. In (c) the opt-out file is left untouched. Control: a natural-language invocation with none of these conditions present DOES fire Step 0 (covered by commit-4)."
         }
       ]
     },
@@ -82,6 +96,13 @@
           "prompt": "/pr",
           "preconditions": "On a feature branch with a single commit and no open PR; tree clean; `origin/main` not advanced (rebase no-op); gh authenticated; `.claude/skills/pr/.team-cache.json` exists with `refreshedAt` 5 days old (within TTL) and contains a login `formerteam` that has since been removed from the repo's collaborator list on GitHub.",
           "expected_output": "Skill reads the cache, renders the picker including `formerteam`. Human picks the number corresponding to `formerteam`. Skill echoes `→ Requesting review from formerteam. Proceeding.` and calls `gh pr create --reviewer formerteam`. gh returns a reviewer-invalid error. Skill catches the error, surfaces the exact `gh` error text to the human, refreshes the team cache via the same three cold-cache fetches (after which `formerteam` no longer appears in `collaborators`), re-renders the picker with the refreshed list, and re-asks for a reviewer pick. Does NOT retry `gh pr create` with the same input. No PR is created until the re-asked picker resolves to a valid set; on the re-asked pick, `gh pr create --reviewer <valid-login>` runs and the PR opens."
+        },
+        {
+          "id": "pr-8-nl-intent-gate-routes-and-confirms",
+          "eval_name": "nl-pr-intent-routes-through-skill-with-step-0",
+          "prompt": "open a PR for this branch",
+          "preconditions": "On a feature branch with commits to push and no open PR; tree may be clean or dirty; gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local` opt-out file; not a delegated call (no `.claude/.nl-delegation-active` marker); invoked by natural language (Skill-tool invocation, not a typed `/pr`).",
+          "expected_output": "The /pr Skill is invoked (NL intent routed through the Skill). Its FIRST action is the Step 0 intent gate via AskUserQuestion (\"Open a PR with: <detected context>?\") — no `gh auth`, no `git fetch`/`push`, no `gh pr create` before it. Choosing Stop ends cleanly with zero side effects (no push, no PR created). Choosing Proceed continues into step 1 onward."
         }
       ]
     },
@@ -110,6 +131,13 @@
           "prompt": "/ship",
           "preconditions": "On a docs-only branch (diff confined to `docs/**` and root `CLAUDE.md`) with a pre-existing open PR; tree clean; `Lint & Functional Tests` posts green within seconds via `dorny/paths-filter` skip; Vercel preview is suppressed per `vercel.json`'s `ignoreCommand` so no preview `deployment_status` event fires and preview `e2e.yml` does not run.",
           "expected_output": "Skill recognizes the docs-only condition, treats absent advisory checks as expected (per `docs/doc-github.md` docs-only rule), does NOT wait 5 minutes for advisories that the docs-only path skipped by design, proceeds on required-green only, runs `gh pr merge --merge --delete-branch`, tidies, captures merge SHA, runs the post-merge watch on `main`. Production builds still run on `main` (including for docs-only merges), so if a production deploy or production `e2e.yml` run appears in the post-merge run list, the Skill reports its result. Reports merge SHA + post-merge status."
+        },
+        {
+          "id": "ship-4-nl-ship-intent-redirects-no-simulate",
+          "eval_name": "nl-ship-intent-redirects-to-explicit-and-merge-asks",
+          "prompt": "ship it",
+          "preconditions": "An open PR exists for the current branch; gh authenticated. `/ship` retains `disable-model-invocation: true`; `.claude/settings.json` ships an `ask` rule on `gh pr merge *` (and the PowerShell equivalent).",
+          "expected_output": "Natural-language \"ship it\" does NOT invoke `/ship` (the Skill tool refuses model invocation via `disable-model-invocation`) and the agent does NOT simulate the merge workflow with ad-hoc commands; instead it tells the human to type `/ship`. Separately, any direct `gh pr merge ...` attempt (e.g., a fake `gh pr merge 99999 --merge --delete-branch`) triggers the checked-in harness `ask` permission prompt, which the human declines — confirming the merge gate fires regardless of how the merge is attempted."
         }
       ]
     }
