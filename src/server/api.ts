@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
+import { appVersion, urgentReleasedAt } from "@/lib/changelog";
 import { isRelationValue } from "@/lib/relation-value";
 import { toSlug } from "@/lib/slug";
 
@@ -820,14 +821,17 @@ const api = new Hono<{ Variables: ApiVariables }>()
     }
     return c.json({ ok: true });
   })
-  .get("/health", async (c) => {
-    const result = await db.execute(sql`SELECT now() AS server_time`);
+  // Public deploy-identity probe for the update banner
+  // (docs/strategy-deployment.md). Unauthenticated so an idle tab whose
+  // session has lapsed can still detect a newer deployment — the tabs
+  // most likely to be running stale code. The client polls this with a
+  // plain fetch, which Skew Protection does not pin, so it resolves to
+  // current production and reports that deployment's id, not the caller's.
+  .get("/version", (c) => {
     return c.json({
-      status: "ok",
-      database: {
-        connected: true,
-        serverTime: result[0].server_time,
-      },
+      id: process.env.VERCEL_DEPLOYMENT_ID ?? "dev",
+      appVersion,
+      urgentReleasedAt,
     });
   })
   .route("/admin", adminRoutes);

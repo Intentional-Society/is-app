@@ -9,6 +9,7 @@ import { NavigationHistory } from "@/components/navigation-history";
 import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeScript } from "@/components/theme-script";
+import { UpdateBanner } from "@/components/update-banner";
 import { loadMe } from "@/lib/api-server";
 import { getServerUser } from "@/lib/supabase/server-user";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ export default async function RootLayout({
             <NavigationHistory />
             <SiteHeader displayName={me?.profile?.displayName ?? null} isAdmin={me?.profile?.isAdmin ?? false} />
             {children}
+            <UpdateBanner />
           </QueryProvider>
         </AuthProvider>
       </body>

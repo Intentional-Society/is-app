@@ -44,7 +44,9 @@ export const requireAdmin: MiddlewareHandler<{ Variables: ApiVariables }> = asyn
 // auth-middleware.test.ts asserts nothing else is public.
 // Strings are matched exactly; RegExps are tested against c.req.path.
 export const PUBLIC_PATHS: readonly (string | RegExp)[] = [
-  "/api/health",
+  // Deploy-identity probe polled by the update banner; unauthenticated
+  // so an idle or signed-out tab can still detect a new version.
+  "/api/version",
   // Prospective members check an invite code before being asked for an
   // email, so this must be reachable without a session.
   /^\/api\/invites\/[^/]+\/check$/,

@@ -15,9 +15,12 @@ test("unauthenticated /api/hello returns 401", async ({ request }) => {
   expect(await res.json()).toEqual({ error: "unauthenticated" });
 });
 
-test("unauthenticated /api/health returns 200", async ({ request }) => {
-  const res = await request.get("/api/health");
+test("unauthenticated /api/version returns the deploy identity", async ({ request }) => {
+  const res = await request.get("/api/version");
   expect(res.status()).toBe(200);
   const body = await res.json();
-  expect(body.status).toBe("ok");
+  expect(typeof body.id).toBe("string");
+  expect(body.id.length).toBeGreaterThan(0);
+  expect(body).toHaveProperty("appVersion");
+  expect(body).toHaveProperty("urgentReleasedAt");
 });
