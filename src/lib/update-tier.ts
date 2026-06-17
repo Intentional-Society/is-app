@@ -18,11 +18,18 @@ export type BuildIdentity = {
   builtAt: string;
 };
 
-// The patch-notify window: hold a patch-only nudge until the running
-// build is this old, then show it at most once per window. Far shorter
-// than the 7-day Skew Protection Max Age, so a patch-only tab is nudged
-// well before its pin could lapse (docs/strategy-deployment.md).
-export const PATCH_HOLD_MS = 12 * 60 * 60 * 1000;
+// First-nudge holds: how old the running build must be before each tier's
+// banner first appears. Tier-specific — a member-facing feature is worth
+// surfacing sooner than a routine patch, but neither interrupts a just-loaded
+// session. See docs/strategy-deployment.md.
+export const PATCH_INITIAL_HOLD_MS = 6 * 60 * 60 * 1000;
+export const FEATURE_INITIAL_HOLD_MS = 2 * 60 * 60 * 1000;
+
+// Reminder cadence: after dismissing either banner, stay quiet this long
+// before nudging again — shared by patch and feature. Sits far inside the
+// 7-day Skew Protection Max Age, so a dismissed tab is re-nudged well before
+// its pin could lapse (docs/strategy-deployment.md).
+export const REPEAT_HOLD_MS = 8 * 60 * 60 * 1000;
 
 // The highest-severity tier among deploys newer than this build, or null
 // when the tab is already on current production. Severity runs
@@ -41,13 +48,20 @@ export function computeUpdateTier(build: BuildIdentity, live: LiveVersion): Upda
   return "patch";
 }
 
-// Whether a *patch* update should surface yet. Feature and urgent are
-// immediate and never pass through here. A patch waits until the build is
-// at least PATCH_HOLD_MS old, then stays quiet for another PATCH_HOLD_MS
-// after a dismissal — so several patches across a day collapse into one
-// eventual nudge, shown at most once per window.
-export function isPatchDue(builtAt: string, now: number, lastPatchDismissalAt: number | null): boolean {
-  if (now - Date.parse(builtAt) < PATCH_HOLD_MS) return false;
-  if (lastPatchDismissalAt !== null && now - lastPatchDismissalAt < PATCH_HOLD_MS) return false;
+// Whether a tier's banner should surface yet, given that tier's initial hold.
+// The tier waits until the build is `initialHoldMs` old, then — after a
+// dismissal — stays quiet for the shared REPEAT_HOLD_MS before nudging again.
+// Patch and feature both flow through here, each with its own initial hold and
+// its own dismissal timestamp (tracked separately so a feature still pierces a
+// dismissed patch); urgent skips it entirely. Several updates across a day thus
+// collapse into one eventual nudge, shown at most once per reminder window.
+export function isUpdateDue(
+  builtAt: string,
+  now: number,
+  initialHoldMs: number,
+  lastDismissalAt: number | null,
+): boolean {
+  if (now - Date.parse(builtAt) < initialHoldMs) return false;
+  if (lastDismissalAt !== null && now - lastDismissalAt < REPEAT_HOLD_MS) return false;
   return true;
 }

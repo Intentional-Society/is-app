@@ -64,12 +64,14 @@ aged-out deployment returns a **404**, which Next.js recovers from by hard-reloa
 onto the latest version — a graceless fallback that discards unsaved state, exactly
 what the update banner exists to pre-empt.
 
-So Max Age and the 12-hour patch-notify window are independent clocks. Max Age is set
-to **7 days** — roughly 14× the notify window. The notify window decides when we
-*gently offer* an update; Max Age is how long we *protect* a tab that hasn't taken one.
-With the pin that much longer than the notify window, the graceful path (banner,
-reloaded at a moment the member chooses) has nearly a week of runway before the 404
-fallback can fire. See `docs/doc-vercel.md` for the dashboard setting.
+So Max Age and the notify holds are independent clocks. Max Age is set
+to **7 days** — far longer than any notify hold (a first nudge at 6 hours for a patch, 2
+for a feature, then a reminder at most once every 8). The holds decide when we *gently
+offer* an update; Max Age is how
+long we *protect* a tab that hasn't taken one. With the pin that much longer than the
+holds, the graceful path (banner, reloaded at a moment the member chooses) has nearly a
+week of runway before the 404 fallback can fire. See `docs/doc-vercel.md` for the
+dashboard setting.
 
 **The built-in document-navigation reload (our passive baseline).** Skew Protection
 deliberately does *not* pin full-page document navigations — a hard refresh, typing
@@ -104,7 +106,7 @@ the banner's insistence scales with them:
 - **Patch** — bug fixes, refactors, infra. No member-facing changelog entry; nobody is
   waiting for it. Notified *gently and late* (see "What the member sees").
 - **Feature** — new member-facing functionality. Earns a changelog entry. Notified
-  immediately, dismissibly.
+  after a brief hold, dismissibly.
 - **Urgent** — a fix for active breakage or a security exposure that old clients must
   stop running. Notified immediately and non-dismissibly.
 
@@ -184,35 +186,41 @@ relies on.)
 
 ### What the member sees
 
-The same banner component renders all three tiers; the tier controls *when* it appears
-and whether it can be dismissed. Reload always calls `window.location.reload()` — a full
-document navigation, so it pulls the latest production assets.
+The same banner component renders all three tiers; the tier controls its message, *when*
+it appears, and whether it can be dismissed. The Reload control sits inline in the
+sentence and always calls `window.location.reload()` — a full document navigation, so it
+pulls the latest production assets.
 
-- **Patch:** a dismissible banner — *"A new version is available."* — held back
-  until the session is worth interrupting. It does **not** appear the moment a patch
-  lands. It waits until the running build is at least **12 hours old**, then shows at
-  most **once per 12 hours** (a dismissal is remembered in `localStorage`). An
-  actively-used fresh session is never interrupted for a bug fix, and several patches
-  landing across a day collapse into a single eventual nudge.
-- **Feature:** the same dismissible banner, but **immediately** — the member-facing
-  change is the whole reason to tell them. Persistent, not a modal: they finish what
-  they are doing and reload at a safe stopping point.
-- **Urgent:** a non-dismissible banner — *"An important update is ready."* —
-  **immediately**. Still member-initiated (one click, never automatic), but it cannot
-  be dismissed.
+- **Patch:** a dismissible banner — *"A new version of the app is ready: please Reload
+  when convenient."* — held back until the session is worth interrupting. It does **not**
+  appear the moment a patch lands. It waits until the running build is at least **6
+  hours old**, then shows at most **once per 8 hours** (a dismissal is remembered in
+  `localStorage`). An actively-used fresh session is never interrupted for a bug fix, and
+  several patches landing across a day collapse into a single eventual nudge.
+- **Feature:** a dismissible banner that names the win — *"The app has new features for
+  you: please Reload when convenient."* — shown once the running build is **2 hours
+  old**. A brief hold, far shorter than patch's: the member-facing change is the whole
+  reason to tell them, but a just-loaded session isn't interrupted even for that.
+  Persistent, not a modal: they finish what they are doing and reload at a safe stopping
+  point. Like patch, a dismissal is remembered in `localStorage`, so the banner returns
+  at most **once per 8 hours** rather than vanishing for the rest of the session.
+- **Urgent:** a non-dismissible banner — *"An urgent update to the app is ready: please
+  Reload at the first opportunity."* — **immediately**. Still member-initiated (one
+  click, never automatic), but it cannot be dismissed.
 
 The patch clock is the running build's own age (`NEXT_PUBLIC_BUILD_TIME`), not the
 moment a newer patch happened to land. Measuring from when the member's build *shipped*,
 rather than from when it was first superseded, keeps the clock to one value we can
 inline and reason about; the difference is at most the gap between a member's load and
-the next patch, and erring toward *later* notification is exactly the goal. This 12-hour
+the next patch, and erring toward *later* notification is exactly the goal. This 6-hour
 window sits far inside the 7-day Skew Protection Max Age (see above), so the gentle
 nudge reliably reaches a patch-only tab long before its pin could lapse into a hard
 reload.
 
 The banner is a client component mounted in the root layout: a persistent card pinned
 to the bottom of the viewport (never a modal — it doesn't block the page), carrying the
-message and a Reload button, plus a dismiss control on the non-urgent tiers. It uses the
+message with the Reload button inline in it, plus a dismiss control on the non-urgent
+tiers. It uses the
 app's theme tokens (`bg-card`, `border`, `text-foreground`) so it reads as part of the
 app; the urgent tier firms up the border to match its weight.
 
@@ -239,7 +247,7 @@ guards unsaved input; home has none at the moment a member lands on it. It is re
 either by a fresh document load (already current) or by an in-app `<Link>` navigation
 (pinned to the old bundle), and in both cases nothing has been typed yet — so a small
 client component checks the live version on mount and, if the tab is stale, reloads
-immediately, bypassing the patch hold. (`window.location.reload()`, not
+immediately, bypassing the tier holds. (`window.location.reload()`, not
 `router.refresh()`: a soft refresh re-runs server components but stays pinned to the old
 deployment, so it would never pull the new bundle.)
 
@@ -278,7 +286,7 @@ to an immediate one. Writing the entry and choosing the tier are one action.
 - **Notifying equally on every deploy** — rejected as notification fatigue. Most
   deploys are patches nobody is waiting on; interrupting an active session for each one
   trains members to ignore the banner, blunting it for the feature and urgent deploys
-  that matter. The patch tier's "12h-old, once-per-12h" hold is the answer.
+  that matter. The patch tier's "6h-old, then once-per-8h" hold is the answer.
 - **Per-deploy env-var tiering (a `CRITICAL_UPDATE` flag on the Vercel deployment)** —
   rejected: a manual dashboard step at the worst possible moment (shipping an urgent
   fix), and invisible in the diff. The tier is derived from the changelog and a
@@ -299,12 +307,12 @@ to an immediate one. Writing the entry and choosing the tier are one action.
 ## Operational notes
 
 - Shipping each tier: a **patch** needs nothing. A **feature** needs its changelog entry
-  (which it earns anyway) — that bump is what makes the banner immediate. An **urgent**
+  (which it earns anyway) — that bump is what promotes it from a quiet patch nudge to a prompt feature notice. An **urgent**
   deploy advances `urgentReleasedAt` in `src/lib/changelog.tsx` in the same PR; that
   one-line committed change is the only manual tier signal, and it is not an env var.
 - A tab that outlives the Max Age loses its pin: its next framework-managed request to
   the aged-out deployment 404s and Next.js hard-reloads it onto the latest version.
-  Because Max Age (7 days) is far above the 12-hour notify window, the gentle banner
+  Because Max Age (7 days) is far above the patch hold, the gentle banner
   almost always reaches a patch-only tab first, so this fallback stays an edge case.
 - Max Age is **7 days**. It cannot exceed the project's deployment-retention window — a
   pin to a deployment retention has already deleted cannot be served — so keep

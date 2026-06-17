@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { type BuildIdentity, computeUpdateTier, isPatchDue, type LiveVersion, PATCH_HOLD_MS } from "@/lib/update-tier";
+import {
+  type BuildIdentity,
+  computeUpdateTier,
+  FEATURE_INITIAL_HOLD_MS,
+  isUpdateDue,
+  type LiveVersion,
+  PATCH_INITIAL_HOLD_MS,
+  REPEAT_HOLD_MS,
+} from "@/lib/update-tier";
 
 const build = (over: Partial<BuildIdentity> = {}): BuildIdentity => ({
   id: "dep_old",
@@ -71,30 +79,31 @@ describe("computeUpdateTier", () => {
   });
 });
 
-describe("isPatchDue", () => {
+describe("isUpdateDue", () => {
   const builtAt = "2026-06-01T00:00:00.000Z";
   const builtMs = Date.parse(builtAt);
 
-  it("is false until the build is PATCH_HOLD_MS old", () => {
-    expect(isPatchDue(builtAt, builtMs, null)).toBe(false);
-    expect(isPatchDue(builtAt, builtMs + PATCH_HOLD_MS - 1, null)).toBe(false);
+  it("holds until the build reaches the tier's initial hold", () => {
+    // Patch waits PATCH_INITIAL_HOLD_MS (6h); feature FEATURE_INITIAL_HOLD_MS (2h).
+    expect(isUpdateDue(builtAt, builtMs + PATCH_INITIAL_HOLD_MS - 1, PATCH_INITIAL_HOLD_MS, null)).toBe(false);
+    expect(isUpdateDue(builtAt, builtMs + PATCH_INITIAL_HOLD_MS, PATCH_INITIAL_HOLD_MS, null)).toBe(true);
+    expect(isUpdateDue(builtAt, builtMs + FEATURE_INITIAL_HOLD_MS - 1, FEATURE_INITIAL_HOLD_MS, null)).toBe(false);
+    expect(isUpdateDue(builtAt, builtMs + FEATURE_INITIAL_HOLD_MS, FEATURE_INITIAL_HOLD_MS, null)).toBe(true);
   });
 
-  it("is true once the build is at least PATCH_HOLD_MS old and never dismissed", () => {
-    expect(isPatchDue(builtAt, builtMs + PATCH_HOLD_MS, null)).toBe(true);
-    expect(isPatchDue(builtAt, builtMs + 5 * PATCH_HOLD_MS, null)).toBe(true);
+  it("stays quiet within REPEAT_HOLD_MS of a dismissal, then returns", () => {
+    const now = builtMs + 5 * REPEAT_HOLD_MS; // well past either initial hold
+    expect(isUpdateDue(builtAt, now, PATCH_INITIAL_HOLD_MS, now - 1)).toBe(false);
+    expect(isUpdateDue(builtAt, now, PATCH_INITIAL_HOLD_MS, now - (REPEAT_HOLD_MS - 1))).toBe(false);
+    // Boundary is inclusive: exactly REPEAT_HOLD_MS since the dismissal.
+    expect(isUpdateDue(builtAt, now, PATCH_INITIAL_HOLD_MS, now - REPEAT_HOLD_MS)).toBe(true);
+    expect(isUpdateDue(builtAt, now, PATCH_INITIAL_HOLD_MS, now - (REPEAT_HOLD_MS + 1))).toBe(true);
   });
 
-  it("is false within PATCH_HOLD_MS of a dismissal", () => {
-    const now = builtMs + 5 * PATCH_HOLD_MS;
-    expect(isPatchDue(builtAt, now, now - 1)).toBe(false);
-    expect(isPatchDue(builtAt, now, now - (PATCH_HOLD_MS - 1))).toBe(false);
-  });
-
-  it("is true again once PATCH_HOLD_MS has passed since the dismissal", () => {
-    const now = builtMs + 5 * PATCH_HOLD_MS;
-    // Boundary is inclusive: exactly PATCH_HOLD_MS since the dismissal.
-    expect(isPatchDue(builtAt, now, now - PATCH_HOLD_MS)).toBe(true);
-    expect(isPatchDue(builtAt, now, now - (PATCH_HOLD_MS + 1))).toBe(true);
+  it("applies the full reminder window after a dismissal even when the initial hold is shorter", () => {
+    // Feature's 2h initial hold has long passed, but a dismissal still quiets
+    // it for the full 8h reminder window.
+    const now = builtMs + 5 * REPEAT_HOLD_MS;
+    expect(isUpdateDue(builtAt, now, FEATURE_INITIAL_HOLD_MS, now - FEATURE_INITIAL_HOLD_MS)).toBe(false);
   });
 });

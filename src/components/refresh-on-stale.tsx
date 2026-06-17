@@ -14,7 +14,7 @@ const RELOAD_AT_KEY = "is-app:home-refreshed-at";
 
 // Mounted on a safe-refresh point (the home page), where the member has no
 // in-process work at the moment of mount. Checks the live version once and,
-// if the tab is stale, hard-reloads immediately — bypassing the patch hold,
+// if the tab is stale, hard-reloads immediately — bypassing the tier holds,
 // because on home there is no work to protect and no nag cost. Renders
 // nothing. See docs/strategy-deployment.md.
 export function RefreshOnStale() {

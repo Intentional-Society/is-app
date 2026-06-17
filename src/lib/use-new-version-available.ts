@@ -2,38 +2,56 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiClient } from "@/lib/api";
 import { BUILD } from "@/lib/build-identity";
-import { computeUpdateTier, isPatchDue, type LiveVersion, type UpdateTier } from "@/lib/update-tier";
+import {
+  computeUpdateTier,
+  FEATURE_INITIAL_HOLD_MS,
+  isUpdateDue,
+  type LiveVersion,
+  PATCH_INITIAL_HOLD_MS,
+  type UpdateTier,
+} from "@/lib/update-tier";
 
-// Holds the ms timestamp of the last patch-banner dismissal — the
-// "once per 12h" memory that survives reloads.
-const PATCH_DISMISSED_KEY = "is-app:update-patch-dismissed-at";
+// localStorage keys holding the ms timestamp of each tier's last banner
+// dismissal — the "remind me again in REPEAT_HOLD_MS" memory that survives
+// reloads. Urgent has none; it can't be dismissed.
+const DISMISSED_KEY = {
+  patch: "is-app:update-patch-dismissed-at",
+  feature: "is-app:update-feature-dismissed-at",
+} as const;
 
-const readPatchDismissal = (): number | null => {
+const readDismissal = (key: string): number | null => {
   if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(PATCH_DISMISSED_KEY);
+  const raw = window.localStorage.getItem(key);
   const parsed = raw ? Number(raw) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const writeDismissal = (key: string, ts: number): void => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(key, String(ts));
+  }
 };
 
 export type NewVersionState = {
   // The tier to surface, or null when nothing should show.
   tier: UpdateTier | null;
-  // Dismiss the current banner. A patch dismissal is remembered for 12h;
-  // a feature dismissal lasts the session. No-op for urgent — that banner
-  // renders no dismiss control.
+  // Dismiss the current banner. A patch or feature dismissal is remembered
+  // for REPEAT_HOLD_MS, after which the banner returns. No-op for urgent —
+  // that banner renders no dismiss control.
   dismiss: () => void;
 };
 
 export function useNewVersionAvailable(): NewVersionState {
   const [live, setLive] = useState<LiveVersion | null>(null);
-  const [featureDismissed, setFeatureDismissed] = useState(false);
   const [patchDismissedAt, setPatchDismissedAt] = useState<number | null>(null);
+  const [featureDismissedAt, setFeatureDismissedAt] = useState<number | null>(null);
   const inFlight = useRef(false);
 
-  // Hydrate the patch cooldown once, client-side, so render never reads
+  // Hydrate the dismissal cooldowns once, client-side, so render never reads
   // localStorage (no SSR mismatch).
   useEffect(() => {
-    setPatchDismissedAt(readPatchDismissal());
+    setPatchDismissedAt(readDismissal(DISMISSED_KEY.patch));
+    setFeatureDismissedAt(readDismissal(DISMISSED_KEY.feature));
   }, []);
 
   useEffect(() => {
@@ -76,6 +94,7 @@ export function useNewVersionAvailable(): NewVersionState {
   }, []);
 
   const rawTier = live ? computeUpdateTier(BUILD, live) : null;
+  const now = Date.now();
 
   // Resolve what to actually show. Within a session the tier only ever
   // climbs (deploys don't un-ship), so an escalation re-surfaces the
@@ -84,23 +103,23 @@ export function useNewVersionAvailable(): NewVersionState {
   let tier: UpdateTier | null = null;
   if (rawTier === "urgent") {
     tier = "urgent";
-  } else if (rawTier === "feature") {
-    // A second feature in the same un-reloaded session stays hidden until
-    // reload — rare, and reloading is the resolution anyway.
-    tier = featureDismissed ? null : "feature";
-  } else if (rawTier === "patch" && isPatchDue(BUILD.builtAt, Date.now(), patchDismissedAt)) {
+  } else if (rawTier === "feature" && isUpdateDue(BUILD.builtAt, now, FEATURE_INITIAL_HOLD_MS, featureDismissedAt)) {
+    // Held until the build clears the feature hold, then shown; a dismissal
+    // quiets it for REPEAT_HOLD_MS, after which it returns — same cadence as
+    // patch.
+    tier = "feature";
+  } else if (rawTier === "patch" && isUpdateDue(BUILD.builtAt, now, PATCH_INITIAL_HOLD_MS, patchDismissedAt)) {
     tier = "patch";
   }
 
   const dismiss = useCallback(() => {
+    const ts = Date.now();
     if (rawTier === "patch") {
-      const ts = Date.now();
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(PATCH_DISMISSED_KEY, String(ts));
-      }
+      writeDismissal(DISMISSED_KEY.patch, ts);
       setPatchDismissedAt(ts);
     } else if (rawTier === "feature") {
-      setFeatureDismissed(true);
+      writeDismissal(DISMISSED_KEY.feature, ts);
+      setFeatureDismissedAt(ts);
     }
   }, [rawTier]);
 
