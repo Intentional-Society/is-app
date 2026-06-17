@@ -9,8 +9,10 @@
 review; preflight-reconciled 2026-06-16; **multi-agent review (Quill + Margo + Forge) reconciled
 2026-06-17 — all 14 threads decision-complete; only Thread 14 (`/ship` ask-path proof) is
 execution-gated and resolves inside the implementation PR.** Supersedes the earlier bootstrap draft
-(which removed `disable-model-invocation: true` from all three Skills uniformly). Implementation
-ready to start. Review record: `.scratch/skill-nl-invocation-review-roundtable.md`.
+(which removed `disable-model-invocation: true` from all three Skills uniformly). **Implemented in
+this PR** (#353): `/commit` + `/pr` Step 0 + delegation marker, `/ship` ask-gate + required
+pre-merge narration (Y/n retained pending the Thread-14 proof — see §2), docs v1.1 sweep, and the
+four NL-routing evals. Review record: `.scratch/skill-nl-invocation-review-roundtable.md`.
 **Tracking issue:** #353 ("Allow 0-to-3 skills to be model-invoked") — the implementation PR
 `Closes #353`.
 **Relevant files:** `.claude/skills/{commit,pr,ship}/SKILL.md`, `CLAUDE.md`, `.gitignore`,
