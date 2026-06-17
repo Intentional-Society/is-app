@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
+
 import { HelpHint } from "@/components/help-hint";
 import { PageHeader } from "@/components/page-header";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { Intention } from "@/lib/api-types";
+import { titleFor } from "@/lib/page-titles";
 
 import { IntentionsCloud } from "./intentions-cloud";
+
+export const metadata: Metadata = { title: titleFor("/intentions") };
 
 export default async function IntentionsPage() {
   await requireUser();
