@@ -12,7 +12,7 @@ import { createServerClient } from "@supabase/ssr";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import app from "@/server/api";
-import { AVATAR_BUCKET, MAX_AVATAR_UPLOAD_BYTES } from "@/server/avatars";
+import { AVATAR_BUCKET, attachAvatarUrls, MAX_AVATAR_UPLOAD_BYTES, resolveAvatarUrls } from "@/server/avatars";
 import { db } from "@/server/db";
 import { profiles } from "@/server/schema";
 
@@ -168,5 +168,37 @@ describe("POST/DELETE /api/me/avatar", () => {
     const [row] = await db.select({ avatarPath: profiles.avatarPath }).from(profiles).where(eq(profiles.id, userId));
     expect(row.avatarPath).toBeNull();
     expect(await objectsFor(userId)).toHaveLength(0);
+  });
+});
+
+describe("resolveAvatarUrls — a Storage failure degrades to initials", () => {
+  it("returns a partial map instead of throwing when a batch sign fails", async () => {
+    // The bug this guards against: a batch-level Storage error — typically a
+    // 429 "too many connections" when a burst of renders all sign at once —
+    // used to throw, 500ing the whole page over a decorative avatar. Signing
+    // is best-effort, so a failure must leave the path unsigned (→ initials).
+    const error = {
+      name: "StorageApiError",
+      message: "Too many connections issued to the database",
+      statusCode: "429",
+    };
+    const fromSpy = vi.spyOn(supabaseAdmin.storage, "from").mockReturnValue({
+      createSignedUrls: vi.fn().mockResolvedValue({ data: null, error }),
+      // biome-ignore lint/suspicious/noExplicitAny: minimal Storage bucket stub
+    } as any);
+
+    try {
+      // A unique path is always a cache miss, so the (mocked, failing) sign runs.
+      const path = `${randomUUID()}/${randomUUID()}.webp`;
+
+      const signed = await resolveAvatarUrls([path]);
+      expect(signed.has(path)).toBe(false);
+
+      // attachAvatarUrls surfaces the miss as a null avatarUrl, not an exception.
+      const [row] = await attachAvatarUrls([{ avatarPath: path }]);
+      expect(row.avatarUrl).toBeNull();
+    } finally {
+      fromSpy.mockRestore();
+    }
   });
 });

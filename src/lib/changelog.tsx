@@ -186,7 +186,7 @@ export const appVersion = changelog[0]?.date ?? "";
 // the same day still compare strictly (the tab tests
 // NEXT_PUBLIC_BUILD_TIME < urgentReleasedAt). The epoch baseline means
 // "no urgent deploy on record."
-export const urgentReleasedAt = "1970-01-01T00:00:00.000Z";
+export const urgentReleasedAt = "2026-06-17T18:31:26.000Z";
 
 // Format an entry's "YYYY-MM-DD" date as e.g. "May 29, 2026". Pinned to
 // UTC so the rendered date matches the string regardless of the

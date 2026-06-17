@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-17 | James | Avatar signing degrades instead of 500ing under Storage load
+
+A directory browse prefetched every member card, and each prefetch render signed that member's avatar via a separate Supabase Storage call; the burst exhausted Storage's DB pool (429), which `resolveAvatarUrls` rethrew into a page 500. Signing is now best-effort — it logs `avatar sign failed` and falls back to initials — and member cards no longer prefetch. Shipped urgent (advanced `urgentReleasedAt`) so open tabs reload off the crashing build.
+
 ## 2026-06-16 | James | Update handling for active sessions
 
 The home page auto-reloads a stale tab, everywhere else a persistent bottom banner offers a member-initiated reload. Deploys now fall into one of three tiers: patch (default, notif held until the running build is 6h old, then once per 8h), feature (held until build is 2h old, then once per 8h, dismissible — whenever a changelog is added), urgent (immediate, non-dismissible — gated by `urgentReleasedAt` marker in code).  Full rationale: docs/strategy-deployment.md.
