@@ -110,6 +110,20 @@ describe("POST/DELETE /api/me/avatar", () => {
     expect(await objectsFor(userId)).toHaveLength(1);
   });
 
+  it("accepts a JPEG upload (the browser webp-fallback path) and stores it as webp", async () => {
+    // When a browser can't encode WebP via canvas.toBlob, the client
+    // falls back to JPEG (avatar-uploader.tsx). The server must accept
+    // it and canonicalize to the same 1024² webp object as any other.
+    const jpeg = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 10, g: 200, b: 90 } } })
+      .jpeg()
+      .toBuffer();
+    const res = await postAvatar(jpeg, "image/jpeg");
+
+    expect(res.status).toBe(200);
+    const [row] = await db.select({ avatarPath: profiles.avatarPath }).from(profiles).where(eq(profiles.id, userId));
+    expect(row.avatarPath).toMatch(new RegExp(`^${userId}/[0-9a-f-]+\\.webp$`));
+  });
+
   it("rejects a non-image content type", async () => {
     const res = await postAvatar(new TextEncoder().encode("not an image"), "text/plain");
     expect(res.status).toBe(400);
