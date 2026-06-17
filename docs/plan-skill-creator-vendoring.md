@@ -124,6 +124,8 @@ their implementer must first check how that revision actually landed:
 
 ## PR 2 — Deterministic structural gate
 
+> Tracked in #396. Reference that issue in the PR body.
+
 A Vitest test in the existing functional suite (so it reports through the already-required
 `Lint & Functional Tests` check — no new workflow, no Python, no secrets). Scoped to an explicit
 allowlist `{commit, pr, ship}`; skill-creator is upstream's artifact and is **not** held to our
@@ -145,6 +147,8 @@ Deliberately *not* asserted (judgment/LLM territory, per spec L115): description
 
 ## PR 3 — Light drift detection + local eval surfacing
 
+> Tracked in #396. Reference that issue in the PR body.
+
 - `.github/workflows/skill-creator-drift.yml`: **weekly** schedule (matches the Dependabot
   rhythm) + `workflow_dispatch`. Runs `node scripts/update-skill-creator.mjs --check`; on
   non-zero, opens **or updates** a single tracking issue with the compare URL and the refresh
@@ -156,6 +160,57 @@ Deliberately *not* asserted (judgment/LLM territory, per spec L115): description
   auto-run Python or behavioral evals in its critical path. `/commit` is the right stage: it is
   the earliest gate, already runs `npm test` (which fires PR 2's gate), and its commit-message
   convention already requires a Test Plan. `/pr` and `/ship` move already-committed work.
+
+## Spike — prove the eval loop (tracked in #396; parallel to PRs 2–3)
+
+**Problem.** `evals/evals.json` is inert: when someone edits a team skill's SKILL.md, there is no
+way to check the edit didn't regress the skill except rereading the prompt. skill-creator's
+with-skill vs. baseline eval loop is the mechanism that turns those committed evals into
+executable regression protection — but PR 1 only proved load (sc-1), validate (sc-2), and
+author (sc-3). The loop itself is unproven in this repo. Secondary payoff: the result is the
+go/no-go input for PR 5 (behavioral evals in CI).
+
+**Success criterion.** Not "the scripts ran" — it's: *a team-skill edit can be evaluated for
+regression by the next maintainer, repeatably, from documented commands alone.* An honest
+negative ("the loop isn't viable locally, here's the blocker and next action") is a valid
+spike outcome and feeds PR 5's go/no-go.
+
+**Facts established by code-reading (verify, don't re-derive):**
+
+- There are **two distinct loops**. (a) *Trigger evals* — `scripts/run_eval.py` / `run_loop.py` /
+  `improve_description.py`: standalone Python CLIs testing whether a skill's *description* causes
+  Claude to invoke it; used for description optimization. (b) *Behavioral evals* — the
+  with-skill vs. baseline comparison: orchestrated by the **skill-creator skill itself in a
+  Claude session** (read its SKILL.md workflow), using the `agents/` subagent definitions
+  (analyzer, comparator, grader), `aggregate_benchmark.py`, and `eval-viewer/` for review.
+  **The spike's target is (b)**; (a) is secondary.
+- **Auth:** the scripts shell out to `claude -p` (the Claude Code CLI, subscription auth — they
+  strip the `CLAUDECODE` env var to allow nesting). No `ANTHROPIC_API_KEY` required.
+- **Windows hazard:** `run_eval.py` uses `select.select()` on subprocess pipes — Unix-only
+  (Windows `select` supports sockets only). Expect the trigger-eval CLIs to fail on native
+  Windows; a worktree lane under WSL is the likely workaround. The behavioral loop may not share
+  this problem (it is agent-orchestrated, not pipe-polling) — verify.
+- **Schema divergence:** upstream expects a per-skill `evals/evals.json` *inside the skill
+  directory* with integer `id` and an `expectations[]` list (see vendored
+  `references/schemas.md`). Our repo-root `evals/evals.json` uses string ids, `eval_name`, and
+  no `expectations`. The spike must map one skill's evals into upstream's shape **in a local
+  scratch copy** — do not rewrite the committed `evals/evals.json` without review.
+
+**Constraints for whoever runs it:**
+
+- All three team skills mutate git state (branch, commit, push). Behavioral eval runs must be
+  sandboxed — a throwaway repo or an isolated worktree lane with no push access — and eval
+  prompts chosen so expected outcomes are observable without remote writes (refusal paths
+  count). Suggested target skill: `/commit` (richest failure-mode surface).
+- Each eval run is a full `claude -p` session: start with one skill and 1–2 evals before any
+  benchmark aggregation. Watch cost/time and report it.
+- Don't edit vendored files; don't commit generated output (note new output paths for
+  `.gitignore` instead).
+
+**Deliverables:** a "Running the eval loop" section in `docs/doc-skill-creator.md` (exact
+commands, prerequisites, output locations); `.gitignore` additions for discovered output paths;
+the #396 checkbox outcome (proved / blocked-with-next-action) plus a line in this doc's
+decision log; cost/time observations for PR 5's go/no-go.
 
 ## PR 4 — Full Dependabot-style auto-PR drift (deferred)
 
