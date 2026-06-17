@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
+import { log } from "next-axiom";
 import sharp from "sharp";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -50,7 +51,18 @@ export const resolveAvatarUrls = async (
 
   if (misses.length > 0) {
     const { data, error } = await supabaseAdmin.storage.from(AVATAR_BUCKET).createSignedUrls(misses, SIGN_TTL_SECONDS);
-    if (error) throw error;
+    if (error) {
+      // Signing is best-effort. A transient Storage error — most often a
+      // 429 "too many connections" when a burst of renders all sign at
+      // once — must not 500 a page over a decorative avatar. Report it,
+      // then leave the misses unsigned so they fall back to initials.
+      log.error("avatar sign failed", {
+        count: misses.length,
+        message: error.message,
+        statusCode: (error as { statusCode?: string }).statusCode,
+      });
+      return result;
+    }
     for (const row of data ?? []) {
       if (row.error || !row.path || !row.signedUrl) continue;
       signedUrlCache.set(row.path, { url: row.signedUrl, expiresAt: now + CACHE_TTL_MS });
