@@ -1,7 +1,6 @@
 ---
 name: commit
-description: "[is-app] Stage, commit, and push the current local changes for the Intentional Society repo. Invoke explicitly as `/commit [issue-or-context]` to draft a Conventional Commit-style message, run the local `npm test` gate, surface a single bundled human approval block (message + staged payload + optional devjournal draft), and push the branch. Auto-creates a feature branch when invoked on `main`. Refuses suspicious payloads, combined expand+contract schema changes, and missing `gh` auth. This Skill fires only on explicit `/commit` invocation; natural-language phrasings (\"commit this\") are guidance for the reader, not triggers."
-disable-model-invocation: true
+description: "[is-app] Stage, commit, and push the current changes via the team's guarded workflow: local `npm test` gate, suspicious-file checks, one bundled human approval, auto-branch from main. Use for any commit/push intent — \"commit this\", \"commit in two steps: X then Y\", or `/commit #142`."
 ---
 
 # /commit
@@ -20,11 +19,27 @@ The leaf Skill in the commit → PR → ship chain. `/commit` is the only place 
 
 Cache the argument for `/pr` and `/ship` in this session so chained invocations reuse the same context.
 
-Natural-language phrasings ("commit this for issue 142", "go ahead and commit") are guidance for the human reading this Skill, **not** triggers. With `disable-model-invocation: true`, this Skill fires only when the user types `/commit` explicitly.
+**Invocation paths.** This Skill fires on an explicit `/commit` **and** on natural-language commit intent ("commit this", "commit these changes in two commits: X then Y"). On the natural-language path the model-invoked **Step 0** confirms intent first (see Steps); explicit `/commit` and delegated calls skip it.
 
 ## Steps
 
 Run these in order. Each step's failure mode is in the Failure modes section below.
+
+0. **NL intent gate (model-invoked only).** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
+
+   - **Verified slash entry** — a `<command-name>` tag for `/commit` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate — a redundant confirm is harmless, a missed one isn't).
+   - **Live delegation marker** — a parent Skill set the single-use marker file `.claude/.nl-delegation-active` immediately before delegating here. If it exists, **delete it now** (clear-on-read, so it can't leak into a later standalone invocation) and proceed to step 1.
+   - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
+
+   When the gate fires, **before any other action** (no `gh auth`, no git commands), present via `AskUserQuestion`: "Run `/commit` with: *[detected context — echo any user guidance such as issue refs or commit-splitting instructions]*?" with options:
+
+   - **Proceed** — continue to step 1.
+   - **Proceed and don't ask again** — create `.claude/skip-nl-confirm-commit-pr.local` containing the standard note (below), then continue to step 1.
+   - **Stop** — stop immediately, zero side effects.
+
+   Standard opt-out file contents: `Skips only the natural-language intent confirmation (Step 0) for /commit and /pr. All approval checkpoints still apply. /ship is unaffected. Delete this file to re-enable.`
+
+   This gate confirms only *intent detection* on the natural-language path; it is not the content-approval checkpoint (step 14), which still runs regardless. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.
 
 1. **Parse the argument** and cache it for downstream Skills (`/pr`, `/ship`) in the same session.
 

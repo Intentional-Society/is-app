@@ -1,7 +1,6 @@
 ---
 name: pr
-description: "[is-app] Open a new PR or update an existing PR for the current branch in the Intentional Society repo. Invoke explicitly as `/pr [PR#|URL|issue-or-context]`. Always fetches `origin/main` first, rebases if main has moved (re-running `npm test` after rebase), then pushes. On a fresh branch with no open PR, drafts a Conventional Commit-style title and structured body for human approval before `gh pr create`. On an existing PR, posts a brief per-commit summary comment and only updates the PR body on material scope change (with human approval, because the body becomes the merge commit message). Delegates dirty / on-main states to `/commit`. Refuses branch-switching — that's `/ship`'s job. Does not poll CI checks. Fires only on explicit `/pr` invocation."
-disable-model-invocation: true
+description: "[is-app] Open or update the PR for the current branch: fetch + rebase on main, re-test if rebased, drafted title/body with human approval. Delegates uncommitted changes to /commit; never switches branches or merges. Use for any PR intent — \"open a PR for this\", or `/pr #142`."
 ---
 
 # /pr
@@ -21,9 +20,17 @@ Argument resolution order:
 
 No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow; `/pr` stops after opening or updating the PR.
 
-Natural-language phrasings ("open the PR for this branch", "make a PR") are guidance, not triggers. With `disable-model-invocation: true`, this Skill fires only on explicit `/pr`.
+**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR"). On the natural-language path the model-invoked **Step 0** confirms intent first (see Steps); explicit `/pr` and delegated calls (`/ship` → `/pr`) skip it.
 
 ## Steps
+
+0. **NL intent gate (model-invoked only).** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
+
+   - **Verified slash entry** — a `<command-name>` tag for `/pr` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate).
+   - **Live delegation marker** — the single-use marker file `.claude/.nl-delegation-active` exists (a parent `/ship` set it immediately before delegating here). **Delete it now** (clear-on-read) and proceed to step 1.
+   - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
+
+   When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: *[detected context — echo any user guidance]*?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects). The standard note text and the intent-vs-content rationale are identical to `/commit`'s Step 0. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.
 
 1. **Check `gh` auth.** `gh auth status`. If it fails, refuse and print `gh auth login` as the suggested next command.
 
@@ -31,7 +38,7 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
 
 3. **Refuse to switch branches.** If the resolved PR is on a branch different from the current checkout, refuse — `/pr` does not switch branches. Name both branches and suggest `/ship <PR#>` (which is allowed to switch when the working tree is clean).
 
-4. **Working-tree pre-flight.** If `git status --porcelain` is non-empty OR HEAD is `main`, delegate to `/commit` with the same argument. When `/commit` returns, continue with this Skill from step 5.
+4. **Working-tree pre-flight.** If `git status --porcelain` is non-empty OR HEAD is `main`, delegate to `/commit` with the same argument. **Immediately before invoking `/commit`, create the single-use delegation marker `.claude/.nl-delegation-active`** so `/commit`'s Step 0 doesn't re-prompt for intent the human already gave to `/pr` (`/commit` deletes the marker on read). When `/commit` returns, continue with this Skill from step 5.
 
 5. **Fetch.** `git fetch origin main`.
 
