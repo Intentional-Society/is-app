@@ -200,5 +200,5 @@ if (skip.status !== 0) {
 process.stdout.write(`${summary}\n\nConfigured. Start it with:  npm run dev\n`);
 process.stdout.write(
   `Windows only — reserve this lane's Supabase ports (admin shell, once):\n` +
-    `  netsh int ipv4 add excludedportrange protocol=tcp startport=${SUPABASE_PORTS.shadow.base + off} numberofports=10\n`,
+    `  netsh int ipv4 add excludedportrange protocol=tcp startport=${SUPABASE_PORTS.api.base + off} numberofports=7\n`,
 );
