@@ -27,7 +27,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 0. **NL intent gate (model-invoked only).** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
 
    - **Verified slash entry** — a `<command-name>` tag for `/pr` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate).
-   - **Live delegation marker** — the single-use marker file `.claude/.nl-delegation-active` exists (a parent `/ship` set it immediately before delegating here). **Delete it now** (clear-on-read) and proceed to step 1.
+   - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 later.
    - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
 
    When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: *[detected context — echo any user guidance]*?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects). The standard note text and the intent-vs-content rationale are identical to `/commit`'s Step 0. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.
@@ -38,7 +38,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 3. **Refuse to switch branches.** If the resolved PR is on a branch different from the current checkout, refuse — `/pr` does not switch branches. Name both branches and suggest `/ship <PR#>` (which is allowed to switch when the working tree is clean).
 
-4. **Working-tree pre-flight.** If `git status --porcelain` is non-empty OR HEAD is `main`, delegate to `/commit` with the same argument. **Immediately before invoking `/commit`, create the single-use delegation marker `.claude/.nl-delegation-active`** so `/commit`'s Step 0 doesn't re-prompt for intent the human already gave to `/pr` (`/commit` deletes the marker on read). When `/commit` returns, continue with this Skill from step 5.
+4. **Working-tree pre-flight.** If `git status --porcelain` is non-empty OR HEAD is `main`, delegate to `/commit` with the same argument. **Immediately before invoking `/commit`, write the delegation marker `.claude/.nl-delegation-active` as `pr\t<current ISO-8601 UTC>`** so `/commit`'s Step 0 doesn't re-prompt for intent the human already gave to `/pr`. `/commit` consumes it on read; **after `/commit` returns, delete the marker if it still exists** (belt-and-suspenders cleanup so a crashed delegation can't leave it behind). When `/commit` returns, continue with this Skill from step 5.
 
 5. **Fetch.** `git fetch origin main`.
 

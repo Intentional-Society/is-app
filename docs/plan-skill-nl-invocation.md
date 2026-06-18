@@ -153,11 +153,17 @@ In both SKILL.md files:
 - **Single-use delegation marker (Thread 1).** When `/pr` delegates to `/commit` (or `/ship` →
   `/pr` → `/commit`), the downstream call travels through the `Skill` tool and would otherwise
   trip Step 0 even though the human explicitly typed the *parent* command — re-creating the
-  delegation friction James objected to. Fix: the **parent** (`/pr`, `/ship`) sets a session-local
-  delegation marker **immediately before** the downstream `Skill()` call; the **callee consumes
-  and clears it at Step 0** (clear-on-read). Single-use by construction, so a later standalone NL
-  "commit this" can't find a stale marker and wrongly skip the gate. Do **not** detect delegation
-  via the cached session argument — NL invocations carry args too, so that's a weak discriminator.
+  delegation friction James objected to. Fix: the **parent** (`/pr`, `/ship`) writes the marker
+  `.claude/.nl-delegation-active` as `<parent-skill>\t<ISO-8601 UTC>` **immediately before** the
+  downstream `Skill()` call **and deletes it after that call returns**; the **callee consumes it at
+  Step 0** (clear-on-read), honoring it only if its timestamp is **within the last 30s** (stale →
+  delete + treat as standalone). This is the standard stale-lock handling — *release-in-`finally`*
+  (the parent's post-return delete) backed by a *short lease/TTL* (the 30s freshness check) as the
+  crash backstop — so a delegation interrupted between write and consume can't leave a stale marker
+  that silently suppresses a later standalone NL invocation. In-repo precedent for the TTL: `/pr`'s
+  `.team-cache.json` `refreshedAt`. Do **not** detect delegation via the cached session argument
+  (NL invocations carry args too — weak discriminator), and do **not** use a sticky session flag
+  (it would go stale).
 
 **Why Step 0 isn't redundant with the existing approval block:** Step 0 confirms *intent
 detection*; the bundled approval block approves *content*. Between the two, `/commit` mutates
@@ -190,10 +196,12 @@ observed.
   Per validated fact 2 this forces a human permission prompt — showing the literal merge command —
   on any `gh pr merge` by any agent path, un-weakenable by local settings.
 - **Amend `/ship` step 10 — delete the conversational Y/n** (supersedes the PR #133 step-10
-  decision — flag for James in the PR). The harness permission prompt on the merge command
-  (step 11) becomes the single merge confirmation for **both** paths (PR pre-existed / PR created
-  this run), replacing the path-dependent Y/n logic. This is the same single-confirmation outcome
-  James argued for in #133, relocated from model to harness.
+  decision — flag for James in the PR). **⚠️ Shipped state (#353): the Y/n is RETAINED — this
+  deletion is gated on the Thread-14 proof below and happens only after it passes; the shipped
+  `/ship` keeps the Y/n with the ask-rule additive (mitigation #1).** The harness permission prompt
+  on the merge command (step 11) becomes the single merge confirmation for **both** paths
+  (PR pre-existed / PR created this run), replacing the path-dependent Y/n logic. This is the same
+  single-confirmation outcome James argued for in #133, relocated from model to harness.
 - **Required pre-merge narration (Thread 2).** Immediately before issuing `gh pr merge`, the Skill
   prints **one required line** with PR number, title, and check posture — e.g.
   `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.` —
@@ -489,5 +497,11 @@ answers James's #353 concern that a confirmation prompt would be cumbersome in 9
   reverses the 2026-06-16 "codify all three" decision above:** this PR ships only the four
   NL-routing evals; contract-phase + the two split false-positive evals are deferred to #396
   (comment `4728284766`).
+- 2026-06-17 (implementation hardening — Blake) — delegation marker upgraded from a bare
+  existence flag to **`<parent>\t<ISO-8601 UTC>` with a 30s TTL + parent post-return cleanup**
+  (release-in-`finally` + lease, the standard stale-lock pattern; F3). Added a guard note to
+  `/ship` against `allowed-tools: Bash(gh *)` (F4) and a shipped-state clarifier at §2 that the
+  Y/n is retained pending the Thread-14 proof (F5). Considered nonce-handshake (fencing token) and
+  no-file in-context directive; rejected as over/under-engineered for a low-severity edge.
 - Prior context: PRs #304/#305 shipped the Skills; explicit-only invocation was P0.4 from
   PR #133 — this spec is a deliberate, dated revision of it.

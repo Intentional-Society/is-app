@@ -28,7 +28,7 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
 0. **NL intent gate (model-invoked only).** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
 
    - **Verified slash entry** — a `<command-name>` tag for `/commit` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate — a redundant confirm is harmless, a missed one isn't).
-   - **Live delegation marker** — a parent Skill set the single-use marker file `.claude/.nl-delegation-active` immediately before delegating here. If it exists, **delete it now** (clear-on-read, so it can't leak into a later standalone invocation) and proceed to step 1.
+   - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/pr` or `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 on a later standalone run.
    - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
 
    When the gate fires, **before any other action** (no `gh auth`, no git commands), present via `AskUserQuestion`: "Run `/commit` with: *[detected context — echo any user guidance such as issue refs or commit-splitting instructions]*?" with options:
