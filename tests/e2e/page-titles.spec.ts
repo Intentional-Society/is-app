@@ -40,12 +40,13 @@ test.describe("page titles", () => {
     await page.goto("/intentions");
     await expect(page).toHaveTitle("IS Web: Current intentions");
 
-    // Dynamic title from generateMetadata: filter the directory to the
-    // seeded member, open their profile, and the title reflects their
-    // display name.
-    await page.goto("/members");
-    await page.getByRole("searchbox").fill("Tessa Titles");
-    await page.getByRole("link", { name: /Tessa Titles/ }).click();
+    // Dynamic title from generateMetadata: open the member's own profile
+    // via the "view as others see it" link on /me. That link carries the
+    // app-supplied slug/id, so this never depends on the directory listing
+    // the just-onboarded user — which isn't deterministic on the shared
+    // prod-Supabase preview the CI e2e runs against.
+    await page.goto("/me");
+    await page.getByRole("link", { name: /view your profile as others see it/i }).click();
     await page.waitForURL((u) => u.pathname.startsWith("/members/"), { timeout: TIMEOUT_MS });
     await expect(page).toHaveTitle("IS Web: Tessa Titles");
   });
