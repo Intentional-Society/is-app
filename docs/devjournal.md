@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-17 | James | #149 audit: auth-callback redemption holds in prod; keep `prepare: false`, add Axiom logging
+
+A three-window audit of the still-unhardened invited-sign-in transaction found zero #149 occurrences: 22/22 prod redemptions clean on a DB integrity check, a normal auth/profile gap, and an empty Sentry `25P02` history (error capture works — #152 is only about missing perf transactions). Kept `prepare: false` (limbo resolved) and instrumented the failure redirect with `log.warn "invite redemption failed"` so the path is queryable in Axiom; pattern-2 hardening deferred until/unless it fires. (#149)
+
 ## 2026-06-17 | James | Per-page HTML titles for usable tab names and browser history
 
 Root layout sets `title.template = "IS Web: %s"`. Per-page titles live in one `src/lib/page-titles.ts` dictionary that feeds both each page's `metadata.title` and the breadcrumb back-labels (which no longer keep a separate list); detail pages set the entity name via `generateMetadata`. New pages add a dictionary entry. (#425)
