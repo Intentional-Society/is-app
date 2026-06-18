@@ -78,6 +78,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 - `docs/strategy-branching.md` — branching strategy and rationale
 - `docs/strategy-worktree-lanes.md` — running parallel worktrees as isolated "lanes" (own Supabase stack + ports) for concurrent dev/test
 - `docs/strategy-committing.md` — commit conventions and expand-contract pattern
+- `docs/strategy-deployment.md` — continuous deployment during active sessions: Skew Protection, the tiered update banner, and the home safe-refresh
 - `docs/strategy-db-transactions.md` — writing transactions that survive the Supabase connection pooler
 - `docs/strategy-project-management.md` — GitHub Projects board conventions
 - `docs/strategy-security.md` — security headers and rationale for each directive

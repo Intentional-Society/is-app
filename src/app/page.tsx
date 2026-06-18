@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { log } from "next-axiom";
 
 import { AppWordmark } from "@/components/app-wordmark";
+import { RefreshOnStale } from "@/components/refresh-on-stale";
 import { Button } from "@/components/ui/button";
 import { loadMe } from "@/lib/api-server";
 import { welcomeEntryStep } from "@/lib/welcomeEntryStep";
@@ -69,6 +70,9 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
 
   return (
     <main className="flex min-h-screen flex-col items-center gap-8 p-8 pt-12">
+      {/* Safe-refresh point: get a stale tab onto the latest build on
+          arrival, before any interaction (docs/strategy-deployment.md). */}
+      <RefreshOnStale />
       <div className="flex flex-col items-center gap-2">
         <h1 className="text-4xl font-bold">The IS Web App</h1>
         <p className="font-serif italic text-muted-foreground">{greeting}. What would you like to do?</p>

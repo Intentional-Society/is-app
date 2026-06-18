@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
+
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
+import { titleFor } from "@/lib/page-titles";
 
 import { MeTabs } from "./me-tabs";
+
+export const metadata: Metadata = { title: titleFor("/me") };
 
 // /me replaces /profile and /profile/edit (#376): one page, two
 // anchor-linked tabs — Profile (editing-first, with a link out to the

@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
+import { appVersion, urgentReleasedAt } from "@/lib/changelog";
 import { isRelationValue } from "@/lib/relation-value";
 import { toSlug } from "@/lib/slug";
 
@@ -494,17 +495,23 @@ const api = new Hono<{ Variables: ApiVariables }>()
 
     const form = await c.req.parseBody().catch(() => null);
     if (!form) {
-      return c.json({ error: "invalid form body" }, 400);
+      return c.json(
+        {
+          error:
+            "We couldn't read that upload. Try once more — if it keeps failing, please let us know with the Give Feedback link in the menu.",
+        },
+        400,
+      );
     }
     const file = form.file;
     if (!(file instanceof File)) {
-      return c.json({ error: "missing file field" }, 400);
+      return c.json({ error: "No image was attached. Please choose a photo." }, 400);
     }
     if (file.size > MAX_AVATAR_UPLOAD_BYTES) {
-      return c.json({ error: "file too large" }, 400);
+      return c.json({ error: "That image is too large. Please choose a smaller photo." }, 400);
     }
     if (!file.type.startsWith("image/")) {
-      return c.json({ error: "file must be an image" }, 400);
+      return c.json({ error: "That file isn't an image. Please choose a JPEG, PNG, or WebP." }, 400);
     }
 
     let webp: Buffer;
@@ -512,7 +519,16 @@ const api = new Hono<{ Variables: ApiVariables }>()
       webp = await encodeAvatar(Buffer.from(await file.arrayBuffer()));
     } catch {
       // sharp throws on bytes that do not decode as an image.
-      return c.json({ error: "could not decode image" }, 400);
+      return c.json({ error: "We couldn't read that image. Please try a JPEG or PNG." }, 400);
+    }
+
+    // A browser that can't encode WebP via canvas.toBlob falls back to
+    // JPEG (the client switches formats; see avatar-uploader.tsx), so a
+    // non-WebP arrival is that fallback firing. Log the rate to size who's
+    // affected — Safari/iOS historically — and to catch a regression.
+    // The received content type is the signal; see docs/doc-axiom.md.
+    if (!file.type.includes("webp")) {
+      log.info("avatar webp fallback", { userId: user.id, receivedType: file.type, bytes: file.size });
     }
 
     // Ensure a profile row exists before pointing it at the object —
@@ -805,14 +821,17 @@ const api = new Hono<{ Variables: ApiVariables }>()
     }
     return c.json({ ok: true });
   })
-  .get("/health", async (c) => {
-    const result = await db.execute(sql`SELECT now() AS server_time`);
+  // Public deploy-identity probe for the update banner
+  // (docs/strategy-deployment.md). Unauthenticated so an idle tab whose
+  // session has lapsed can still detect a newer deployment — the tabs
+  // most likely to be running stale code. The client polls this with a
+  // plain fetch, which Skew Protection does not pin, so it resolves to
+  // current production and reports that deployment's id, not the caller's.
+  .get("/version", (c) => {
     return c.json({
-      status: "ok",
-      database: {
-        connected: true,
-        serverTime: result[0].server_time,
-      },
+      id: process.env.VERCEL_DEPLOYMENT_ID ?? "dev",
+      appVersion,
+      urgentReleasedAt,
     });
   })
   .route("/admin", adminRoutes);

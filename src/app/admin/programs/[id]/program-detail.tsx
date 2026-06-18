@@ -54,6 +54,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const router = useRouter();
   const [name, setName] = useState(program.name);
   const [slug, setSlug] = useState(program.slug);
+  const [blurb, setBlurb] = useState(program.blurb ?? "");
   const [description, setDescription] = useState(program.description ?? "");
   const [buttondownTag, setButtondownTag] = useState(program.buttondownTag ?? "");
   const [editError, setEditError] = useState<string | null>(null);
@@ -67,6 +68,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     mutationFn: async (vars: {
       name?: string;
       slug?: string;
+      blurb?: string | null;
       description?: string | null;
       archived?: boolean;
       signupsOpen?: boolean;
@@ -173,6 +175,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const dirty =
     trimmedName !== program.name ||
     trimmedSlug !== program.slug ||
+    blurb.trim() !== (program.blurb ?? "") ||
     description.trim() !== (program.description ?? "") ||
     trimmedButtondownTag !== (program.buttondownTag ?? "");
 
@@ -188,6 +191,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     updateMutation.mutate({
       name: trimmedName,
       slug: trimmedSlug,
+      blurb: blurb.trim() || null,
       description: description.trim() || null,
       buttondownTag: trimmedButtondownTag || null,
     });
@@ -220,12 +224,25 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
           <p className="text-xs text-muted-foreground">Used in URLs — lowercase letters, numbers, and hyphens.</p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="program-description">Description</Label>
+          <Label htmlFor="program-blurb">Blurb</Label>
+          <Input
+            id="program-blurb"
+            value={blurb}
+            onChange={(e) => setBlurb(e.target.value)}
+            disabled={updateMutation.isPending}
+            placeholder="One sentence shown on the program card"
+          />
+          <p className="text-xs text-muted-foreground">Short tagline shown on the programs list. Max 200 characters.</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-description">Full description</Label>
           <Textarea
             id="program-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={updateMutation.isPending}
+            placeholder="Shown on the program detail page"
+            rows={5}
           />
         </div>
         <div className="flex flex-col gap-1.5">

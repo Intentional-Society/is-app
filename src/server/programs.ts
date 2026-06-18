@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { and, asc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -38,15 +38,23 @@ export const autoSubscribeNewMember = async (userId: string): Promise<void> => {
     .onConflictDoNothing();
 };
 
+export type ProgramMemberAvatar = {
+  id: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+
 export type ProgramWithMembership = {
   id: string;
   slug: string;
   name: string;
+  blurb: string | null;
   description: string | null;
   signupsOpen: boolean;
   memberCount: number;
   joined: boolean;
   joinedAt: string | null;
+  memberAvatars: ProgramMemberAvatar[];
 };
 
 // Note: memberCount and joinedAt use correlated subqueries which is
@@ -68,6 +76,7 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
       id: programs.id,
       slug: programs.slug,
       name: programs.name,
+      blurb: programs.blurb,
       description: programs.description,
       signupsOpen: programs.signupsOpen,
       memberCount: sql<number>`(
@@ -86,9 +95,39 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
     .where(isNull(programs.archivedAt))
     .orderBy(programs.name);
 
+  // Fetch up to 5 current members per program for the avatar facepile.
+  const programIds = rows.map((r) => r.id);
+  const avatarRows =
+    programIds.length > 0
+      ? await db
+          .select({
+            programId: profilePrograms.programId,
+            id: profiles.id,
+            displayName: profiles.displayName,
+            avatarPath: profiles.avatarPath,
+            assignedAt: profilePrograms.assignedAt,
+          })
+          .from(profilePrograms)
+          .innerJoin(profiles, eq(profiles.id, profilePrograms.profileId))
+          .where(and(inArray(profilePrograms.programId, programIds), isNull(profilePrograms.leftAt)))
+          .orderBy(desc(profilePrograms.assignedAt))
+      : [];
+
+  const withAvatarUrls = await attachAvatarUrls(avatarRows);
+
+  const avatarsByProgram = new Map<string, ProgramMemberAvatar[]>();
+  for (const row of withAvatarUrls) {
+    const existing = avatarsByProgram.get(row.programId) ?? [];
+    if (existing.length < 5) {
+      existing.push({ id: row.id, displayName: row.displayName, avatarUrl: row.avatarUrl });
+      avatarsByProgram.set(row.programId, existing);
+    }
+  }
+
   return rows.map((r) => ({
     ...r,
     joined: r.joinedAt !== null,
+    memberAvatars: avatarsByProgram.get(r.id) ?? [],
   }));
 };
 
@@ -209,6 +248,7 @@ export type ProgramDetailForMember = {
   id: string;
   slug: string;
   name: string;
+  blurb: string | null;
   description: string | null;
   signupsOpen: boolean;
   memberCount: number;
@@ -226,6 +266,7 @@ export const getProgramBySlug = async (
       id: programs.id,
       slug: programs.slug,
       name: programs.name,
+      blurb: programs.blurb,
       description: programs.description,
       signupsOpen: programs.signupsOpen,
       archivedAt: programs.archivedAt,
@@ -266,6 +307,7 @@ export const getProgramBySlug = async (
       id: program.id,
       slug: program.slug,
       name: program.name,
+      blurb: program.blurb,
       description: program.description,
       signupsOpen: program.signupsOpen,
       memberCount: members.length,
@@ -287,6 +329,7 @@ export type AdminProgram = {
   id: string;
   slug: string;
   name: string;
+  blurb: string | null;
   description: string | null;
   archivedAt: string | null;
   signupsOpen: boolean;
@@ -307,6 +350,7 @@ export type ProgramDetail = AdminProgram & { participants: ProgramParticipant[] 
 
 const MAX_PROGRAM_NAME = 120;
 const MAX_PROGRAM_SLUG = 80;
+const MAX_PROGRAM_BLURB = 200;
 const MAX_PROGRAM_DESCRIPTION = 2000;
 // Buttondown tag names are short by convention; the cap is well above
 // anything Buttondown surfaces in its UI and keeps the column index-friendly.
@@ -332,7 +376,9 @@ const validateSlug = (slug: string): { slug: string } | { error: string } => {
 // buttondownTag is also optional; blank is normalized to null.
 export const parseProgramCreate = (
   body: unknown,
-): { name: string; slug: string; description: string | null; buttondownTag: string | null } | { error: string } => {
+):
+  | { name: string; slug: string; blurb: string | null; description: string | null; buttondownTag: string | null }
+  | { error: string } => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "body must be a JSON object" };
   }
@@ -346,6 +392,11 @@ export const parseProgramCreate = (
   const slugCheck = validateSlug(slug);
   if ("error" in slugCheck) return slugCheck;
 
+  const blurb = trimmedString(obj.blurb);
+  if (blurb && blurb.length > MAX_PROGRAM_BLURB) {
+    return { error: "blurb is too long" };
+  }
+
   const description = trimmedString(obj.description);
   if (description && description.length > MAX_PROGRAM_DESCRIPTION) {
     return { error: "description is too long" };
@@ -358,6 +409,7 @@ export const parseProgramCreate = (
   return {
     name,
     slug,
+    blurb: blurb || null,
     description: description || null,
     buttondownTag: buttondownTag || null,
   };
@@ -371,6 +423,7 @@ export const parseProgramCreate = (
 export type ProgramUpdate = {
   name?: string;
   slug?: string;
+  blurb?: string | null;
   description?: string | null;
   archived?: boolean;
   signupsOpen?: boolean;
@@ -399,6 +452,13 @@ export const parseProgramUpdate = (body: unknown): ProgramUpdate | { error: stri
     const slugCheck = validateSlug(slug);
     if ("error" in slugCheck) return slugCheck;
     result.slug = slug;
+  }
+  if ("blurb" in obj) {
+    const blurb = trimmedString(obj.blurb);
+    if (blurb && blurb.length > MAX_PROGRAM_BLURB) {
+      return { error: "blurb is too long" };
+    }
+    result.blurb = blurb || null;
   }
   if ("description" in obj) {
     const description = trimmedString(obj.description);
@@ -441,6 +501,7 @@ export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
       id: programs.id,
       slug: programs.slug,
       name: programs.name,
+      blurb: programs.blurb,
       description: programs.description,
       archivedAt: sql<string | null>`to_json(${programs.archivedAt}) #>> '{}'`,
       signupsOpen: programs.signupsOpen,
@@ -459,6 +520,7 @@ export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
 export const createProgram = async (input: {
   name: string;
   slug: string;
+  blurb: string | null;
   description: string | null;
   buttondownTag: string | null;
 }): Promise<{ program: AdminProgram } | { error: "slug_conflict" }> => {
@@ -470,6 +532,7 @@ export const createProgram = async (input: {
     .values({
       slug: input.slug,
       name: input.name,
+      blurb: input.blurb,
       description: input.description,
       buttondownTag: input.buttondownTag,
     })
@@ -480,6 +543,7 @@ export const createProgram = async (input: {
       id: row.id,
       slug: row.slug,
       name: row.name,
+      blurb: row.blurb,
       description: row.description,
       archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
       signupsOpen: row.signupsOpen,
@@ -503,6 +567,7 @@ export const updateProgram = async (
   // want now()/null, so split the type out from the validated input.
   const update: Record<string, unknown> = {};
   if (input.name !== undefined) update.name = input.name;
+  if (input.blurb !== undefined) update.blurb = input.blurb;
   if (input.description !== undefined) update.description = input.description;
   if (input.archived !== undefined) {
     update.archivedAt = input.archived ? sql`now()` : null;
@@ -539,6 +604,7 @@ export const getProgramDetail = async (
       id: programs.id,
       slug: programs.slug,
       name: programs.name,
+      blurb: programs.blurb,
       description: programs.description,
       archivedAt: programs.archivedAt,
       signupsOpen: programs.signupsOpen,
@@ -576,6 +642,7 @@ export const getProgramDetail = async (
       id: program.id,
       slug: program.slug,
       name: program.name,
+      blurb: program.blurb,
       description: program.description,
       archivedAt: program.archivedAt ? program.archivedAt.toISOString() : null,
       signupsOpen: program.signupsOpen,

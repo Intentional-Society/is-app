@@ -1,9 +1,14 @@
 import { expect, type Page } from "@playwright/test";
 
-// Two long-lived test users seeded manually in prod Supabase. We sign
-// in through the real /signin form with a known password rather than
-// minting a fresh user per test, which keeps the service-role key out
-// of CI. Per-run state cleanup happens via POST /api/_test/reset in the
+// Two long-lived test users. A local e2e run always has them:
+// `npm run test:e2e` runs `npm run dev:db`, whose last step is
+// `scripts/seed-e2e-users.mjs` — idempotent, and it keeps each password
+// in sync with `.env.local`. CI instead runs Playwright against the
+// Vercel preview, which shares prod Supabase; the same two users are
+// seeded there by hand (docs/doc-supabase.md), never by CI. We sign in
+// through the real /signin form with a known password rather than
+// minting a fresh user per test, which keeps the service-role key out of
+// CI. Per-run state cleanup happens via POST /api/_test/reset in the
 // Playwright setup project (see tests/e2e/reset.setup.ts).
 export type TestRole = "regular" | "admin";
 

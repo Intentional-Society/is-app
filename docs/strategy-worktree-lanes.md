@@ -112,9 +112,9 @@ session *and* an e2e run at once, use two lanes (each lane is one Supabase stack
   loop cliffs after ~5. If a lane's `.next` wedges, delete it to rebuild.
 - **Stop a lane's stack:** `npm run dev:db:stop` from that worktree.
 - **Remove a lane:** `git worktree remove ../is-app-worktrees/is-app-2`.
-- **Windows port grabbing:** reserve a lane's Supabase block once in an admin
-  shell (the script prints the exact command):
-  `netsh int ipv4 add excludedportrange protocol=tcp startport=54520 numberofports=10`.
+- **Windows port grabbing:** reserve a lane's Supabase ports once in an admin
+  shell (the script prints the exact command — lane 2 shown):
+  `netsh int ipv4 add excludedportrange protocol=tcp startport=54521 numberofports=7`.
 - **If `config.toml` changes upstream:** because the file is `--skip-worktree`
   in lanes, a pull won't update it there. Run `git update-index
   --no-skip-worktree supabase/config.toml`, pull, then re-run

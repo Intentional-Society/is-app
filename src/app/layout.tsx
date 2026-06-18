@@ -9,6 +9,7 @@ import { NavigationHistory } from "@/components/navigation-history";
 import { QueryProvider } from "@/components/query-provider";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeScript } from "@/components/theme-script";
+import { UpdateBanner } from "@/components/update-banner";
 import { loadMe } from "@/lib/api-server";
 import { getServerUser } from "@/lib/supabase/server-user";
 import { cn } from "@/lib/utils";
@@ -29,8 +30,16 @@ const ovo = Ovo({
 // Default metadata for the app. The whole app is noindex by default —
 // it's a members-only network. The three public pages (/, /signin,
 // /signup) opt back in with their own robots: { index: true } export.
+//
+// title.template prefixes every page's own title with "IS Web: " so the
+// browser history stack and tab strip stay scannable (each page sets a
+// distinct title via its own metadata export). The home page and any
+// page that sets no title fall back to title.default.
 export const metadata: Metadata = {
-  title: "Intentional Society Web App",
+  title: {
+    template: "IS Web: %s",
+    default: "Intentional Society Web App",
+  },
   description: "The IS Web App — for the member network of Intentional Society",
   robots: { index: false, follow: false },
   openGraph: {
@@ -65,6 +74,7 @@ export default async function RootLayout({
             <NavigationHistory />
             <SiteHeader displayName={me?.profile?.displayName ?? null} isAdmin={me?.profile?.isAdmin ?? false} />
             {children}
+            <UpdateBanner />
           </QueryProvider>
         </AuthProvider>
       </body>

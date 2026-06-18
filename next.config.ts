@@ -71,10 +71,20 @@ if (!isProd) {
 }
 
 const nextConfig: NextConfig = {
-  // Inlines the deploy environment into the client bundle so
-  // instrumentation-client.ts can gate Sentry to production deploys,
+  // Inlines build-time values into the client bundle. NEXT_PUBLIC_VERCEL_ENV
+  // lets instrumentation-client.ts gate Sentry to production deploys,
   // independent of Vercel's "expose system env vars" dashboard toggle.
-  env: { NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "" },
+  // NEXT_PUBLIC_BUILD_ID / NEXT_PUBLIC_BUILD_TIME are the open tab's frozen
+  // deploy identity for the update banner, compared against the live values
+  // from /api/version (docs/strategy-deployment.md). BUILD_TIME is captured
+  // once per build and serves as both the patch-notify clock and the urgent
+  // comparison. All fall back to a dev sentinel locally, where there is only
+  // ever one "deployment".
+  env: {
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "",
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_DEPLOYMENT_ID ?? "dev",
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+  },
   typedRoutes: true,
   images: {
     remotePatterns,

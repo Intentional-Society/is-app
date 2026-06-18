@@ -125,7 +125,7 @@ Stopping is optional — the containers are lightweight and persist safely betwe
 : Docker Desktop must be running. Check `docker ps` to confirm it's up.
 
 **Port conflicts**
-: Ports 54321–54324 and 3000 must be free. Stop other Supabase projects or local Postgres instances that may be using them.
+: Ports 54321–54327 and 3000 must be free. Stop other Supabase projects or local Postgres instances that may be using them. On Windows, a `supabase start` `Error status 404` rollback usually means a process grabbed `54321` from the ephemeral range — reserve the span once (see [setup-dev-machine.md](setup-dev-machine.md#windows-reserve-the-local-supabase-ports)).
 
 **Migration errors on startup**
 : The `dev:db` script treats migration failures as non-fatal (`|| true`). If you see schema-related errors in the app, run `npx drizzle-kit migrate` manually to see the error output.

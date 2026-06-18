@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { InvitesAdmin } from "./invites-admin";
+
+export const metadata: Metadata = { title: titleFor("/admin/invites") };
 
 export default async function AdminInvitesPage() {
   const me = await requireUser();
