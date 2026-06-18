@@ -88,6 +88,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 - `docs/design-profile-pictures.md` — avatar uploads, storage bucket, signed URLs
 - `docs/design-relations.md` — the relationship web (schema, flows, rationale)
 - `docs/design-buttondown.md` — Buttondown sync (program tag mirror, cron, write policy)
+- `docs/design-richtext.md` — rich text: markdown storage, react-markdown render, MDXEditor authoring
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-supabase.md` — Supabase dashboard settings (auth URLs, API keys)
 - `docs/doc-resend.md` — Resend transactional email (sending domain, DMARC, alternatives)
