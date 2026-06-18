@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api";
 import type { Me, MemberSummary } from "@/lib/api-types";
+import { formatDate } from "@/lib/format-date";
 import { HINTS_PER_INVITE_LIMIT, MIN_NOTE_LENGTH } from "@/lib/invite-limits";
 import {
   RELATION_VALUE_LABELS,
@@ -320,18 +321,6 @@ function StatusBadge({ status }: { status: InviteRow["status"] }) {
     expired: "text-muted-foreground",
   };
   return <span className={`text-sm font-semibold uppercase tracking-wide ${tone[status]}`}>{status}</span>;
-}
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return iso;
-  }
 }
 
 function confirmRevoke(): boolean {

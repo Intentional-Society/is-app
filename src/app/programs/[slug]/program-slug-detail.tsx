@@ -8,6 +8,7 @@ import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { ProgramDetail } from "@/lib/api-types";
+import { formatDate } from "@/lib/format-date";
 
 const programQueryKey = (slug: string) => ["programs", "by-slug", slug] as const;
 
@@ -146,12 +147,4 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
       </section>
     </div>
   );
-}
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  } catch {
-    return iso;
-  }
 }
