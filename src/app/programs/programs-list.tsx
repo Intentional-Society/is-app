@@ -79,7 +79,7 @@ function ProgramCard({
                 name={member.displayName}
                 url={member.avatarUrl}
                 sizes="28px"
-                className="h-full w-full rounded-full text-[10px]"
+                className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-muted-foreground"
               />
             </div>
           ))}
