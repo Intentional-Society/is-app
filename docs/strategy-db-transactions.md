@@ -276,7 +276,9 @@ This is the `#149` bug. A single `await db.insert(...)` is fine; the
 postgres-js options worth knowing: `max` (pool size), `idle_timeout` (close idle
 connections — the key to bounding session-mode backends), `prepare` (defaults
 true; harmless on the transaction pooler in practice — Supavisor emulates
-prepared-statement support).
+prepared-statement support). The default `db` client nonetheless sets
+`prepare: false` as a #149 variable-reduction measure, kept after the 2026-06
+audit found the redemption path clean under it — see the comment in `db.ts`.
 
 ## Recognizing this in the wild
 
@@ -295,7 +297,7 @@ Keep this current as transactions are added or changed.
 |---|---|
 | `resetE2EUsers` (`src/server/test-reset.ts`) | Fixed — `db.transaction` dropped; two autocommit statements (it never needed atomicity). |
 | `createInvite` (`src/server/invites.ts`) | Hardened — pattern 1 (writable CTE): invite + hint rows written in one statement, no transaction. |
-| invited sign-in (`src/app/auth/callback/route.ts`) | Exposed — needs atomicity (profile insert + invite redemption + relations). Candidate for pattern 2 or 3. Not yet hardened. |
+| invited sign-in (`src/app/auth/callback/route.ts`) | Exposed but monitored — multi-statement txn (profile insert + invite redemption + relations). A 2026-06 audit found **zero** occurrences across all 22 prod redemptions (DB integrity check), a normal auth/profile gap, and an empty Sentry `25P02` history; the redirect is now instrumented (`log.warn "invite redemption failed"`, queryable in Axiom). Left as-is under `prepare: false`; pattern 2 (a `redeem_invite` function) is the fix if it ever fires. |
 
 ## References
 
