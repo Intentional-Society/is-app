@@ -49,6 +49,11 @@ export type ProgramWithMembership = {
   slug: string;
   name: string;
   blurb: string | null;
+  schedule: string | null;
+  duration: string | null;
+  commitment: string | null;
+  facilitator: string | null;
+  contact: string | null;
   description: string | null;
   signupsOpen: boolean;
   memberCount: number;
@@ -77,6 +82,11 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
       slug: programs.slug,
       name: programs.name,
       blurb: programs.blurb,
+      schedule: programs.schedule,
+      duration: programs.duration,
+      commitment: programs.commitment,
+      facilitator: programs.facilitator,
+      contact: programs.contact,
       description: programs.description,
       signupsOpen: programs.signupsOpen,
       memberCount: sql<number>`(
@@ -249,6 +259,11 @@ export type ProgramDetailForMember = {
   slug: string;
   name: string;
   blurb: string | null;
+  schedule: string | null;
+  duration: string | null;
+  commitment: string | null;
+  facilitator: string | null;
+  contact: string | null;
   description: string | null;
   signupsOpen: boolean;
   memberCount: number;
@@ -267,6 +282,11 @@ export const getProgramBySlug = async (
       slug: programs.slug,
       name: programs.name,
       blurb: programs.blurb,
+      schedule: programs.schedule,
+      duration: programs.duration,
+      commitment: programs.commitment,
+      facilitator: programs.facilitator,
+      contact: programs.contact,
       description: programs.description,
       signupsOpen: programs.signupsOpen,
       archivedAt: programs.archivedAt,
@@ -308,6 +328,11 @@ export const getProgramBySlug = async (
       slug: program.slug,
       name: program.name,
       blurb: program.blurb,
+      schedule: program.schedule,
+      duration: program.duration,
+      commitment: program.commitment,
+      facilitator: program.facilitator,
+      contact: program.contact,
       description: program.description,
       signupsOpen: program.signupsOpen,
       memberCount: members.length,
@@ -330,6 +355,11 @@ export type AdminProgram = {
   slug: string;
   name: string;
   blurb: string | null;
+  schedule: string | null;
+  duration: string | null;
+  commitment: string | null;
+  facilitator: string | null;
+  contact: string | null;
   description: string | null;
   archivedAt: string | null;
   signupsOpen: boolean;
@@ -351,6 +381,11 @@ export type ProgramDetail = AdminProgram & { participants: ProgramParticipant[] 
 const MAX_PROGRAM_NAME = 120;
 const MAX_PROGRAM_SLUG = 80;
 const MAX_PROGRAM_BLURB = 200;
+const MAX_PROGRAM_SCHEDULE = 120;
+const MAX_PROGRAM_DURATION = 80;
+const MAX_PROGRAM_COMMITMENT = 120;
+const MAX_PROGRAM_FACILITATOR = 120;
+const MAX_PROGRAM_CONTACT = 200;
 const MAX_PROGRAM_DESCRIPTION = 2000;
 // Buttondown tag names are short by convention; the cap is well above
 // anything Buttondown surfaces in its UI and keeps the column index-friendly.
@@ -377,7 +412,18 @@ const validateSlug = (slug: string): { slug: string } | { error: string } => {
 export const parseProgramCreate = (
   body: unknown,
 ):
-  | { name: string; slug: string; blurb: string | null; description: string | null; buttondownTag: string | null }
+  | {
+      name: string;
+      slug: string;
+      blurb: string | null;
+      schedule: string | null;
+      duration: string | null;
+      commitment: string | null;
+      facilitator: string | null;
+      contact: string | null;
+      description: string | null;
+      buttondownTag: string | null;
+    }
   | { error: string } => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "body must be a JSON object" };
@@ -397,6 +443,31 @@ export const parseProgramCreate = (
     return { error: "blurb is too long" };
   }
 
+  const schedule = trimmedString(obj.schedule);
+  if (schedule && schedule.length > MAX_PROGRAM_SCHEDULE) {
+    return { error: "schedule is too long" };
+  }
+
+  const duration = trimmedString(obj.duration);
+  if (duration && duration.length > MAX_PROGRAM_DURATION) {
+    return { error: "duration is too long" };
+  }
+
+  const commitment = trimmedString(obj.commitment);
+  if (commitment && commitment.length > MAX_PROGRAM_COMMITMENT) {
+    return { error: "commitment is too long" };
+  }
+
+  const facilitator = trimmedString(obj.facilitator);
+  if (facilitator && facilitator.length > MAX_PROGRAM_FACILITATOR) {
+    return { error: "facilitator is too long" };
+  }
+
+  const contact = trimmedString(obj.contact);
+  if (contact && contact.length > MAX_PROGRAM_CONTACT) {
+    return { error: "contact is too long" };
+  }
+
   const description = trimmedString(obj.description);
   if (description && description.length > MAX_PROGRAM_DESCRIPTION) {
     return { error: "description is too long" };
@@ -410,6 +481,11 @@ export const parseProgramCreate = (
     name,
     slug,
     blurb: blurb || null,
+    schedule: schedule || null,
+    duration: duration || null,
+    commitment: commitment || null,
+    facilitator: facilitator || null,
+    contact: contact || null,
     description: description || null,
     buttondownTag: buttondownTag || null,
   };
@@ -424,6 +500,11 @@ export type ProgramUpdate = {
   name?: string;
   slug?: string;
   blurb?: string | null;
+  schedule?: string | null;
+  duration?: string | null;
+  commitment?: string | null;
+  facilitator?: string | null;
+  contact?: string | null;
   description?: string | null;
   archived?: boolean;
   signupsOpen?: boolean;
@@ -459,6 +540,41 @@ export const parseProgramUpdate = (body: unknown): ProgramUpdate | { error: stri
       return { error: "blurb is too long" };
     }
     result.blurb = blurb || null;
+  }
+  if ("schedule" in obj) {
+    const schedule = trimmedString(obj.schedule);
+    if (schedule && schedule.length > MAX_PROGRAM_SCHEDULE) {
+      return { error: "schedule is too long" };
+    }
+    result.schedule = schedule || null;
+  }
+  if ("duration" in obj) {
+    const duration = trimmedString(obj.duration);
+    if (duration && duration.length > MAX_PROGRAM_DURATION) {
+      return { error: "duration is too long" };
+    }
+    result.duration = duration || null;
+  }
+  if ("commitment" in obj) {
+    const commitment = trimmedString(obj.commitment);
+    if (commitment && commitment.length > MAX_PROGRAM_COMMITMENT) {
+      return { error: "commitment is too long" };
+    }
+    result.commitment = commitment || null;
+  }
+  if ("facilitator" in obj) {
+    const facilitator = trimmedString(obj.facilitator);
+    if (facilitator && facilitator.length > MAX_PROGRAM_FACILITATOR) {
+      return { error: "facilitator is too long" };
+    }
+    result.facilitator = facilitator || null;
+  }
+  if ("contact" in obj) {
+    const contact = trimmedString(obj.contact);
+    if (contact && contact.length > MAX_PROGRAM_CONTACT) {
+      return { error: "contact is too long" };
+    }
+    result.contact = contact || null;
   }
   if ("description" in obj) {
     const description = trimmedString(obj.description);
@@ -502,6 +618,11 @@ export const listAllProgramsForAdmin = async (): Promise<AdminProgram[]> => {
       slug: programs.slug,
       name: programs.name,
       blurb: programs.blurb,
+      schedule: programs.schedule,
+      duration: programs.duration,
+      commitment: programs.commitment,
+      facilitator: programs.facilitator,
+      contact: programs.contact,
       description: programs.description,
       archivedAt: sql<string | null>`to_json(${programs.archivedAt}) #>> '{}'`,
       signupsOpen: programs.signupsOpen,
@@ -521,6 +642,11 @@ export const createProgram = async (input: {
   name: string;
   slug: string;
   blurb: string | null;
+  schedule: string | null;
+  duration: string | null;
+  commitment: string | null;
+  facilitator: string | null;
+  contact: string | null;
   description: string | null;
   buttondownTag: string | null;
 }): Promise<{ program: AdminProgram } | { error: "slug_conflict" }> => {
@@ -533,6 +659,11 @@ export const createProgram = async (input: {
       slug: input.slug,
       name: input.name,
       blurb: input.blurb,
+      schedule: input.schedule,
+      duration: input.duration,
+      commitment: input.commitment,
+      facilitator: input.facilitator,
+      contact: input.contact,
       description: input.description,
       buttondownTag: input.buttondownTag,
     })
@@ -544,6 +675,11 @@ export const createProgram = async (input: {
       slug: row.slug,
       name: row.name,
       blurb: row.blurb,
+      schedule: row.schedule,
+      duration: row.duration,
+      commitment: row.commitment,
+      facilitator: row.facilitator,
+      contact: row.contact,
       description: row.description,
       archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
       signupsOpen: row.signupsOpen,
@@ -568,6 +704,11 @@ export const updateProgram = async (
   const update: Record<string, unknown> = {};
   if (input.name !== undefined) update.name = input.name;
   if (input.blurb !== undefined) update.blurb = input.blurb;
+  if (input.schedule !== undefined) update.schedule = input.schedule;
+  if (input.duration !== undefined) update.duration = input.duration;
+  if (input.commitment !== undefined) update.commitment = input.commitment;
+  if (input.facilitator !== undefined) update.facilitator = input.facilitator;
+  if (input.contact !== undefined) update.contact = input.contact;
   if (input.description !== undefined) update.description = input.description;
   if (input.archived !== undefined) {
     update.archivedAt = input.archived ? sql`now()` : null;
@@ -605,6 +746,11 @@ export const getProgramDetail = async (
       slug: programs.slug,
       name: programs.name,
       blurb: programs.blurb,
+      schedule: programs.schedule,
+      duration: programs.duration,
+      commitment: programs.commitment,
+      facilitator: programs.facilitator,
+      contact: programs.contact,
       description: programs.description,
       archivedAt: programs.archivedAt,
       signupsOpen: programs.signupsOpen,
@@ -643,6 +789,11 @@ export const getProgramDetail = async (
       slug: program.slug,
       name: program.name,
       blurb: program.blurb,
+      schedule: program.schedule,
+      duration: program.duration,
+      commitment: program.commitment,
+      facilitator: program.facilitator,
+      contact: program.contact,
       description: program.description,
       archivedAt: program.archivedAt ? program.archivedAt.toISOString() : null,
       signupsOpen: program.signupsOpen,

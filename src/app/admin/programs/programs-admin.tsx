@@ -24,13 +24,27 @@ export function ProgramsAdmin() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [schedule, setSchedule] = useState("");
+  const [duration, setDuration] = useState("");
+  const [commitment, setCommitment] = useState("");
+  const [facilitator, setFacilitator] = useState("");
+  const [contact, setContact] = useState("");
   const [description, setDescription] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const programsQuery = useQuery({ queryKey: PROGRAMS_QUERY_KEY, queryFn: fetchPrograms });
 
   const createMutation = useMutation({
-    mutationFn: async (vars: { name: string; slug: string; description: string | null }) => {
+    mutationFn: async (vars: {
+      name: string;
+      slug: string;
+      schedule: string | null;
+      duration: string | null;
+      commitment: string | null;
+      facilitator: string | null;
+      contact: string | null;
+      description: string | null;
+    }) => {
       const res = await apiClient.api.admin.programs.$post({ json: vars });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -45,6 +59,11 @@ export function ProgramsAdmin() {
     onSuccess: () => {
       setName("");
       setSlug("");
+      setSchedule("");
+      setDuration("");
+      setCommitment("");
+      setFacilitator("");
+      setContact("");
       setDescription("");
       setErrorMessage(null);
       queryClient.invalidateQueries({ queryKey: PROGRAMS_QUERY_KEY });
@@ -68,6 +87,11 @@ export function ProgramsAdmin() {
     createMutation.mutate({
       name: trimmedName,
       slug: trimmedSlug,
+      schedule: schedule.trim() || null,
+      duration: duration.trim() || null,
+      commitment: commitment.trim() || null,
+      facilitator: facilitator.trim() || null,
+      contact: contact.trim() || null,
       description: description.trim() || null,
     });
   };
@@ -96,6 +120,56 @@ export function ProgramsAdmin() {
             disabled={createMutation.isPending}
           />
           <p className="text-xs text-muted-foreground">Used in URLs — lowercase letters, numbers, and hyphens.</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-schedule">Schedule</Label>
+          <Input
+            id="program-schedule"
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+            disabled={createMutation.isPending}
+            placeholder="e.g. Tuesdays 7pm UTC"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-duration">Duration</Label>
+          <Input
+            id="program-duration"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            disabled={createMutation.isPending}
+            placeholder="e.g. 6 weeks"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-commitment">Commitment</Label>
+          <Input
+            id="program-commitment"
+            value={commitment}
+            onChange={(e) => setCommitment(e.target.value)}
+            disabled={createMutation.isPending}
+            placeholder="e.g. ~2 hrs/week"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-facilitator">Facilitator</Label>
+          <Input
+            id="program-facilitator"
+            value={facilitator}
+            onChange={(e) => setFacilitator(e.target.value)}
+            disabled={createMutation.isPending}
+            placeholder="e.g. James Baker"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-contact">Contact for questions</Label>
+          <Input
+            id="program-contact"
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+            disabled={createMutation.isPending}
+            placeholder="e.g. james@intentionalsociety.org"
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           {/* Editor renders a contenteditable div (no labelable control), so the

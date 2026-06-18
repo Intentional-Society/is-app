@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-18 | Ola | Programs gain key-facts fields
+
+Programs now carry five optional key facts — schedule, duration, commitment, facilitator, and contact — set by admins (create + edit) and shown to members on the list card and the detail page. Additive expand (one migration, five nullable columns); the prod schema is expanded ahead of merge via the gated `prod:db:expand`, so the merge-deploy migrate is a no-op.
+
 ## 2026-06-18 | James | Rich text: markdown storage, react-markdown render, MDXEditor authoring
 
 Program copy (`description`/`blurb`) and member prose (`bio`/`currentIntention`/`supplementaryInfo`) are now formatted: stored as markdown in the existing `text` columns (no migration), rendered by a shared `<Markdown>` (full + constrained-inline variants, react-markdown + remark-gfm, no rehype-raw → XSS-safe), and authored in a lazy `ssr:false` MDXEditor (full + inline configs). See docs/design-richtext.md. (#432)

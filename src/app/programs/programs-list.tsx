@@ -70,6 +70,12 @@ function ProgramCard({
         <MarkdownInline className="font-serif text-sm text-muted-foreground leading-relaxed">{cardText}</MarkdownInline>
       )}
 
+      {(program.duration || program.schedule || program.commitment) && (
+        <p className="text-xs text-muted-foreground">
+          {[program.duration, program.schedule, program.commitment].filter(Boolean).join(" · ")}
+        </p>
+      )}
+
       {/* Facepile and action button are bottom-pinned together so the
           avatar row lands on the same baseline across cards regardless of
           how long each card's blurb runs. */}
