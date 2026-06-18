@@ -168,7 +168,7 @@ export function ProgramsAdmin() {
             value={contact}
             onChange={(e) => setContact(e.target.value)}
             disabled={createMutation.isPending}
-            placeholder="e.g. james@intentionalsociety.org"
+            placeholder="e.g. questions@intentionalsociety.org"
           />
         </div>
         <div className="flex flex-col gap-1.5">

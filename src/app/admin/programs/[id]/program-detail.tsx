@@ -305,7 +305,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
             value={contact}
             onChange={(e) => setContact(e.target.value)}
             disabled={updateMutation.isPending}
-            placeholder="e.g. james@intentionalsociety.org"
+            placeholder="e.g. questions@intentionalsociety.org"
           />
         </div>
         <div className="flex flex-col gap-1.5">
