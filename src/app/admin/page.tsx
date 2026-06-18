@@ -1,12 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
+import { QueryProvider } from "@/components/query-provider";
 import { requireUser, serverApiClient } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { AdminHidden } from "./admin-hidden";
 import { AdminHints } from "./admin-hints";
 import { ButtondownSyncButtons } from "./buttondown-sync-buttons";
+
+export const metadata: Metadata = { title: titleFor("/admin") };
 
 export default async function AdminPage() {
   const me = await requireUser();
@@ -69,20 +74,22 @@ export default async function AdminPage() {
         </Link>
       </section>
 
-      <section className="flex w-full max-w-xl flex-col gap-2">
-        <h2 className="text-lg font-semibold">Web</h2>
-        <AdminHints />
-      </section>
+      <QueryProvider>
+        <section className="flex w-full max-w-xl flex-col gap-2">
+          <h2 className="text-lg font-semibold">Web</h2>
+          <AdminHints />
+        </section>
 
-      <section className="flex w-full max-w-xl flex-col gap-2">
-        <h2 className="text-lg font-semibold">Hidden accounts</h2>
-        <AdminHidden />
-      </section>
+        <section className="flex w-full max-w-xl flex-col gap-2">
+          <h2 className="text-lg font-semibold">Hidden accounts</h2>
+          <AdminHidden />
+        </section>
 
-      <section className="flex w-full max-w-xl flex-col gap-2">
-        <h2 className="text-lg font-semibold">Buttondown sync</h2>
-        <ButtondownSyncButtons />
-      </section>
+        <section className="flex w-full max-w-xl flex-col gap-2">
+          <h2 className="text-lg font-semibold">Buttondown sync</h2>
+          <ButtondownSyncButtons />
+        </section>
+      </QueryProvider>
     </main>
   );
 }

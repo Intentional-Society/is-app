@@ -99,6 +99,13 @@
       "when": 1780506291419,
       "tag": "0013_add_profile_deactivated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781267777169,
+      "tag": "0014_massive_firelord",
+      "breakpoints": true
     }
   ]
 }

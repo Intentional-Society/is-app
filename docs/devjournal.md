@@ -4,6 +4,22 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-17 | James | #149 audit: auth-callback redemption holds in prod; keep `prepare: false`, add Axiom logging
+
+A three-window audit of the still-unhardened invited-sign-in transaction found zero #149 occurrences: 22/22 prod redemptions clean on a DB integrity check, a normal auth/profile gap, and an empty Sentry `25P02` history (error capture works — #152 is only about missing perf transactions). Kept `prepare: false` (limbo resolved) and instrumented the failure redirect with `log.warn "invite redemption failed"` so the path is queryable in Axiom; pattern-2 hardening deferred until/unless it fires. (#149)
+
+## 2026-06-17 | James | Per-page HTML titles for usable tab names and browser history
+
+Root layout sets `title.template = "IS Web: %s"`. Per-page titles live in one `src/lib/page-titles.ts` dictionary that feeds both each page's `metadata.title` and the breadcrumb back-labels (which no longer keep a separate list); detail pages set the entity name via `generateMetadata`. New pages add a dictionary entry. (#425)
+
+## 2026-06-17 | James | Avatar signing degrades instead of 500ing under Storage load
+
+A directory browse prefetched every member card, and each prefetch render made separate Supabase Storage call; that exhausted Storage's DB pool (429), which `resolveAvatarUrls` rethrew into a page 500. Signing is now best-effort — it logs `avatar sign failed` and falls back to initials — and member cards no longer prefetch. First test example of shipping an `urgentReleasedAt` update.
+
+## 2026-06-16 | James | Update handling for active sessions
+
+The home page auto-reloads a stale tab, everywhere else a persistent bottom banner offers a member-initiated reload. Deploys now fall into one of three tiers: patch (default, notif held until the running build is 6h old, then once per 8h), feature (held until build is 2h old, then once per 8h, dismissible — whenever a changelog is added), urgent (immediate, non-dismissible — gated by `urgentReleasedAt` marker in code).  Full rationale: docs/strategy-deployment.md.
+
 ## 2026-06-12 | James | Unified top bar
 
 Page titles and breadcrumbs now share one band with the fixed home/menu icons, via a shared `PageHeader` (full-width row, `pt-3` mains).

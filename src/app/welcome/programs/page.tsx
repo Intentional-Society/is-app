@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
+
 import { requireUser } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { ProgramsList } from "../../programs/programs-list";
 import { WelcomeAdvanceButton } from "../welcome-advance-button";
+
+export const metadata: Metadata = { title: titleFor("/welcome/programs") };
 
 // Step 3 of the welcome flow: browse and join programs. "Done" stamps
 // lastReviewedPrograms and advances, completing onboarding.

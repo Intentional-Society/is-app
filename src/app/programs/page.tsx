@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
+
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { ProgramsList } from "./programs-list";
+
+export const metadata: Metadata = { title: titleFor("/programs") };
 
 export default async function ProgramsPage() {
   await requireUser();

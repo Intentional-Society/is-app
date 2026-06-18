@@ -4,6 +4,7 @@ import type { UrlObject } from "node:url";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { Program } from "@/lib/api-types";
@@ -22,42 +23,69 @@ function ProgramCard({
   onLeave: (id: string) => void;
   pending: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const DESCRIPTION_LIMIT = 120;
-  const description = program.description ?? "";
-  const isLong = description.length > DESCRIPTION_LIMIT;
-  const visibleDescription = isLong && !expanded ? `${description.slice(0, DESCRIPTION_LIMIT)}…` : description;
+  const cardText = program.blurb ?? program.description ?? "";
+  const isOngoing = program.memberCount > 0;
+  const isGearingUp = !isOngoing && program.signupsOpen;
+
+  const statusBlip = isOngoing ? (
+    <span className="relative flex h-2 w-2 shrink-0" title="Ongoing">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+    </span>
+  ) : isGearingUp ? (
+    <span className="relative flex h-2 w-2 shrink-0" title="Gearing up">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+    </span>
+  ) : (
+    <span className="relative flex h-2 w-2 shrink-0" title="Ready">
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-muted-foreground/30" />
+    </span>
+  );
 
   return (
     <li
       className={`flex flex-col gap-3 rounded-xl bg-card p-5 ${program.joined ? "border border-transparent ring-3 ring-ring/50" : "border border-border"}`}
     >
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">
-          <Link
-            href={{ pathname: `/programs/${program.slug}` } satisfies UrlObject}
-            className="hover:underline focus-visible:underline"
-          >
-            {program.name}
-          </Link>
-        </h2>
+        <div className="flex items-center gap-2">
+          {statusBlip}
+          <h2 className="text-lg font-semibold">
+            <Link
+              href={{ pathname: `/programs/${program.slug}` } satisfies UrlObject}
+              className="hover:underline focus-visible:underline"
+            >
+              {program.name}
+            </Link>
+          </h2>
+        </div>
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
           {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}
         </p>
       </div>
 
-      {description && (
-        <div className="flex flex-col gap-1">
-          <p className="font-serif text-sm text-muted-foreground leading-relaxed">{visibleDescription}</p>
-          {isLong && (
-            <button
-              type="button"
-              onClick={() => setExpanded((e) => !e)}
-              className="self-start text-xs text-muted-foreground underline hover:no-underline"
+      {cardText && <p className="font-serif text-sm text-muted-foreground leading-relaxed">{cardText}</p>}
+
+      {program.memberAvatars.length > 0 && (
+        <div className="flex items-center">
+          {program.memberAvatars.map((member, i) => (
+            <div
+              key={member.id}
+              className="relative h-7 w-7 shrink-0 rounded-full border-2 border-card bg-muted"
+              style={{ marginLeft: i === 0 ? 0 : "-8px", zIndex: program.memberAvatars.length - i }}
+              title={member.displayName ?? undefined}
             >
-              {expanded ? "Show less" : "Show more"}
-            </button>
+              <Avatar
+                name={member.displayName}
+                url={member.avatarUrl}
+                sizes="28px"
+                className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-muted-foreground"
+              />
+            </div>
+          ))}
+          {program.memberCount > 5 && (
+            <span className="ml-1 text-xs text-muted-foreground">+{program.memberCount - 5}</span>
           )}
         </div>
       )}

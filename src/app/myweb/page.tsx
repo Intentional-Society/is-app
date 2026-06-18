@@ -1,9 +1,13 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
+import type { Metadata } from "next";
 
 import { requireUser, serverApiClient } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { MyWeb } from "./my-web";
 import { DEFAULT_SUBGRAPH_VIEW, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
+
+export const metadata: Metadata = { title: titleFor("/myweb") };
 
 export default async function MyWebPage() {
   const me = await requireUser();

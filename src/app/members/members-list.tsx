@@ -13,8 +13,14 @@ import { scoreMember } from "@/lib/member-search";
 function MemberCard({ member }: { member: MemberSummary }) {
   const href: UrlObject = { pathname: `/members/${member.slug ?? member.id}` };
   return (
+    // prefetch={false}: the grid can hold dozens of cards, and Next prefetches
+    // each one's target page server-side — every render signing that member's
+    // avatar via its own Supabase Storage round-trip. That burst can exhaust
+    // Storage's DB pool (429). The list already carries everything a card
+    // shows; defer the per-page work to an actual click.
     <Link
       href={href}
+      prefetch={false}
       className="flex h-full flex-col rounded-sm border border-border hover:bg-muted/50 transition-colors overflow-hidden"
     >
       <Avatar

@@ -58,10 +58,10 @@ describe("API auth middleware", () => {
     });
   });
 
-  it("allows /api/health without a session", async () => {
+  it("allows /api/version without a session", async () => {
     mockGetUser(null);
 
-    const res = await app.request("/api/health");
+    const res = await app.request("/api/version");
 
     expect(res.status).toBe(200);
     // The Supabase client should never even be built for a public route.
@@ -73,7 +73,7 @@ describe("API auth middleware", () => {
     // be added here intentionally — and that change will be visible in
     // this test's diff.
     expect(PUBLIC_PATHS).toEqual([
-      "/api/health",
+      "/api/version",
       /^\/api\/invites\/[^/]+\/check$/,
       "/api/_test/reset",
       "/api/cron/buttondown-sync",

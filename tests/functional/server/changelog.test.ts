@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appVersion, changelog, formatChangelogDate } from "@/lib/changelog";
+import { appVersion, changelog, formatChangelogDate, urgentReleasedAt } from "@/lib/changelog";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -36,6 +36,18 @@ describe("changelog data", () => {
 describe("appVersion", () => {
   it("is the date of the newest entry", () => {
     expect(appVersion).toBe(changelog[0].date);
+  });
+});
+
+describe("urgentReleasedAt", () => {
+  it("is a full ISO 8601 timestamp, not a plain date", () => {
+    // The urgent comparison tests NEXT_PUBLIC_BUILD_TIME < urgentReleasedAt,
+    // so it must carry sub-day precision: two urgent deploys on the same
+    // day have to advance it strictly. A bare "YYYY-MM-DD" would not.
+    expect(urgentReleasedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/);
+    expect(Number.isNaN(Date.parse(urgentReleasedAt))).toBe(false);
+    // Round-trips through Date without drift — a well-formed instant.
+    expect(new Date(urgentReleasedAt).toISOString()).toBe(urgentReleasedAt);
   });
 });
 
