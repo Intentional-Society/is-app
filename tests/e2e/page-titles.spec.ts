@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
 
 // Every page sets a distinct <title> ("IS Web: <page>") so the browser
 // history stack and tab strip stay scannable (issue #425). This covers
 // the root-layout title template, a few static page titles, the
-// home-page default (bare brand, no prefix), and a dynamic member title
-// produced by generateMetadata.
+// home-page default (bare brand, no prefix), and a dynamic title from
+// members/[id]'s generateMetadata.
 test.describe.configure({ mode: "serial" });
 
 test.describe("page titles", () => {
@@ -26,9 +26,11 @@ test.describe("page titles", () => {
     await expect(page).toHaveTitle("IS Web: Forgot password");
   });
 
-  test("authed pages carry distinct titles, including the dynamic member name", async ({ page }) => {
+  test("authed pages carry distinct titles, including a dynamic generateMetadata title", async ({ page }) => {
     await signInAs(page, "regular");
-    await completeWelcome(page, { displayName: "Tessa Titles", bio: "e2e bio · page-titles.spec · member title" });
+    // Onboard so "/" stops redirecting into the welcome flow; the distinct
+    // bio keeps the #149 reset probe happy (one bio per completeWelcome caller).
+    await completeWelcome(page, { bio: "e2e bio · page-titles.spec · dynamic title" });
 
     // Home keeps the bare brand: it sets no title, so it falls back to
     // the template default rather than getting the "IS Web: " prefix.
@@ -40,14 +42,13 @@ test.describe("page titles", () => {
     await page.goto("/intentions");
     await expect(page).toHaveTitle("IS Web: Current intentions");
 
-    // Dynamic title from generateMetadata: open the member's own profile
-    // via the "view as others see it" link on /me. That link carries the
-    // app-supplied slug/id, so this never depends on the directory listing
-    // the just-onboarded user — which isn't deterministic on the shared
-    // prod-Supabase preview the CI e2e runs against.
-    await page.goto("/me");
-    await page.getByRole("link", { name: /view your profile as others see it/i }).click();
-    await page.waitForURL((u) => u.pathname.startsWith("/members/"), { timeout: TIMEOUT_MS });
-    await expect(page).toHaveTitle("IS Web: Tessa Titles");
+    // Dynamic title from members/[id]'s generateMetadata (not a static
+    // metadata export). We can't assert a real member's name on the
+    // preview — the only seeded member we control is hidden on prod, and a
+    // hidden profile 404s from /members/:id, so its page is unviewable —
+    // so assert the deterministic not-found branch, which still proves
+    // generateMetadata drives the title.
+    await page.goto("/members/no-such-member-page-titles-e2e");
+    await expect(page).toHaveTitle("IS Web: Member not found");
   });
 });
