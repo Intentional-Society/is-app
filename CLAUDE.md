@@ -26,7 +26,7 @@ Intentional Society web application — an authenticated app for a small, global
 
 Architecture specs in `docs/architecture-appstack.md` and `docs/architecture-devstack.md`.
 
-- **Next.js 15** (App Router) serves the frontend and hosts the API via catch-all route
+- **Next.js 16** (App Router) serves the frontend and hosts the API via catch-all route
 - **Hono** handles all API logic at `src/app/api/[[...route]]/route.ts`, defined in `src/server/api.ts`
 - **Hono RPC client** (`apiClient` from `src/lib/api.ts`) provides type-safe API calls — use this instead of raw `fetch`
 - **Drizzle ORM** for Postgres access. Schema at `src/server/schema.ts`, connection at `src/server/db.ts`

@@ -27,7 +27,7 @@ Confirmed 2026-06-18. Every item is standard markdown (CommonMark + GFM) and ren
 - Bullet and numbered lists
 - Links
 - Block quotes
-- Headings — start at **h3** (h3–h4). The pages that render this prose use h2 for their own title, so authored headings begin one level deeper; the shared `<Markdown>` maps the top markdown heading to h3 and below, keeping authored content under the page title in the document outline
+- Headings — **h3–h4 only**. The editor authors them as literal `###`/`####`, which `react-markdown` renders as `<h3>`/`<h4>` verbatim — no render-side level remapping (markdown is hidden, so there is no shallower authored heading to shift). The pages that render this prose use h2 for their own title, so starting authored headings at h3 keeps them correctly nested under the page title in the document outline. h5+ is left out deliberately: at that depth a heading reads as bold body text, adding no real hierarchy — trivially re-enabled via the editor's allowed-levels config if a need appears
 
 `blurb` carries an **inline-only** subset of the above (bold, italic, strikethrough, links — no headings, lists, or quotes), because it renders in the tight space of a list card.
 
@@ -59,7 +59,7 @@ Rendering uses **`react-markdown` + `remark-gfm`**, with **no `rehype-raw`**.
 - `react-markdown` parses markdown to an AST and builds a React element tree directly. It never uses `dangerouslySetInnerHTML` and does not render embedded raw HTML unless `rehype-raw` is enabled — so it is XSS-safe with no separate sanitizer.
 - `remark-gfm` adds the GitHub-flavored extras (tables, strikethrough, task lists, autolinks). The toolbar only authors strikethrough and links (autolinks just make a bare URL clickable), but the full `<Markdown>` renderer is deliberately **left unconstrained**: if legacy or pasted source happens to contain a table or `- [ ]` checkbox it renders as one. That is harmless layout, not a security concern (still no raw HTML), and authors are trusted, so we do not pin `allowedElements` here. The constrained-inline card variant is the one exception, and it allowlists for layout, not safety (see [Cards](#cards-and-other-constrained-surfaces)).
 - **`rehype-raw` is the one thing we do not add** — it is the only path that reintroduces raw-HTML execution and would drag in DOMPurify + CSP work for no benefit here.
-- Styling: `@tailwindcss/typography` (`prose` classes), themed to the app's serif look, so headings/lists/links inherit the existing tokens rather than browser defaults.
+- Styling: `@tailwindcss/typography` (`prose` classes) — a new dependency, enabled with one `@plugin "@tailwindcss/typography";` line in `globals.css` — themed to the app's serif look, so headings/lists/links inherit the existing tokens rather than browser defaults.
 
 A single shared `<Markdown>` component wraps this, used everywhere formatted prose is displayed.
 
@@ -107,7 +107,7 @@ The decisive axis is **round-trip fidelity**, not raw popularity. Tiptap's and B
 
 ### Bundle weight
 
-MDXEditor is built on Lexical and is not small. It is **lazily loaded in every authoring surface** — the admin program editor *and* the member-facing profile/onboarding forms — and **never ships to a render-only page** (public program detail, member profile, list cards), which need only `react-markdown`. The render path and the authoring path have entirely separate dependency footprints. Member prose is authored on bundle-sensitive member routes — including onboarding — so the dynamic import matters there as much as in admin: the editor chunk is fetched only when an author actually mounts the form, never on a first paint that only displays prose.
+MDXEditor is built on Lexical and is not small. It is **lazily loaded** (`next/dynamic` with `ssr: false` — Lexical is client-only) **in every authoring surface** — the admin program editor *and* the member-facing profile/onboarding forms — and **never ships to a render-only page** (public program detail, member profile, list cards), which need only `react-markdown`. The render path and the authoring path have entirely separate dependency footprints. Member prose is authored on bundle-sensitive member routes — including onboarding — so the dynamic import matters there as much as in admin: the editor chunk is fetched only when an author actually mounts the form, never on a first paint that only displays prose.
 
 ## Security model
 
