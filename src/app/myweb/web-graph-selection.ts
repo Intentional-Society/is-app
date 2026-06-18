@@ -97,35 +97,41 @@ type EdgeDecoration = {
   // WebGraph dims off-path on a click; the mini-map leaves the rest at full
   // strength (the lit path is co-equal content, not a spotlight).
   dimUnlit: boolean;
-  // Whether a click on an edge does anything in this canvas — true in the full
-  // graph (a click selects the edge and reveals its number; an outgoing edge's
-  // second click opens the relating dialog), false in the read-only mini-map.
-  // Drives cursor:pointer, since every edge is equally clickable.
+  // Whether clicks on edges do anything in this canvas — true in the full graph
+  // (a click selects the edge and reveals its number; an outgoing edge's second
+  // click opens the relating dialog), false in the read-only mini-map. Gates the
+  // cursor:pointer that marks the editable (outgoing) edges.
   edgesClickable: boolean;
   // The edge under the pointer, lifted above the tangle so it's traceable end to
   // end. Null when nothing is hovered / in read-only views.
   hoverEdgeId: string | null;
 };
 
-// Edge decorations layered onto the base edges: cursor:pointer on every edge
-// when the canvas's edges are clickable; the lit edges painted success-green and
-// lifted above the rest; every other edge dimmed by blending its stroke toward
-// the canvas when dimUnlit is set. Untouched edges are returned by reference, so
-// this stays a cheap diff. Generic so callers keep their concrete edge type.
-export function decorateEdges<E extends Edge>(
+// Edge decorations layered onto the base edges: cursor:pointer on an editable
+// (outgoing) edge when the canvas's edges are clickable — matching its value
+// bubble, so an incoming or 2nd-degree link reads as inert; the lit edges painted
+// success-green and lifted above the rest; every other edge dimmed by blending
+// its stroke toward the canvas when dimUnlit is set. Untouched edges are returned
+// by reference, so this stays a cheap diff. Generic so callers keep their
+// concrete edge type.
+export function decorateEdges<E extends Edge<{ isOutgoing?: boolean }>>(
   edges: readonly E[],
   { litEdgeIds, dimUnlit, edgesClickable, hoverEdgeId }: EdgeDecoration,
 ): E[] {
   return edges.map((e) => {
+    // Pointer only on your own (outgoing) edges — the ones whose value bubble is
+    // itself clickable; an incoming or 2nd-degree link stays cursor-default so the
+    // line and the bubble agree.
+    const cursor = edgesClickable && e.data?.isOutgoing === true;
     const onPath = litEdgeIds.has(e.id);
     const dim = dimUnlit && !onPath;
     const hovered = e.id === hoverEdgeId;
-    if (!edgesClickable && !onPath && !dim && !hovered) return e;
+    if (!cursor && !onPath && !dim && !hovered) return e;
     const next = { ...e } as E;
-    if (edgesClickable) {
+    if (cursor) {
       // ReactFlow merges className onto the edge's <g>; cursor inherits down to
       // both the visible line and the wider invisible interaction path, so the
-      // whole line signals it's clickable.
+      // whole line signals it's editable.
       next.className = "cursor-pointer";
     }
     if (onPath) {

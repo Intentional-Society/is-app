@@ -126,19 +126,20 @@ describe("decorateEdges", () => {
     expect(out[1].style?.stroke).toBeUndefined();
   });
 
-  it("marks every edge clickable when the canvas's edges are clickable", () => {
+  it("marks only your own outgoing edge clickable, matching its value bubble", () => {
     const out = decorateEdges([mk("in", false), mk("out", true)], {
       litEdgeIds: new Set(),
       dimUnlit: false,
       edgesClickable: true,
       hoverEdgeId: null,
     });
-    // Incoming and outgoing alike — every edge selects on click, so both signal it.
-    expect(out[0].className).toBe("cursor-pointer");
+    // An incoming or 2nd-degree link can't be edited, so its line stays inert —
+    // the cursor agrees with the (non-clickable) bubble.
+    expect(out[0].className).toBeUndefined();
     expect(out[1].className).toBe("cursor-pointer");
   });
 
-  it("leaves edges unmarked when the canvas's edges aren't clickable (mini-map)", () => {
+  it("leaves even an outgoing edge unmarked when the canvas's edges aren't clickable (mini-map)", () => {
     const out = decorateEdges([mk("e1", true)], {
       litEdgeIds: new Set(),
       dimUnlit: false,

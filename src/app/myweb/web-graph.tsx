@@ -354,11 +354,6 @@ export function WebGraph({
   }, [clearPreviewTimer]);
   useEffect(() => clearPreviewTimer, [clearPreviewTimer]);
 
-  const edgeInteraction = useMemo<EdgeInteraction>(
-    () => ({ openRelating: onOpenRelating, hoverEdgeId, selectedEdgeId, previewEdge, endPreviewSoon }),
-    [onOpenRelating, hoverEdgeId, selectedEdgeId, previewEdge, endPreviewSoon],
-  );
-
   // Shortest-path tree from the center over the (undirected) edge set, rebuilt
   // once per subgraph. Selecting a node walks these parent pointers back to the
   // center to find the chain that should stay lit while the rest dims.
@@ -374,6 +369,21 @@ export function WebGraph({
   const { pathNodeIds, pathEdgeIds } = useMemo(
     () => pathToCenter(selectedNodeId, parentByNode),
     [selectedNodeId, parentByNode],
+  );
+
+  // The selected node's path edges (litEdgeIds) reveal their value bubbles too,
+  // alongside the hovered/selected edge — so highlighting a path shows the
+  // relation values along it. Empty unless a node is selected.
+  const edgeInteraction = useMemo<EdgeInteraction>(
+    () => ({
+      openRelating: onOpenRelating,
+      hoverEdgeId,
+      selectedEdgeId,
+      litEdgeIds: pathEdgeIds,
+      previewEdge,
+      endPreviewSoon,
+    }),
+    [onOpenRelating, hoverEdgeId, selectedEdgeId, pathEdgeIds, previewEdge, endPreviewSoon],
   );
 
   // A node selection lights its path back to you and dims everything off it; an

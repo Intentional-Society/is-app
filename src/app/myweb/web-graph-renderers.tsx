@@ -150,6 +150,11 @@ export type EdgeInteraction = {
   // number shows when its id matches either.
   hoverEdgeId: string | null;
   selectedEdgeId: string | null;
+  // The selected node's lit path-to-center edges, whose numbers also show so a
+  // highlighted path reads its relation values. Direction-stamped both ways, so
+  // an edge id (one direction) matches by set membership. Empty when no node is
+  // selected.
+  litEdgeIds: ReadonlySet<string>;
   previewEdge: (id: string) => void;
   endPreviewSoon: () => void;
 };
@@ -172,7 +177,9 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
   const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
   const interaction = useContext(EdgeInteractionContext);
   const isClickable = data?.isOutgoing === true && interaction !== null;
-  const isVisible = interaction !== null && (interaction.hoverEdgeId === id || interaction.selectedEdgeId === id);
+  const isVisible =
+    interaction !== null &&
+    (interaction.hoverEdgeId === id || interaction.selectedEdgeId === id || interaction.litEdgeIds.has(id));
   const handleClick = isClickable
     ? () =>
         interaction?.openRelating({
