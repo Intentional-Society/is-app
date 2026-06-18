@@ -39,24 +39,56 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   return res.json();
 };
 
-// View<->edit canvas animation. View is a square whose height tracks the
-// measured width; edit collapses to EDIT_HEIGHT. Width never changes between
-// modes, so only the height animates — top-anchored, so the bottom edge
-// travels while ReactFlow re-fits each frame to scale the graph with the box.
-const EDIT_HEIGHT = 500;
+// View<->edit canvas sizing. View mode fills the available rectangle as fully as
+// it can, clamping only its aspect ratio to the [3:4, 4:3] range — so a roughly
+// square area is used whole, and only a viewport more extreme than 4:3 (wide
+// desktop) or 3:4 (portrait phone) gets letterboxed in its long direction. Edit
+// mode collapses to a shorter strip so the suggestion feed below stays on
+// screen. Width is identical between modes — only the height animates on the
+// toggle (top-anchored, so the bottom edge travels while ReactFlow re-fits each
+// frame to scale the graph with the box).
+const MAX_ASPECT = 4 / 3; // widest allowed (width:height) — 4:3 landscape
+const MIN_ASPECT = 3 / 4; // tallest allowed (width:height) — 3:4 portrait
+// Edit mode's strip is this fraction of the view-mode height, so it scales with
+// the viewport (a taller window gets a taller strip) instead of a fixed px. The
+// remaining ~40% leaves room for the suggestion feed below.
+const EDIT_HEIGHT_FRACTION = 0.6;
+// Space reserved below the canvas — the page's own padding (main's pb-8 / px-8,
+// both 2rem) so the gap under the canvas matches the gap beside it. Resolved
+// from the live root font-size rather than assuming 16px (the app sets it
+// larger), so it lands on the same px the page padding uses; the canvas bottom
+// then sits exactly pb-8 above the viewport floor, totalling 100vh, so view
+// mode never spills into a vertical scrollbar. (Edit mode's feed legitimately
+// scrolls — the no-scrollbar guarantee is a view-mode one.)
+const PAGE_PAD_REM = 2;
+const bottomReserve = () => PAGE_PAD_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
 const MODE_ANIM_MS = 1000;
 const MODE_ANIM_EASE = "cubic-bezier(0.45, 0, 0.55, 1)"; // accelerate + decelerate
 
 export function WebGraph({
-  square,
+  expanded,
   onOpenRelating,
   onReplayTour,
+  mode,
+  onEdit,
+  onDone,
+  donePending,
+  doneError,
 }: {
-  // View mode renders a tall, centered square canvas; edit mode keeps the
-  // shorter landscape strip so the suggestion feed below stays in view.
-  square: boolean;
+  // View mode expands the canvas to fill the available space (aspect clamped to
+  // the 3:4–4:3 range); edit mode keeps the shorter strip so the suggestion feed
+  // below stays in view.
+  expanded: boolean;
   onOpenRelating: (target: RelatingTarget) => void;
   onReplayTour: () => void;
+  // The Edit/Done toggle lives in the canvas's lower-left corner (a Panel
+  // below), but its state and the mark-done mutation stay in MyWeb — passed
+  // down here so the toggle travels with the graph chrome.
+  mode: "edit" | "view";
+  onEdit: () => void;
+  onDone: () => void;
+  donePending: boolean;
+  doneError: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState<SubgraphViewOptions>(DEFAULT_SUBGRAPH_VIEW);
@@ -159,53 +191,103 @@ export function WebGraph({
     fitViewRef.current = fitView;
   }, []);
 
-  // Canvas height animation. Width is CSS-driven (w-full, capped to the
-  // viewport height); we measure the resulting width and use it as the
-  // square's height in view mode, collapsing to EDIT_HEIGHT in edit mode.
-  const [graphWidth, setGraphWidth] = useState(0);
-  const lastWidthRef = useRef(0);
+  // The available box: the full width of the canvas's wrapper, and the vertical
+  // space from the wrapper's top down to the viewport bottom (less BOTTOM_RESERVE).
+  // The wrapper top is set by the page chrome above (header + gaps), which never
+  // changes with the box height, so measuring it is stable across mode toggles.
+  const [avail, setAvail] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const lastAvailRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   // Transition is armed for mode toggles but disarmed for the initial measure
   // and for resizes, so the box tracks the window instantly rather than easing.
   const [animateHeight, setAnimateHeight] = useState(false);
+  const wrapElRef = useRef<HTMLDivElement | null>(null);
   const resizeObsRef = useRef<ResizeObserver | null>(null);
-  // Callback ref: attach the observer once the graph element mounts (it only
-  // renders after the loading/empty early-returns below).
-  const measureRef = useCallback((el: HTMLDivElement | null) => {
-    resizeObsRef.current?.disconnect();
-    if (!el) {
-      resizeObsRef.current = null;
-      return;
-    }
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0].contentRect.width;
-      // Ignore height-only changes (our own animation); only width changes
-      // (resize) re-derive the square's height, and should do so instantly.
-      if (Math.abs(w - lastWidthRef.current) < 0.5) return;
-      lastWidthRef.current = w;
-      setAnimateHeight(false);
-      setGraphWidth(w);
-    });
-    ro.observe(el);
-    resizeObsRef.current = ro;
+  const measure = useCallback(() => {
+    const el = wrapElRef.current;
+    if (!el) return;
+    const w = el.clientWidth;
+    const h = Math.max(0, window.innerHeight - el.getBoundingClientRect().top - bottomReserve());
+    const prev = lastAvailRef.current;
+    if (Math.abs(w - prev.w) < 0.5 && Math.abs(h - prev.h) < 0.5) return;
+    lastAvailRef.current = { w, h };
+    setAnimateHeight(false); // a resize commits instantly; only mode toggles ease
+    setAvail({ w, h });
   }, []);
+  // Callback ref: attach a width observer once the wrapper mounts (it only
+  // renders after the loading/empty early-returns below). A ResizeObserver on a
+  // full-width element catches layout-width changes; a window 'resize' listener
+  // (below) catches viewport-height changes the observer wouldn't see.
+  const wrapRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      resizeObsRef.current?.disconnect();
+      wrapElRef.current = el;
+      if (!el) {
+        resizeObsRef.current = null;
+        return;
+      }
+      measure();
+      const ro = new ResizeObserver(() => measure());
+      ro.observe(el);
+      resizeObsRef.current = ro;
+    },
+    [measure],
+  );
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    // Web fonts load after first paint and grow the header a few px, shifting
+    // the wrapper's top — a one-time drift neither observer above would catch,
+    // and which would otherwise leave the height slightly too tall (a faint
+    // scrollbar). Re-measure once fonts settle. (?. short-circuits the whole
+    // chain where FontFaceSet is absent, e.g. jsdom.)
+    document.fonts?.ready.then(() => measure());
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+
+  // The largest box that fits the available rectangle with its aspect ratio
+  // clamped to [3:4, 4:3]. When the rectangle's own ratio is already in range we
+  // use it whole (no waste — square, 4:3, whatever it is); only a more extreme
+  // viewport letterboxes, and then in its long direction so the canvas still
+  // fills the short one and never overflows (no vertical scrollbar). Width is
+  // shared by both modes so the toggle never shifts the box sideways.
+  const dims = useMemo(() => {
+    const { w, h } = avail;
+    if (w <= 0 || h <= 0) return null;
+    const ratio = w / h;
+    let width: number;
+    let viewH: number;
+    if (ratio > MAX_ASPECT) {
+      // Wider than 4:3 — fill the height, narrow the width to 4:3.
+      viewH = h;
+      width = h * MAX_ASPECT;
+    } else if (ratio < MIN_ASPECT) {
+      // Taller than 3:4 — fill the width, shorten the height to 3:4.
+      width = w;
+      viewH = w / MIN_ASPECT;
+    } else {
+      // In range — fill the whole rectangle.
+      width = w;
+      viewH = h;
+    }
+    return { width, viewH, editH: viewH * EDIT_HEIGHT_FRACTION };
+  }, [avail]);
 
   // Re-arm the transition one frame after the initial measure or a resize, so
   // the next mode toggle eases but the size change that just committed didn't.
   useEffect(() => {
-    if (graphWidth > 0 && !animateHeight) {
+    if (dims && !animateHeight) {
       const id = requestAnimationFrame(() => setAnimateHeight(true));
       return () => cancelAnimationFrame(id);
     }
-  }, [graphWidth, animateHeight]);
+  }, [dims, animateHeight]);
 
   // On a mode toggle, re-fit every frame for the duration of the height
   // transition so the graph zooms to match the shrinking/growing box. The
   // height eases via CSS, so fitting to the current box each frame inherits
   // that easing. Skips the first run (initial mount fits via the sim).
   const firstModeRef = useRef(true);
-  // `square` is the trigger, not a read value — the effect must re-run each
+  // `expanded` is the trigger, not a read value — the effect must re-run each
   // time the mode flips so the fit follows the height transition.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: square triggers the per-toggle re-fit
+  // biome-ignore lint/correctness/useExhaustiveDependencies: expanded triggers the per-toggle re-fit
   useEffect(() => {
     if (firstModeRef.current) {
       firstModeRef.current = false;
@@ -219,7 +301,7 @@ export function WebGraph({
     return () => {
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [square]);
+  }, [expanded]);
 
   // Edge-number reveal. Numbers stay hidden until shown one of two ways:
   //   - hover (desktop): a transient preview while the pointer is on the line
@@ -323,130 +405,155 @@ export function WebGraph({
   // narrows the nullable memo for the canvas below.
   if (!filtered) return null;
 
-  // Width is identical in both modes — w-full capped to the viewport height,
-  // free of the page's max-w-5xl wrapper so on tall displays the square grows
-  // past 1024px. Only the height differs: the measured width (a square) in
-  // view mode, EDIT_HEIGHT in edit mode. Animating just the height keeps the
-  // box from ever widening on the toggle; the top stays put, so the bottom
-  // edge is what travels.
-  const heightPx = graphWidth > 0 ? (square ? graphWidth : Math.min(graphWidth, EDIT_HEIGHT)) : undefined;
+  // Width is shared by both modes (from `dims`); only the height differs —
+  // the full fitted height in view mode, the EDIT_HEIGHT-capped strip in edit
+  // mode. Animating just the height keeps the box from shifting sideways on
+  // the toggle; the top stays put, so the bottom edge is what travels.
+  const heightPx = dims ? (expanded ? dims.viewH : dims.editH) : undefined;
 
   return (
-    <div
-      ref={measureRef}
-      data-tour="graph"
-      style={{
-        height: heightPx ? `${heightPx}px` : undefined,
-        transition: animateHeight ? `height ${MODE_ANIM_MS}ms ${MODE_ANIM_EASE}` : undefined,
-      }}
-      className="mx-auto w-full max-w-[calc(100vh_-_12rem)] overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
-    >
-      <WebGraphCanvas
-        subgraph={filtered}
-        litNodeIds={pathNodeIds}
-        litEdgeIds={pathEdgeIds}
-        dimUnlit={dimUnlit}
-        selectedNodeId={selectedNodeId}
-        selectedEdgeId={selectedEdgeId}
-        edgeInteraction={edgeInteraction}
-        onReady={handleCanvasReady}
-        // Hover previews a number on desktop (off while an edge is selected).
-        onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
-        onEdgeMouseLeave={() => endPreviewSoon()}
-        // Click/tap a line selects it and shows its number; a second click on
-        // the selected line opens the relating dialog (clicking the number
-        // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
-        onEdgeClick={(_event, edge) => {
-          clearPreviewTimer();
-          // Selecting an edge supersedes any node selection.
-          setSelectedNodeId(null);
-          if (selectedEdgeId === edge.id) {
-            const d = edge.data;
-            if (d?.isOutgoing) {
-              onOpenRelating({
-                id: d.relateeId,
-                displayName: d.relateeName,
-                currentValue: isRelationValue(d.value) ? d.value : null,
-              });
-            }
-            return;
-          }
-          setSelectedEdgeId(edge.id);
+    // Full-width wrapper: its width is the available width (clientWidth) and
+    // its top is the canvas's offset from the viewport top — both read by
+    // measure() to size the centered box inside without measuring the box's
+    // own (derived) width, which would be circular.
+    <div ref={wrapRef} className="w-full">
+      <div
+        data-tour="graph"
+        style={{
+          width: dims ? `${dims.width}px` : undefined,
+          height: heightPx ? `${heightPx}px` : undefined,
+          transition: animateHeight ? `height ${MODE_ANIM_MS}ms ${MODE_ANIM_EASE}` : undefined,
         }}
-        onPaneClick={() => clearSelection()}
-        onNodeClick={(_event, node) => {
-          // Select the node (re-click toggles off): lights its path back to
-          // you and dims the rest. No viewport pan; clears any edge
-          // selection. Double-click still opens the member's profile.
-          clearPreviewTimer();
-          setHoverEdgeId(null);
-          setSelectedEdgeId(null);
-          setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
-        }}
-        onNodeDoubleClick={(_event, node) => {
-          const slug = node.data.slug ?? node.data.id;
-          router.push(`/members/${slug}`);
-        }}
+        className="mx-auto overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
       >
-        {/* Built-in +/-/fit-view buttons for users who can't or don't
-         * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
-         * is hidden — selection and connection are already disabled. */}
-        <Controls position="top-left" showInteractive={false} />
-        <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
-          {/* Click-to-toggle (not hover) so the hints stay reachable on
-           * touch devices where hover doesn't exist. */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
-            aria-expanded={hintOpen}
-            aria-controls="web-graph-hints"
-            onClick={() => setHintOpen((h) => !h)}
-            className="rounded-full border border-border bg-background/90 font-bold"
-          >
-            ?
-          </Button>
-          {hintOpen && (
-            <div
-              id="web-graph-hints"
-              className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
-            >
-              <ul className="flex flex-col gap-1">
-                <li>Drag the background to pan.</li>
-                <li>Drag a circle to reposition it.</li>
-                <li>Scroll or pinch to zoom.</li>
-                <li>Single-click a circle to highlight its path to you.</li>
-                <li>Double-click a circle to open their profile.</li>
-                <li>
-                  <span className="font-medium text-foreground">Friends-of-friends</span> adds your connections&apos;
-                  connections.
-                </li>
-                <li>
-                  Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship
-                  depths.
-                </li>
-              </ul>
-              <button
-                type="button"
-                onClick={() => {
-                  setHintOpen(false);
-                  onReplayTour();
-                }}
-                className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+        <WebGraphCanvas
+          subgraph={filtered}
+          litNodeIds={pathNodeIds}
+          litEdgeIds={pathEdgeIds}
+          dimUnlit={dimUnlit}
+          selectedNodeId={selectedNodeId}
+          selectedEdgeId={selectedEdgeId}
+          edgeInteraction={edgeInteraction}
+          onReady={handleCanvasReady}
+          // Hover previews a number on desktop (off while an edge is selected).
+          onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
+          onEdgeMouseLeave={() => endPreviewSoon()}
+          // Click/tap a line selects it and shows its number; a second click on
+          // the selected line opens the relating dialog (clicking the number
+          // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
+          onEdgeClick={(_event, edge) => {
+            clearPreviewTimer();
+            // Selecting an edge supersedes any node selection.
+            setSelectedNodeId(null);
+            if (selectedEdgeId === edge.id) {
+              const d = edge.data;
+              if (d?.isOutgoing) {
+                onOpenRelating({
+                  id: d.relateeId,
+                  displayName: d.relateeName,
+                  currentValue: isRelationValue(d.value) ? d.value : null,
+                });
+              }
+              return;
+            }
+            setSelectedEdgeId(edge.id);
+          }}
+          onPaneClick={() => clearSelection()}
+          onNodeClick={(_event, node) => {
+            // Select the node (re-click toggles off): lights its path back to
+            // you and dims the rest. No viewport pan; clears any edge
+            // selection. Double-click still opens the member's profile.
+            clearPreviewTimer();
+            setHoverEdgeId(null);
+            setSelectedEdgeId(null);
+            setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
+          }}
+          onNodeDoubleClick={(_event, node) => {
+            const slug = node.data.slug ?? node.data.id;
+            router.push(`/members/${slug}`);
+          }}
+        >
+          {/* Built-in +/-/fit-view buttons for users who can't or don't
+           * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+           * is hidden — selection and connection are already disabled. */}
+          <Controls position="top-left" showInteractive={false} />
+          {/* Edit/Done in the lower-left corner so the toggle rides with the
+           * graph chrome and the page below stays clear for the feed. Same
+           * affordance in both modes, different label. The Done button carries
+           * the welcome tour's finishing-step anchor (data-tour). */}
+          <Panel position="bottom-left" className="flex flex-col items-start gap-2">
+            {doneError && (
+              <p
+                role="alert"
+                className="max-w-[16rem] rounded border border-border bg-background/90 p-2 text-sm text-destructive"
               >
-                Replay guided tour
-              </button>
-            </div>
-          )}
-        </Panel>
-        <WebGraphControls
-          hops={view.hops}
-          onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
-          valueFilter={valueFilter}
-          onToggleValue={toggleValue}
-        />
-      </WebGraphCanvas>
+                Couldn&apos;t save your update — your relationships are still saved.
+              </p>
+            )}
+            {mode === "edit" ? (
+              <Button variant="secondary" data-tour="done-button" disabled={donePending} onClick={onDone}>
+                {donePending ? "Saving…" : "Done"}
+              </Button>
+            ) : (
+              <Button onClick={onEdit}>Edit</Button>
+            )}
+          </Panel>
+          <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+            {/* Click-to-toggle (not hover) so the hints stay reachable on
+             * touch devices where hover doesn't exist. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+              aria-expanded={hintOpen}
+              aria-controls="web-graph-hints"
+              onClick={() => setHintOpen((h) => !h)}
+              className="rounded-full border border-border bg-background/90 font-bold"
+            >
+              ?
+            </Button>
+            {hintOpen && (
+              <div
+                id="web-graph-hints"
+                className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+              >
+                <ul className="flex flex-col gap-1">
+                  <li>Drag the background to pan.</li>
+                  <li>Drag a circle to reposition it.</li>
+                  <li>Scroll or pinch to zoom.</li>
+                  <li>Single-click a circle to highlight its path to you.</li>
+                  <li>Double-click a circle to open their profile.</li>
+                  <li>
+                    <span className="font-medium text-foreground">Friends-of-friends</span> adds your connections&apos;
+                    connections.
+                  </li>
+                  <li>
+                    Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship
+                    depths.
+                  </li>
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHintOpen(false);
+                    onReplayTour();
+                  }}
+                  className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+                >
+                  Replay guided tour
+                </button>
+              </div>
+            )}
+          </Panel>
+          <WebGraphControls
+            hops={view.hops}
+            onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
+            valueFilter={valueFilter}
+            onToggleValue={toggleValue}
+          />
+        </WebGraphCanvas>
+      </div>
     </div>
   );
 }

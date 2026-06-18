@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
 
@@ -172,41 +171,28 @@ export function MyWeb({ initialLastUpdatedWeb }: { initialLastUpdatedWeb: Date |
        * introduced. visibility (not display) keeps the layout stable
        * under the tooltip. */}
       <PageHeader title="My web" className={farewellRun ? "invisible" : undefined} />
-      {/* Below 600px the graph breaks out of the page's horizontal padding to
-       * go edge-to-edge; the title/breadcrumb (above) and the Edit/Done row +
-       * feed (below) keep their padding. The negative margin equals -(50vw -
+      {/* Below 900px the graph breaks out of the page's horizontal padding to
+       * go edge-to-edge; the title/breadcrumb (above) and the feed (below, in
+       * edit mode) keep their padding. The negative margin equals -(50vw -
        * half the container), the canonical full-bleed within a padded parent. */}
-      <div className="w-full max-[600px]:mx-[calc(50%_-_50vw)] max-[600px]:w-screen">
-        <WebGraph square={mode === "view"} onOpenRelating={setRelatingTarget} onReplayTour={replayTour} />
+      <div className="w-full max-[900px]:mx-[calc(50%_-_50vw)] max-[900px]:w-screen">
+        <WebGraph
+          expanded={mode === "view"}
+          onOpenRelating={setRelatingTarget}
+          onReplayTour={replayTour}
+          mode={mode}
+          onEdit={() => setMode("edit")}
+          onDone={handleDoneClick}
+          donePending={markDone.isPending}
+          doneError={markDone.isError}
+        />
       </div>
 
-      {/* Toggle floats in the right gutter so it doesn't claim its own
-       * row. Edit and Done sit at the same coordinates across modes —
-       * same affordance, different label. Capped at max-w-5xl so the
-       * builder and toggle stay readable even though the view-mode graph
-       * above now spans wider. */}
-      <div className="relative w-full max-w-5xl">
-        <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-2">
-          {mode === "edit" ? (
-            <Button variant="secondary" data-tour="done-button" disabled={markDone.isPending} onClick={handleDoneClick}>
-              {markDone.isPending ? "Saving…" : "Done"}
-            </Button>
-          ) : (
-            <Button onClick={() => setMode("edit")}>Edit</Button>
-          )}
-          {markDone.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              Couldn&apos;t save your update — your relationships are still saved.
-            </p>
-          )}
+      {mode === "edit" && (
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+          <WebBuilder onOpenRelating={setRelatingTarget} flyingId={flying?.candidateId ?? null} />
         </div>
-
-        {mode === "edit" && (
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            <WebBuilder onOpenRelating={setRelatingTarget} flyingId={flying?.candidateId ?? null} />
-          </div>
-        )}
-      </div>
+      )}
 
       <RelatingDialog
         target={relatingTarget}

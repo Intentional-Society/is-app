@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ReactFlow measures its container via ResizeObserver, which jsdom lacks; the
@@ -65,11 +65,21 @@ const populatedWeb = {
   edges: [{ relatorId: "c", relateeId: "a", value: 3 }],
 };
 
-const renderGraph = () => {
+const renderGraph = (props: Partial<ComponentProps<typeof WebGraph>> = {}) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <WebGraph square={false} onOpenRelating={vi.fn()} onReplayTour={vi.fn()} />
+      <WebGraph
+        expanded={false}
+        onOpenRelating={vi.fn()}
+        onReplayTour={vi.fn()}
+        mode="edit"
+        onEdit={vi.fn()}
+        onDone={vi.fn()}
+        donePending={false}
+        doneError={false}
+        {...props}
+      />
     </QueryClientProvider>,
   );
 };
@@ -111,6 +121,32 @@ describe("WebGraph — view persistence", () => {
     $get.mockResolvedValue(okResponse(emptyWeb));
     renderGraph();
     await waitFor(() => expect($get).toHaveBeenCalledWith({ query: { hops: "1" } }));
+  });
+});
+
+describe("WebGraph — Edit/Done toggle", () => {
+  // The toggle lives in the canvas's lower-left Panel; state stays in MyWeb and
+  // arrives via props, so the canvas just renders the label and reports clicks.
+  it("renders Done in edit mode and reports the click", async () => {
+    $get.mockResolvedValue(okResponse(populatedWeb));
+    const onDone = vi.fn();
+    renderGraph({ mode: "edit", onDone });
+    fireEvent.click(await screen.findByRole("button", { name: "Done" }));
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it("renders Edit in view mode and reports the click", async () => {
+    $get.mockResolvedValue(okResponse(populatedWeb));
+    const onEdit = vi.fn();
+    renderGraph({ mode: "view", onEdit });
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(onEdit).toHaveBeenCalledOnce();
+  });
+
+  it("surfaces the save error alongside the still-enabled Done button", async () => {
+    $get.mockResolvedValue(okResponse(populatedWeb));
+    renderGraph({ mode: "edit", doneError: true });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save your update");
   });
 });
 
