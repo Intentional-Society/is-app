@@ -382,21 +382,35 @@ export function WebGraph({
   // canvas applies these to the rendered nodes/edges.
   const dimUnlit = selectedNodeId !== null;
 
-  // Which nodes show their name. Hidden by default; revealed for the lit path (a
-  // node selection), the hovered node, and the two endpoints of a hovered or
-  // selected edge. Edge ids are `relator->relatee` and member ids never contain
-  // "->", so a split cleanly recovers both endpoints.
-  const labeledNodeIds = useMemo(() => {
-    const ids = new Set<string>(pathNodeIds);
+  // The live pointer focus, lifted to the top of the z-stack so a revealed name
+  // reads above its neighbors: the directly-hovered node, plus both endpoints of
+  // a hovered edge (whose names appear alongside its number). Edge ids are
+  // `relator->relatee` and member ids never contain "->", so a split cleanly
+  // recovers both endpoints.
+  const hoveredNodeIds = useMemo(() => {
+    const ids = new Set<string>();
     if (hoverNodeId) ids.add(hoverNodeId);
-    for (const edgeId of [hoverEdgeId, selectedEdgeId]) {
-      if (!edgeId) continue;
-      const [relatorId, relateeId] = edgeId.split("->");
+    if (hoverEdgeId) {
+      const [relatorId, relateeId] = hoverEdgeId.split("->");
       ids.add(relatorId);
       ids.add(relateeId);
     }
     return ids;
-  }, [pathNodeIds, hoverNodeId, hoverEdgeId, selectedEdgeId]);
+  }, [hoverNodeId, hoverEdgeId]);
+
+  // Which nodes show their name. Hidden by default; revealed for the lit path (a
+  // node selection), the hover set above, and the two endpoints of a selected
+  // edge.
+  const labeledNodeIds = useMemo(() => {
+    const ids = new Set<string>(pathNodeIds);
+    for (const id of hoveredNodeIds) ids.add(id);
+    if (selectedEdgeId) {
+      const [relatorId, relateeId] = selectedEdgeId.split("->");
+      ids.add(relatorId);
+      ids.add(relateeId);
+    }
+    return ids;
+  }, [pathNodeIds, hoveredNodeIds, selectedEdgeId]);
 
   const empty = !data || data.nodes.length === 0;
 
@@ -452,7 +466,8 @@ export function WebGraph({
           dimUnlit={dimUnlit}
           labeledNodeIds={labeledNodeIds}
           selectedNodeId={selectedNodeId}
-          selectedEdgeId={selectedEdgeId}
+          hoverNodeIds={hoveredNodeIds}
+          hoverEdgeId={hoverEdgeId}
           edgeInteraction={edgeInteraction}
           onReady={handleCanvasReady}
           // Hover previews a number on desktop (off while an edge is selected).

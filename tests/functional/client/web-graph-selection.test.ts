@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   decorateEdges,
   decorateNodes,
+  HOVER_EDGE_Z,
+  HOVER_NODE_Z,
   pathToCenter,
   SELECTION_EDGE_Z,
   SELECTION_NODE_Z,
@@ -87,9 +89,14 @@ describe("decorateEdges", () => {
     data: { isOutgoing },
   });
 
-  it("returns edges untouched when nothing is lit or dimmed", () => {
+  it("returns edges untouched when nothing is clickable, lit, dimmed, or hovered", () => {
     const edges = [mk("e1"), mk("e2")];
-    const out = decorateEdges(edges, { litEdgeIds: new Set(), dimUnlit: false, selectedEdgeId: null });
+    const out = decorateEdges(edges, {
+      litEdgeIds: new Set(),
+      dimUnlit: false,
+      edgesClickable: false,
+      hoverEdgeId: null,
+    });
     expect(out[0]).toBe(edges[0]);
     expect(out[1]).toBe(edges[1]);
   });
@@ -98,7 +105,8 @@ describe("decorateEdges", () => {
     const out = decorateEdges([mk("on"), mk("off")], {
       litEdgeIds: new Set(["on"]),
       dimUnlit: true,
-      selectedEdgeId: null,
+      edgesClickable: false,
+      hoverEdgeId: null,
     });
     expect(out[0].style?.stroke).toBe("var(--color-success)");
     expect(out[0].zIndex).toBe(SELECTION_EDGE_Z);
@@ -110,41 +118,89 @@ describe("decorateEdges", () => {
     const out = decorateEdges([mk("on"), mk("off")], {
       litEdgeIds: new Set(["on"]),
       dimUnlit: false,
-      selectedEdgeId: null,
+      edgesClickable: false,
+      hoverEdgeId: null,
     });
     expect(out[0].style?.stroke).toBe("var(--color-success)");
     // The off-path edge is returned untouched — no dim wash.
     expect(out[1].style?.stroke).toBeUndefined();
   });
 
-  it("marks a selected outgoing edge as clickable", () => {
-    const out = decorateEdges([mk("e1", true)], { litEdgeIds: new Set(), dimUnlit: false, selectedEdgeId: "e1" });
-    expect(out[0].className).toBe("cursor-pointer");
-  });
-
-  it("leaves a selected incoming edge unclickable", () => {
-    const out = decorateEdges([mk("e1", false)], {
+  it("marks every edge clickable when the canvas's edges are clickable", () => {
+    const out = decorateEdges([mk("in", false), mk("out", true)], {
       litEdgeIds: new Set(),
       dimUnlit: false,
-      selectedEdgeId: "e1",
+      edgesClickable: true,
+      hoverEdgeId: null,
+    });
+    // Incoming and outgoing alike — every edge selects on click, so both signal it.
+    expect(out[0].className).toBe("cursor-pointer");
+    expect(out[1].className).toBe("cursor-pointer");
+  });
+
+  it("leaves edges unmarked when the canvas's edges aren't clickable (mini-map)", () => {
+    const out = decorateEdges([mk("e1", true)], {
+      litEdgeIds: new Set(),
+      dimUnlit: false,
+      edgesClickable: false,
+      hoverEdgeId: null,
     });
     expect(out[0].className).toBeUndefined();
+  });
+
+  it("lifts a plain hovered edge above the tangle without recoloring it", () => {
+    const out = decorateEdges([mk("h"), mk("rest")], {
+      litEdgeIds: new Set(),
+      dimUnlit: false,
+      edgesClickable: false,
+      hoverEdgeId: "h",
+    });
+    expect(out[0].zIndex).toBe(HOVER_EDGE_Z);
+    expect(out[0].style?.stroke).toBeUndefined(); // hover reveals, never recolors
+    expect(out[1].zIndex).toBeUndefined();
+  });
+
+  it("lifts a hovered lit edge above its lit-path z (pointer focus outranks selection)", () => {
+    const out = decorateEdges([mk("on")], {
+      litEdgeIds: new Set(["on"]),
+      dimUnlit: true,
+      edgesClickable: false,
+      hoverEdgeId: "on",
+    });
+    // Keeps the lit green stroke but rides the hover tier, not SELECTION_EDGE_Z.
+    expect(out[0].style?.stroke).toBe("var(--color-success)");
+    expect(out[0].zIndex).toBe(HOVER_EDGE_Z);
   });
 });
 
 describe("decorateNodes", () => {
   const mk = (id: string): Node => ({ id, position: { x: 0, y: 0 }, data: {} });
 
-  it("returns the same array reference when nothing is lit", () => {
+  it("returns the same array reference when nothing is lifted", () => {
     const nodes = [mk("a"), mk("b")];
-    expect(decorateNodes(nodes, { litNodeIds: new Set() })).toBe(nodes);
+    expect(decorateNodes(nodes, { litNodeIds: new Set(), hoverNodeIds: new Set() })).toBe(nodes);
   });
 
   it("lifts lit nodes and leaves the rest untouched", () => {
     const offPath = mk("b");
-    const out = decorateNodes([mk("a"), offPath], { litNodeIds: new Set(["a"]) });
+    const out = decorateNodes([mk("a"), offPath], { litNodeIds: new Set(["a"]), hoverNodeIds: new Set() });
     expect(out[0].zIndex).toBe(SELECTION_NODE_Z);
     expect(out[1]).toBe(offPath);
     expect(out[1].zIndex).toBeUndefined();
+  });
+
+  it("lifts hovered nodes to the hover tier above the lit path", () => {
+    const out = decorateNodes([mk("h"), mk("lit"), mk("rest")], {
+      litNodeIds: new Set(["lit"]),
+      hoverNodeIds: new Set(["h"]),
+    });
+    expect(out[0].zIndex).toBe(HOVER_NODE_Z);
+    expect(out[1].zIndex).toBe(SELECTION_NODE_Z);
+    expect(out[2].zIndex).toBeUndefined();
+  });
+
+  it("gives hover precedence when a node is both lit and hovered", () => {
+    const out = decorateNodes([mk("a")], { litNodeIds: new Set(["a"]), hoverNodeIds: new Set(["a"]) });
+    expect(out[0].zIndex).toBe(HOVER_NODE_Z);
   });
 });

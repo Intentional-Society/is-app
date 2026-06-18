@@ -18,7 +18,7 @@ import type { RelationSubgraph } from "@/lib/api-types";
 import { isRelationValue } from "@/lib/relation-value";
 
 import type { RelatingTarget } from "./relating-dialog";
-import { DIM_KEEP } from "./web-graph-selection";
+import { DIM_KEEP, EDGE_LABEL_Z } from "./web-graph-selection";
 
 // The two custom ReactFlow renderers — the member node and the numbered edge —
 // plus the data shapes they read and the interaction contexts WebGraph fills.
@@ -196,6 +196,11 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            // Lift the revealed pill above the hover tier so its halo never tucks
+            // under a lifted avatar. The edge-label layer is stacking-transparent,
+            // so this competes in the viewport (see EDGE_LABEL_Z). Hidden pills
+            // stay at auto — they're invisible and capture no clicks anyway.
+            zIndex: isVisible ? EDGE_LABEL_Z : undefined,
           }}
           className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/80 text-xs font-semibold text-canvas-foreground transition-opacity duration-150 ${
             isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"

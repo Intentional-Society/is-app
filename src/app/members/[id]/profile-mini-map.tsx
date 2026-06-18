@@ -105,7 +105,6 @@ export function ProfileMiniMap({ profileId, memberName }: { profileId: string; m
         dimUnlit={false}
         labeledNodeIds={labeledNodeIds}
         selectedNodeId={null}
-        selectedEdgeId={null}
         viewerCueNodeId={subgraph.viewerId}
         interactive={false}
         fitViewPadding={MINI_MAP_FIT_PADDING}

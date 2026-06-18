@@ -20,6 +20,10 @@ import {
 } from "./web-graph-renderers";
 import { decorateEdges, decorateNodes } from "./web-graph-selection";
 
+// Stable empty hover set for read-only consumers that omit the prop, so the
+// decorateNodes memo below doesn't see a fresh Set each render.
+const NO_HOVER_NODE_IDS: ReadonlySet<string> = new Set();
+
 // The reusable rendering surface beneath WebGraph: it owns the d3-force layout,
 // the ReactFlow canvas, the member/edge renderer contexts, and the lit/dim
 // decoration. The full graph (WebGraph) and a future controls-free mini-map both
@@ -56,10 +60,15 @@ type WebGraphCanvasProps = {
   // Names are hidden otherwise. WebGraph builds the set from its hover/selection
   // state; a read-only consumer can pass an empty set for a nameless graph.
   labeledNodeIds: ReadonlySet<string>;
-  // The clicked node (kept at hover size) and the selected editable edge
-  // (cursor:pointer). Both null in read-only views like the mini-map.
+  // The clicked node, kept at hover size. Null in read-only views like the
+  // mini-map. (The selected edge reaches the renderer via edgeInteraction; the
+  // canvas no longer needs it, since every edge now reads as clickable.)
   selectedNodeId: string | null;
-  selectedEdgeId: string | null;
+  // The live pointer focus, lifted to the top of the stack: the nodes under it
+  // (the hovered node, plus a hovered edge's two endpoints) and the hovered
+  // edge's line. Omitted in read-only views (the mini-map has no hover state).
+  hoverNodeIds?: ReadonlySet<string>;
+  hoverEdgeId?: string | null;
   // The viewer's node — its name label reads "You" (the mini-map's viewer at the
   // end of the lit path). Null in the full graph, where you're obviously the
   // center.
@@ -103,7 +112,8 @@ export function WebGraphCanvas({
   dimUnlit,
   labeledNodeIds,
   selectedNodeId,
-  selectedEdgeId,
+  hoverNodeIds = NO_HOVER_NODE_IDS,
+  hoverEdgeId = null,
   viewerCueNodeId = null,
   edgeInteraction = null,
   fitViewPadding = FIT_VIEW_PADDING,
@@ -170,16 +180,26 @@ export function WebGraphCanvas({
     [litNodeIds, dimUnlit, selectedNodeId, labeledNodeIds, viewerCueNodeId],
   );
 
-  // Light the selected edge and the lit path; dim the rest when asked. The
-  // stroke transition on the base style eases the recolor. See decorateEdges.
+  // Edges are clickable exactly when the wrapper wired up a click handler — the
+  // full graph does (select / open the relating dialog), the read-only mini-map
+  // doesn't. A stable boolean so the memo below doesn't churn on the handler's
+  // changing identity.
+  const edgesClickable = onEdgeClick != null;
+
+  // Light the lit path and dim the rest when asked; mark every edge clickable.
+  // The stroke transition on the base style eases the recolor. See decorateEdges.
   const decoratedEdges = useMemo(
-    () => decorateEdges(baseEdges, { litEdgeIds, dimUnlit, selectedEdgeId }),
-    [baseEdges, litEdgeIds, dimUnlit, selectedEdgeId],
+    () => decorateEdges(baseEdges, { litEdgeIds, dimUnlit, edgesClickable, hoverEdgeId }),
+    [baseEdges, litEdgeIds, dimUnlit, edgesClickable, hoverEdgeId],
   );
 
-  // Lift the lit nodes above the dimmed graph; derived from the live `nodes`
-  // state so sim ticks and drags flow through untouched. See decorateNodes.
-  const decoratedNodes = useMemo(() => decorateNodes(nodes, { litNodeIds }), [nodes, litNodeIds]);
+  // Lift the lit nodes above the dimmed graph and the hovered nodes above that;
+  // derived from the live `nodes` state so sim ticks and drags flow through
+  // untouched. See decorateNodes.
+  const decoratedNodes = useMemo(
+    () => decorateNodes(nodes, { litNodeIds, hoverNodeIds }),
+    [nodes, litNodeIds, hoverNodeIds],
+  );
 
   // Read-only embed config: lock every gesture so the canvas never steals page
   // scroll, and drop minZoom well below ReactFlow's 0.5 default so fitView can
