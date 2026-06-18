@@ -27,7 +27,7 @@ Confirmed 2026-06-18. Every item is standard markdown (CommonMark + GFM) and ren
 - Bullet and numbered lists
 - Links
 - Block quotes
-- Headings — scoped to sub-page levels (h2–h4) so authored headings nest under the page's own title rather than competing with it
+- Headings — start at **h3** (h3–h4). The pages that render this prose use h2 for their own title, so authored headings begin one level deeper; the shared `<Markdown>` maps the top markdown heading to h3 and below, keeping authored content under the page title in the document outline
 
 `blurb` carries an **inline-only** subset of the above (bold, italic, strikethrough, links — no headings, lists, or quotes), because it renders in the tight space of a list card.
 
@@ -50,14 +50,14 @@ Why markdown over an HTML subset or editor-specific JSON:
 - **Portable and diffable.** Markdown is human-readable, editor-agnostic, and survives a future editor swap. Editor-specific JSON couples the stored data to one library.
 - **No DB-level change.** The column type, length, and nullability are untouched.
 
-Rich text applies to `programs.description` and `programs.blurb` (the latter inline-only — see [Formatting set](#formatting-set-v1)), plus the member-prose fields `profiles.bio`, `currentIntention`, and `supplementaryInfo`. **No length cap** is imposed on any of them — the `text` columns stay unlimited; authors are members and admins, not the public.
+Rich text applies to `programs.description` and `programs.blurb` (the latter inline-only — see [Formatting set](#formatting-set-v1)), plus the member-prose fields `profiles.bio`, `currentIntention`, and `supplementaryInfo`. These are already `text` columns and stay so. Whatever length limit each field carries today is a separate per-field product decision that this design neither sets nor changes — markdown is just text, so existing caps keep applying to the source bytes untouched.
 
 ## Render: `react-markdown`, no raw HTML
 
 Rendering uses **`react-markdown` + `remark-gfm`**, with **no `rehype-raw`**.
 
 - `react-markdown` parses markdown to an AST and builds a React element tree directly. It never uses `dangerouslySetInnerHTML` and does not render embedded raw HTML unless `rehype-raw` is enabled — so it is XSS-safe with no separate sanitizer.
-- `remark-gfm` adds the GitHub-flavored extras (tables, strikethrough, task lists, autolinks).
+- `remark-gfm` adds the GitHub-flavored extras (tables, strikethrough, task lists, autolinks). The toolbar only authors strikethrough and links (autolinks just make a bare URL clickable), but the full `<Markdown>` renderer is deliberately **left unconstrained**: if legacy or pasted source happens to contain a table or `- [ ]` checkbox it renders as one. That is harmless layout, not a security concern (still no raw HTML), and authors are trusted, so we do not pin `allowedElements` here. The constrained-inline card variant is the one exception, and it allowlists for layout, not safety (see [Cards](#cards-and-other-constrained-surfaces)).
 - **`rehype-raw` is the one thing we do not add** — it is the only path that reintroduces raw-HTML execution and would drag in DOMPurify + CSP work for no benefit here.
 - Styling: `@tailwindcss/typography` (`prose` classes), themed to the app's serif look, so headings/lists/links inherit the existing tokens rather than browser defaults.
 
@@ -92,6 +92,8 @@ Why MDXEditor specifically, given markdown storage:
 
 **Paste keeps formatting:** pasted rich content (from a doc or web page) is converted to the supported markdown subset; anything outside the set degrades to plain text rather than being preserved as raw HTML.
 
+**Required-field empty state:** an editor a user has touched and cleared can still serialize to non-empty whitespace or empty markup, so a required field (member `bio` is the only one today) gates "Save" on the rendered output being non-empty, not on the markdown string having length.
+
 The candidates were the WYSIWYG-over-markdown editors:
 
 | Editor | Weekly npm (2026-06-18) | License | Markdown round-trip | Notes |
@@ -105,7 +107,7 @@ The decisive axis is **round-trip fidelity**, not raw popularity. Tiptap's and B
 
 ### Bundle weight
 
-MDXEditor is built on Lexical and is not small. It is loaded **only in the admin authoring surface**, lazily — it must never ship to the public program-detail page, which needs only `react-markdown`. The render path and the authoring path have entirely separate dependency footprints.
+MDXEditor is built on Lexical and is not small. It is **lazily loaded in every authoring surface** — the admin program editor *and* the member-facing profile/onboarding forms — and **never ships to a render-only page** (public program detail, member profile, list cards), which need only `react-markdown`. The render path and the authoring path have entirely separate dependency footprints. Member prose is authored on bundle-sensitive member routes — including onboarding — so the dynamic import matters there as much as in admin: the editor chunk is fetched only when an author actually mounts the form, never on a first paint that only displays prose.
 
 ## Security model
 
@@ -127,4 +129,4 @@ Suggested build order *within* v1: land the shared components against program `d
 
 - **Legacy normalization** — confirm the one-time bare-newline normalization for existing descriptions (vs. keeping `remark-breaks` as a render-side belt). See [Line breaks](#line-breaks-let-the-editor-own-them-normalize-legacy-once).
 - **Theme integration** — tuning `prose` tokens against the serif type and existing color tokens (`docs/strategy-ui.md`).
-- **Measured bundle delta** from MDXEditor in the admin chunk, to confirm lazy-loading keeps it off the public page.
+- **Measured bundle delta** from MDXEditor on each authoring surface (admin program editor and the member/onboarding profile forms), to confirm the lazy import keeps it off every render-only page.
