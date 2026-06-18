@@ -56,6 +56,10 @@ export function ProfileMiniMap({ profileId, memberName }: { profileId: string; m
 
   const litNodeIds = useMemo(() => new Set(data?.pathToViewer ?? []), [data?.pathToViewer]);
   const litEdgeIds = useMemo(() => pathEdgeIds(data?.pathToViewer ?? []), [data?.pathToViewer]);
+  // This embed is a static, read-only diagram with no hover, so every node keeps
+  // its name (the full graph hides names until hover/selection instead). Pass the
+  // whole id set so the canvas labels them all.
+  const labeledNodeIds = useMemo(() => new Set((data?.nodes ?? []).map((n) => n.id)), [data?.nodes]);
   // Memoized so the canvas's layout effect (keyed on the subgraph) doesn't
   // rebuild the simulation on every render.
   const subgraph = useMemo(
@@ -99,6 +103,7 @@ export function ProfileMiniMap({ profileId, memberName }: { profileId: string; m
         litNodeIds={litNodeIds}
         litEdgeIds={litEdgeIds}
         dimUnlit={false}
+        labeledNodeIds={labeledNodeIds}
         selectedNodeId={null}
         selectedEdgeId={null}
         viewerCueNodeId={subgraph.viewerId}

@@ -52,6 +52,10 @@ type WebGraphCanvasProps = {
   litNodeIds: ReadonlySet<string>;
   litEdgeIds: ReadonlySet<string>;
   dimUnlit: boolean;
+  // Nodes whose name label is shown (lit path + hovered node/edge endpoints).
+  // Names are hidden otherwise. WebGraph builds the set from its hover/selection
+  // state; a read-only consumer can pass an empty set for a nameless graph.
+  labeledNodeIds: ReadonlySet<string>;
   // The clicked node (kept at hover size) and the selected editable edge
   // (cursor:pointer). Both null in read-only views like the mini-map.
   selectedNodeId: string | null;
@@ -85,6 +89,8 @@ type WebGraphCanvasProps = {
   onEdgeClick?: EdgeMouseHandler<Edge<EdgeData>>;
   onPaneClick?: (event: ReactMouseEvent) => void;
   onNodeClick?: NodeMouseHandler<Node<MemberNodeData>>;
+  onNodeMouseEnter?: NodeMouseHandler<Node<MemberNodeData>>;
+  onNodeMouseLeave?: NodeMouseHandler<Node<MemberNodeData>>;
   onNodeDoubleClick?: NodeMouseHandler<Node<MemberNodeData>>;
   // Corner panels (Controls, hints, view controls) rendered inside ReactFlow.
   children?: ReactNode;
@@ -95,6 +101,7 @@ export function WebGraphCanvas({
   litNodeIds,
   litEdgeIds,
   dimUnlit,
+  labeledNodeIds,
   selectedNodeId,
   selectedEdgeId,
   viewerCueNodeId = null,
@@ -108,6 +115,8 @@ export function WebGraphCanvas({
   onEdgeClick,
   onPaneClick,
   onNodeClick,
+  onNodeMouseEnter,
+  onNodeMouseLeave,
   onNodeDoubleClick,
   children,
 }: WebGraphCanvasProps) {
@@ -157,8 +166,8 @@ export function WebGraphCanvas({
   // Carries the node decoration to MemberNode via context (kept out of node.data
   // so a selection doesn't trigger a setNodes pass). See NodeInteraction.
   const nodeInteraction = useMemo<NodeInteraction>(
-    () => ({ litNodeIds, dimUnlit, selectedNodeId, viewerCueNodeId }),
-    [litNodeIds, dimUnlit, selectedNodeId, viewerCueNodeId],
+    () => ({ litNodeIds, dimUnlit, selectedNodeId, labeledNodeIds, viewerCueNodeId }),
+    [litNodeIds, dimUnlit, selectedNodeId, labeledNodeIds, viewerCueNodeId],
   );
 
   // Light the selected edge and the lit path; dim the rest when asked. The
@@ -218,6 +227,8 @@ export function WebGraphCanvas({
           elementsSelectable={false}
           proOptions={{ hideAttribution: true }}
           onNodeClick={onNodeClick}
+          onNodeMouseEnter={onNodeMouseEnter}
+          onNodeMouseLeave={onNodeMouseLeave}
           onNodeDoubleClick={onNodeDoubleClick}
         >
           {children}

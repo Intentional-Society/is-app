@@ -63,6 +63,11 @@ export type NodeInteraction = {
   // The clicked node, kept at hover size so a selection reads as "this one's it."
   // Null in read-only views (the mini-map navigates on click instead).
   selectedNodeId: string | null;
+  // Nodes whose name label is shown. Names are hidden by default and revealed
+  // for the lit path (a node selection) plus transient hover — a node, or a
+  // connected edge (its two endpoints); everything else stays nameless. Mirrors
+  // the edge-number reveal. WebGraph builds the set.
+  labeledNodeIds: ReadonlySet<string>;
   // The viewer's node — its name label reads "You" in place of the member name
   // (how the mini-map marks you). Null in the full graph, where you're the
   // obvious center.
@@ -74,6 +79,9 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
   const selection = useContext(NodeInteractionContext);
   const isSelected = selection?.selectedNodeId === id;
   const isViewer = selection?.viewerCueNodeId === id;
+  // Names are hidden by default; this node's shows only while it's labeled
+  // (lit path, or hovered directly / via a connected edge).
+  const labeled = selection?.labeledNodeIds.has(id) === true;
   // When dimming is on, every node off the lit set dims (see DIM_KEEP).
   const isDimmed = selection?.dimUnlit === true && !selection.litNodeIds.has(id);
   // Every lit node gets the green border to match the links; otherwise the
@@ -106,14 +114,23 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
           style={{ opacity: isDimmed ? 1 - DIM_KEEP : 0 }}
         />
       </div>
-      {/* The name dims by mixing its text color toward the canvas — color paints
-          only the glyphs, so no covering box (square) and no bleed-through. The
+      {/* Hidden by default, faded in when labeled (hover or lit path). Kept
+          mounted at opacity 0 rather than unmounted so the node's height never
+          shifts as names appear (no reflow against the fixed layout). The
           viewer's own node reads "You" in place of their name (mini-map cue). */}
       <div
-        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-colors duration-150"
-        style={
-          isDimmed ? { color: `color-mix(in srgb, currentColor ${DIM_KEEP * 100}%, var(--color-canvas))` } : undefined
-        }
+        aria-hidden={!labeled}
+        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-opacity duration-150"
+        style={{
+          opacity: labeled ? 1 : 0,
+          // Canvas-colored halo so the name reads over the dense edge lines
+          // behind it — those strokes are canvas-foreground, the same color
+          // family as the text, so without a moat the glyphs blend in.
+          // paint-order:stroke draws the stroke behind the fill, so it's a true
+          // outline (glyphs stay crisp) rather than a thinned weight.
+          paintOrder: "stroke",
+          WebkitTextStroke: "3px var(--color-canvas)",
+        }}
       >
         {isViewer ? "You" : (data.displayName ?? "—")}
       </div>

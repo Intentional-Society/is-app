@@ -318,6 +318,9 @@ export function WebGraph({
   // Node selection (click/tap a circle). Independent of edge selection but
   // mutually exclusive in practice: selecting one clears the other.
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // Transient node hover (desktop), independent of selection — reveals just that
+  // node's name while the pointer is on its circle. Cleared on leave.
+  const [hoverNodeId, setHoverNodeId] = useState<string | null>(null);
   // Mirror of selectedEdgeId for the stable previewEdge callback to read
   // without re-creating each time the selection changes.
   const selectedEdgeRef = useRef<string | null>(null);
@@ -379,6 +382,22 @@ export function WebGraph({
   // canvas applies these to the rendered nodes/edges.
   const dimUnlit = selectedNodeId !== null;
 
+  // Which nodes show their name. Hidden by default; revealed for the lit path (a
+  // node selection), the hovered node, and the two endpoints of a hovered or
+  // selected edge. Edge ids are `relator->relatee` and member ids never contain
+  // "->", so a split cleanly recovers both endpoints.
+  const labeledNodeIds = useMemo(() => {
+    const ids = new Set<string>(pathNodeIds);
+    if (hoverNodeId) ids.add(hoverNodeId);
+    for (const edgeId of [hoverEdgeId, selectedEdgeId]) {
+      if (!edgeId) continue;
+      const [relatorId, relateeId] = edgeId.split("->");
+      ids.add(relatorId);
+      ids.add(relateeId);
+    }
+    return ids;
+  }, [pathNodeIds, hoverNodeId, hoverEdgeId, selectedEdgeId]);
+
   const empty = !data || data.nodes.length === 0;
 
   if (isError) {
@@ -431,6 +450,7 @@ export function WebGraph({
           litNodeIds={pathNodeIds}
           litEdgeIds={pathEdgeIds}
           dimUnlit={dimUnlit}
+          labeledNodeIds={labeledNodeIds}
           selectedNodeId={selectedNodeId}
           selectedEdgeId={selectedEdgeId}
           edgeInteraction={edgeInteraction}
@@ -468,6 +488,8 @@ export function WebGraph({
             setSelectedEdgeId(null);
             setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
           }}
+          onNodeMouseEnter={(_event, node) => setHoverNodeId(node.id)}
+          onNodeMouseLeave={() => setHoverNodeId(null)}
           onNodeDoubleClick={(_event, node) => {
             const slug = node.data.slug ?? node.data.id;
             router.push(`/members/${slug}`);
