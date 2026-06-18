@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
+
 import { requireUser } from "@/lib/api-server";
 import type { Me } from "@/lib/api-types";
+import { titleFor } from "@/lib/page-titles";
 
 import { WelcomeTabs } from "./welcome-tabs";
+
+export const metadata: Metadata = { title: titleFor("/welcome/profile") };
 
 // Step 2 of the welcome flow: fill in or review profile data, then meet
 // the Settings tab (one-step tour) before continuing. Saving the form

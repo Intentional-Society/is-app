@@ -37,6 +37,11 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-06-17",
+    title: "Find the right tab",
+    description: "Browser tabs and history now show each page's name, so they're easy to tell apart.",
+  },
+  {
     date: "2026-06-12",
     title: "Home button",
     description: "There's no place like home... (house icon at the top-left)",
@@ -184,8 +189,7 @@ export const appVersion = changelog[0]?.date ?? "";
 // in the same PR as the fix; otherwise leave it. It is a full ISO 8601
 // timestamp, not a plain date like appVersion, so two urgent deploys on
 // the same day still compare strictly (the tab tests
-// NEXT_PUBLIC_BUILD_TIME < urgentReleasedAt). The epoch baseline means
-// "no urgent deploy on record."
+// NEXT_PUBLIC_BUILD_TIME < urgentReleasedAt).
 export const urgentReleasedAt = "2026-06-17T18:31:26.000Z";
 
 // Format an entry's "YYYY-MM-DD" date as e.g. "May 29, 2026". Pinned to

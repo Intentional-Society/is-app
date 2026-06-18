@@ -1,12 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { requireUser, serverApiClient } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { AdminHidden } from "./admin-hidden";
 import { AdminHints } from "./admin-hints";
 import { ButtondownSyncButtons } from "./buttondown-sync-buttons";
+
+export const metadata: Metadata = { title: titleFor("/admin") };
 
 export default async function AdminPage() {
   const me = await requireUser();

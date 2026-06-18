@@ -4,9 +4,13 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-17 | James | Per-page HTML titles for usable tab names and browser history
+
+Root layout sets `title.template = "IS Web: %s"`. Per-page titles live in one `src/lib/page-titles.ts` dictionary that feeds both each page's `metadata.title` and the breadcrumb back-labels (which no longer keep a separate list); detail pages set the entity name via `generateMetadata`. New pages add a dictionary entry. (#425)
+
 ## 2026-06-17 | James | Avatar signing degrades instead of 500ing under Storage load
 
-A directory browse prefetched every member card, and each prefetch render signed that member's avatar via a separate Supabase Storage call; the burst exhausted Storage's DB pool (429), which `resolveAvatarUrls` rethrew into a page 500. Signing is now best-effort — it logs `avatar sign failed` and falls back to initials — and member cards no longer prefetch. Shipped urgent (advanced `urgentReleasedAt`) so open tabs reload off the crashing build.
+A directory browse prefetched every member card, and each prefetch render made separate Supabase Storage call; that exhausted Storage's DB pool (429), which `resolveAvatarUrls` rethrew into a page 500. Signing is now best-effort — it logs `avatar sign failed` and falls back to initials — and member cards no longer prefetch. First test example of shipping an `urgentReleasedAt` update.
 
 ## 2026-06-16 | James | Update handling for active sessions
 
