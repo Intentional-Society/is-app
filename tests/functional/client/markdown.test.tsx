@@ -84,10 +84,13 @@ describe("Markdown (full)", () => {
     expect(container.textContent).toContain("<script>alert(1)</script>");
   });
 
-  it("neutralizes javascript: link protocols", () => {
-    const { container } = render(<Markdown>{"[x](javascript:alert(1))"}</Markdown>);
-    const href = container.querySelector("a")?.getAttribute("href") ?? "";
-    expect(href.startsWith("javascript:")).toBe(false);
+  it("neutralizes dangerous link protocols", () => {
+    // react-markdown allowlists URL protocols, so each of these dangerous
+    // schemes drops to an empty href rather than rendering as a live link.
+    for (const url of ["javascript:alert(1)", "vbscript:msgbox(1)", "data:text/html,<script>alert(1)</script>"]) {
+      const { container } = render(<Markdown>{`[x](${url})`}</Markdown>);
+      expect(container.querySelector("a")?.getAttribute("href") ?? "").toBe("");
+    }
   });
 });
 
@@ -146,10 +149,12 @@ describe("markdownHasContent", () => {
     expect(markdownHasContent("hello")).toBe(true);
     expect(markdownHasContent("**bold**")).toBe(true);
     expect(markdownHasContent("- a list item")).toBe(true);
+    // Literal HTML renders as text (no raw-HTML stripping), so it counts.
+    expect(markdownHasContent("<br>")).toBe(true);
   });
 
   it("is false for whitespace or empty markup", () => {
-    for (const empty of ["", "   ", "\n\n", "<br>", "**  **", "###", "> "]) {
+    for (const empty of ["", "   ", "\n\n", "**  **", "###", "> "]) {
       expect(markdownHasContent(empty)).toBe(false);
     }
   });

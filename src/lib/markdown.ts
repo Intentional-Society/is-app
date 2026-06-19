@@ -7,15 +7,13 @@ export const PROSE_CLASSNAME = "prose max-w-none font-serif prose-headings:font-
 
 // Returns true when markdown source renders to some visible text. Used to
 // validate "required" rich-text fields: a WYSIWYG editor a user has touched
-// and cleared can still serialize to non-empty whitespace or empty markup
-// ("\n", "<br>", "**  **"), so we check the rendered output rather than the
-// raw string length. See docs/design-richtext.md (Required-field empty state).
+// and cleared can still serialize to whitespace or bare structural markup
+// ("\n", "**  **", "###"), so we check for rendered content rather than raw
+// string length. The render path has no raw-HTML support, so any literal HTML
+// (e.g. "<br>") shows as text and counts as content — we strip only markdown
+// structural/emphasis punctuation and whitespace. See docs/design-richtext.md
+// (Required-field empty state).
 export function markdownHasContent(markdown: string): boolean {
-  const stripped = markdown
-    // raw <br> and any stray HTML tags carry no rendered text
-    .replace(/<[^>]*>/g, "")
-    // markdown structural + emphasis punctuation
-    .replace(/[#>*_~`+\-[\]()!|]/g, "")
-    .replace(/\s+/g, "");
+  const stripped = markdown.replace(/[#>*_~`+\-[\]()!|]/g, "").replace(/\s+/g, "");
   return stripped.length > 0;
 }
