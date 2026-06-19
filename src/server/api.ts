@@ -44,6 +44,8 @@ import {
   type ProfileReadProbe,
   parseEditableProfile,
   reactivateProfile,
+  removePassword,
+  setPasswordFlag,
   setProfileHidden,
   syncDisplayNameToAuthMetadata,
   upsertProfile,
@@ -488,6 +490,17 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const user = c.get("user");
     const result = await reactivateProfile(user.id);
     if ("error" in result) return c.json({ error: "profile not found" }, 404);
+    return c.json({ ok: true });
+  })
+  .post("/me/password-flag", async (c) => {
+    const user = c.get("user");
+    await setPasswordFlag(user.id, true);
+    return c.json({ ok: true });
+  })
+  .delete("/me/password", async (c) => {
+    const user = c.get("user");
+    const result = await removePassword(user.id);
+    if ("error" in result) return c.json({ error: result.error }, 500);
     return c.json({ ok: true });
   })
   .post("/me/avatar", async (c) => {

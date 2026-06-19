@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ChangePasswordForm } from "./change-password-form";
 import { DeactivateAccountForm } from "./deactivate-account-form";
 import { EmergencyContactForm } from "./emergency-contact-form";
+import { RemovePasswordForm } from "./remove-password-form";
 import { SlugForm } from "./slug-form";
 import { ThemeSelector } from "./theme-selector";
 
@@ -35,7 +36,7 @@ export function SettingsSections({
   profile,
   includeDeactivate = true,
 }: {
-  profile: { slug: string | null; emergencyContact: string | null; deactivatedAt: string | null };
+  profile: { slug: string | null; emergencyContact: string | null; deactivatedAt: string | null; hasPassword: boolean };
   includeDeactivate?: boolean;
 }) {
   return (
@@ -46,6 +47,7 @@ export function SettingsSections({
         divider={false}
       >
         <ChangePasswordForm />
+        {profile.hasPassword && <RemovePasswordForm />}
       </SettingsSection>
 
       <SettingsSection title="Emergency contact" description="Visible only to you and admins, in case of emergency.">

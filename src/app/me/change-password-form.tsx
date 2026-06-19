@@ -5,11 +5,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiClient } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
 type Status = { kind: "idle" } | { kind: "submitting" } | { kind: "success" } | { kind: "error"; message: string };
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ onPasswordSet }: { onPasswordSet?: () => void }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -34,6 +35,8 @@ export function ChangePasswordForm() {
         setStatus({ kind: "success" });
         setPassword("");
         setConfirm("");
+        await apiClient.api.me["password-flag"].$post({});
+        onPasswordSet?.();
       }
     } catch {
       // A thrown error (network drop, CORS) bypasses the returned { error };

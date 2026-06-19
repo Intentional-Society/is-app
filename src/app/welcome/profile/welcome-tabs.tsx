@@ -76,6 +76,7 @@ export function WelcomeTabs({ profile }: { profile: Me["profile"] }) {
             slug: profile?.slug ?? null,
             emergencyContact: profile?.emergencyContact ?? null,
             deactivatedAt: profile?.deactivatedAt ?? null,
+            hasPassword: profile?.hasPassword ?? false,
           }}
           includeDeactivate={false}
         />

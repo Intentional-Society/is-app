@@ -20,6 +20,10 @@ A directory browse prefetched every member card, and each prefetch render made s
 
 The home page auto-reloads a stale tab, everywhere else a persistent bottom banner offers a member-initiated reload. Deploys now fall into one of three tiers: patch (default, notif held until the running build is 6h old, then once per 8h), feature (held until build is 2h old, then once per 8h, dismissible — whenever a changelog is added), urgent (immediate, non-dismissible — gated by `urgentReleasedAt` marker in code).  Full rationale: docs/strategy-deployment.md.
 
+## 2026-06-14 | Ola | Remove password option (#212)
+
+Members can now remove their password from /me settings, reverting to magic-link-only sign-in. The "Remove password" button is only shown when `profiles.has_password` is true — set whenever a password is saved, cleared on removal. Removal uses `supabase.auth.admin.updateUserById` to replace the password with an unguessable random value (the only supported server-side path; direct `auth.users` mutation is intentionally avoided). Migration 0015 adds the `has_password` boolean column (default false).
+
 ## 2026-06-12 | James | Unified top bar
 
 Page titles and breadcrumbs now share one band with the fixed home/menu icons, via a shared `PageHeader` (full-width row, `pt-3` mains).

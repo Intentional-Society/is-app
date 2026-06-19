@@ -66,6 +66,7 @@ export const profiles = pgTable("profiles", {
   // are hidden from all member-facing views. Admins can reactivate by clearing
   // the field. Distinct from `hidden` which is an admin-only test-account flag.
   deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
+  hasPassword: boolean("has_password").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
