@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  computeNeighborNormalization,
   computeNormalization,
   EDGE_AVOID_THRESHOLD,
   edgeAvoidance,
   edgeStrokeOpacity,
   edgeStrokeWidth,
   linkDistance,
+  medianNearestNeighbor,
   radialSeed,
   SEED_FIRST_HOP_RADIUS,
   SEED_RING_GAP,
@@ -81,6 +83,86 @@ describe("computeNormalization", () => {
         600,
       ),
     ).toEqual({ cx: 50, cy: 150, scale: 2 });
+  });
+});
+
+describe("medianNearestNeighbor", () => {
+  it("returns 0 for fewer than two points", () => {
+    expect(medianNearestNeighbor([])).toBe(0);
+    expect(medianNearestNeighbor([{ x: 1, y: 1 }])).toBe(0);
+  });
+
+  it("measures each node's distance to its closest other", () => {
+    expect(
+      medianNearestNeighbor([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ]),
+    ).toBe(10);
+  });
+
+  it("takes the median across nodes", () => {
+    // x = 0, 10, 30 → nearest-neighbor distances 10, 10, 20 → median 10.
+    expect(
+      medianNearestNeighbor([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 30, y: 0 },
+      ]),
+    ).toBe(10);
+  });
+});
+
+describe("computeNeighborNormalization", () => {
+  it("returns null for an empty cloud", () => {
+    expect(computeNeighborNormalization([], 100)).toBeNull();
+  });
+
+  it("scales so the median neighbor gap renders as targetGap, centered on the bbox", () => {
+    // Neighbors 20 apart, targetGap 100 → scale 5.
+    expect(
+      computeNeighborNormalization(
+        [
+          { x: 0, y: 0 },
+          { x: 20, y: 0 },
+        ],
+        100,
+      ),
+    ).toEqual({ cx: 10, cy: 0, scale: 5 });
+  });
+
+  it("keeps scale 1 when the spacing is degenerate (coincident points)", () => {
+    expect(
+      computeNeighborNormalization(
+        [
+          { x: 3, y: 3 },
+          { x: 3, y: 3 },
+        ],
+        100,
+      )?.scale,
+    ).toBe(1);
+  });
+
+  it("is invariant to overall extent — same neighbor gap, same scale (the point of (b))", () => {
+    // A tight pair and a far-flung set with the SAME neighbor gap normalize to the
+    // same scale, even though their bounding boxes differ wildly.
+    const tight = computeNeighborNormalization(
+      [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+      ],
+      100,
+    );
+    const spread = computeNeighborNormalization(
+      [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 500, y: 0 },
+        { x: 520, y: 0 },
+      ],
+      100,
+    );
+    expect(spread?.scale).toBe(tight?.scale); // both 5 — the bounding box doesn't matter
   });
 });
 

@@ -6,7 +6,7 @@ import { type Edge, type EdgeMouseHandler, type Node, type NodeMouseHandler, Rea
 import { type MouseEvent as ReactMouseEvent, type ReactNode, useEffect, useMemo } from "react";
 
 import { FIT_VIEW_PADDING, useWebGraphSimulation } from "./use-web-graph-simulation";
-import { edgeStrokeOpacity, edgeStrokeWidth } from "./web-graph-layout";
+import { edgeStrokeOpacity, edgeStrokeWidth, type Normalize } from "./web-graph-layout";
 import {
   type EdgeData,
   type EdgeInteraction,
@@ -79,11 +79,10 @@ type WebGraphCanvasProps = {
   edgeInteraction?: EdgeInteraction | null;
   // Fraction of the canvas kept as breathing room on every fitView.
   fitViewPadding?: number;
-  // Sim-unit span the settled layout's longer axis normalizes to before fitView
-  // frames it — the map's zoom knob. Smaller ⇒ fitView zooms in ⇒ avatars,
-  // labels, and link gaps all render larger (the mini-map runs tighter than the
-  // full graph). Defaults to the full-graph target.
-  normalizationTarget?: number;
+  // How the settled layout maps into render space — the wrapper's density knob.
+  // The full graph scales by neighbor spacing (its spacing slider lives in this
+  // function's identity, so a drag re-fits); the mini-map scales by bounding box.
+  normalize: Normalize;
   // When false, pan/zoom/drag are locked (the mini-map never hijacks page
   // scroll). Defaults to the fully-interactive full graph.
   interactive?: boolean;
@@ -117,7 +116,7 @@ export function WebGraphCanvas({
   viewerCueNodeId = null,
   edgeInteraction = null,
   fitViewPadding = FIT_VIEW_PADDING,
-  normalizationTarget,
+  normalize,
   interactive = true,
   onReady,
   onEdgeMouseEnter,
@@ -168,7 +167,7 @@ export function WebGraphCanvas({
   // normalized render positions into `nodes`, fits the viewport as it settles,
   // and integrates node dragging. See useWebGraphSimulation.
   const { nodes, onNodesChange, onNodeDragStart, onNodeDrag, onNodeDragStop, registerFlow, markUserMoved, fitView } =
-    useWebGraphSimulation(subgraph, fitViewPadding, normalizationTarget);
+    useWebGraphSimulation(subgraph, fitViewPadding, normalize);
 
   // Surface fitView to the wrapper once (the hook returns a stable callback).
   useEffect(() => onReady?.(fitView), [onReady, fitView]);

@@ -12,12 +12,15 @@ import { apiClient } from "@/lib/api";
 import { isRelationValue, type RelationValue } from "@/lib/relation-value";
 
 import {
+  DEFAULT_SPACING,
   DEFAULT_SUBGRAPH_VIEW,
   defaultValueFilter,
+  parseStoredSpacing,
   parseStoredValueFilter,
   parseStoredView,
   RELATION_SUBGRAPH_QUERY_KEY,
   type RelationValueFilter,
+  SPACING_STORAGE_KEY,
   type SubgraphViewOptions,
   VALUE_FILTER_STORAGE_KEY,
   VIEW_STORAGE_KEY,
@@ -26,6 +29,7 @@ import type { RelatingTarget } from "./relating-dialog";
 import { WebGraphCanvas } from "./web-graph-canvas";
 import { WebGraphControls } from "./web-graph-controls";
 import { filterSubgraphByValue } from "./web-graph-filtering";
+import { computeNeighborNormalization, NEIGHBOR_GAP_BASE } from "./web-graph-layout";
 import type { EdgeInteraction } from "./web-graph-renderers";
 import { pathToCenter, shortestPathTree } from "./web-graph-selection";
 
@@ -102,6 +106,11 @@ export function WebGraph({
   // subgraph (see the `filtered` memo), so toggling re-filters instantly with no
   // refetch. Lazy init so the default Set isn't a shared module singleton.
   const [valueFilter, setValueFilter] = useState<RelationValueFilter>(defaultValueFilter);
+  // The spacing slider's value — a multiplier on the rendered neighbor gap (<1
+  // denser, >1 airier). The normalization holds density constant on its own, so
+  // this is pure taste. Restored from localStorage in the mount effect below;
+  // persisted on its own key.
+  const [spacing, setSpacing] = useState<number>(DEFAULT_SPACING);
 
   // Restore the user's last filter choice across reloads. Done in an
   // effect rather than the useState initializer so SSR-rendered markup
@@ -113,6 +122,8 @@ export function WebGraph({
     if (stored && stored.hops !== DEFAULT_SUBGRAPH_VIEW.hops) setView(stored);
     const storedFilter = parseStoredValueFilter(window.localStorage.getItem(VALUE_FILTER_STORAGE_KEY));
     if (storedFilter) setValueFilter(storedFilter);
+    const storedSpacing = parseStoredSpacing(window.localStorage.getItem(SPACING_STORAGE_KEY));
+    if (storedSpacing !== null) setSpacing(storedSpacing);
     setViewHydrated(true);
   }, []);
 
@@ -123,6 +134,10 @@ export function WebGraph({
   useEffect(() => {
     window.localStorage.setItem(VALUE_FILTER_STORAGE_KEY, JSON.stringify([...valueFilter]));
   }, [valueFilter]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SPACING_STORAGE_KEY, JSON.stringify(spacing));
+  }, [spacing]);
   // The view options become part of the query key so toggling refetches
   // automatically and the relating-dialog's mutation invalidator (which uses the
   // bare ["relations", "subgraph"] key) still hits every variant.
@@ -171,6 +186,17 @@ export function WebGraph({
       emphasizedNodeId: data.centerId,
     };
   }, [data, valueFilter]);
+
+  // The full graph's normalization strategy: scale the settled layout so
+  // neighbors render a fixed gap apart (× the spacing multiplier), for a density
+  // that's invariant to node count, link strength, and clustering. The new
+  // function identity per spacing change is what tells the canvas to re-fit (see
+  // useWebGraphSimulation). See computeNeighborNormalization.
+  const normalize = useMemo(
+    () => (points: ReadonlyArray<{ x: number; y: number }>) =>
+      computeNeighborNormalization(points, spacing * NEIGHBOR_GAP_BASE),
+    [spacing],
+  );
 
   // Flip one depth in/out of the filter. Each toggle is independent (not a
   // threshold) and a new Set keeps the state update immutable.
@@ -479,6 +505,7 @@ export function WebGraph({
           hoverNodeIds={hoveredNodeIds}
           hoverEdgeId={hoverEdgeId}
           edgeInteraction={edgeInteraction}
+          normalize={normalize}
           onReady={handleCanvasReady}
           // Hover previews a number on desktop (off while an edge is selected).
           onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
@@ -598,6 +625,8 @@ export function WebGraph({
             onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
             valueFilter={valueFilter}
             onToggleValue={toggleValue}
+            spacing={spacing}
+            onSpacingChange={setSpacing}
           />
         </WebGraphCanvas>
       </div>

@@ -6,6 +6,7 @@ import { useMemo } from "react";
 
 import { relationMiniMapQueryKey } from "@/app/myweb/query-keys";
 import { WebGraphCanvas } from "@/app/myweb/web-graph-canvas";
+import { computeNormalization, type Normalize } from "@/app/myweb/web-graph-layout";
 import { apiClient } from "@/lib/api";
 import type { RelationMiniMap } from "@/lib/api-types";
 
@@ -19,10 +20,14 @@ import type { RelationMiniMap } from "@/lib/api-types";
 // needs extra margin to keep the end avatars and their labels off the edges.
 const MINI_MAP_FIT_PADDING = 0.12;
 
-// Tighter than the full graph's 600: the longer axis normalizes to fewer sim
-// units, so fitView zooms in and the fixed-px avatars and names render larger in
-// this small embed. Trades a little link breathing room for legibility.
+// Tighter than the full graph's neighbor-gap target: the longer axis normalizes
+// to fewer sim units, so fitView zooms in and the fixed-px avatars and names
+// render larger in this small embed. Trades a little link breathing room for
+// legibility. The mini-map keeps the bounding-box strategy (a short path of a
+// few nodes frames better by extent than by neighbor spacing), so it's a stable
+// module-level closure — the canvas never re-fits on its identity.
 const MINI_MAP_NORMALIZATION_TARGET = 280;
+const miniMapNormalize: Normalize = (points) => computeNormalization(points, MINI_MAP_NORMALIZATION_TARGET);
 
 const fetchMiniMap = async (profileId: string): Promise<RelationMiniMap> => {
   const res = await apiClient.api.relations["mini-map"][":profileId"].$get({ param: { profileId } });
@@ -108,7 +113,7 @@ export function ProfileMiniMap({ profileId, memberName }: { profileId: string; m
         viewerCueNodeId={subgraph.viewerId}
         interactive={false}
         fitViewPadding={MINI_MAP_FIT_PADDING}
-        normalizationTarget={MINI_MAP_NORMALIZATION_TARGET}
+        normalize={miniMapNormalize}
         // Read-only: a click opens the member's profile (no selection state).
         onNodeClick={(_event, node) => {
           const slug = node.data.slug ?? node.data.id;

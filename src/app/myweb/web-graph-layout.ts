@@ -55,18 +55,19 @@ export function edgeAvoidance(
   return { dvx: (rx / dist) * push, dvy: (ry / dist) * push };
 }
 
-// The longer-axis span (sim units) the settled layout is normalized to fill.
-export const NORMALIZATION_TARGET = 600;
+// The settled point cloud mapped into render space: a center (cx, cy) to
+// translate to the origin and a uniform scale. Null means there's nothing to
+// frame (empty cloud).
+export type Normalization = { cx: number; cy: number; scale: number };
+// A strategy for turning settled sim points into a Normalization. The full graph
+// scales by local spacing (computeNeighborNormalization); the mini-map by the
+// bounding box (computeNormalization). The simulation hook just calls whichever
+// it's handed, so the two views differ only in this function.
+export type Normalize = (points: ReadonlyArray<{ x: number; y: number }>) => Normalization | null;
 
-// Bounding-box normalization: center the point cloud on the origin and scale
-// its longer axis to `target` sim units, so the rendered graph fills the
-// viewport regardless of node count. A single point (or a sub-unit spread)
-// keeps scale 1 rather than blowing up. Returns null for an empty cloud.
-export function computeNormalization(
-  points: ReadonlyArray<{ x: number; y: number }>,
-  target: number,
-): { cx: number; cy: number; scale: number } | null {
-  if (points.length === 0) return null;
+// Axis-aligned bounds of the cloud — shared by both normalizers (each frames on
+// the bbox center).
+function bounds(points: ReadonlyArray<{ x: number; y: number }>) {
   let minX = points[0].x;
   let maxX = minX;
   let minY = points[0].y;
@@ -78,8 +79,70 @@ export function computeNormalization(
     if (p.y < minY) minY = p.y;
     else if (p.y > maxY) maxY = p.y;
   }
+  return { minX, maxX, minY, maxY };
+}
+
+// Bounding-box normalization: center the cloud and scale its longer axis to
+// `target` sim units, so the rendered graph fills the viewport regardless of node
+// count. A single point (or sub-unit spread) keeps scale 1 rather than blowing
+// up. Null for an empty cloud. Used by the read-only mini-map; the full graph
+// uses computeNeighborNormalization instead.
+export function computeNormalization(
+  points: ReadonlyArray<{ x: number; y: number }>,
+  target: number,
+): Normalization | null {
+  if (points.length === 0) return null;
+  const { minX, maxX, minY, maxY } = bounds(points);
   const longer = Math.max(maxX - minX, maxY - minY);
   const scale = longer > 1 ? target / longer : 1;
+  return { cx: (maxX + minX) / 2, cy: (maxY + minY) / 2, scale };
+}
+
+// The median distance from each node to its nearest neighbor (sim units): a
+// topology-aware read of how tight the settled layout actually is, which the
+// bounding box misses (it sees only the extent, not the internal spacing). O(n²),
+// but it runs only on the throttled settle ticks and at rest, over a personal
+// web's tens-to-low-hundreds of nodes. Returns 0 for fewer than two points (the
+// caller falls back to scale 1).
+export function medianNearestNeighbor(points: ReadonlyArray<{ x: number; y: number }>): number {
+  if (points.length < 2) return 0;
+  const nearest: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    let best = Number.POSITIVE_INFINITY;
+    for (let j = 0; j < points.length; j++) {
+      if (i === j) continue;
+      const dx = points[i].x - points[j].x;
+      const dy = points[i].y - points[j].y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < best) best = d2;
+    }
+    nearest.push(Math.sqrt(best));
+  }
+  nearest.sort((a, b) => a - b);
+  const mid = Math.floor(nearest.length / 2);
+  return nearest.length % 2 === 1 ? nearest[mid] : (nearest[mid - 1] + nearest[mid]) / 2;
+}
+
+// The rendered center-to-center neighbor gap (render units) the layout fills to
+// at spacing 1. A regular avatar is h-12 = 3rem = 54px at the app's 112.5% root,
+// so this is ~2× an avatar of spacing. The user's spacing multiplier rides on
+// top; this is the knob for the default feel.
+export const NEIGHBOR_GAP_BASE = 110;
+
+// Neighbor-spacing normalization: center the cloud and scale so its *median
+// nearest-neighbor* distance renders as `targetGap` units. Because the avatars
+// are a fixed size, fixing the neighbor gap fixes the perceived density —
+// invariant to node count, link strength, and clustering, none of which the
+// bounding box captures. A degenerate spread keeps scale 1. Null for an empty
+// cloud. This is what the full graph feeds the simulation.
+export function computeNeighborNormalization(
+  points: ReadonlyArray<{ x: number; y: number }>,
+  targetGap: number,
+): Normalization | null {
+  if (points.length === 0) return null;
+  const { minX, maxX, minY, maxY } = bounds(points);
+  const nn = medianNearestNeighbor(points);
+  const scale = nn > 1 ? targetGap / nn : 1;
   return { cx: (maxX + minX) / 2, cy: (maxY + minY) / 2, scale };
 }
 

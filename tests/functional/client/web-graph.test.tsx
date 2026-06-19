@@ -49,7 +49,7 @@ vi.mock("@/lib/api", () => ({
   apiClient: { api: { relations: { subgraph: { $get: vi.fn() } } } },
 }));
 
-import { VIEW_STORAGE_KEY } from "@/app/myweb/query-keys";
+import { DEFAULT_SPACING, SPACING_STORAGE_KEY, VIEW_STORAGE_KEY } from "@/app/myweb/query-keys";
 import { WebGraph } from "@/app/myweb/web-graph";
 import { apiClient } from "@/lib/api";
 
@@ -147,6 +147,31 @@ describe("WebGraph — Edit/Done toggle", () => {
     $get.mockResolvedValue(okResponse(populatedWeb));
     renderGraph({ mode: "edit", doneError: true });
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save your update");
+  });
+});
+
+describe("WebGraph — spacing slider", () => {
+  it("persists the default spacing on mount", async () => {
+    $get.mockResolvedValue(okResponse(populatedWeb));
+    renderGraph();
+    await screen.findByRole("slider"); // controls render once data lands
+    await waitFor(() => expect(localStorage.getItem(SPACING_STORAGE_KEY)).toBe(JSON.stringify(DEFAULT_SPACING)));
+  });
+
+  it("restores a stored spacing onto the slider", async () => {
+    localStorage.setItem(SPACING_STORAGE_KEY, JSON.stringify(1.1));
+    $get.mockResolvedValue(okResponse(populatedWeb));
+    renderGraph();
+    expect(await screen.findByRole("slider")).toHaveValue("1.1");
+  });
+
+  it("updates and persists the spacing when dragged", async () => {
+    $get.mockResolvedValue(okResponse(populatedWeb));
+    renderGraph();
+    const slider = await screen.findByRole("slider");
+    fireEvent.change(slider, { target: { value: "0.7" } });
+    expect(slider).toHaveValue("0.7");
+    await waitFor(() => expect(localStorage.getItem(SPACING_STORAGE_KEY)).toBe(JSON.stringify(0.7)));
   });
 });
 

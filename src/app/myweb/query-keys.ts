@@ -64,3 +64,32 @@ export function parseStoredValueFilter(raw: string | null): Set<RelationValue> |
   }
   return null;
 }
+
+// The spacing control persists a *multiplier* on the rendered neighbor-gap
+// baseline (NEIGHBOR_GAP_BASE; see computeNeighborNormalization): below 1 packs
+// neighbors closer, above 1 spreads them apart. The normalization already holds
+// density constant across node count, link strength, and clustering, so this is
+// pure taste — one value reads the same on every web. Its own key, like hops and
+// the value filter, so the choice survives reloads.
+export const SPACING_STORAGE_KEY = "isweb-graph-spacing";
+export const SPACING_MIN = 0.6;
+export const SPACING_MAX = 1.2;
+export const SPACING_STEP = 0.05;
+export const DEFAULT_SPACING = 0.9;
+
+// Permissive parser: a finite number clamped into [MIN, MAX] survives; anything
+// else (missing, NaN, ±Infinity, wrong type, garbled) falls back to null so the
+// caller keeps the default. Clamping guards a hand-edited or stale out-of-range
+// value from driving the layout off the rails.
+export function parseStoredSpacing(raw: string | null): number | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed === "number" && Number.isFinite(parsed)) {
+      return Math.min(SPACING_MAX, Math.max(SPACING_MIN, parsed));
+    }
+  } catch {
+    // fall through to null
+  }
+  return null;
+}
