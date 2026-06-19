@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Renders member- and admin-authored markdown (the <Markdown> component).
+   See docs/design-richtext.md. */
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Maps the design tokens defined in :root / .dark below onto Tailwind utility
@@ -192,6 +196,35 @@
   --xy-controls-button-color: var(--foreground);
   --xy-controls-button-color-hover: var(--foreground);
   --xy-controls-button-border-color: var(--border);
+}
+
+/* Themes @tailwindcss/typography's `prose` output onto the app tokens so
+   rendered markdown inherits our colour roles instead of the plugin's gray
+   defaults. We own every `prose` usage (the <Markdown> component), so styling
+   the base class is safe. The tokens already flip in .dark, so mapping them
+   here covers dark mode too — no `prose-invert` needed. */
+.prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-links: var(--primary);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--muted-foreground);
+  --tw-prose-quotes: var(--muted-foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-hr: var(--border);
+}
+
+/* MDXEditor authoring chrome (the `is-mdxeditor` class is set on the editor
+   root in markdown-editor-impl.tsx). Narrow profile forms can't fit the whole
+   toolbar on one row, so let it wrap instead of scrolling horizontally, and let
+   the block-type select size to its label rather than a fixed 9rem. */
+.is-mdxeditor [role="toolbar"] {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.is-mdxeditor [role="toolbar"] [role="combobox"] {
+  width: 7rem;
 }
 
 @layer base {

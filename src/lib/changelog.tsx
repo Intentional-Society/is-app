@@ -37,6 +37,11 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-06-18",
+    title: "Rich text arrives",
+    description: "Your profile fields, and program descriptions, now support common text formatting styles.",
+  },
+  {
     date: "2026-06-17",
     title: "Find the right tab",
     description: "Browser tabs and history now show each page's name, so they're easy to tell apart.",

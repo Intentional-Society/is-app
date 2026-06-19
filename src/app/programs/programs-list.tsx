@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { Program } from "@/lib/api-types";
@@ -65,7 +66,9 @@ function ProgramCard({
         </p>
       </div>
 
-      {cardText && <p className="font-serif text-sm text-muted-foreground leading-relaxed">{cardText}</p>}
+      {cardText && (
+        <MarkdownInline className="font-serif text-sm text-muted-foreground leading-relaxed">{cardText}</MarkdownInline>
+      )}
 
       {program.memberAvatars.length > 0 && (
         <div className="flex items-center">

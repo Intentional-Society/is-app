@@ -4,9 +4,9 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
-## 2026-06-17 | James | #149 audit: auth-callback redemption holds in prod; keep `prepare: false`, add Axiom logging
+## 2026-06-18 | James | Rich text: markdown storage, react-markdown render, MDXEditor authoring
 
-A three-window audit of the still-unhardened invited-sign-in transaction found zero #149 occurrences: 22/22 prod redemptions clean on a DB integrity check, a normal auth/profile gap, and an empty Sentry `25P02` history (error capture works — #152 is only about missing perf transactions). Kept `prepare: false` (limbo resolved) and instrumented the failure redirect with `log.warn "invite redemption failed"` so the path is queryable in Axiom; pattern-2 hardening deferred until/unless it fires. (#149)
+Program copy (`description`/`blurb`) and member prose (`bio`/`currentIntention`/`supplementaryInfo`) are now formatted: stored as markdown in the existing `text` columns (no migration), rendered by a shared `<Markdown>` (full + constrained-inline variants, react-markdown + remark-gfm, no rehype-raw → XSS-safe), and authored in a lazy `ssr:false` MDXEditor (full + inline configs). See docs/design-richtext.md. (#432)
 
 ## 2026-06-17 | James | Per-page HTML titles for usable tab names and browser history
 
