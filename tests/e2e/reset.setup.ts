@@ -17,6 +17,13 @@ setup("reset seeded test users", async ({ baseURL }) => {
 // function spin-up (CI Vercel) cost.
 const WARMUP_ROUTES = ["/signin", "/", "/signup", "/forgot-password"];
 
+// Authed welcome-flow segments. completeWelcome (helpers/session.ts) walks
+// these in every spec that gets past onboarding. The sign-in below only warms
+// the landing (the first step), so the first walk paid the cold profile/
+// programs RSC render and blew the 12s waitForURL on the agreements → profile
+// hop (#437). Warmed GET-only after sign-in — see the phase-3 note.
+const WARMUP_WELCOME_ROUTES = ["/welcome", "/welcome/agreements", "/welcome/profile", "/welcome/programs"];
+
 // Per-attempt navigation windows. The first hit gets a generous window so a
 // slow cold start still has room to respond — a cold function on a degraded CI
 // network (#368) can exceed 30s. The retry is deliberately short: a function
@@ -29,21 +36,22 @@ const WARMUP_FIRST_NAV_TIMEOUT_MS = 30_000;
 const WARMUP_RETRY_NAV_TIMEOUT_MS = 8_000;
 const WARMUP_ATTEMPTS = 2;
 
-// Hard ceilings on each warm-up phase — the routes loop and the sign-in
-// respectively. Once a phase's budget is spent it gives up loudly instead of
-// grinding through every remaining retry. These — not the per-attempt windows
-// — are what bound the worst case when the network browns out mid-run. A
-// persistent brownout still recovers via CI's project-level `retries: 2`,
-// which re-runs the whole setup test later.
+// Hard ceilings on each warm-up phase — the public-routes loop, the sign-in,
+// and the authed welcome-routes loop respectively. Once a phase's budget is
+// spent it gives up loudly instead of grinding through every remaining retry.
+// These — not the per-attempt windows — are what bound the worst case when the
+// network browns out mid-run. A persistent brownout still recovers via CI's
+// project-level `retries: 2`, which re-runs the whole setup test later.
 const WARMUP_ROUTES_BUDGET_MS = 75_000;
 const WARMUP_SIGN_IN_BUDGET_MS = 25_000;
+const WARMUP_WELCOME_BUDGET_MS = 45_000;
 
-// The setup test timeout sits above both phase budgets plus waitForURL slack
-// (75s + 25s + ~12s), so the named budget/attempt errors below always fire
-// before Playwright's opaque "Test timeout exceeded" message. Its 30s default
-// is far too tight for a cold first hit, and would trip before the retry logic
-// could run.
-const WARMUP_TEST_TIMEOUT_MS = 120_000;
+// The setup test timeout sits above all three phase budgets plus waitForURL
+// slack (75s + 25s + 45s + ~12s), so the named budget/attempt errors below
+// always fire before Playwright's opaque "Test timeout exceeded" message. Its
+// 30s default is far too tight for a cold first hit, and would trip before the
+// retry logic could run.
+const WARMUP_TEST_TIMEOUT_MS = 165_000;
 
 // Navigate to a route with one short retry, bounded by both its per-attempt
 // window and the shared deadline. Returns once the document parses; throws a
@@ -70,15 +78,17 @@ const warmRoute = async (page: Page, path: string, deadlineMs: number): Promise<
 
 // Warm the page-serving path before any timed test runs. Paying cold-start
 // cost here, in untimed setup, means the first real test no longer pays it
-// inside signInAs's waitForURL budget — so TIMEOUT_MS can sit tight at 12s.
-// The reset above only warms one API function; this warms the React/SSR page
-// pipeline + the public routes, then signs in once to warm the authed landing
-// the way every test reaches it. The sign-in is read-only (no completeWelcome),
-// so the welcome spec still sees a fresh user.
+// inside the waitForURL budget of signInAs or completeWelcome — so TIMEOUT_MS
+// can sit tight at 12s. The reset above only warms one API function; this warms
+// the React/SSR page pipeline + public routes, signs in once to warm the authed
+// landing the way every test reaches it, then warms the authed welcome-flow
+// segments that completeWelcome walks. Every step is read-only — the sign-in
+// runs no completeWelcome and the welcome routes are GET-only (no marker
+// stamped), so the welcome spec still sees a fresh user.
 //
 // A warm-up that can't complete after its retries fails this setup project
 // loudly: a cold/brownout run becomes a clear "warm-up: X did not respond"
-// error rather than a confusing downstream first-test flake (#368). CI's
+// error rather than a confusing downstream first-test flake (#368, #437). CI's
 // project-level `retries: 2` still re-runs the whole warm-up, so only a
 // persistent brownout fails the suite — a transient one recovers on retry.
 setup("warm up the page-serving path", async ({ page }) => {
@@ -89,14 +99,15 @@ setup("warm up the page-serving path", async ({ page }) => {
     await warmRoute(page, path, routesDeadline);
   }
 
-  // Warm the authed landing through a real sign-in, retrying on the same
-  // cold/brownout terms. signInAs carries no explicit timeout on its goto or
-  // form actions, and Playwright Test defaults navigationTimeout/actionTimeout
+  // Phase 2 — warm the authed landing through a real sign-in, retrying on the
+  // same cold/brownout terms. signInAs carries no explicit timeout on its goto
+  // or form actions, and Playwright Test defaults navigationTimeout/actionTimeout
   // to 0 — so those operations would otherwise fall back to the whole remaining
   // test budget, letting one hung goto trip the opaque test timeout. Cap every
   // navigation/action to the remaining sign-in budget so this phase fails with
   // the named error below instead. (signInAs's waitForURL keeps its own 12s.)
   const signInDeadline = Date.now() + WARMUP_SIGN_IN_BUDGET_MS;
+  let signedIn = false;
   let lastError: unknown;
   for (let attempt = 1; attempt <= WARMUP_ATTEMPTS; attempt++) {
     const remaining = signInDeadline - Date.now();
@@ -107,11 +118,27 @@ setup("warm up the page-serving path", async ({ page }) => {
     page.setDefaultTimeout(remaining);
     try {
       await signInAs(page, "regular");
-      return;
+      signedIn = true;
+      break;
     } catch (error) {
       lastError = error;
     }
   }
-  const reason = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new Error(`warm-up: sign-in did not complete after ${WARMUP_ATTEMPTS} attempts: ${reason}`);
+  if (!signedIn) {
+    const reason = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(`warm-up: sign-in did not complete after ${WARMUP_ATTEMPTS} attempts: ${reason}`);
+  }
+
+  // Phase 3 — warm the authed welcome-flow segments now that the page holds a
+  // session. completeWelcome walks /welcome → agreements → profile → programs;
+  // the landing above only warmed the first step, so the cold profile/programs
+  // RSC renders were what tripped the 12s waitForURL on the agreements → profile
+  // hop (#437). Each warmRoute GET compiles a step's route module — the same
+  // module the in-app RSC navigation reuses. (The marker PUTs ride the Hono
+  // catch-all, already warmed by the reset phase above; and a GET stamps
+  // nothing, so the seeded user stays fresh.)
+  const welcomeDeadline = Date.now() + WARMUP_WELCOME_BUDGET_MS;
+  for (const path of WARMUP_WELCOME_ROUTES) {
+    await warmRoute(page, path, welcomeDeadline);
+  }
 });
