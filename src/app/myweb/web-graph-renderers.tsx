@@ -88,6 +88,10 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
   // emphasized node is primary-teal, rest default.
   const onLitPath = selection?.litNodeIds.has(id) === true;
   const borderClass = onLitPath ? "border-success" : data.emphasized ? "border-primary" : "border-border";
+  // The emphasized (root/you) avatar is 1.18× the regular h-12 (3rem) base — an
+  // arbitrary 3.54rem, since 1.18× isn't a Tailwind spacing step (h-14 = 3.5rem is
+  // the nearest). Both keep border-2, so the ring adds equally either way.
+  const sizeClass = data.emphasized ? "h-[3.54rem] w-[3.54rem]" : "h-12 w-12";
   return (
     // Only the Avatar is a click target: the wrapper is pointer-events-none and
     // .react-flow__node is !pointer-events-none (set per-node above), so clicks on
@@ -101,9 +105,7 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
         <Avatar
           name={data.displayName}
           url={data.avatarUrl}
-          className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${
-            data.emphasized ? "h-16 w-16" : "h-12 w-12"
-          } ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
+          className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${sizeClass} ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
         />
         {/* Dim wash clipped to the avatar circle (rounded-full, never a square
             over the edges behind), blended over the opaque avatar so endpoints
