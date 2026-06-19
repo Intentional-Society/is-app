@@ -182,6 +182,7 @@ export type ProfileForSelf = {
   currentIntention: string | null;
   intentionUpdatedAt: Date | null;
   deactivatedAt: Date | null;
+  hasPassword: boolean;
   isAdmin: boolean;
   hidden: boolean;
   lastSignedAgreements: Date | null;
@@ -210,6 +211,7 @@ export const getProfileForSelf = async (userId: string): Promise<ProfileForSelf 
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
+      hasPassword: profiles.hasPassword,
       isAdmin: profiles.isAdmin,
       hidden: profiles.hidden,
       lastSignedAgreements: profiles.lastSignedAgreements,
@@ -268,6 +270,7 @@ export const getProfileForSelfWithProbe = async (
       currentIntention: profiles.currentIntention,
       intentionUpdatedAt: profiles.intentionUpdatedAt,
       deactivatedAt: profiles.deactivatedAt,
+      hasPassword: profiles.hasPassword,
       isAdmin: profiles.isAdmin,
       hidden: profiles.hidden,
       lastSignedAgreements: profiles.lastSignedAgreements,
@@ -516,6 +519,23 @@ export const reactivateProfile = async (userId: string): Promise<{ ok: true } | 
     .where(eq(profiles.id, userId))
     .returning({ id: profiles.id });
   if (result.length === 0) return { error: "not_found" };
+  return { ok: true };
+};
+
+export const setPasswordFlag = async (userId: string, hasPassword: boolean): Promise<void> => {
+  await db.update(profiles).set({ hasPassword }).where(eq(profiles.id, userId));
+};
+
+// Removes the member's password by replacing it with an unguessable random
+// value, forcing them back to magic-link / email sign-in. Uses the admin
+// API which is the only supported server-side path; direct auth.users
+// mutation is intentionally avoided.
+export const removePassword = async (userId: string): Promise<{ ok: true } | { error: string }> => {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    password: crypto.randomUUID(),
+  });
+  if (error) return { error: error.message };
+  await setPasswordFlag(userId, false);
   return { ok: true };
 };
 
