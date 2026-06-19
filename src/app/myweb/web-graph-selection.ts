@@ -17,6 +17,31 @@ export const DIM_KEEP = 0.7;
 export const SELECTION_EDGE_Z = 1000;
 export const SELECTION_NODE_Z = 1001;
 
+// One tier above the selection: the element under the pointer is the user's live
+// focus, so a hover rides over even a lit path. The same node > edge gap keeps an
+// avatar capping the lines into it — a hovered edge's endpoints lift for their
+// names and stay above the hovered line.
+export const HOVER_EDGE_Z = 1002;
+export const HOVER_NODE_Z = 1003;
+
+// The edge's value pill renders in xyflow's edge-label layer, which sits *before*
+// the nodes in the DOM and forms no stacking context of its own — so by default
+// an avatar paints over it, and a hover-lifted endpoint (HOVER_NODE_Z) certainly
+// does. A z-index on the pill therefore competes directly in the viewport; one
+// tier above the hover nodes keeps a revealed number on top of everything.
+export const EDGE_LABEL_Z = 1004;
+
+// Edge ids are direction-stamped `relator->relatee`. Member ids are UUIDs and
+// never contain the separator, so the two endpoints split back out cleanly. This
+// pair is the one home for that convention — every edge id is built with edgeId
+// and taken apart with edgeEndpoints.
+const EDGE_ID_SEP = "->";
+export const edgeId = (relatorId: string, relateeId: string): string => `${relatorId}${EDGE_ID_SEP}${relateeId}`;
+export const edgeEndpoints = (id: string): [relatorId: string, relateeId: string] => {
+  const [relatorId, relateeId] = id.split(EDGE_ID_SEP);
+  return [relatorId, relateeId];
+};
+
 // Breadth-first shortest-path tree from `centerId` over the (undirected) edge
 // set. Returns parent pointers (center → null); nodes unreachable from the
 // center are absent. Ties break by edge insertion order — the route BFS reaches
@@ -68,8 +93,8 @@ export function pathToCenter(
     pathNodeIds.add(cur);
     const par = parentByNode.get(cur);
     if (par == null) break;
-    pathEdgeIds.add(`${par}->${cur}`);
-    pathEdgeIds.add(`${cur}->${par}`);
+    pathEdgeIds.add(edgeId(par, cur));
+    pathEdgeIds.add(edgeId(cur, par));
     cur = par;
   }
   return { pathNodeIds, pathEdgeIds };
@@ -83,25 +108,36 @@ type EdgeDecoration = {
   // WebGraph dims off-path on a click; the mini-map leaves the rest at full
   // strength (the lit path is co-equal content, not a spotlight).
   dimUnlit: boolean;
-  // The edge to mark cursor:pointer because it's selected and editable. Null in
-  // read-only views (the mini-map doesn't edit edges).
-  selectedEdgeId: string | null;
+  // Whether clicks on edges do anything in this canvas — true in the full graph
+  // (a click selects the edge and reveals its number; an outgoing edge's second
+  // click opens the relating dialog), false in the read-only mini-map. Gates the
+  // cursor:pointer that marks the editable (outgoing) edges.
+  edgesClickable: boolean;
+  // The edge under the pointer, lifted above the tangle so it's traceable end to
+  // end. Null when nothing is hovered / in read-only views.
+  hoverEdgeId: string | null;
 };
 
-// Edge decorations layered onto the base edges: cursor:pointer on a selected
-// editable (outgoing) edge; the lit edges painted success-green and lifted above
-// the rest; every other edge dimmed by blending its stroke toward the canvas
-// when dimUnlit is set. Untouched edges are returned by reference, so this stays
-// a cheap diff. Generic so callers keep their concrete edge type.
+// Edge decorations layered onto the base edges: cursor:pointer on an editable
+// (outgoing) edge when the canvas's edges are clickable — matching its value
+// bubble, so an incoming or 2nd-degree link reads as inert; the lit edges painted
+// success-green and lifted above the rest; every other edge dimmed by blending
+// its stroke toward the canvas when dimUnlit is set. Untouched edges are returned
+// by reference, so this stays a cheap diff. Generic so callers keep their
+// concrete edge type.
 export function decorateEdges<E extends Edge<{ isOutgoing?: boolean }>>(
   edges: readonly E[],
-  { litEdgeIds, dimUnlit, selectedEdgeId }: EdgeDecoration,
+  { litEdgeIds, dimUnlit, edgesClickable, hoverEdgeId }: EdgeDecoration,
 ): E[] {
   return edges.map((e) => {
-    const cursor = e.id === selectedEdgeId && e.data?.isOutgoing === true;
+    // Pointer only on your own (outgoing) edges — the ones whose value bubble is
+    // itself clickable; an incoming or 2nd-degree link stays cursor-default so the
+    // line and the bubble agree.
+    const cursor = edgesClickable && e.data?.isOutgoing === true;
     const onPath = litEdgeIds.has(e.id);
     const dim = dimUnlit && !onPath;
-    if (!cursor && !onPath && !dim) return e;
+    const hovered = e.id === hoverEdgeId;
+    if (!cursor && !onPath && !dim && !hovered) return e;
     const next = { ...e } as E;
     if (cursor) {
       // ReactFlow merges className onto the edge's <g>; cursor inherits down to
@@ -120,14 +156,26 @@ export function decorateEdges<E extends Edge<{ isOutgoing?: boolean }>>(
         stroke: `color-mix(in srgb, var(--color-canvas-foreground) ${DIM_KEEP * 100}%, var(--color-canvas))`,
       };
     }
+    // The pointer focus outranks the lit path, so apply it last — a hovered
+    // line lifts above everything (recolor untouched; hover only reveals).
+    if (hovered) next.zIndex = HOVER_EDGE_Z;
     return next;
   });
 }
 
-// Lift the lit nodes above the rest so a highlight never sits under a dimmed
-// node. Returns the same array reference when nothing is lit, so the caller's
-// memo stays stable. Generic so callers keep their concrete node type.
-export function decorateNodes<N extends Node>(nodes: N[], { litNodeIds }: { litNodeIds: ReadonlySet<string> }): N[] {
-  if (litNodeIds.size === 0) return nodes;
-  return nodes.map((n) => (litNodeIds.has(n.id) ? ({ ...n, zIndex: SELECTION_NODE_Z } as N) : n));
+// Lift the lit nodes above the dimmed rest, and the hovered nodes above even
+// that — so a highlight never sits under a dimmed node, and a hovered node (with
+// its revealed name) clears its neighbors. Hover wins when a node is both.
+// Returns the same array reference when nothing is lifted, so the caller's memo
+// stays stable. Generic so callers keep their concrete node type.
+export function decorateNodes<N extends Node>(
+  nodes: N[],
+  { litNodeIds, hoverNodeIds }: { litNodeIds: ReadonlySet<string>; hoverNodeIds: ReadonlySet<string> },
+): N[] {
+  if (litNodeIds.size === 0 && hoverNodeIds.size === 0) return nodes;
+  return nodes.map((n) => {
+    if (hoverNodeIds.has(n.id)) return { ...n, zIndex: HOVER_NODE_Z } as N;
+    if (litNodeIds.has(n.id)) return { ...n, zIndex: SELECTION_NODE_Z } as N;
+    return n;
+  });
 }

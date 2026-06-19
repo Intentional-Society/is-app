@@ -38,6 +38,11 @@ export type ChangelogEntry = {
 export const changelog: ChangelogEntry[] = [
   {
     date: "2026-06-18",
+    title: "Spacing slider",
+    description: "My Web has a spacing slider to adjust map density, plus clarity and hover improvements.",
+  },
+  {
+    date: "2026-06-18",
     title: "Rich text arrives",
     description: "Your profile fields, and program descriptions, now support common text formatting styles.",
   },
