@@ -64,8 +64,8 @@ export function AdminHidden() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 rounded border border-border p-3">
         <p className="text-sm text-muted-foreground">
-          Hide an account so it stops showing up in the directory, the web, and the suggestion feed. Admins still see
-          hidden accounts everywhere; non-admins act as if the account never existed.
+          Hide an account so it stops showing up in the directory, the web, and the suggestion feed — for everyone,
+          admins included. Hidden accounts surface only here and on the admin members page.
         </p>
         <MemberTypeahead
           label="Account to hide"

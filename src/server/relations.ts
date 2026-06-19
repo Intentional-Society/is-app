@@ -92,15 +92,10 @@ const collectInto = <T extends { id: string }>(
 // IDs via `seen`. Sources 1–4 land in `suggestions` (signal-bearing);
 // source 5 lands in `otherMembers` (catch-all of the rest of the
 // directory) so the feed never goes empty while a member remains.
-// includeHidden=true skips profiles.hidden filtering across all five
-// sources so admins still see hidden test accounts in suggestions.
-export const getRelationSuggestions = async (
-  userId: string,
-  options: { includeHidden?: boolean } = {},
-): Promise<RelationSuggestionFeed> => {
-  const notHidden = options.includeHidden
-    ? sql`true`
-    : sql`${profiles.hidden} = false AND ${profiles.deactivatedAt} IS NULL`;
+// Hidden and deactivated profiles are filtered from all five sources for
+// every caller, admins included — the suggestion feed is member-facing.
+export const getRelationSuggestions = async (userId: string): Promise<RelationSuggestionFeed> => {
+  const notHidden = sql`${profiles.hidden} = false AND ${profiles.deactivatedAt} IS NULL`;
   const seen = new Set<string>([userId]);
   const suggestions: SuggestionCardRow[] = [];
   const otherMembers: SuggestionCardRow[] = [];

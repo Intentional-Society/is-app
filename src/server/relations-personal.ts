@@ -38,24 +38,20 @@ export const nodeColumns = {
 const edgeKey = (e: { relatorId: string; relateeId: string }): string => `${e.relatorId}:${e.relateeId}`;
 
 // Hints (value IS NULL) are filtered out — they live in the suggestion
-// feed, not the rendered web. includeHidden=true keeps hidden profiles in
-// the graph — admins see everything. When false, hidden profiles are
-// excluded as nodes AND edges touching them are dropped, so the rendered
-// web never shows a dangling edge to a vanished node.
+// feed, not the rendered web. Hidden profiles are excluded as nodes AND
+// edges touching them are dropped, so the rendered web never shows a
+// dangling edge to a vanished node; admins see the same web as anyone.
 export const getPersonalWeb = async (params: {
   centerId: string;
   includeIncoming: boolean;
   includeOutgoing: boolean;
   hops: 1 | 2;
-  includeHidden?: boolean;
 }): Promise<Subgraph> => {
   const { centerId, includeIncoming, includeOutgoing, hops } = params;
-  const includeHidden = params.includeHidden ?? false;
 
-  // First hop — direct relations involving centerId. If the viewer is
-  // not an admin, the join to profiles on both endpoints is what filters
-  // an edge whose other end is hidden; we do that pruning in JS rather
-  // than two subquery joins.
+  // First hop — direct relations involving centerId. Pruning an edge whose
+  // other end is hidden is done in JS over the endpoint set rather than two
+  // subquery joins.
   const firstHopWhere = (() => {
     if (includeIncoming && includeOutgoing) {
       return or(eq(relations.relatorId, centerId), eq(relations.relateeId, centerId));
@@ -75,16 +71,13 @@ export const getPersonalWeb = async (params: {
     .where(and(firstHopWhere, isNotNull(relations.value)));
 
   // Determine which ids to drop as nodes and as edge endpoints before
-  // rendering. Deactivated profiles are always dropped; hidden ones only
-  // for non-admins (admins pass includeHidden=true and keep seeing them).
+  // rendering: any hidden or deactivated profile.
   const candidateIds = new Set<string>([centerId]);
   for (const e of firstHop) {
     candidateIds.add(e.relatorId);
     candidateIds.add(e.relateeId);
   }
-  const dropFilter = includeHidden
-    ? isNotNull(profiles.deactivatedAt)
-    : or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt));
+  const dropFilter = or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt));
   const hiddenIds = new Set<string>();
   if (candidateIds.size > 0) {
     const rows = await db
@@ -130,8 +123,7 @@ export const getPersonalWeb = async (params: {
           and(isNotNull(relations.value), inArray(relations.relatorId, firstHopIds), ne(relations.relateeId, centerId)),
         );
       // Second-hop relatees can introduce new ids; mark any to-drop ones
-      // (always deactivated, plus hidden for non-admins) so the filter
-      // below catches them too.
+      // (hidden or deactivated) so the filter below catches them too.
       const newIds = secondHop.map((e) => e.relateeId).filter((id) => !candidateIds.has(id));
       if (newIds.length > 0) {
         const rows = await db

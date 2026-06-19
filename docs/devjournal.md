@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-19 | James | Hidden accounts no longer surface to admins on member-facing pages
+
+Dropped the admin `includeHidden` bypass from the directory, profile pages, intentions, and My Web; hidden accounts now show only on the `/admin` pages.
+
 ## 2026-06-18 | James | Rich text: markdown storage, react-markdown render, MDXEditor authoring
 
 Program copy (`description`/`blurb`) and member prose (`bio`/`currentIntention`/`supplementaryInfo`) are now formatted: stored as markdown in the existing `text` columns (no migration), rendered by a shared `<Markdown>` (full + constrained-inline variants, react-markdown + remark-gfm, no rehype-raw → XSS-safe), and authored in a lazy `ssr:false` MDXEditor (full + inline configs). See docs/design-richtext.md. (#432)

@@ -312,19 +312,14 @@ describe("profiles.hidden", () => {
     expect(profile?.hidden).toBe(true);
   });
 
-  it("listMembers excludes hidden by default and includes when includeHidden=true", async () => {
+  it("listMembers excludes hidden accounts", async () => {
     const visible = await listMembers();
     expect(visible.find((m) => m.id === hiddenId)).toBeUndefined();
     expect(visible.find((m) => m.id === visibleId)).toBeDefined();
-
-    const all = await listMembers({ includeHidden: true });
-    expect(all.find((m) => m.id === hiddenId)).toBeDefined();
   });
 
-  it("getProfileForMember returns null for hidden by default; returns the row when includeHidden=true", async () => {
+  it("getProfileForMember returns null for hidden accounts", async () => {
     expect(await getProfileForMember(hiddenId)).toBeNull();
-    const admin = await getProfileForMember(hiddenId, { includeHidden: true });
-    expect(admin?.id).toBe(hiddenId);
   });
 
   it("listHiddenMembers returns only hidden profiles", async () => {
@@ -363,11 +358,6 @@ describe("directory onboarding gate", () => {
   it("listMembers omits a member who has not set up their profile yet", async () => {
     const visible = await listMembers();
     expect(visible.find((m) => m.id === pendingId)).toBeUndefined();
-  });
-
-  it("admins still see mid-onboarding members via includeHidden", async () => {
-    const all = await listMembers({ includeHidden: true });
-    expect(all.find((m) => m.id === pendingId)).toBeDefined();
   });
 
   it("a saved bio makes the member visible (whitespace alone does not)", async () => {

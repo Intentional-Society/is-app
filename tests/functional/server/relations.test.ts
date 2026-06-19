@@ -388,12 +388,6 @@ describe("getRelationSuggestions — hidden filter", () => {
     expect(allIds).toContain(visibleOther);
     expect(allIds).not.toContain(hiddenOther);
   });
-
-  it("includeHidden=true keeps hidden profiles in the feed", async () => {
-    const feed = await getRelationSuggestions(me, { includeHidden: true });
-    const allIds = [...feed.suggestions, ...feed.otherMembers].map((c) => c.id);
-    expect(allIds).toContain(hiddenOther);
-  });
 });
 
 describe("materializeInviteRelations", () => {

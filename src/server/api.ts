@@ -634,23 +634,17 @@ const api = new Hono<{ Variables: ApiVariables }>()
     return c.json({ valid: false, reason: result.reason });
   })
   .get("/members", async (c) => {
-    const user = c.get("user");
-    const includeHidden = await isAdmin(user.id);
-    const members = await listMembers({ includeHidden });
+    const members = await listMembers();
     return c.json({ members });
   })
   .get("/members/:id", async (c) => {
-    const user = c.get("user");
     const memberId = c.req.param("id");
-    const includeHidden = await isAdmin(user.id);
-    const profile = await getProfileForMember(memberId, { includeHidden });
+    const profile = await getProfileForMember(memberId);
     if (!profile) return c.json({ error: "not_found" }, 404);
     return c.json({ profile });
   })
   .get("/intentions", async (c) => {
-    const user = c.get("user");
-    const includeHidden = await isAdmin(user.id);
-    const intentions = await listCurrentIntentions({ includeHidden });
+    const intentions = await listCurrentIntentions();
     return c.json({ intentions });
   })
   .get("/programs", async (c) => {
@@ -704,8 +698,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
   })
   .get("/relations/candidates", async (c) => {
     const user = c.get("user");
-    const includeHidden = await isAdmin(user.id);
-    const feed = await getRelationSuggestions(user.id, { includeHidden });
+    const feed = await getRelationSuggestions(user.id);
     return c.json(feed);
   })
   .get("/relations/subgraph", async (c) => {
@@ -715,26 +708,22 @@ const api = new Hono<{ Variables: ApiVariables }>()
     const includeOutgoing = c.req.query("out") !== "false";
     const includeIncoming = c.req.query("in") === "true";
     const hops = c.req.query("hops") === "1" ? 1 : 2;
-    const includeHidden = await isAdmin(user.id);
 
     const subgraph = await getPersonalWeb({
       centerId: user.id,
       includeIncoming,
       includeOutgoing,
       hops,
-      includeHidden,
     });
     return c.json(subgraph);
   })
   // Read-only mini-map for a member's profile page: the profile member, their
-  // strong connections, and the caller's shortest path back to them. Mirrors
-  // /relations/subgraph's admin → includeHidden rule.
+  // strong connections, and the caller's shortest path back to them.
   .get("/relations/mini-map/:profileId", async (c) => {
     const user = c.get("user");
     const profileId = c.req.param("profileId");
     if (!isUuid(profileId)) return c.json({ error: "profileId must be a UUID" }, 400);
-    const includeHidden = await isAdmin(user.id);
-    const miniMap = await getProfileMiniMap({ viewerId: user.id, profileId, includeHidden });
+    const miniMap = await getProfileMiniMap({ viewerId: user.id, profileId });
     return c.json(miniMap);
   })
   .get("/relations/value/:relateeId", async (c) => {
