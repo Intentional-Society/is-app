@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { apiClient } from "@/lib/api";
 type Status = { kind: "idle" } | { kind: "confirming" } | { kind: "removing" } | { kind: "error"; message: string };
 
 export function RemovePasswordForm({ onRemoved }: { onRemoved?: () => void }) {
+  const router = useRouter();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   const handleRemove = async () => {
@@ -19,6 +21,9 @@ export function RemovePasswordForm({ onRemoved }: { onRemoved?: () => void }) {
         setStatus({ kind: "error", message: body.error ?? "Failed to remove password." });
         return;
       }
+      // Re-fetch the server component so `profile.hasPassword` flips to false
+      // and this form unmounts — otherwise it stays stuck on "Removing…".
+      router.refresh();
       onRemoved?.();
     } catch {
       setStatus({ kind: "error", message: "Unexpected error. Please try again." });
