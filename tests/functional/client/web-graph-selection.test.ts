@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   decorateEdges,
   decorateNodes,
+  edgeEndpoints,
+  edgeId,
   HOVER_EDGE_Z,
   HOVER_NODE_Z,
   pathToCenter,
@@ -13,6 +15,18 @@ import {
 } from "@/app/myweb/web-graph-selection";
 
 const edge = (relatorId: string, relateeId: string) => ({ relatorId, relateeId });
+
+describe("edgeId / edgeEndpoints", () => {
+  it("stamps direction into the id and splits it back out", () => {
+    expect(edgeId("alice", "bob")).toBe("alice->bob");
+    expect(edgeEndpoints("alice->bob")).toEqual(["alice", "bob"]);
+  });
+
+  it("round-trips a constructed id", () => {
+    const [relator, relatee] = edgeEndpoints(edgeId("u-1", "u-2"));
+    expect([relator, relatee]).toEqual(["u-1", "u-2"]);
+  });
+});
 
 describe("shortestPathTree", () => {
   it("roots the center at null", () => {

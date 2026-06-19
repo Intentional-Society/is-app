@@ -146,6 +146,45 @@ export function computeNeighborNormalization(
   return { cx: (maxX + minX) / 2, cy: (maxY + minY) / 2, scale };
 }
 
+// View-mode canvas sizing. The box fills the available rectangle but clamps its
+// aspect ratio to [3:4, 4:3]: a roughly square area is used whole, and only a
+// viewport more extreme than 4:3 (wide desktop) or 3:4 (portrait phone) gets
+// letterboxed — in its long direction, so the canvas still fills the short one
+// and never overflows. Width is shared by both modes (the toggle only animates
+// height), so it's returned once here.
+export const CANVAS_MAX_ASPECT = 4 / 3; // widest allowed (width:height) — 4:3 landscape
+export const CANVAS_MIN_ASPECT = 3 / 4; // tallest allowed (width:height) — 3:4 portrait
+// Edit mode's strip is this fraction of the view-mode height, so it scales with
+// the viewport (a taller window gets a taller strip) instead of a fixed px. The
+// remaining ~40% leaves room for the suggestion feed below.
+export const EDIT_HEIGHT_FRACTION = 0.6;
+
+export type CanvasDims = { width: number; viewH: number; editH: number };
+
+// The largest aspect-clamped box (see above) that fits a `w`×`h` rectangle,
+// plus the shorter edit-mode height. Null for a non-positive rectangle (nothing
+// measured yet).
+export function fitAspectClamped(w: number, h: number): CanvasDims | null {
+  if (w <= 0 || h <= 0) return null;
+  const ratio = w / h;
+  let width: number;
+  let viewH: number;
+  if (ratio > CANVAS_MAX_ASPECT) {
+    // Wider than 4:3 — fill the height, narrow the width to 4:3.
+    viewH = h;
+    width = h * CANVAS_MAX_ASPECT;
+  } else if (ratio < CANVAS_MIN_ASPECT) {
+    // Taller than 3:4 — fill the width, shorten the height to 3:4.
+    width = w;
+    viewH = w / CANVAS_MIN_ASPECT;
+  } else {
+    // In range — fill the whole rectangle.
+    width = w;
+    viewH = h;
+  }
+  return { width, viewH, editH: viewH * EDIT_HEIGHT_FRACTION };
+}
+
 // First-hop ring radius (sim units) and the gap added per additional hop. The
 // first ring sits near linkDistance's range (110..230) so the force layout
 // barely has to move it; normalization rescales the whole cloud to the viewport

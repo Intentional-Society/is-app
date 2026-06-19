@@ -26,12 +26,13 @@ import {
   VIEW_STORAGE_KEY,
 } from "./query-keys";
 import type { RelatingTarget } from "./relating-dialog";
+import { useCanvasBox } from "./use-canvas-box";
 import { WebGraphCanvas } from "./web-graph-canvas";
 import { WebGraphControls } from "./web-graph-controls";
 import { filterSubgraphByValue } from "./web-graph-filtering";
 import { computeNeighborNormalization, NEIGHBOR_GAP_BASE } from "./web-graph-layout";
 import type { EdgeInteraction } from "./web-graph-renderers";
-import { pathToCenter, shortestPathTree } from "./web-graph-selection";
+import { edgeEndpoints, pathToCenter, shortestPathTree } from "./web-graph-selection";
 
 const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   const res = await apiClient.api.relations.subgraph.$get({
@@ -43,29 +44,12 @@ const fetchSubgraph = async (opts: SubgraphViewOptions) => {
   return res.json();
 };
 
-// View<->edit canvas sizing. View mode fills the available rectangle as fully as
-// it can, clamping only its aspect ratio to the [3:4, 4:3] range — so a roughly
-// square area is used whole, and only a viewport more extreme than 4:3 (wide
-// desktop) or 3:4 (portrait phone) gets letterboxed in its long direction. Edit
-// mode collapses to a shorter strip so the suggestion feed below stays on
+// View<->edit canvas sizing lives in useCanvasBox (measurement) and
+// fitAspectClamped (the aspect math). View mode fills the aspect-clamped box;
+// edit mode collapses to a shorter strip so the suggestion feed below stays on
 // screen. Width is identical between modes — only the height animates on the
 // toggle (top-anchored, so the bottom edge travels while ReactFlow re-fits each
 // frame to scale the graph with the box).
-const MAX_ASPECT = 4 / 3; // widest allowed (width:height) — 4:3 landscape
-const MIN_ASPECT = 3 / 4; // tallest allowed (width:height) — 3:4 portrait
-// Edit mode's strip is this fraction of the view-mode height, so it scales with
-// the viewport (a taller window gets a taller strip) instead of a fixed px. The
-// remaining ~40% leaves room for the suggestion feed below.
-const EDIT_HEIGHT_FRACTION = 0.6;
-// Space reserved below the canvas — the page's own padding (main's pb-8 / px-8,
-// both 2rem) so the gap under the canvas matches the gap beside it. Resolved
-// from the live root font-size rather than assuming 16px (the app sets it
-// larger), so it lands on the same px the page padding uses; the canvas bottom
-// then sits exactly pb-8 above the viewport floor, totalling 100vh, so view
-// mode never spills into a vertical scrollbar. (Edit mode's feed legitimately
-// scrolls — the no-scrollbar guarantee is a view-mode one.)
-const PAGE_PAD_REM = 2;
-const bottomReserve = () => PAGE_PAD_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
 const MODE_ANIM_MS = 1000;
 const MODE_ANIM_EASE = "cubic-bezier(0.45, 0, 0.55, 1)"; // accelerate + decelerate
 
@@ -217,94 +201,12 @@ export function WebGraph({
     fitViewRef.current = fitView;
   }, []);
 
-  // The available box: the full width of the canvas's wrapper, and the vertical
-  // space from the wrapper's top down to the viewport bottom (less BOTTOM_RESERVE).
-  // The wrapper top is set by the page chrome above (header + gaps), which never
-  // changes with the box height, so measuring it is stable across mode toggles.
-  const [avail, setAvail] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
-  const lastAvailRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
-  // Transition is armed for mode toggles but disarmed for the initial measure
-  // and for resizes, so the box tracks the window instantly rather than easing.
-  const [animateHeight, setAnimateHeight] = useState(false);
-  const wrapElRef = useRef<HTMLDivElement | null>(null);
-  const resizeObsRef = useRef<ResizeObserver | null>(null);
-  const measure = useCallback(() => {
-    const el = wrapElRef.current;
-    if (!el) return;
-    const w = el.clientWidth;
-    const h = Math.max(0, window.innerHeight - el.getBoundingClientRect().top - bottomReserve());
-    const prev = lastAvailRef.current;
-    if (Math.abs(w - prev.w) < 0.5 && Math.abs(h - prev.h) < 0.5) return;
-    lastAvailRef.current = { w, h };
-    setAnimateHeight(false); // a resize commits instantly; only mode toggles ease
-    setAvail({ w, h });
-  }, []);
-  // Callback ref: attach a width observer once the wrapper mounts (it only
-  // renders after the loading/empty early-returns below). A ResizeObserver on a
-  // full-width element catches layout-width changes; a window 'resize' listener
-  // (below) catches viewport-height changes the observer wouldn't see.
-  const wrapRef = useCallback(
-    (el: HTMLDivElement | null) => {
-      resizeObsRef.current?.disconnect();
-      wrapElRef.current = el;
-      if (!el) {
-        resizeObsRef.current = null;
-        return;
-      }
-      measure();
-      const ro = new ResizeObserver(() => measure());
-      ro.observe(el);
-      resizeObsRef.current = ro;
-    },
-    [measure],
-  );
-  useEffect(() => {
-    window.addEventListener("resize", measure);
-    // Web fonts load after first paint and grow the header a few px, shifting
-    // the wrapper's top — a one-time drift neither observer above would catch,
-    // and which would otherwise leave the height slightly too tall (a faint
-    // scrollbar). Re-measure once fonts settle. (?. short-circuits the whole
-    // chain where FontFaceSet is absent, e.g. jsdom.)
-    document.fonts?.ready.then(() => measure());
-    return () => window.removeEventListener("resize", measure);
-  }, [measure]);
-
-  // The largest box that fits the available rectangle with its aspect ratio
-  // clamped to [3:4, 4:3]. When the rectangle's own ratio is already in range we
-  // use it whole (no waste — square, 4:3, whatever it is); only a more extreme
-  // viewport letterboxes, and then in its long direction so the canvas still
-  // fills the short one and never overflows (no vertical scrollbar). Width is
-  // shared by both modes so the toggle never shifts the box sideways.
-  const dims = useMemo(() => {
-    const { w, h } = avail;
-    if (w <= 0 || h <= 0) return null;
-    const ratio = w / h;
-    let width: number;
-    let viewH: number;
-    if (ratio > MAX_ASPECT) {
-      // Wider than 4:3 — fill the height, narrow the width to 4:3.
-      viewH = h;
-      width = h * MAX_ASPECT;
-    } else if (ratio < MIN_ASPECT) {
-      // Taller than 3:4 — fill the width, shorten the height to 3:4.
-      width = w;
-      viewH = w / MIN_ASPECT;
-    } else {
-      // In range — fill the whole rectangle.
-      width = w;
-      viewH = h;
-    }
-    return { width, viewH, editH: viewH * EDIT_HEIGHT_FRACTION };
-  }, [avail]);
-
-  // Re-arm the transition one frame after the initial measure or a resize, so
-  // the next mode toggle eases but the size change that just committed didn't.
-  useEffect(() => {
-    if (dims && !animateHeight) {
-      const id = requestAnimationFrame(() => setAnimateHeight(true));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [dims, animateHeight]);
+  // The measured available box and the aspect-clamped view/edit dimensions, plus
+  // whether the height transition is armed (mode toggles ease; resizes commit
+  // instantly). The wrapper's top is set by the page chrome above, which never
+  // changes with the box height, so the measurement is stable across toggles.
+  // See useCanvasBox.
+  const { wrapRef, dims, animateHeight } = useCanvasBox();
 
   // On a mode toggle, re-fit every frame for the duration of the height
   // transition so the graph zooms to match the shrinking/growing box. The
@@ -420,14 +322,12 @@ export function WebGraph({
 
   // The live pointer focus, lifted to the top of the z-stack so a revealed name
   // reads above its neighbors: the directly-hovered node, plus both endpoints of
-  // a hovered edge (whose names appear alongside its number). Edge ids are
-  // `relator->relatee` and member ids never contain "->", so a split cleanly
-  // recovers both endpoints.
+  // a hovered edge (whose names appear alongside its number). See edgeEndpoints.
   const hoveredNodeIds = useMemo(() => {
     const ids = new Set<string>();
     if (hoverNodeId) ids.add(hoverNodeId);
     if (hoverEdgeId) {
-      const [relatorId, relateeId] = hoverEdgeId.split("->");
+      const [relatorId, relateeId] = edgeEndpoints(hoverEdgeId);
       ids.add(relatorId);
       ids.add(relateeId);
     }
@@ -441,7 +341,7 @@ export function WebGraph({
     const ids = new Set<string>(pathNodeIds);
     for (const id of hoveredNodeIds) ids.add(id);
     if (selectedEdgeId) {
-      const [relatorId, relateeId] = selectedEdgeId.split("->");
+      const [relatorId, relateeId] = edgeEndpoints(selectedEdgeId);
       ids.add(relatorId);
       ids.add(relateeId);
     }
@@ -474,17 +374,17 @@ export function WebGraph({
   // narrows the nullable memo for the canvas below.
   if (!filtered) return null;
 
-  // Width is shared by both modes (from `dims`); only the height differs —
-  // the full fitted height in view mode, the EDIT_HEIGHT-capped strip in edit
-  // mode. Animating just the height keeps the box from shifting sideways on
-  // the toggle; the top stays put, so the bottom edge is what travels.
+  // Width is shared by both modes (from `dims`); only the height differs — the
+  // full fitted height in view mode, the shorter edit strip in edit mode.
+  // Animating just the height keeps the box from shifting sideways on the toggle;
+  // the top stays put, so the bottom edge is what travels.
   const heightPx = dims ? (expanded ? dims.viewH : dims.editH) : undefined;
 
   return (
-    // Full-width wrapper: its width is the available width (clientWidth) and
-    // its top is the canvas's offset from the viewport top — both read by
-    // measure() to size the centered box inside without measuring the box's
-    // own (derived) width, which would be circular.
+    // Full-width wrapper: its width is the available width (clientWidth) and its
+    // top is the canvas's offset from the viewport top — both read by useCanvasBox
+    // to size the centered box inside without measuring the box's own (derived)
+    // width, which would be circular.
     <div ref={wrapRef} className="w-full">
       <div
         data-tour="graph"

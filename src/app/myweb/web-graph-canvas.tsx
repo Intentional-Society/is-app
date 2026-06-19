@@ -18,7 +18,7 @@ import {
   nodeTypes,
   type SubgraphNode,
 } from "./web-graph-renderers";
-import { decorateEdges, decorateNodes } from "./web-graph-selection";
+import { decorateEdges, decorateNodes, edgeId } from "./web-graph-selection";
 
 // Stable empty hover set for read-only consumers that omit the prop, so the
 // decorateNodes memo below doesn't see a fresh Set each render.
@@ -61,8 +61,8 @@ type WebGraphCanvasProps = {
   // state; a read-only consumer can pass an empty set for a nameless graph.
   labeledNodeIds: ReadonlySet<string>;
   // The clicked node, kept at hover size. Null in read-only views like the
-  // mini-map. (The selected edge reaches the renderer via edgeInteraction; the
-  // canvas no longer needs it, since every edge now reads as clickable.)
+  // mini-map. (Edge selection reaches the renderer via edgeInteraction, so the
+  // canvas only tracks the node here.)
   selectedNodeId: string | null;
   // The live pointer focus, lifted to the top of the stack: the nodes under it
   // (the hovered node, plus a hovered edge's two endpoints) and the hovered
@@ -138,7 +138,7 @@ export function WebGraphCanvas({
       const isOutgoing = e.relatorId === viewerId;
       const relatee = nodeById.get(e.relateeId);
       return {
-        id: `${e.relatorId}->${e.relateeId}`,
+        id: edgeId(e.relatorId, e.relateeId),
         source: e.relatorId,
         target: e.relateeId,
         type: "numbered",

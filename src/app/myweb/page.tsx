@@ -36,6 +36,9 @@ export default async function MyWebPage() {
   });
 
   return (
+    // The web canvas sizes its view-mode height to leave exactly this `pb-8`
+    // (2rem) below itself, so it never spills into a scrollbar — useCanvasBox's
+    // PAGE_PAD_REM mirrors this value. Change them together.
     <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
       <HydrationBoundary state={dehydrate(queryClient)}>
         <MyWeb initialLastUpdatedWeb={initialLastUpdatedWeb} />

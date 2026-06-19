@@ -31,6 +31,17 @@ export const HOVER_NODE_Z = 1003;
 // tier above the hover nodes keeps a revealed number on top of everything.
 export const EDGE_LABEL_Z = 1004;
 
+// Edge ids are direction-stamped `relator->relatee`. Member ids are UUIDs and
+// never contain the separator, so the two endpoints split back out cleanly. This
+// pair is the one home for that convention — every edge id is built with edgeId
+// and taken apart with edgeEndpoints.
+const EDGE_ID_SEP = "->";
+export const edgeId = (relatorId: string, relateeId: string): string => `${relatorId}${EDGE_ID_SEP}${relateeId}`;
+export const edgeEndpoints = (id: string): [relatorId: string, relateeId: string] => {
+  const [relatorId, relateeId] = id.split(EDGE_ID_SEP);
+  return [relatorId, relateeId];
+};
+
 // Breadth-first shortest-path tree from `centerId` over the (undirected) edge
 // set. Returns parent pointers (center → null); nodes unreachable from the
 // center are absent. Ties break by edge insertion order — the route BFS reaches
@@ -82,8 +93,8 @@ export function pathToCenter(
     pathNodeIds.add(cur);
     const par = parentByNode.get(cur);
     if (par == null) break;
-    pathEdgeIds.add(`${par}->${cur}`);
-    pathEdgeIds.add(`${cur}->${par}`);
+    pathEdgeIds.add(edgeId(par, cur));
+    pathEdgeIds.add(edgeId(cur, par));
     cur = par;
   }
   return { pathNodeIds, pathEdgeIds };
