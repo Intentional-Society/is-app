@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { Markdown } from "@/components/markdown";
 import { PageHeader } from "@/components/page-header";
 import { QueryProvider } from "@/components/query-provider";
 import { requireUser, serverApiClient } from "@/lib/api-server";
@@ -102,14 +103,14 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
         )}
 
         <dl className="flex w-full max-w-md flex-col gap-4">
-          <Field label="Bio">{profile.bio}</Field>
+          <Field label="Bio">{profile.bio && <Markdown>{profile.bio}</Markdown>}</Field>
           <Field label="Keywords">{profile.keywords.length > 0 ? profile.keywords.join(", ") : null}</Field>
           <Field label="Location">{profile.location}</Field>
           {profile.currentIntention && (
             <Field label="Current intention">
-              <span>{profile.currentIntention}</span>
+              <Markdown>{profile.currentIntention}</Markdown>
               {profile.intentionUpdatedAt && (
-                <span className="ml-2 text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {new Date(profile.intentionUpdatedAt).toLocaleDateString(undefined, {
                     month: "long",
                     year: "numeric",
@@ -118,7 +119,9 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
               )}
             </Field>
           )}
-          <Field label="Supplementary info">{profile.supplementaryInfo}</Field>
+          <Field label="Supplementary info">
+            {profile.supplementaryInfo && <Markdown>{profile.supplementaryInfo}</Markdown>}
+          </Field>
         </dl>
 
         {profile.email && (

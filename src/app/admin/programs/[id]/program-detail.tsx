@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { MemberTypeahead } from "@/components/member-typeahead";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
 import type { AdminProgramDetail } from "@/lib/api-types";
 import { formatDate } from "@/lib/format-date";
@@ -225,25 +225,28 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
           <p className="text-xs text-muted-foreground">Used in URLs — lowercase letters, numbers, and hyphens.</p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="program-blurb">Blurb</Label>
-          <Input
-            id="program-blurb"
+          {/* Editor renders a contenteditable div (no labelable control), so the
+              field name rides on the editor's ariaLabel rather than htmlFor. */}
+          <Label>Blurb</Label>
+          <MarkdownEditor
+            variant="inline"
+            ariaLabel="Blurb"
             value={blurb}
-            onChange={(e) => setBlurb(e.target.value)}
+            onChange={setBlurb}
             disabled={updateMutation.isPending}
             placeholder="One sentence shown on the program card"
           />
           <p className="text-xs text-muted-foreground">Short tagline shown on the programs list. Max 200 characters.</p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="program-description">Full description</Label>
-          <Textarea
-            id="program-description"
+          <Label>Full description</Label>
+          <MarkdownEditor
+            variant="full"
+            ariaLabel="Full description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
             disabled={updateMutation.isPending}
             placeholder="Shown on the program detail page"
-            rows={5}
           />
         </div>
         <div className="flex flex-col gap-1.5">

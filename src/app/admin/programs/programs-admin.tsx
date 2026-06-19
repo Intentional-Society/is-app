@@ -4,10 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
 import type { AdminProgram } from "@/lib/api-types";
 
@@ -98,11 +98,14 @@ export function ProgramsAdmin() {
           <p className="text-xs text-muted-foreground">Used in URLs — lowercase letters, numbers, and hyphens.</p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="program-description">Description</Label>
-          <Textarea
-            id="program-description"
+          {/* Editor renders a contenteditable div (no labelable control), so the
+              field name rides on the editor's ariaLabel rather than htmlFor. */}
+          <Label>Description</Label>
+          <MarkdownEditor
+            variant="full"
+            ariaLabel="Description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
             placeholder="What is this program about?"
             disabled={createMutation.isPending}
           />
