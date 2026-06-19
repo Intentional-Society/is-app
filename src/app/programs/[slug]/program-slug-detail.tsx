@@ -96,6 +96,41 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
         </p>
       </header>
 
+      {(program.facilitator || program.schedule || program.duration || program.commitment || program.contact) && (
+        <dl className="flex flex-col gap-1.5 text-sm">
+          {program.facilitator && (
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-muted-foreground">Facilitator</dt>
+              <dd>{program.facilitator}</dd>
+            </div>
+          )}
+          {program.schedule && (
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-muted-foreground">Schedule</dt>
+              <dd>{program.schedule}</dd>
+            </div>
+          )}
+          {program.duration && (
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-muted-foreground">Duration</dt>
+              <dd>{program.duration}</dd>
+            </div>
+          )}
+          {program.commitment && (
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-muted-foreground">Commitment</dt>
+              <dd>{program.commitment}</dd>
+            </div>
+          )}
+          {program.contact && (
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-muted-foreground">Questions</dt>
+              <dd>{program.contact}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+
       {program.description && <Markdown>{program.description}</Markdown>}
 
       <div className="flex items-center gap-3">

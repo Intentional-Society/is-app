@@ -80,6 +80,11 @@ export const programs = pgTable("programs", {
   name: text("name").notNull(),
   blurb: text("blurb"),
   description: text("description"),
+  schedule: text("schedule"),
+  duration: text("duration"),
+  commitment: text("commitment"),
+  facilitator: text("facilitator"),
+  contact: text("contact"),
   // Archived programs are hidden from member-facing listings (admins
   // still see them in /admin/programs). Set the timestamp instead of
   // a boolean — it's strictly more information.

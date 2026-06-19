@@ -56,6 +56,11 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const [name, setName] = useState(program.name);
   const [slug, setSlug] = useState(program.slug);
   const [blurb, setBlurb] = useState(program.blurb ?? "");
+  const [schedule, setSchedule] = useState(program.schedule ?? "");
+  const [duration, setDuration] = useState(program.duration ?? "");
+  const [commitment, setCommitment] = useState(program.commitment ?? "");
+  const [facilitator, setFacilitator] = useState(program.facilitator ?? "");
+  const [contact, setContact] = useState(program.contact ?? "");
   const [description, setDescription] = useState(program.description ?? "");
   const [buttondownTag, setButtondownTag] = useState(program.buttondownTag ?? "");
   const [editError, setEditError] = useState<string | null>(null);
@@ -70,6 +75,11 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
       name?: string;
       slug?: string;
       blurb?: string | null;
+      schedule?: string | null;
+      duration?: string | null;
+      commitment?: string | null;
+      facilitator?: string | null;
+      contact?: string | null;
       description?: string | null;
       archived?: boolean;
       signupsOpen?: boolean;
@@ -177,6 +187,11 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     trimmedName !== program.name ||
     trimmedSlug !== program.slug ||
     blurb.trim() !== (program.blurb ?? "") ||
+    schedule.trim() !== (program.schedule ?? "") ||
+    duration.trim() !== (program.duration ?? "") ||
+    commitment.trim() !== (program.commitment ?? "") ||
+    facilitator.trim() !== (program.facilitator ?? "") ||
+    contact.trim() !== (program.contact ?? "") ||
     description.trim() !== (program.description ?? "") ||
     trimmedButtondownTag !== (program.buttondownTag ?? "");
 
@@ -193,6 +208,11 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
       name: trimmedName,
       slug: trimmedSlug,
       blurb: blurb.trim() || null,
+      schedule: schedule.trim() || null,
+      duration: duration.trim() || null,
+      commitment: commitment.trim() || null,
+      facilitator: facilitator.trim() || null,
+      contact: contact.trim() || null,
       description: description.trim() || null,
       buttondownTag: trimmedButtondownTag || null,
     });
@@ -237,6 +257,56 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
             placeholder="One sentence shown on the program card"
           />
           <p className="text-xs text-muted-foreground">Short tagline shown on the programs list. Max 200 characters.</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-schedule">Schedule</Label>
+          <Input
+            id="program-schedule"
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+            disabled={updateMutation.isPending}
+            placeholder="e.g. Tuesdays 7pm UTC"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-duration">Duration</Label>
+          <Input
+            id="program-duration"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            disabled={updateMutation.isPending}
+            placeholder="e.g. 6 weeks"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-commitment">Commitment</Label>
+          <Input
+            id="program-commitment"
+            value={commitment}
+            onChange={(e) => setCommitment(e.target.value)}
+            disabled={updateMutation.isPending}
+            placeholder="e.g. ~2 hrs/week"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-facilitator">Facilitator</Label>
+          <Input
+            id="program-facilitator"
+            value={facilitator}
+            onChange={(e) => setFacilitator(e.target.value)}
+            disabled={updateMutation.isPending}
+            placeholder="e.g. James Baker"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="program-contact">Contact for questions</Label>
+          <Input
+            id="program-contact"
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+            disabled={updateMutation.isPending}
+            placeholder="e.g. questions@intentionalsociety.org"
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>Full description</Label>
