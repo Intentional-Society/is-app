@@ -70,30 +70,33 @@ function ProgramCard({
         <MarkdownInline className="font-serif text-sm text-muted-foreground leading-relaxed">{cardText}</MarkdownInline>
       )}
 
-      {program.memberAvatars.length > 0 && (
-        <div className="flex items-center">
-          {program.memberAvatars.map((member, i) => (
-            <div
-              key={member.id}
-              className="relative h-7 w-7 shrink-0 rounded-full border-2 border-card bg-muted"
-              style={{ marginLeft: i === 0 ? 0 : "-8px", zIndex: program.memberAvatars.length - i }}
-              title={member.displayName ?? undefined}
-            >
-              <Avatar
-                name={member.displayName}
-                url={member.avatarUrl}
-                sizes="28px"
-                className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-muted-foreground"
-              />
-            </div>
-          ))}
-          {program.memberCount > 5 && (
-            <span className="ml-1 text-xs text-muted-foreground">+{program.memberCount - 5}</span>
-          )}
-        </div>
-      )}
+      {/* Facepile and action button are bottom-pinned together so the
+          avatar row lands on the same baseline across cards regardless of
+          how long each card's blurb runs. */}
+      <div className="mt-auto flex flex-col gap-3 pt-2">
+        {program.memberAvatars.length > 0 && (
+          <div className="flex items-center">
+            {program.memberAvatars.map((member, i) => (
+              <div
+                key={member.id}
+                className="relative h-7 w-7 shrink-0 rounded-full border-2 border-card bg-muted"
+                style={{ marginLeft: i === 0 ? 0 : "-8px", zIndex: program.memberAvatars.length - i }}
+                title={member.displayName ?? undefined}
+              >
+                <Avatar
+                  name={member.displayName}
+                  url={member.avatarUrl}
+                  sizes="28px"
+                  className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-muted-foreground"
+                />
+              </div>
+            ))}
+            {program.memberCount > 5 && (
+              <span className="ml-1 text-xs text-muted-foreground">+{program.memberCount - 5}</span>
+            )}
+          </div>
+        )}
 
-      <div className="mt-auto pt-2">
         {program.joined ? (
           <Button
             type="button"
