@@ -18,7 +18,7 @@ import type { RelationSubgraph } from "@/lib/api-types";
 import { isRelationValue } from "@/lib/relation-value";
 
 import type { RelatingTarget } from "./relating-dialog";
-import { DIM_KEEP } from "./web-graph-selection";
+import { DIM_KEEP, EDGE_LABEL_Z } from "./web-graph-selection";
 
 // The two custom ReactFlow renderers — the member node and the numbered edge —
 // plus the data shapes they read and the interaction contexts WebGraph fills.
@@ -63,6 +63,11 @@ export type NodeInteraction = {
   // The clicked node, kept at hover size so a selection reads as "this one's it."
   // Null in read-only views (the mini-map navigates on click instead).
   selectedNodeId: string | null;
+  // Nodes whose name label is shown. Names are hidden by default and revealed
+  // for the lit path (a node selection) plus transient hover — a node, or a
+  // connected edge (its two endpoints); everything else stays nameless. Mirrors
+  // the edge-number reveal. WebGraph builds the set.
+  labeledNodeIds: ReadonlySet<string>;
   // The viewer's node — its name label reads "You" in place of the member name
   // (how the mini-map marks you). Null in the full graph, where you're the
   // obvious center.
@@ -74,12 +79,19 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
   const selection = useContext(NodeInteractionContext);
   const isSelected = selection?.selectedNodeId === id;
   const isViewer = selection?.viewerCueNodeId === id;
+  // Names are hidden by default; this node's shows only while it's labeled
+  // (lit path, or hovered directly / via a connected edge).
+  const labeled = selection?.labeledNodeIds.has(id) === true;
   // When dimming is on, every node off the lit set dims (see DIM_KEEP).
   const isDimmed = selection?.dimUnlit === true && !selection.litNodeIds.has(id);
   // Every lit node gets the green border to match the links; otherwise the
   // emphasized node is primary-teal, rest default.
   const onLitPath = selection?.litNodeIds.has(id) === true;
   const borderClass = onLitPath ? "border-success" : data.emphasized ? "border-primary" : "border-border";
+  // The emphasized (root/you) avatar is 1.18× the regular h-12 (3rem) base — an
+  // arbitrary 3.54rem, since 1.18× isn't a Tailwind spacing step (h-14 = 3.5rem is
+  // the nearest). Both keep border-2, so the ring adds equally either way.
+  const sizeClass = data.emphasized ? "h-[3.54rem] w-[3.54rem]" : "h-12 w-12";
   return (
     // Only the Avatar is a click target: the wrapper is pointer-events-none and
     // .react-flow__node is !pointer-events-none (set per-node above), so clicks on
@@ -93,9 +105,7 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
         <Avatar
           name={data.displayName}
           url={data.avatarUrl}
-          className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${
-            data.emphasized ? "h-16 w-16" : "h-12 w-12"
-          } ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
+          className={`pointer-events-auto flex cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 [clip-path:circle()] ${sizeClass} ${borderClass} bg-muted text-base font-semibold text-muted-foreground`}
         />
         {/* Dim wash clipped to the avatar circle (rounded-full, never a square
             over the edges behind), blended over the opaque avatar so endpoints
@@ -106,14 +116,23 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
           style={{ opacity: isDimmed ? 1 - DIM_KEEP : 0 }}
         />
       </div>
-      {/* The name dims by mixing its text color toward the canvas — color paints
-          only the glyphs, so no covering box (square) and no bleed-through. The
+      {/* Hidden by default, faded in when labeled (hover or lit path). Kept
+          mounted at opacity 0 rather than unmounted so the node's height never
+          shifts as names appear (no reflow against the fixed layout). The
           viewer's own node reads "You" in place of their name (mini-map cue). */}
       <div
-        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-colors duration-150"
-        style={
-          isDimmed ? { color: `color-mix(in srgb, currentColor ${DIM_KEEP * 100}%, var(--color-canvas))` } : undefined
-        }
+        aria-hidden={!labeled}
+        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-opacity duration-150"
+        style={{
+          opacity: labeled ? 1 : 0,
+          // Canvas-colored halo so the name reads over the dense edge lines
+          // behind it — those strokes are canvas-foreground, the same color
+          // family as the text, so without a moat the glyphs blend in.
+          // paint-order:stroke draws the stroke behind the fill, so it's a true
+          // outline (glyphs stay crisp) rather than a thinned weight.
+          paintOrder: "stroke",
+          WebkitTextStroke: "3px var(--color-canvas)",
+        }}
       >
         {isViewer ? "You" : (data.displayName ?? "—")}
       </div>
@@ -133,6 +152,11 @@ export type EdgeInteraction = {
   // number shows when its id matches either.
   hoverEdgeId: string | null;
   selectedEdgeId: string | null;
+  // The selected node's lit path-to-center edges, whose numbers also show so a
+  // highlighted path reads its relation values. Direction-stamped both ways, so
+  // an edge id (one direction) matches by set membership. Empty when no node is
+  // selected.
+  litEdgeIds: ReadonlySet<string>;
   previewEdge: (id: string) => void;
   endPreviewSoon: () => void;
 };
@@ -155,7 +179,9 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
   const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY });
   const interaction = useContext(EdgeInteractionContext);
   const isClickable = data?.isOutgoing === true && interaction !== null;
-  const isVisible = interaction !== null && (interaction.hoverEdgeId === id || interaction.selectedEdgeId === id);
+  const isVisible =
+    interaction !== null &&
+    (interaction.hoverEdgeId === id || interaction.selectedEdgeId === id || interaction.litEdgeIds.has(id));
   const handleClick = isClickable
     ? () =>
         interaction?.openRelating({
@@ -179,6 +205,11 @@ function NumberedEdge({ id, sourceX, sourceY, targetX, targetY, style, data }: E
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            // Lift the revealed pill above the hover tier so its halo never tucks
+            // under a lifted avatar. The edge-label layer is stacking-transparent,
+            // so this competes in the viewport (see EDGE_LABEL_Z). Hidden pills
+            // stay at auto — they're invisible and capture no clicks anyway.
+            zIndex: isVisible ? EDGE_LABEL_Z : undefined,
           }}
           className={`flex h-5 w-5 items-center justify-center rounded-full bg-canvas/80 text-xs font-semibold text-canvas-foreground transition-opacity duration-150 ${
             isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"

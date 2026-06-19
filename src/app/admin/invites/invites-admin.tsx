@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { AdminInvite } from "@/lib/api-types";
+import { formatDate } from "@/lib/format-date";
 
 const QUERY_KEY = ["admin", "invites"] as const;
 
@@ -15,8 +16,6 @@ const fetchInvites = async (): Promise<AdminInvite[]> => {
   const body = await res.json();
   return body.invites;
 };
-
-const fmtDate = (iso: string): string => new Date(iso).toLocaleDateString();
 
 export function InvitesAdmin() {
   const queryClient = useQueryClient();
@@ -59,7 +58,7 @@ export function InvitesAdmin() {
               // always show it — falling back to (unnamed) when that member
               // never set a display name, the same way the creator does.
               inv.status === "redeemed" ? `redeemed by ${inv.redeemerName ?? "(unnamed)"}` : null,
-              fmtDate(inv.createdAt),
+              formatDate(inv.createdAt),
             ].filter(Boolean);
 
             return (

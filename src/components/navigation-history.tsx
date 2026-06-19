@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-import { HISTORY_KEY, HISTORY_LIMIT } from "@/lib/route-labels";
+import { HISTORY_KEY, HISTORY_LIMIT } from "@/lib/page-titles";
 
 // Records each in-app pathname into a sessionStorage-backed stack so
 // BreadcrumbLink can render history-aware "← <previous>" links.

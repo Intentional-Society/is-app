@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
+
 import { requireUser } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { WelcomeAdvanceButton } from "../welcome-advance-button";
 import { AgreementsContent } from "./agreements-content";
+
+export const metadata: Metadata = { title: titleFor("/welcome/agreements") };
 
 // Step 1 of the welcome flow: a welcome message and the community
 // agreements. "I agree" stamps lastSignedAgreements and advances.

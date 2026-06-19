@@ -4,9 +4,25 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-18 | James | Rich text: markdown storage, react-markdown render, MDXEditor authoring
+
+Program copy (`description`/`blurb`) and member prose (`bio`/`currentIntention`/`supplementaryInfo`) are now formatted: stored as markdown in the existing `text` columns (no migration), rendered by a shared `<Markdown>` (full + constrained-inline variants, react-markdown + remark-gfm, no rehype-raw → XSS-safe), and authored in a lazy `ssr:false` MDXEditor (full + inline configs). See docs/design-richtext.md. (#432)
+
+## 2026-06-17 | James | Per-page HTML titles for usable tab names and browser history
+
+Root layout sets `title.template = "IS Web: %s"`. Per-page titles live in one `src/lib/page-titles.ts` dictionary that feeds both each page's `metadata.title` and the breadcrumb back-labels (which no longer keep a separate list); detail pages set the entity name via `generateMetadata`. New pages add a dictionary entry. (#425)
+
+## 2026-06-17 | James | Avatar signing degrades instead of 500ing under Storage load
+
+A directory browse prefetched every member card, and each prefetch render made separate Supabase Storage call; that exhausted Storage's DB pool (429), which `resolveAvatarUrls` rethrew into a page 500. Signing is now best-effort — it logs `avatar sign failed` and falls back to initials — and member cards no longer prefetch. First test example of shipping an `urgentReleasedAt` update.
+
+## 2026-06-16 | James | Update handling for active sessions
+
+The home page auto-reloads a stale tab, everywhere else a persistent bottom banner offers a member-initiated reload. Deploys now fall into one of three tiers: patch (default, notif held until the running build is 6h old, then once per 8h), feature (held until build is 2h old, then once per 8h, dismissible — whenever a changelog is added), urgent (immediate, non-dismissible — gated by `urgentReleasedAt` marker in code).  Full rationale: docs/strategy-deployment.md.
+
 ## 2026-06-14 | Ola | Remove password option (#212)
 
-Members can now remove their password from /me settings, reverting to magic-link-only sign-in. The "Remove password" button is only shown when `profiles.has_password` is true — set whenever a password is saved, cleared on removal. Removal uses `supabase.auth.admin.updateUserById` to replace the password with an unguessable random value (the only supported server-side path; direct `auth.users` mutation is intentionally avoided). Migration 0014 adds the `has_password` boolean column (default false).
+Members can now remove their password from /me settings, reverting to magic-link-only sign-in. The "Remove password" button is only shown when `profiles.has_password` is true — set whenever a password is saved, cleared on removal. Removal uses `supabase.auth.admin.updateUserById` to replace the password with an unguessable random value (the only supported server-side path; direct `auth.users` mutation is intentionally avoided). Migration 0015 adds the `has_password` boolean column (default false).
 
 ## 2026-06-12 | James | Unified top bar
 

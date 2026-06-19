@@ -33,7 +33,9 @@ const STEPS: Step[] = [
     title: "Finish by clicking Done",
     content:
       "No notifications are sent, but your relations become hints for others. Click Done now! (You can add more anytime.)",
-    placement: "left",
+    // Done now sits in the canvas's lower-left corner, so the tooltip floats
+    // above it (left would push it off the canvas edge).
+    placement: "top",
     // No primary button on the final step — the spotlighted Done
     // button on the page is the only finisher.
     buttons: ["back", "skip"],

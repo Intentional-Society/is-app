@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { MemberTypeahead } from "@/components/member-typeahead";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
 import type { AdminProgramDetail } from "@/lib/api-types";
+import { formatDate } from "@/lib/format-date";
 
 const programQueryKey = (id: string) => ["admin", "programs", id] as const;
 
@@ -54,6 +55,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const router = useRouter();
   const [name, setName] = useState(program.name);
   const [slug, setSlug] = useState(program.slug);
+  const [blurb, setBlurb] = useState(program.blurb ?? "");
   const [description, setDescription] = useState(program.description ?? "");
   const [buttondownTag, setButtondownTag] = useState(program.buttondownTag ?? "");
   const [editError, setEditError] = useState<string | null>(null);
@@ -67,6 +69,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     mutationFn: async (vars: {
       name?: string;
       slug?: string;
+      blurb?: string | null;
       description?: string | null;
       archived?: boolean;
       signupsOpen?: boolean;
@@ -173,6 +176,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const dirty =
     trimmedName !== program.name ||
     trimmedSlug !== program.slug ||
+    blurb.trim() !== (program.blurb ?? "") ||
     description.trim() !== (program.description ?? "") ||
     trimmedButtondownTag !== (program.buttondownTag ?? "");
 
@@ -188,6 +192,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     updateMutation.mutate({
       name: trimmedName,
       slug: trimmedSlug,
+      blurb: blurb.trim() || null,
       description: description.trim() || null,
       buttondownTag: trimmedButtondownTag || null,
     });
@@ -220,12 +225,28 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
           <p className="text-xs text-muted-foreground">Used in URLs — lowercase letters, numbers, and hyphens.</p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="program-description">Description</Label>
-          <Textarea
-            id="program-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+          {/* Editor renders a contenteditable div (no labelable control), so the
+              field name rides on the editor's ariaLabel rather than htmlFor. */}
+          <Label>Blurb</Label>
+          <MarkdownEditor
+            variant="inline"
+            ariaLabel="Blurb"
+            value={blurb}
+            onChange={setBlurb}
             disabled={updateMutation.isPending}
+            placeholder="One sentence shown on the program card"
+          />
+          <p className="text-xs text-muted-foreground">Short tagline shown on the programs list. Max 200 characters.</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Full description</Label>
+          <MarkdownEditor
+            variant="full"
+            ariaLabel="Full description"
+            value={description}
+            onChange={setDescription}
+            disabled={updateMutation.isPending}
+            placeholder="Shown on the program detail page"
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -283,7 +304,7 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
               <span className="font-medium">Archived</span>{" "}
               <span className="text-muted-foreground">
                 {program.archivedAt
-                  ? `— hidden from /programs since ${new Date(program.archivedAt).toLocaleDateString()}`
+                  ? `— hidden from /programs since ${formatDate(program.archivedAt)}`
                   : "— visible to members on /programs"}
               </span>
             </span>

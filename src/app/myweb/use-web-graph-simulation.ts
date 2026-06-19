@@ -11,13 +11,7 @@ import {
 import { forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  computeNormalization,
-  edgeAvoidance,
-  linkDistance,
-  NORMALIZATION_TARGET,
-  radialSeed,
-} from "./web-graph-layout";
+import { edgeAvoidance, linkDistance, type Normalize, radialSeed } from "./web-graph-layout";
 import type { EdgeData, MemberNodeData, SubgraphNode } from "./web-graph-renderers";
 
 // d3-force mutates these objects in place; ReactFlow's Node objects are
@@ -90,7 +84,7 @@ type WebGraphSimulation = {
 export function useWebGraphSimulation(
   filtered: SimulationSubgraph | null,
   fitPadding: number = FIT_VIEW_PADDING,
-  normalizationTarget: number = NORMALIZATION_TARGET,
+  normalize: Normalize,
 ): WebGraphSimulation {
   const [nodes, setNodes] = useState<Node<MemberNodeData>[]>([]);
   // The fit padding every internal refit uses (settle fits, the "end" fit, and
@@ -99,12 +93,12 @@ export function useWebGraphSimulation(
   // roomier than the full graph (fixed-size nodes need margin in a small box).
   const fitPaddingRef = useRef(fitPadding);
   fitPaddingRef.current = fitPadding;
-  // The longer-axis span the settled layout normalizes to before fitView frames
-  // it — the map's zoom knob (smaller ⇒ fitView zooms in ⇒ everything renders
-  // larger). Held in a ref for the same reason as the padding. The mini-map runs
-  // tighter than the full graph so its fixed-px avatars and labels read larger.
-  const normalizationTargetRef = useRef(normalizationTarget);
-  normalizationTargetRef.current = normalizationTarget;
+  // The normalization strategy — how settled sim points map to render space. Held
+  // in a ref so paintFromSim and the stable callbacks read the latest without
+  // re-subscribing: the full graph swaps it as the spacing slider moves; the
+  // mini-map's is constant.
+  const normalizeRef = useRef(normalize);
+  normalizeRef.current = normalize;
   const simRef = useRef<Simulation<SimNode, SimEdge> | null>(null);
   // Captured via ReactFlow's onInit so we can refit the viewport every
   // time node positions change — fitView only auto-fires on first
@@ -276,15 +270,14 @@ export function useWebGraphSimulation(
         }
       });
 
-    // Paints React node positions from the live simNodes, normalized so
-    // the layout's longer axis spans NORMALIZATION_TARGET sim units and is
-    // centered on the origin (see computeNormalization). Combined with a manual
-    // fitView refit, this makes the rendered graph fill the viewport regardless
-    // of node count.
+    // Paints React node positions from the live simNodes, normalized (centered +
+    // scaled) by the current strategy — the full graph scales so neighbors sit a
+    // fixed gap apart (see computeNeighborNormalization). Combined with a manual
+    // fitView refit, this fills the viewport at a consistent density.
     function paintFromSim() {
       if (simNodes.length === 0) return;
       // During a drag, freeze the normalization. Recomputing it would
-      // shift cx/cy/scale based on the moving bbox, which makes the
+      // shift cx/cy/scale based on the moving cloud, which makes the
       // dragged node visually drift away from the cursor.
       let cx: number;
       let cy: number;
@@ -292,7 +285,7 @@ export function useWebGraphSimulation(
       if (draggedNodeIdRef.current && normRef.current) {
         ({ cx, cy, scale } = normRef.current);
       } else {
-        const norm = computeNormalization(simNodes, normalizationTargetRef.current);
+        const norm = normalizeRef.current(simNodes);
         if (!norm) return;
         ({ cx, cy, scale } = norm);
         normRef.current = norm;
@@ -316,10 +309,10 @@ export function useWebGraphSimulation(
         return changed ? next : prev;
       });
 
-      // Refit every paint while the initial layout settles. Normalization pins
-      // the longer axis to NORMALIZATION_TARGET, so the fit is stable from the
-      // first painted frame — the viewport tracks the settling graph rather
-      // than snapping once at the end. A one-shot fit here used to fire (via
+      // Refit every paint while the initial layout settles. Normalization keeps
+      // the neighbor gap fixed, so the fit is stable from the first painted frame
+      // — the viewport tracks the settling graph rather than snapping once at the
+      // end. A one-shot fit here used to fire (via
       // rAF) before the normalized nodes reached ReactFlow's store, fitting the
       // raw seed instead, which left the graph zoomed-out until the "end" fit
       // visibly zoomed in. Skipped during a drag (we freeze normalization then)
@@ -399,6 +392,47 @@ export function useWebGraphSimulation(
   const fitView = useCallback(() => {
     flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 0 });
   }, []);
+
+  // Re-scale the at-rest layout with the current normalization strategy and
+  // refit. The spacing slider swaps `normalize` while the sim is usually settled,
+  // so paintFromSim (which only re-reads it on a live tick) won't pick it up —
+  // this applies it directly: recompute the render scale, repaint, then reframe.
+  // Skipped before the first settle (the build effect's per-paint fit owns it
+  // until then) and during a drag (normalization is frozen).
+  const applyNormalization = useCallback(() => {
+    if (!initialSettleDoneRef.current || draggedNodeIdRef.current) return;
+    const simById = simNodesByIdRef.current;
+    if (simById.size === 0) return;
+    const norm = normalizeRef.current([...simById.values()]);
+    if (!norm) return;
+    normRef.current = norm;
+    const { cx, cy, scale } = norm;
+    setNodes((prev) =>
+      prev.map((node) => {
+        const sn = simById.get(node.id);
+        return sn ? { ...node, position: { x: (sn.x - cx) * scale, y: (sn.y - cy) * scale } } : node;
+      }),
+    );
+    // Reframe instantly (duration 0) so the view tracks the slider crisply rather
+    // than queuing an animation per tick; rAF lets the repainted nodes reach
+    // ReactFlow's store first.
+    requestAnimationFrame(() => flowRef.current?.fitView({ padding: fitPaddingRef.current, duration: 0 }));
+  }, []);
+
+  // Re-apply normalization once the layout's at rest when the strategy changes —
+  // the spacing slider swaps `normalize`, and the sim is usually settled by then,
+  // so paintFromSim wouldn't pick it up. Skips the first run (initial mount), where
+  // the build/settle path already paints + fits. `normalize` is the trigger, read
+  // inside applyNormalization via normalizeRef.
+  const densityInitRef = useRef(true);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: normalize triggers the re-scale (read via the ref)
+  useEffect(() => {
+    if (densityInitRef.current) {
+      densityInitRef.current = false;
+      return;
+    }
+    applyNormalization();
+  }, [normalize, applyNormalization]);
 
   return {
     nodes,

@@ -5,9 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 import { Avatar } from "@/components/avatar";
+import { Markdown, MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { ProgramDetail } from "@/lib/api-types";
+import { formatDate } from "@/lib/format-date";
 
 const programQueryKey = (slug: string) => ["programs", "by-slug", slug] as const;
 
@@ -85,15 +87,16 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
     <div className="flex w-full max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-2">
         <h2 className="text-3xl font-semibold">{program.name}</h2>
+        {program.blurb && (
+          <MarkdownInline className="font-serif text-base text-muted-foreground">{program.blurb}</MarkdownInline>
+        )}
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
           {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}
         </p>
       </header>
 
-      {program.description && (
-        <p className="font-serif text-base text-muted-foreground leading-relaxed">{program.description}</p>
-      )}
+      {program.description && <Markdown>{program.description}</Markdown>}
 
       <div className="flex items-center gap-3">
         {program.joined ? (
@@ -147,12 +150,4 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
       </section>
     </div>
   );
-}
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  } catch {
-    return iso;
-  }
 }

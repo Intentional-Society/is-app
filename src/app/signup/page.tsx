@@ -3,12 +3,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppWordmark } from "@/components/app-wordmark";
+import { titleFor } from "@/lib/page-titles";
 import { getServerUser } from "@/lib/supabase/server-user";
 
 import { SignupForm } from "./signup-form";
 
 // Public page — opt back in to indexing (root layout is noindex by default).
-export const metadata: Metadata = { robots: { index: true, follow: true } };
+export const metadata: Metadata = { title: titleFor("/signup"), robots: { index: true, follow: true } };
 
 type SignupPageProps = {
   searchParams: Promise<{ code?: string }>;

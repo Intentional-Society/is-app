@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api";
 import type { AdminSignin } from "@/lib/api-types";
+import { formatDateTime } from "@/lib/format-date";
 
 const QUERY_KEY = ["admin", "signins"] as const;
 const STALE_TIME = 5 * 60 * 1000;
@@ -15,25 +16,13 @@ const fetchSignins = async (): Promise<AdminSignin[]> => {
   return body.signins;
 };
 
-function formatSignin(iso: string) {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
 function SigninRow({ member, detail }: { member: AdminSignin; detail: string | null }) {
   // lastActivityAt covers live sessions only, so it matches lastSignInAt
   // for everyone else — show it only when it adds information.
   const activity =
-    member.lastActivityAt && member.lastActivityAt !== member.lastSignInAt ? formatSignin(member.lastActivityAt) : null;
+    member.lastActivityAt && member.lastActivityAt !== member.lastSignInAt
+      ? formatDateTime(member.lastActivityAt)
+      : null;
 
   return (
     <li className="flex items-center gap-3 rounded border border-border px-3 py-2">
@@ -81,7 +70,7 @@ export function SigninsAdminPanel() {
         ) : (
           <ul className="flex flex-col gap-2">
             {signedIn.map((member) => (
-              <SigninRow key={member.id} member={member} detail={formatSignin(member.lastSignInAt as string)} />
+              <SigninRow key={member.id} member={member} detail={formatDateTime(member.lastSignInAt as string)} />
             ))}
           </ul>
         )}

@@ -1,6 +1,6 @@
 {
   "id": "96f29156-ad2c-45a6-b3a4-dfe339e39691",
-  "prevId": "415505cb-bdf6-4606-9e10-0f9196c0c6cb",
+  "prevId": "63d35da5-e105-4b14-a629-b2bf648bc603",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -425,13 +425,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "has_password": {
-          "name": "has_password",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -445,6 +438,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "has_password": {
+          "name": "has_password",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {},
@@ -513,6 +513,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "blurb": {
+          "name": "blurb",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "description": {
           "name": "description",

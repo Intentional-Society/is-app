@@ -1,9 +1,13 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
+import type { Metadata } from "next";
 
 import { requireUser, serverApiClient } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { MyWeb } from "./my-web";
 import { DEFAULT_SUBGRAPH_VIEW, RELATION_SUBGRAPH_QUERY_KEY } from "./query-keys";
+
+export const metadata: Metadata = { title: titleFor("/myweb") };
 
 export default async function MyWebPage() {
   const me = await requireUser();
@@ -32,6 +36,9 @@ export default async function MyWebPage() {
   });
 
   return (
+    // The web canvas sizes its view-mode height to leave exactly this `pb-8`
+    // (2rem) below itself, so it never spills into a scrollbar — useCanvasBox's
+    // PAGE_PAD_REM mirrors this value. Change them together.
     <main className="flex min-h-screen flex-col items-center gap-6 px-8 pb-8 pt-3">
       <HydrationBoundary state={dehydrate(queryClient)}>
         <MyWeb initialLastUpdatedWeb={initialLastUpdatedWeb} />

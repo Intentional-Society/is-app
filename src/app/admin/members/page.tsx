@@ -1,10 +1,14 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
+import { titleFor } from "@/lib/page-titles";
 
 import { MemberEmailsPanel } from "./member-emails-panel";
 import { MembersAdminPanel } from "./members-admin-panel";
+
+export const metadata: Metadata = { title: titleFor("/admin/members") };
 
 export default async function AdminMembersPage() {
   const me = await requireUser();

@@ -3,11 +3,12 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
 import { appVersion, changelog, formatChangelogDate } from "@/lib/changelog";
+import { titleFor } from "@/lib/page-titles";
 
 import { CollapsibleSection } from "./collapsible-section";
 import { SystemMetrics } from "./system-metrics";
 
-export const metadata: Metadata = { title: "About" };
+export const metadata: Metadata = { title: titleFor("/about") };
 
 export default async function AboutPage() {
   await requireUser();

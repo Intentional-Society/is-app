@@ -1,8 +1,8 @@
 "use client";
 
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 type Props = {
   fields: {
@@ -37,15 +37,12 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
         disabled={disabled}
       />
 
-      <Label htmlFor="bio">Bio</Label>
-      <Textarea
-        id="bio"
-        required
-        value={fields.bio}
-        onChange={(e) => setters.setBio(e.target.value)}
-        disabled={disabled}
-        rows={4}
-      />
+      {/* Editor renders a contenteditable div (no labelable control), so the
+          field name rides on the editor's ariaLabel rather than htmlFor. Bio is
+          required; the empty check lives in useProfileForm (rendered output,
+          not raw string length). */}
+      <Label>Bio</Label>
+      <MarkdownEditor ariaLabel="Bio" value={fields.bio} onChange={setters.setBio} disabled={disabled} />
 
       <Label htmlFor="keywords">
         Keywords <span className="text-muted-foreground">(comma-separated)</span>
@@ -67,25 +64,23 @@ export function ProfileFields({ fields, setters, disabled }: Props) {
         disabled={disabled}
       />
 
-      <Label htmlFor="currentIntention">
+      <Label>
         Current intention <span className="text-muted-foreground">(what are you focused on right now?)</span>
       </Label>
-      <Textarea
-        id="currentIntention"
+      <MarkdownEditor
+        ariaLabel="Current intention"
         value={fields.currentIntention}
-        onChange={(e) => setters.setCurrentIntention(e.target.value)}
+        onChange={setters.setCurrentIntention}
         disabled={disabled}
-        rows={3}
         placeholder="e.g. Building deeper listening skills in my conversations this quarter."
       />
 
-      <Label htmlFor="supplementaryInfo">Supplementary info</Label>
-      <Textarea
-        id="supplementaryInfo"
+      <Label>Supplementary info</Label>
+      <MarkdownEditor
+        ariaLabel="Supplementary info"
         value={fields.supplementaryInfo}
-        onChange={(e) => setters.setSupplementaryInfo(e.target.value)}
+        onChange={setters.setSupplementaryInfo}
         disabled={disabled}
-        rows={3}
       />
     </>
   );

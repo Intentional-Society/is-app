@@ -37,6 +37,21 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-06-18",
+    title: "Spacing slider",
+    description: "My Web has a spacing slider to adjust map density, plus clarity and hover improvements.",
+  },
+  {
+    date: "2026-06-18",
+    title: "Rich text arrives",
+    description: "Your profile fields, and program descriptions, now support common text formatting styles.",
+  },
+  {
+    date: "2026-06-17",
+    title: "Find the right tab",
+    description: "Browser tabs and history now show each page's name, so they're easy to tell apart.",
+  },
+  {
     date: "2026-06-12",
     title: "Home button",
     description: "There's no place like home... (house icon at the top-left)",
@@ -174,6 +189,18 @@ export const changelog: ChangelogEntry[] = [
 
 // The "version" shown on /about: the date of the most recent change.
 export const appVersion = changelog[0]?.date ?? "";
+
+// The instant of the most recent urgent deploy — a fix that older
+// clients must stop running (active breakage or a security exposure).
+// The update banner forces an immediate, non-dismissible reload on any
+// open tab whose build predates this; see docs/strategy-deployment.md.
+//
+// To escalate a deploy to the urgent tier, set this to the current time
+// in the same PR as the fix; otherwise leave it. It is a full ISO 8601
+// timestamp, not a plain date like appVersion, so two urgent deploys on
+// the same day still compare strictly (the tab tests
+// NEXT_PUBLIC_BUILD_TIME < urgentReleasedAt).
+export const urgentReleasedAt = "2026-06-17T18:31:26.000Z";
 
 // Format an entry's "YYYY-MM-DD" date as e.g. "May 29, 2026". Pinned to
 // UTC so the rendered date matches the string regardless of the

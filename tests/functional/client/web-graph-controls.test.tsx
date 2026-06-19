@@ -18,6 +18,8 @@ const makeProps = (
   onHopsChange: vi.fn(),
   valueFilter: new Set<RelationValue>([1, 2, 3, 4]),
   onToggleValue: vi.fn(),
+  spacing: 1,
+  onSpacingChange: vi.fn(),
   ...over,
 });
 
@@ -46,5 +48,14 @@ describe("WebGraphControls", () => {
     render(<WebGraphControls {...makeProps({ onToggleValue })} />);
     fireEvent.click(screen.getByRole("button", { name: "Depth 2: Friend" }));
     expect(onToggleValue).toHaveBeenCalledWith(2);
+  });
+
+  it("reflects the current spacing and reports a numeric change when dragged", () => {
+    const onSpacingChange = vi.fn();
+    render(<WebGraphControls {...makeProps({ spacing: 1, onSpacingChange })} />);
+    const slider = screen.getByRole("slider");
+    expect(slider).toHaveValue("1");
+    fireEvent.change(slider, { target: { value: "1.1" } });
+    expect(onSpacingChange).toHaveBeenCalledWith(1.1);
   });
 });

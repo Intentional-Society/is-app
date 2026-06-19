@@ -3,12 +3,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppWordmark } from "@/components/app-wordmark";
+import { titleFor } from "@/lib/page-titles";
 import { getServerUser } from "@/lib/supabase/server-user";
 
 import { SigninForm } from "./signin-form";
 
 // Public page — opt back in to indexing (root layout is noindex by default).
-export const metadata: Metadata = { robots: { index: true, follow: true } };
+export const metadata: Metadata = { title: titleFor("/signin"), robots: { index: true, follow: true } };
 
 // Keys must match the error codes emitted by /auth/callback —
 // unknown codes silently render no message.

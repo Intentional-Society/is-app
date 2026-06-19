@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { apiClient } from "@/lib/api";
+import { markdownHasContent } from "@/lib/markdown";
 
 export type ProfileFormValues = {
   displayName: string;
@@ -29,6 +30,13 @@ export function useProfileForm(initial: ProfileFormValues) {
   const [status, setStatus] = useState<ProfileFormStatus>({ kind: "idle" });
 
   const submit = async (): Promise<boolean> => {
+    // Bio is the one required prose field. The editor is a WYSIWYG surface with
+    // no native `required`, and a cleared editor can still hold whitespace or
+    // empty markup — so gate on the rendered output, not the raw string length.
+    if (!markdownHasContent(bio)) {
+      setStatus({ kind: "error", message: "Bio is required." });
+      return false;
+    }
     setStatus({ kind: "submitting" });
     try {
       const keywords = keywordsText

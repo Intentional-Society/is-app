@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+import { titleFor } from "@/lib/page-titles";
+
+export const metadata: Metadata = { title: titleFor("/colors") };
 
 export default function ColorsPage() {
   if (process.env.NODE_ENV === "production") notFound();

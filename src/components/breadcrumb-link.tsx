@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { HISTORY_KEY, labelForPath } from "@/lib/route-labels";
+import { HISTORY_KEY, labelForPath } from "@/lib/page-titles";
 
 type Props = {
   fallback: string;

@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CANVAS_MAX_ASPECT,
+  CANVAS_MIN_ASPECT,
+  computeNeighborNormalization,
   computeNormalization,
   EDGE_AVOID_THRESHOLD,
+  EDIT_HEIGHT_FRACTION,
   edgeAvoidance,
   edgeStrokeOpacity,
   edgeStrokeWidth,
+  fitAspectClamped,
   linkDistance,
+  medianNearestNeighbor,
   radialSeed,
   SEED_FIRST_HOP_RADIUS,
   SEED_RING_GAP,
@@ -81,6 +87,120 @@ describe("computeNormalization", () => {
         600,
       ),
     ).toEqual({ cx: 50, cy: 150, scale: 2 });
+  });
+});
+
+describe("medianNearestNeighbor", () => {
+  it("returns 0 for fewer than two points", () => {
+    expect(medianNearestNeighbor([])).toBe(0);
+    expect(medianNearestNeighbor([{ x: 1, y: 1 }])).toBe(0);
+  });
+
+  it("measures each node's distance to its closest other", () => {
+    expect(
+      medianNearestNeighbor([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ]),
+    ).toBe(10);
+  });
+
+  it("takes the median across nodes", () => {
+    // x = 0, 10, 30 → nearest-neighbor distances 10, 10, 20 → median 10.
+    expect(
+      medianNearestNeighbor([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 30, y: 0 },
+      ]),
+    ).toBe(10);
+  });
+});
+
+describe("computeNeighborNormalization", () => {
+  it("returns null for an empty cloud", () => {
+    expect(computeNeighborNormalization([], 100)).toBeNull();
+  });
+
+  it("scales so the median neighbor gap renders as targetGap, centered on the bbox", () => {
+    // Neighbors 20 apart, targetGap 100 → scale 5.
+    expect(
+      computeNeighborNormalization(
+        [
+          { x: 0, y: 0 },
+          { x: 20, y: 0 },
+        ],
+        100,
+      ),
+    ).toEqual({ cx: 10, cy: 0, scale: 5 });
+  });
+
+  it("keeps scale 1 when the spacing is degenerate (coincident points)", () => {
+    expect(
+      computeNeighborNormalization(
+        [
+          { x: 3, y: 3 },
+          { x: 3, y: 3 },
+        ],
+        100,
+      )?.scale,
+    ).toBe(1);
+  });
+
+  it("is invariant to overall extent — same neighbor gap, same scale (the point of (b))", () => {
+    // A tight pair and a far-flung set with the SAME neighbor gap normalize to the
+    // same scale, even though their bounding boxes differ wildly.
+    const tight = computeNeighborNormalization(
+      [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+      ],
+      100,
+    );
+    const spread = computeNeighborNormalization(
+      [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 500, y: 0 },
+        { x: 520, y: 0 },
+      ],
+      100,
+    );
+    expect(spread?.scale).toBe(tight?.scale); // both 5 — the bounding box doesn't matter
+  });
+});
+
+describe("fitAspectClamped", () => {
+  it("returns null for a non-positive rectangle (nothing measured yet)", () => {
+    expect(fitAspectClamped(0, 600)).toBeNull();
+    expect(fitAspectClamped(600, 0)).toBeNull();
+    expect(fitAspectClamped(-10, 600)).toBeNull();
+  });
+
+  it("uses an in-range rectangle whole (ratio within [3:4, 4:3])", () => {
+    // A square is in range — no letterboxing, the whole box is used.
+    expect(fitAspectClamped(600, 600)).toEqual({
+      width: 600,
+      viewH: 600,
+      editH: 600 * EDIT_HEIGHT_FRACTION,
+    });
+  });
+
+  it("keeps a boundary ratio (exactly 4:3) whole", () => {
+    // 800×600 = 4:3 exactly, the widest in-range ratio — used whole, not clamped.
+    expect(fitAspectClamped(800, 600)).toEqual({ width: 800, viewH: 600, editH: 600 * EDIT_HEIGHT_FRACTION });
+  });
+
+  it("letterboxes a too-wide viewport by narrowing the width to 4:3", () => {
+    // 2000×600 (ratio 3.33 > 4:3): fill the height, width clamps to h × 4:3.
+    const dims = fitAspectClamped(2000, 600);
+    expect(dims).toEqual({ width: 600 * CANVAS_MAX_ASPECT, viewH: 600, editH: 600 * EDIT_HEIGHT_FRACTION });
+  });
+
+  it("letterboxes a too-tall viewport by shortening the height to 3:4", () => {
+    // 600×2000 (ratio 0.3 < 3:4): fill the width, height clamps to w ÷ 3:4.
+    const viewH = 600 / CANVAS_MIN_ASPECT;
+    expect(fitAspectClamped(600, 2000)).toEqual({ width: 600, viewH, editH: viewH * EDIT_HEIGHT_FRACTION });
   });
 });
 

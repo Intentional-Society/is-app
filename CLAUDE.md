@@ -26,7 +26,7 @@ Intentional Society web application — an authenticated app for a small, global
 
 Architecture specs in `docs/architecture-appstack.md` and `docs/architecture-devstack.md`.
 
-- **Next.js 15** (App Router) serves the frontend and hosts the API via catch-all route
+- **Next.js 16** (App Router) serves the frontend and hosts the API via catch-all route
 - **Hono** handles all API logic at `src/app/api/[[...route]]/route.ts`, defined in `src/server/api.ts`
 - **Hono RPC client** (`apiClient` from `src/lib/api.ts`) provides type-safe API calls — use this instead of raw `fetch`
 - **Drizzle ORM** for Postgres access. Schema at `src/server/schema.ts`, connection at `src/server/db.ts`
@@ -78,6 +78,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 - `docs/strategy-branching.md` — branching strategy and rationale
 - `docs/strategy-worktree-lanes.md` — running parallel worktrees as isolated "lanes" (own Supabase stack + ports) for concurrent dev/test
 - `docs/strategy-committing.md` — commit conventions and expand-contract pattern
+- `docs/strategy-deployment.md` — continuous deployment during active sessions: Skew Protection, the tiered update banner, and the home safe-refresh
 - `docs/strategy-db-transactions.md` — writing transactions that survive the Supabase connection pooler
 - `docs/strategy-project-management.md` — GitHub Projects board conventions
 - `docs/strategy-security.md` — security headers and rationale for each directive
@@ -87,6 +88,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 - `docs/design-profile-pictures.md` — avatar uploads, storage bucket, signed URLs
 - `docs/design-relations.md` — the relationship web (schema, flows, rationale)
 - `docs/design-buttondown.md` — Buttondown sync (program tag mirror, cron, write policy)
+- `docs/design-richtext.md` — rich text: markdown storage, react-markdown render, MDXEditor authoring
 - `docs/doc-vercel.md` — Vercel dashboard settings
 - `docs/doc-supabase.md` — Supabase dashboard settings (auth URLs, API keys)
 - `docs/doc-resend.md` — Resend transactional email (sending domain, DMARC, alternatives)

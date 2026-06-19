@@ -1,6 +1,7 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException as Sentry_captureException } from "@sentry/nextjs";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
+import { log } from "next-axiom";
 
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
@@ -16,7 +17,7 @@ const tryAutoSubscribe = async (userId: string): Promise<void> => {
   try {
     await autoSubscribeNewMember(userId);
   } catch (err) {
-    Sentry.captureException(err);
+    Sentry_captureException(err);
   }
 };
 
@@ -133,7 +134,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       result = await upsertProfile(data.user);
     } catch (err) {
-      Sentry.captureException(err);
+      Sentry_captureException(err, {
+        tags: { feature: "auth-callback", path: "profile-upsert" },
+        extra: { userId: data.user.id },
+      });
+      log.warn("profile upsert failed", {
+        userId: data.user.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await log.flush();
       return NextResponse.redirect(new URL("/signin?error=profile_error", request.url), 303);
     }
     if (result.created) {
@@ -220,7 +229,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Anything other than InviteInvalid (the routine "code already
     // redeemed/expired" path) is a real Postgres/transaction failure —
     // capture it instead of swallowing it behind the generic redirect.
-    Sentry.captureException(err);
+    // Also log to Axiom: this route isn't under the Hono request logger
+    // and the failure leaves a 303 (not a 5xx), so without this the
+    // "did a redemption ever fail in prod?" question has no answer there.
+    // `pgCode` surfaces the SQLSTATE (e.g. 25P02) the #149 pooler hazard
+    // would raise.
+    Sentry_captureException(err, {
+      tags: { feature: "auth-callback", path: "invite-redemption" },
+      extra: { inviteCode: invite, userId },
+    });
+    log.warn("invite redemption failed", {
+      inviteCode: invite,
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+      pgCode: err instanceof Error ? (err as Error & { code?: string }).code : undefined,
+    });
+    await log.flush();
     return NextResponse.redirect(new URL("/signin?error=profile_error", request.url), 303);
   }
 
