@@ -34,18 +34,16 @@ export type ProfileMiniMap = {
 //      first).
 // The lit path is the shortest bridge among those rendered (a direct edge wins,
 // then a mutual, then a two-hop), ties broken by the strongest average. Hidden/
-// deactivated endpoints are pruned for non-admins; them and you are exempt since
-// they anchor the map.
+// deactivated endpoints are pruned for everyone, admins included; them and you
+// are exempt since they anchor the map.
 // At MVP scale (≤100 members) loading the whole confirmed-edge set and doing the
 // bridge enumeration in JS is trivial; revisit if the network grows large.
 export const getProfileMiniMap = async (params: {
   viewerId: string;
   profileId: string;
-  includeHidden?: boolean;
   maxNodes?: number;
 }): Promise<ProfileMiniMap> => {
   const { viewerId, profileId } = params;
-  const includeHidden = params.includeHidden ?? false;
   const maxNodes = params.maxNodes ?? 10;
 
   const allRelations = await db
@@ -58,16 +56,14 @@ export const getProfileMiniMap = async (params: {
     .from(relations)
     .where(isNotNull(relations.value));
 
-  // Drop hidden/deactivated endpoints for non-admins (deactivated always); them
-  // and you anchor the map, so they're exempt.
+  // Drop hidden/deactivated endpoints; them and you anchor the map, so
+  // they're exempt.
   const endpointIds = new Set<string>([viewerId, profileId]);
   for (const e of allRelations) {
     endpointIds.add(e.relatorId);
     endpointIds.add(e.relateeId);
   }
-  const dropFilter = includeHidden
-    ? isNotNull(profiles.deactivatedAt)
-    : or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt));
+  const dropFilter = or(eq(profiles.hidden, true), isNotNull(profiles.deactivatedAt));
   const droppedIds = new Set<string>();
   const dropRows = await db
     .select({ id: profiles.id })

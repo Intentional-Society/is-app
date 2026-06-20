@@ -355,16 +355,14 @@ export type ProfileForMember = {
 // Accepts either a UUID or a slug so /members/aria-chen and
 // /members/<uuid> both work. UUID-shaped strings go straight to the id
 // column; anything else is treated as a slug lookup.
-// includeHidden=true bypasses the profiles.hidden filter so admins can
-// view hidden test accounts; the API handler decides which to pass.
-export const getProfileForMember = async (
-  idOrSlug: string,
-  options: { includeHidden?: boolean } = {},
-): Promise<ProfileForMember | null> => {
+// Hidden and deactivated profiles are never returned — the profile page is
+// member-facing, so admins see the same as anyone. Admins manage hidden
+// accounts from the /admin pages, which run their own queries.
+export const getProfileForMember = async (idOrSlug: string): Promise<ProfileForMember | null> => {
   const match = isUuid(idOrSlug)
     ? or(eq(profiles.id, idOrSlug), eq(profiles.slug, idOrSlug))
     : eq(profiles.slug, idOrSlug);
-  const where = options.includeHidden ? match : and(match, eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
+  const where = and(match, eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
 
   const [row] = await db
     .select({
@@ -409,11 +407,16 @@ export type MemberSummary = {
 // gates on content, not on lastUpdatedProfile.
 const hasSetUpProfile = sql`btrim(coalesce(${profiles.bio}, '')) <> ''`;
 
-// includeHidden=true returns hidden profiles too — admins only.
-export const listMembers = async (options: { includeHidden?: boolean } = {}): Promise<MemberSummary[]> => {
-  const where = options.includeHidden
-    ? isNotNull(profiles.displayName)
-    : and(isNotNull(profiles.displayName), hasSetUpProfile, eq(profiles.hidden, false), isNull(profiles.deactivatedAt));
+// The directory everyone sees: members who finished onboarding and aren't
+// hidden or deactivated. Admins see the same list — hidden and mid-onboarding
+// accounts surface on the /admin members page instead.
+export const listMembers = async (): Promise<MemberSummary[]> => {
+  const where = and(
+    isNotNull(profiles.displayName),
+    hasSetUpProfile,
+    eq(profiles.hidden, false),
+    isNull(profiles.deactivatedAt),
+  );
   const rows = await db
     .select({
       id: profiles.id,
@@ -442,15 +445,15 @@ export type IntentionSummary = {
 // first — the /intentions browse cloud renders the most recently
 // updated on top (highest z-index) and largest. `nulls last` parks the
 // rare row whose intentionUpdatedAt was never stamped at the back.
-// Hidden profiles are excluded unless an admin caller opts in, matching
-// listMembers.
-export const listCurrentIntentions = async (options: { includeHidden?: boolean } = {}): Promise<IntentionSummary[]> => {
+// Hidden profiles are always excluded, matching listMembers — the intentions
+// cloud is member-facing, so admins see the same as anyone.
+export const listCurrentIntentions = async (): Promise<IntentionSummary[]> => {
   const present = and(
     isNotNull(profiles.displayName),
     isNotNull(profiles.currentIntention),
     sql`btrim(${profiles.currentIntention}) <> ''`,
   );
-  const where = options.includeHidden ? present : and(present, eq(profiles.hidden, false));
+  const where = and(present, eq(profiles.hidden, false));
   const rows = await db
     .select({
       id: profiles.id,

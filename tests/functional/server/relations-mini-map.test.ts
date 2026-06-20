@@ -183,19 +183,15 @@ describe("getProfileMiniMap", () => {
     expect(set.has(a)).toBe(true);
   });
 
-  it("prunes a hidden mutual for a non-admin viewer, keeps it for an admin", async () => {
+  it("prunes a hidden mutual from the map", async () => {
     const hidden = await mk("Hidden");
     await relate(viewer, hidden, 4);
     await relate(hidden, them, 4);
     await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, hidden));
 
-    const nonAdmin = await getProfileMiniMap({ viewerId: viewer, profileId: them });
-    expect(ids(nonAdmin).has(hidden)).toBe(false);
-    expect(nonAdmin.pathToViewer).toEqual([]); // the only bridge ran through the hidden node
-
-    const admin = await getProfileMiniMap({ viewerId: viewer, profileId: them, includeHidden: true });
-    expect(ids(admin)).toEqual(new Set([them, viewer, hidden]));
-    expect(admin.pathToViewer).toEqual([them, hidden, viewer]);
+    const map = await getProfileMiniMap({ viewerId: viewer, profileId: them });
+    expect(ids(map).has(hidden)).toBe(false);
+    expect(map.pathToViewer).toEqual([]); // the only bridge ran through the hidden node
   });
 
   it("returns every confirmed edge among the final node set", async () => {
@@ -252,7 +248,7 @@ describe("GET /api/relations/mini-map/:profileId", () => {
     expect(res.status).toBe(400);
   });
 
-  it("prunes a hidden node for a non-admin but keeps it for an admin", async () => {
+  it("prunes a hidden node for non-admins and admins alike", async () => {
     await updateRelationValue({ relatorId: them, relateeId: hidden, value: 4 });
     await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, hidden));
 
@@ -262,6 +258,6 @@ describe("GET /api/relations/mini-map/:profileId", () => {
 
     authAs(admin);
     const adminBody = await (await app.request(`/api/relations/mini-map/${them}`)).json();
-    expect(adminBody.nodes.map((n: { id: string }) => n.id)).toContain(hidden);
+    expect(adminBody.nodes.map((n: { id: string }) => n.id)).not.toContain(hidden);
   });
 });

@@ -116,22 +116,6 @@ describe("getPersonalWeb", () => {
     expect(sub.edges[0]).toMatchObject({ relatorId: center, relateeId: a });
   });
 
-  it("includeHidden=true keeps hidden nodes and their edges (admin viewer)", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await updateRelationValue({ relatorId: center, relateeId: b, value: 2 });
-    await db.update(profiles).set({ hidden: true }).where(eq(profiles.id, b));
-
-    const sub = await getPersonalWeb({
-      centerId: center,
-      includeIncoming: false,
-      includeOutgoing: true,
-      hops: 1,
-      includeHidden: true,
-    });
-    expect(new Set(sub.nodes.map((n) => n.id))).toEqual(new Set([center, a, b]));
-    expect(sub.edges).toHaveLength(2);
-  });
-
   it("hops=2 drops a hidden second-degree neighbor and the edge that reaches it", async () => {
     const c = randomUUID();
     await insertUserAndProfile(c, { displayName: "C" });
@@ -167,20 +151,6 @@ describe("getPersonalWeb", () => {
     expect(sub.nodes.map((n) => n.id).includes(b)).toBe(false);
     expect(sub.edges.some((e) => e.relateeId === b)).toBe(false);
     expect(sub.nodes.map((n) => n.id).includes(a)).toBe(true);
-  });
-
-  it("includeHidden=true still drops deactivated neighbors (admin viewer)", async () => {
-    await updateRelationValue({ relatorId: center, relateeId: a, value: 3 });
-    await db.update(profiles).set({ deactivatedAt: new Date() }).where(eq(profiles.id, a));
-
-    const sub = await getPersonalWeb({
-      centerId: center,
-      includeIncoming: false,
-      includeOutgoing: true,
-      hops: 1,
-      includeHidden: true,
-    });
-    expect(sub.nodes.map((n) => n.id).includes(a)).toBe(false);
   });
 });
 
