@@ -351,7 +351,6 @@ export type ProgramDetail = AdminProgram & { participants: ProgramParticipant[] 
 const MAX_PROGRAM_NAME = 120;
 const MAX_PROGRAM_SLUG = 80;
 const MAX_PROGRAM_BLURB = 200;
-const MAX_PROGRAM_DESCRIPTION = 2000;
 // Buttondown tag names are short by convention; the cap is well above
 // anything Buttondown surfaces in its UI and keeps the column index-friendly.
 const MAX_BUTTONDOWN_TAG = 100;
@@ -398,9 +397,6 @@ export const parseProgramCreate = (
   }
 
   const description = trimmedString(obj.description);
-  if (description && description.length > MAX_PROGRAM_DESCRIPTION) {
-    return { error: "description is too long" };
-  }
 
   const buttondownTag = trimmedString(obj.buttondownTag);
   if (buttondownTag && buttondownTag.length > MAX_BUTTONDOWN_TAG) {
@@ -462,9 +458,6 @@ export const parseProgramUpdate = (body: unknown): ProgramUpdate | { error: stri
   }
   if ("description" in obj) {
     const description = trimmedString(obj.description);
-    if (description && description.length > MAX_PROGRAM_DESCRIPTION) {
-      return { error: "description is too long" };
-    }
     result.description = description || null;
   }
   if ("archived" in obj) {
