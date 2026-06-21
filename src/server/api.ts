@@ -60,6 +60,7 @@ import {
   joinProgram,
   leaveProgram,
   listAllProgramsForAdmin,
+  listProgramParticipantEmails,
   listPrograms,
   parseProgramCreate,
   parseProgramUpdate,
@@ -179,6 +180,10 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
     });
     return c.json({ ok: true });
+  })
+  .get("/programs/:id/participant-emails", async (c) => {
+    const emails = await listProgramParticipantEmails(c.req.param("id"));
+    return c.json({ emails });
   })
   .get("/profiles/hidden", async (c) => {
     const members = await listHiddenMembers();

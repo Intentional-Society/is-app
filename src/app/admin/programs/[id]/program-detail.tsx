@@ -14,6 +14,8 @@ import { apiClient } from "@/lib/api";
 import type { AdminProgramDetail } from "@/lib/api-types";
 import { formatDate } from "@/lib/format-date";
 
+import { ProgramEmailsPanel } from "./program-emails-panel";
+
 const programQueryKey = (id: string) => ["admin", "programs", id] as const;
 
 const fetchProgram = async (id: string): Promise<AdminProgramDetail> => {
@@ -362,6 +364,12 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
               </li>
             ))}
           </ul>
+        )}
+        {hasParticipants && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <h3 className="text-sm font-medium">Email addresses</h3>
+            <ProgramEmailsPanel programId={program.id} />
+          </div>
         )}
       </section>
 
