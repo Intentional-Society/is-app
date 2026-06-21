@@ -3,6 +3,7 @@
 import { House, Menu, Moon, Settings, ShieldCheck, Sun, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLogger } from "next-axiom";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -57,6 +58,8 @@ function HomeLink() {
 
 // The top-right corner: the hamburger trigger and the nav sheet it opens.
 function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdmin: boolean }) {
+  const { user } = useAuth();
+  const log = useLogger();
   const [isDark, setIsDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -80,6 +83,9 @@ function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdm
     const next: ThemePreference = isDark ? "light" : "dark";
     applyThemePreference(next);
     setIsDark(!isDark);
+    // Mirror the settings-page selector's log so theme adoption is
+    // countable per-person; `source` distinguishes which affordance.
+    log.info("theme-selected", { theme: next, userId: user?.id ?? null, source: "nav" });
   };
 
   return (
