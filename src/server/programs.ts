@@ -114,15 +114,26 @@ export const listPrograms = async (userId: string): Promise<ProgramWithMembershi
           .orderBy(desc(profilePrograms.assignedAt))
       : [];
 
-  const withAvatarUrls = await attachAvatarUrls(avatarRows);
+  // Cap to 5 per program *before* signing. avatarRows is ordered by
+  // desc(assignedAt), so the first 5 of each program are exactly the faces
+  // the card renders; signing the rest just signs (and caches) avatars that
+  // never appear in the facepile (#424).
+  const facepileRows = new Map<string, typeof avatarRows>();
+  for (const row of avatarRows) {
+    const existing = facepileRows.get(row.programId) ?? [];
+    if (existing.length < 5) {
+      existing.push(row);
+      facepileRows.set(row.programId, existing);
+    }
+  }
+
+  const withAvatarUrls = await attachAvatarUrls([...facepileRows.values()].flat());
 
   const avatarsByProgram = new Map<string, ProgramMemberAvatar[]>();
   for (const row of withAvatarUrls) {
     const existing = avatarsByProgram.get(row.programId) ?? [];
-    if (existing.length < 5) {
-      existing.push({ id: row.id, displayName: row.displayName, avatarUrl: row.avatarUrl });
-      avatarsByProgram.set(row.programId, existing);
-    }
+    existing.push({ id: row.id, displayName: row.displayName, avatarUrl: row.avatarUrl });
+    avatarsByProgram.set(row.programId, existing);
   }
 
   return rows.map((r) => ({

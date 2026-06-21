@@ -118,6 +118,34 @@ describe("Programs API", () => {
       const hit = body.programs.find((p: { id: string }) => p.id === programId);
       expect(hit).toBeUndefined();
     });
+
+    it("caps the facepile at 5 even when a program has more members", async () => {
+      // Six current members; the card shows at most 5 faces (and the
+      // server caps before signing so it never signs the other one — #424).
+      const memberIds = Array.from({ length: 6 }, () => randomUUID());
+      for (const id of memberIds) {
+        await db.execute(
+          sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous)
+              VALUES (${id}::uuid, ${`facepile-${id.slice(0, 8)}@testfake.local`}, false, false)`,
+        );
+        await db.insert(profiles).values({ id, displayName: `Member ${id.slice(0, 4)}` });
+        await db.insert(profilePrograms).values({ profileId: id, programId });
+      }
+
+      try {
+        const res = await app.request("/api/programs");
+        const body = await res.json();
+        const program = body.programs.find((p: { id: string }) => p.id === programId);
+        expect(program.memberCount).toBe(6);
+        expect(program.memberAvatars).toHaveLength(5);
+      } finally {
+        await db.delete(profilePrograms).where(eq(profilePrograms.programId, programId));
+        for (const id of memberIds) {
+          await db.delete(profiles).where(eq(profiles.id, id));
+          await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
+        }
+      }
+    });
   });
 
   describe("POST /api/programs/:id/join", () => {
