@@ -30,7 +30,7 @@ export function ThemeSelector() {
     setPref(next);
     // userId is the pseudonymous auth UUID (same field as the api
     // request log), so adoption is countable per-person, not per-click.
-    log.info("theme-selected", { theme: next, userId: user?.id ?? null });
+    log.info("theme-selected", { theme: next, userId: user?.id ?? null, source: "settings" });
   };
 
   return (
