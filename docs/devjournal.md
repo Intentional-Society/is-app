@@ -8,6 +8,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 Avatar signed URLs rotate a `?token=` that's part of next/image's optimizer cache key, and the optimizer's default `minimumCacheTTL` is 4h — so every avatar's 1024² source was re-fetched from Storage daily (rotation) and again every 4h (expiry), blowing the free-plan egress quota during the Convening. Fix: `SIGN_TTL_SECONDS` 24h → 5 days, and `images.minimumCacheTTL` → 31 days (safe — object paths are immutable). The durable fix (a tokenless proxy route) stays open as #382.
 
+## 2026-06-21 | Ola | e2e runs serialize via a CI concurrency group
+
+Two e2e runs overlapping against the shared prod DB clobbered the seeded accounts mid-run and failed. A global `concurrency: { group: e2e-shared-prod-db, cancel-in-progress: false }` in `e2e.yml` now queues runs instead — no deploy loses its e2e. (#358)
+
 ## 2026-06-20 | James | Buttondown subscribers now carry the member's display name in `metadata.name`
 
 We forgot this earlier: Push `profiles.displayName` into Buttondown's `metadata.name`. Seeded on create, reconciled by the cron via PATCH, and pushed inline on profile displayName edit (`reason: "update-name"`). Adds an `allowReservedTestEmails` client opt-out just for re-recording golds. (#444)
