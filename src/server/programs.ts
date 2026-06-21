@@ -5,6 +5,7 @@ import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
 import { profilePrograms, profiles, programs } from "./schema";
+import { E2E_EMAILS } from "./test-reset";
 
 // Slugs of programs every new member is enrolled in automatically on
 // first sign-in. The welcome flow's "We added one for you" copy on
@@ -645,6 +646,33 @@ export const getProgramDetail = async (
       participants,
     },
   };
+};
+
+// Recipient list for one program's admin drill-down: every current
+// participant who should receive mail — same exclusions as
+// listActiveMemberEmails (hidden profiles, deactivated profiles, and the
+// seeded e2e accounts), scoped to this program's active memberships
+// (left_at IS NULL). Email lives on auth.users, which schema.ts maps only
+// partially, so the query is raw SQL — same approach as members-admin.ts.
+export const listProgramParticipantEmails = async (programId: string): Promise<string[]> => {
+  if (!isUuid(programId)) return [];
+  const e2eList = sql.join(
+    E2E_EMAILS.map((e) => sql`${e}`),
+    sql`, `,
+  );
+  const rows = (await db.execute(sql`
+    SELECT u.email
+    FROM auth.users u
+    JOIN public.profiles p ON p.id = u.id
+    JOIN public.profile_programs pp ON pp.profile_id = p.id
+    WHERE pp.program_id = ${programId}::uuid
+      AND pp.left_at IS NULL
+      AND p.hidden = false
+      AND p.deactivated_at IS NULL
+      AND u.email NOT IN (${e2eList})
+    ORDER BY lower(u.email), u.email
+  `)) as unknown as { email: string }[];
+  return rows.map((r) => r.email);
 };
 
 export const addParticipant = async (
