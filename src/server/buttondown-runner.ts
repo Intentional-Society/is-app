@@ -223,7 +223,7 @@ export const runFirstProfileSaveForServer = async (params: {
  * program-join trigger a resync that ends in an error?" without
  * parsing log strings.
  */
-export type ProfileResyncReason = "join-program" | "leave-program" | "admin-remove-participant";
+export type ProfileResyncReason = "join-program" | "leave-program" | "admin-remove-participant" | "update-name";
 
 /**
  * Best-effort inline resync for a single profile. Called from the

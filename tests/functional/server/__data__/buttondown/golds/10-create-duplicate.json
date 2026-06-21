@@ -17,9 +17,11 @@
         "status": 400,
         "body": {
           "code": "email_already_exists",
-          "detail": "That email address (probe-created@fixture.test) is already subscribed (id=2625ce71-e572-4aa0-aa64-927b8d84d13b).",
+          "detail": "That email address (probe-created@fixture.test) is already subscribed (id=9efc28e0-0973-4b6e-8d9c-14c9d1efd9fb). To update them instead, retry with the header 'X-Buttondown-Collision-Behavior: overwrite', or PATCH /v1/subscribers/9efc28e0-0973-4b6e-8d9c-14c9d1efd9fb.",
           "metadata": {
-            "subscriber_id": "2625ce71-e572-4aa0-aa64-927b8d84d13b"
+            "subscriber_id": "9efc28e0-0973-4b6e-8d9c-14c9d1efd9fb",
+            "remedy_header": "X-Buttondown-Collision-Behavior: overwrite",
+            "documentation_url": "https://docs.buttondown.com/api-subscribers-create"
           }
         }
       }

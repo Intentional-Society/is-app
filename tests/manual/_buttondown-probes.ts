@@ -64,6 +64,7 @@ export const SEED_EMAILS = {
 export const PROBE_CREATED_EMAIL = "probe-created@fixture.test";
 export const PROBE_CREATED_EMAIL_RENAMED = "probe-created-renamed@fixture.test";
 export const PROBE_CREATED_EMAIL_FINAL = "probe-created-final@fixture.test";
+export const PROBE_METADATA_EMAIL = "probe-metadata@fixture.test";
 export const PROBE_MISSING_ID = "missing-subscriber-for-probe-04";
 export const PROBE_MISSING_EMAIL = "nobody-here@fixture.test";
 
@@ -205,6 +206,32 @@ export const buildProbes = (): Probe[] => [
   {
     name: "19-delete-missing",
     run: async (client) => client.deleteSubscriber(PROBE_MISSING_ID),
+  },
+  {
+    // The definitive merge-vs-replace answer for #444. Create a
+    // subscriber holding a SECOND metadata key, then PATCH metadata
+    // with ONLY `name`. The recorded GET shows whether `external_id`
+    // survives — i.e. whether Buttondown merges server-side or
+    // replaces the whole blob. We record reality rather than assert it:
+    // the sync always sends a full merged blob (`{ ...existing, name }`),
+    // so other keys survive under either semantics; this probe just
+    // pins Buttondown's native behavior so the fake reproduces it.
+    // Self-contained (creates and deletes its own subscriber) so the
+    // sequence stays idempotent like probe 18.
+    name: "20-patch-metadata-partial",
+    run: async (client) => {
+      const created = await client.createSubscriber({
+        email_address: PROBE_METADATA_EMAIL,
+        tags: ["probe-metadata"],
+        type: "regular",
+        metadata: { name: "Probe Original", external_id: "ext-444" },
+      });
+      if ("dryRun" in created) throw new Error("probe 20: unexpected dry-run");
+      await client.updateSubscriber(created.id, { metadata: { name: "Probe Renamed" } });
+      const after = await client.getSubscriber(created.id);
+      await client.deleteSubscriber(created.id);
+      return after;
+    },
   },
 ];
 

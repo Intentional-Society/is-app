@@ -447,6 +447,21 @@ const api = new Hono<{ Variables: ApiVariables }>()
       // DB write commits, so a slug clash (409 above) can't desync the two.
       if (parsed.displayName !== undefined) {
         await syncDisplayNameToAuthMetadata(user.id, parsed.displayName, user.user_metadata ?? {});
+
+        // Mirror the same edit into Buttondown's metadata.name — but only
+        // on a *subsequent* save. On the first save the inline hook below
+        // owns the create and seeds the name; firing here too would
+        // pre-empt that path's new/returning ownership. The scoped resync
+        // does the merge-preserving name reconcile from the cron in one
+        // place. Same write gate and swallow-on-failure posture as the
+        // auth mirror; the cron is the safety net.
+        if (!isFirstSave) {
+          await runProfileResyncForServer({
+            profileId: user.id,
+            reason: "update-name",
+            write: process.env.BUTTONDOWN_SYNC_WRITE === "1",
+          });
+        }
       }
     }
 

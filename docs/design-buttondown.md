@@ -18,7 +18,7 @@ The app's sync **replaced** the Apps Script as the writer of program tags; the c
 
 One sentence the whole integration enforces:
 
-> A member who has saved their profile should exist as a Buttondown subscriber, tagged exactly according to their current memberships in programs that have a `buttondownTag` set.
+> A member who has saved their profile should exist as a Buttondown subscriber, tagged exactly according to their current memberships in programs that have a `buttondownTag` set, and whose `metadata.name` equals their current display name.
 
 Every code path below is a route to making that statement true.
 
@@ -50,6 +50,17 @@ We identify "tags we manage" by joining against the `programs` table: the set of
 
 Subscribers are keyed by email. We use `auth.users.email` for the matching member's profile id — the same email Supabase signs them in with. There is no separate "newsletter email" field. Edge case: members who already exist in Buttondown under a different email won't be matched; that's an acknowledged limitation.
 
+### Display name (`metadata.name`)
+
+Buttondown subscribers carry an open `metadata` key-value blob. We mirror the member's display name into `metadata.name`, **verbatim** as they supplied it (`profiles.displayName` — typically "Firstname Lastname", sometimes a first name only; never the slug, never normalized). This restores a detail the pre-cutover Apps Script set, which the app initially dropped when it took over as the writer (#444).
+
+Rules:
+
+- **Only ever write a non-empty name.** An empty or whitespace-only display name never blanks an existing `metadata.name`.
+- **Every write is merge-preserving.** Subscribers carry other metadata keys we don't own, so each name write reads the subscriber first and PATCHes `{ ...existing, name }` — a whole-blob write that keeps the rest. Buttondown **replaces** the whole `metadata` blob on PATCH (it does not merge server-side — confirmed by [Appendix A](#appendix-a-fake-vs-real-comparison-recording-from-a-dedicated-newsletter) probe 20), so sending the full merged blob is exactly what preserves the other keys.
+- **Self-heals like tags.** The daily cron reads `metadata.name` back and repairs drift, so `metadata` is part of the client's subscriber projection.
+- **Hidden / unsubscribed:** same posture as tags — no create for hidden profiles, no write at all for unsubscribed subscribers, but a name reconcile still applies to an already-existing subscriber.
+
 ### Standing tags: `isweb-member`, `new`, `returning`
 
 Three tags carry signup-moment semantics — the app writes them when a subscriber first arrives via IS Web, and the daily cron never modifies them after that:
@@ -79,13 +90,15 @@ When a member saves their profile and `profiles.lastUpdatedProfile IS NULL` *bef
 1. Fetch the member's email from `auth.users`.
 2. Compute the desired program-tag set from their current `profile_programs` rows joined to programs with non-null `buttondownTag`.
 3. GET the Buttondown subscriber by email.
-   - **Missing** → POST to create with tags = `[…program_tags, "isweb-member", "new"]`. Store the returned subscriber id on `profiles.buttondownSubscriberId`.
+   - **Missing** → POST to create with tags = `[…program_tags, "isweb-member", "new"]` and (when the name is non-empty) `metadata: { name }`. Store the returned subscriber id on `profiles.buttondownSubscriberId`.
    - **Unsubscribed** → don't write. Raise an [unsubscribe alert](#unsubscribe-handling) so a human can decide whether this person should be in IS Web at all. Profile save still succeeds.
-   - **Active, existing, already has `isweb-member`** → no-op. The app has authoritatively written this subscriber on a previous run; doing another full-overwrite now risks clobbering tags a human has added in the Buttondown UI since. The cron's diff-only path handles any program-tag drift.
-   - **Active, existing, no `isweb-member`** → PATCH with a **full overwrite** of tags = `[…program_tags, "isweb-member", "returning"]`. This is the one moment we authoritatively reset. Record the subscriber id on `profiles.buttondownSubscriberId`.
+   - **Active, existing, already has `isweb-member`** → no-op. The app has authoritatively written this subscriber on a previous run; doing another full-overwrite now risks clobbering tags a human has added in the Buttondown UI since. The cron's diff-only path handles any program-tag drift — and any `metadata.name` drift.
+   - **Active, existing, no `isweb-member`** → PATCH with a **full overwrite** of tags = `[…program_tags, "isweb-member", "returning"]`, merging `name` into the subscriber's existing metadata. This is the one moment we authoritatively reset. Record the subscriber id on `profiles.buttondownSubscriberId`.
 4. Failure logs to Sentry and is **swallowed** — the profile save succeeds regardless. The cron picks up any miss, and any human tags lost to the overwrite were lost at a discrete known moment that admins can mentally bracket.
 
 This path exists only to shorten the new-member time-to-first-email. It is a latency optimization, not a correctness guarantee. The cron is what we trust.
+
+**Name edits.** A *subsequent* `PUT /me` that changes the display name fires a scoped resync (`runProfileResyncForServer`, reason `update-name`) right after the DB commit — the same merge-preserving name reconcile the cron runs, but inline so the name lands in Buttondown within the request instead of a day later. First saves are excluded: the inline first-save hook above already seeds the name, and firing here too would pre-empt its `new`/`returning` ownership. Like join/leave, it's best-effort, swallows failures, and is gated on `BUTTONDOWN_SYNC_WRITE`.
 
 ### 2. Daily reconciler (Vercel cron)
 
@@ -99,7 +112,7 @@ For each profile where `lastUpdatedProfile IS NOT NULL`:
    - **Unsubscribed**: don't write. Raise an [unsubscribe alert](#unsubscribe-handling).
    - **Found by id but email differs from `auth.users.email`**: PATCH the subscriber's `email` field to the current app email. Then continue with tag diffing.
    - **Found by email** (no stored id yet): record the id on `profiles.buttondownSubscriberId` for next time. Then continue with tag diffing.
-   - **Subscribed**: compute `(subscriber.tags ∩ managed_universe) Δ desired`. PATCH only if the diff is non-empty. Preserves human-set tags and the `isweb-member` / `new` / `returning` markers because they're outside the managed universe.
+   - **Subscribed**: compute `(subscriber.tags ∩ managed_universe) Δ desired`, and compare `subscriber.metadata?.name` to the member's display name. PATCH only if the tag diff is non-empty, the email drifted, or the name drifted — folding all three into one PATCH per profile. Tags preserve human-set tags and the `isweb-member` / `new` / `returning` markers because they're outside the managed universe; the name write merges `{ ...existing, name }` so other metadata keys survive, and a missing/empty display name is left untouched (never blanked).
 
 Output a structured summary to the dedicated Axiom dataset (see [Logging](#logging)): members scanned, subscribers created, tags added, tags removed, emails updated, unsubscribes flagged, errors.
 
@@ -265,11 +278,13 @@ The manual tests deliberately live outside the `npm test` portfolio. They're run
 
 Record and seed both load `.env.prod` and require `BUTTONDOWN_TEST_API_KEY`. The primary safety is structural — Buttondown's per-newsletter key scoping confines writes (and `listSubscribers` reads) to the key's specific newsletter, so a mis-pasted key cannot reach the wrong audience. The operational sanity check is `assertTestNewsletter` in `tests/manual/_buttondown-probes.ts`: it calls `GET /v1/accounts/me`, which returns the single newsletter the key writes to, and refuses to proceed unless the username matches `intentional-society-api-tests`. That catches both wrong-account and wrong-newsletter-same-account swaps. The key needs `administrivia_access` to call `/accounts/me` (in addition to `subscriber_access` for the destructive ops); the seed-fixtures script's startup error message points at this if the permission is missing.
 
+Both scripts construct their client with `allowReservedTestEmails: true`. The canonical audience is `@fixture.test` addresses, and the client's reserved-TLD wire guard (a prod safety: refuse `.test`/`.local`/etc. so a test user never reaches real Buttondown) would otherwise refuse every probe and seed call *before* any HTTP — which silently broke both scripts from when the guard landed (2026-05-25) until #444. Opting out is safe here precisely because the structural safety above (per-newsletter key scope + `assertTestNewsletter`) is what confines these scripts, not the TLD guard. Every prod path leaves the opt-out off.
+
 ### One probe sequence
 
 There's one ordered sequence of probes covering every public method on `ButtondownClient`, plus targeted error and edge cases. The authoritative list lives in code at `tests/manual/_buttondown-probes.ts` (`buildProbes()`); the recorded outcome for each probe lives at `tests/functional/server/__data__/buttondown/golds/NN-<short-name>.json`. Record and replay both walk the sequence in order.
 
-The last probe deletes the created subscriber, so re-running the sequence is idempotent without needing to re-seed.
+The last probes clean up after themselves — probe 18 deletes the subscriber probe 09 created, and probe 20 (the `metadata` merge-vs-replace check added for #444) creates and deletes its own — so re-running the sequence is idempotent without needing to re-seed.
 
 ### Data layout
 

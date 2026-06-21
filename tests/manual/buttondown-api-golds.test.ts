@@ -116,7 +116,16 @@ describe.skipIf(!process.env.BUTTONDOWN_TEST_API_KEY)("buttondown api golds (rec
 
   beforeAll(async () => {
     const recorder = createRecordingFetcher();
-    const client = createButtondownClient({ apiKey, write: true, fetcher: recorder.fetch });
+    // The probe fixtures are @fixture.test addresses (RFC-reserved), the
+    // intended audience of the api-tests newsletter — so opt out of the
+    // client's reserved-TLD refusal here. Safety is the per-newsletter
+    // key scope + assertTestNewsletter below, not that guard.
+    const client = createButtondownClient({
+      apiKey,
+      write: true,
+      fetcher: recorder.fetch,
+      allowReservedTestEmails: true,
+    });
 
     // Refuse to record if the key points at anything other than the
     // api-tests newsletter. The recorder also writes (creates and

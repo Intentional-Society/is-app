@@ -1,0 +1,69 @@
+{
+  "probe": "20-patch-metadata-partial",
+  "http_calls": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.buttondown.com/v1/subscribers",
+        "body": {
+          "email_address": "probe-metadata@fixture.test",
+          "tags": [
+            "probe-metadata"
+          ],
+          "type": "regular",
+          "metadata": {
+            "name": "Probe Original",
+            "external_id": "ext-444"
+          }
+        }
+      },
+      "response": {
+        "status": 201
+      }
+    },
+    {
+      "request": {
+        "method": "PATCH",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_4tq1rzjzyf9qk9n3d9k089czcs",
+        "body": {
+          "metadata": {
+            "name": "Probe Renamed"
+          }
+        }
+      },
+      "response": {
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_4tq1rzjzyf9qk9n3d9k089czcs"
+      },
+      "response": {
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "method": "DELETE",
+        "url": "https://api.buttondown.com/v1/subscribers/sub_4tq1rzjzyf9qk9n3d9k089czcs"
+      },
+      "response": {
+        "status": 204,
+        "body": null
+      }
+    }
+  ],
+  "typed_result": {
+    "id": "sub_4tq1rzjzyf9qk9n3d9k089czcs",
+    "email_address": "probe-metadata@fixture.test",
+    "type": "regular",
+    "tags": [
+      "probe-metadata"
+    ],
+    "metadata": {
+      "name": "Probe Renamed"
+    }
+  }
+}

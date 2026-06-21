@@ -23,18 +23,31 @@ vi.mock("@sentry/nextjs", () => ({
   captureMessage: vi.fn(),
 }));
 
+// Stub the Buttondown runner so the inline hooks PUT /me fires are
+// observable without a live key (the real fns soft-skip when
+// BUTTONDOWN_API_KEY is unset, so these no-op spies are behaviorally
+// equivalent for every other test in the file).
+vi.mock("@/server/buttondown-runner", () => ({
+  runButtondownSyncForServer: vi.fn().mockResolvedValue({ status: "skipped", reason: "api_key_missing" }),
+  runFirstProfileSaveForServer: vi.fn().mockResolvedValue(undefined),
+  runProfileResyncForServer: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { captureException as Sentry_captureException } from "@sentry/nextjs";
 import { createServerClient } from "@supabase/ssr";
 
 import { toSlug } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import app from "@/server/api";
+import { runFirstProfileSaveForServer, runProfileResyncForServer } from "@/server/buttondown-runner";
 import { db } from "@/server/db";
 import { profiles } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 const mockUpdateUserById = vi.mocked(supabaseAdmin.auth.admin.updateUserById);
 const mockCaptureException = vi.mocked(Sentry_captureException);
+const mockResync = vi.mocked(runProfileResyncForServer);
+const mockFirstSave = vi.mocked(runFirstProfileSaveForServer);
 
 // Unique per run: upsertProfile derives the profile slug via toSlug,
 // which hits a global unique constraint, and parallel test files share
@@ -61,6 +74,8 @@ describe("GET /api/me", () => {
     testUserId = randomUUID();
     mockUpdateUserById.mockClear();
     mockCaptureException.mockClear();
+    mockResync.mockClear();
+    mockFirstSave.mockClear();
     await db.execute(
       sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous) VALUES (${testUserId}::uuid, 'me-test@testfake.local', false, false)`,
     );
@@ -345,6 +360,49 @@ describe("GET /api/me", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).profile.displayName).toBe("Resilient Name");
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /me pushes a Buttondown name resync on a subsequent name edit", async () => {
+    // A profile that has already been saved once → not a first save.
+    // An explicit slug keeps the rename from triggering slug-backfill
+    // (and its unique-constraint collision with parallel test files).
+    await db.insert(profiles).values({
+      id: testUserId,
+      displayName: "Old Name",
+      slug: `sub-edit-${testUserId.slice(0, 8)}`,
+      lastUpdatedProfile: new Date(),
+    });
+
+    const res = await putMe({ displayName: "Renamed Member" });
+    expect(res.status).toBe(200);
+
+    expect(mockResync).toHaveBeenCalledTimes(1);
+    expect(mockResync).toHaveBeenCalledWith(expect.objectContaining({ profileId: testUserId, reason: "update-name" }));
+    // First-save hook is the other branch — it must not also fire.
+    expect(mockFirstSave).not.toHaveBeenCalled();
+  });
+
+  it("PUT /me does not push a name resync on the first save (the first-save hook owns it)", async () => {
+    // No prior save: lastUpdatedProfile is null, so this is a first save.
+    const res = await putMe({ displayName: "First Name" });
+    expect(res.status).toBe(200);
+
+    expect(mockResync).not.toHaveBeenCalled();
+    expect(mockFirstSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /me does not push a name resync when displayName is absent", async () => {
+    await db.insert(profiles).values({
+      id: testUserId,
+      displayName: "Steady Name",
+      slug: `steady-${testUserId.slice(0, 8)}`,
+      lastUpdatedProfile: new Date(),
+    });
+
+    const res = await putMe({ bio: "Edited my bio, not my name." });
+    expect(res.status).toBe(200);
+
+    expect(mockResync).not.toHaveBeenCalled();
   });
 });
 

@@ -24,7 +24,7 @@ import { createFakeButtondownClient, type FakeButtondownEffect } from "./buttond
 const insertUserAndProfile = async (
   id: string,
   opts: {
-    displayName?: string;
+    displayName?: string | null;
     saved?: boolean;
     buttondownSubscriberId?: string | null;
     email?: string;
@@ -423,6 +423,152 @@ describe("runButtondownSync (daily reconciler)", () => {
     expect(updated?.tags.sort()).toEqual(["isweb-member", "weekly"]);
     expect(summary.tagsUpdated).toBe(1);
     expect(summary.skippedHiddenCreate).toBe(0);
+  });
+
+  it("backfills a missing metadata.name without rewriting tags", async () => {
+    const profileId = await makeProfile({
+      email: "name-a@example.com",
+      displayName: "Alan Turing",
+      buttondownSubscriberId: "sub_name_a",
+    });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    // Tags already current → the only diff is the absent metadata.name.
+    const initial = sampleSubscriber({
+      id: "sub_name_a",
+      email_address: "name-a@example.com",
+      tags: ["weekly", "isweb-member"],
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+    const { log, events } = collectingLogger();
+
+    const summary = await runButtondownSync({ client, runId: "rn1", write: true, log, scopeProfileIds: [profileId] });
+
+    const myEffects = effectsForSubscriberId(client.effects, "sub_name_a");
+    expect(myEffects).toHaveLength(1);
+    const eff = myEffects[0];
+    expect(eff.kind).toBe("update");
+    if (eff.kind === "update") {
+      expect(eff.patch.metadata).toEqual({ name: "Alan Turing" });
+      // Metadata-only PATCH: tags weren't part of the diff.
+      expect(eff.patch.tags).toBeUndefined();
+    }
+    expect(summary.nameUpdated).toBe(1);
+    expect(summary.tagsUpdated).toBe(0);
+    expect(events.find((e) => e.action === "name-updated" && e.profileId === profileId)).toMatchObject({
+      from: null,
+      to: "Alan Turing",
+    });
+    expect((await client.getSubscriber("sub_name_a"))?.metadata).toEqual({ name: "Alan Turing" });
+  });
+
+  it("repairs a drifted metadata.name and preserves a second metadata key", async () => {
+    const profileId = await makeProfile({
+      email: "name-b@example.com",
+      displayName: "Katherine Johnson",
+      buttondownSubscriberId: "sub_name_b",
+    });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    const initial = sampleSubscriber({
+      id: "sub_name_b",
+      email_address: "name-b@example.com",
+      tags: ["weekly", "isweb-member"],
+      metadata: { name: "Old Name", external_id: "crm-7" },
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const summary = await runButtondownSync({ client, runId: "rn2", write: true, scopeProfileIds: [profileId] });
+
+    expect(summary.nameUpdated).toBe(1);
+    // name repaired; external_id untouched (merge-preserving write).
+    expect((await client.getSubscriber("sub_name_b"))?.metadata).toEqual({
+      name: "Katherine Johnson",
+      external_id: "crm-7",
+    });
+  });
+
+  it("never blanks an existing metadata.name when the display name is empty", async () => {
+    const profileId = await makeProfile({
+      email: "name-c@example.com",
+      displayName: null,
+      buttondownSubscriberId: "sub_name_c",
+    });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    const initial = sampleSubscriber({
+      id: "sub_name_c",
+      email_address: "name-c@example.com",
+      tags: ["weekly", "isweb-member"],
+      metadata: { name: "Keep Me" },
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const summary = await runButtondownSync({ client, runId: "rn3", write: true, scopeProfileIds: [profileId] });
+
+    expect(effectsForSubscriberId(client.effects, "sub_name_c")).toHaveLength(0);
+    expect(summary.nameUpdated).toBe(0);
+    expect(summary.unchanged).toBe(1);
+    expect((await client.getSubscriber("sub_name_c"))?.metadata).toEqual({ name: "Keep Me" });
+  });
+
+  it("leaves metadata.name alone when it already matches the display name", async () => {
+    const profileId = await makeProfile({
+      email: "name-d@example.com",
+      displayName: "Exact Match",
+      buttondownSubscriberId: "sub_name_d",
+    });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    const initial = sampleSubscriber({
+      id: "sub_name_d",
+      email_address: "name-d@example.com",
+      tags: ["weekly", "isweb-member"],
+      metadata: { name: "Exact Match" },
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const summary = await runButtondownSync({ client, runId: "rn4", write: true, scopeProfileIds: [profileId] });
+
+    expect(effectsForSubscriberId(client.effects, "sub_name_d")).toHaveLength(0);
+    expect(summary.nameUpdated).toBe(0);
+  });
+
+  it("folds a name repair and a tag change into a single PATCH", async () => {
+    const profileId = await makeProfile({
+      email: "name-e@example.com",
+      displayName: "Combined Edit",
+      buttondownSubscriberId: "sub_name_e",
+    });
+    const weekly = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, weekly);
+    // "monthly" is in the managed universe but not desired → a tag drop.
+    await makeProgram({ buttondownTag: "monthly" });
+
+    const initial = sampleSubscriber({
+      id: "sub_name_e",
+      email_address: "name-e@example.com",
+      tags: ["monthly", "isweb-member"],
+      metadata: { name: "Stale Name" },
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const summary = await runButtondownSync({ client, runId: "rn5", write: true, scopeProfileIds: [profileId] });
+
+    const myEffects = effectsForSubscriberId(client.effects, "sub_name_e");
+    expect(myEffects).toHaveLength(1); // one PATCH carrying both changes
+    const eff = myEffects[0];
+    if (eff.kind === "update") {
+      expect(eff.patch.metadata).toEqual({ name: "Combined Edit" });
+      expect(eff.patch.tags?.sort()).toEqual(["isweb-member", "weekly"]);
+    }
+    expect(summary.tagsUpdated).toBe(1);
+    expect(summary.nameUpdated).toBe(1);
+    expect((await client.getSubscriber("sub_name_e"))?.metadata).toEqual({ name: "Combined Edit" });
   });
 });
 

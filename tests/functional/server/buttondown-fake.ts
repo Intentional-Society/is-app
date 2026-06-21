@@ -65,7 +65,11 @@ const sortTags = (tags: string[]): string[] => [...tags].sort();
 export const createFakeButtondownClient = (config: FakeButtondownConfig = { write: true }): FakeButtondownClient => {
   const subscribers = new Map<string, ButtondownSubscriber>();
   for (const s of config.initialSubscribers ?? []) {
-    subscribers.set(s.id, { ...s, tags: sortTags(s.tags) });
+    // Real Buttondown always returns `metadata` as an object — a
+    // metadata-less subscriber comes back as `{}`, not absent (confirmed
+    // by the re-recorded golds, Appendix A). Normalize seeds to match so
+    // the fake's reads deep-equal the real ones.
+    subscribers.set(s.id, { ...s, tags: sortTags(s.tags), metadata: { ...(s.metadata ?? {}) } });
   }
   const account: ButtondownAccount = { ...(config.account ?? DEFAULT_FAKE_ACCOUNT) };
   const effects: FakeButtondownEffect[] = [];
@@ -85,7 +89,11 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
     async listSubscribers() {
       // Snapshot — callers shouldn't see in-flight mutations during a
       // single iteration, so we return a copy of the values.
-      return Array.from(subscribers.values()).map((s) => ({ ...s, tags: [...s.tags] }));
+      return Array.from(subscribers.values()).map((s) => ({
+        ...s,
+        tags: [...s.tags],
+        metadata: { ...(s.metadata ?? {}) },
+      }));
     },
 
     async getAccount() {
@@ -104,9 +112,9 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
         return { dryRun: true, intent: "create", payload: input };
       }
       if (findByEmail(input.email_address)) {
-        // Real Buttondown returns 400 (not 409) for duplicate
-        // creates — see probe 10's gold. Match the status; the
-        // message text is whatever, since replay compares {name,
+        // Real Buttondown returns 400 email_already_exists for a
+        // duplicate create — see probe 10's gold. Match the status;
+        // the message text is whatever, since replay compares {name,
         // status} only.
         throw new ButtondownApiError(400, "fake: duplicate email");
       }
@@ -115,9 +123,12 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
         email_address: input.email_address,
         type: "regular",
         tags: sortTags(input.tags),
+        // Absent input metadata materializes as `{}`, mirroring real
+        // Buttondown's create response (Appendix A golds).
+        metadata: { ...(input.metadata ?? {}) },
       };
       subscribers.set(sub.id, sub);
-      return sub;
+      return { ...sub, metadata: { ...sub.metadata } };
     },
 
     async updateSubscriber(
@@ -143,9 +154,15 @@ export const createFakeButtondownClient = (config: FakeButtondownConfig = { writ
         ...(patch.email_address !== undefined ? { email_address: patch.email_address } : {}),
         ...(patch.tags !== undefined ? { tags: sortTags(patch.tags) } : {}),
         ...(patch.type !== undefined ? { type: patch.type } : {}),
+        // Whole-blob replace: a PATCH carrying `metadata` sets the
+        // entire object, dropping any key not in the new blob — probe 20
+        // confirms Buttondown replaces rather than server-side merges.
+        // The sync only ever sends a full merged blob (`{ ...existing,
+        // name }`), so other keys survive every production write.
+        ...(patch.metadata !== undefined ? { metadata: { ...patch.metadata } } : {}),
       };
       subscribers.set(id, updated);
-      return updated;
+      return { ...updated, metadata: { ...(updated.metadata ?? {}) } };
     },
 
     async deleteSubscriber(id: string): Promise<undefined | DryRunOutcome<"delete">> {

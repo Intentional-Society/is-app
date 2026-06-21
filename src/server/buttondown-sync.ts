@@ -27,6 +27,18 @@ import { db } from "./db";
 import { authUsers, profilePrograms, profiles, programs } from "./schema";
 
 /**
+ * The verbatim display name to mirror into Buttondown's
+ * `metadata.name` (see docs/design-buttondown.md → "The invariant"),
+ * or undefined when the profile has no usable name. We never blank an
+ * existing `metadata.name`, so an empty or whitespace-only display
+ * name yields undefined and every caller simply skips the name write.
+ * The returned value is the stored string untouched — never the slug,
+ * never normalized.
+ */
+const desiredMetadataName = (displayName: string | null | undefined): string | undefined =>
+  displayName && displayName.trim().length > 0 ? displayName : undefined;
+
+/**
  * Inline first-profile-save hook. Called from PUT /me when the
  * profile was being saved for the first time (lastUpdatedProfile was
  * NULL before the save). The "one moment" of full-overwrite tag
@@ -63,8 +75,12 @@ export const runFirstProfileSaveSync = async (params: {
   // Buttondown row spun up on their behalf, even if they exist in
   // the app. (Tag updates for already-existing subscribers still run
   // below.) One row read, fine on the first-save fast path.
-  const [profileRow] = await db.select({ hidden: profiles.hidden }).from(profiles).where(eq(profiles.id, profileId));
+  const [profileRow] = await db
+    .select({ hidden: profiles.hidden, displayName: profiles.displayName })
+    .from(profiles)
+    .where(eq(profiles.id, profileId));
   const hidden = profileRow?.hidden ?? false;
+  const name = desiredMetadataName(profileRow?.displayName);
 
   // This profile's current tagged-program memberships — same shape
   // the daily reconciler computes but for one profile only.
@@ -95,6 +111,7 @@ export const runFirstProfileSaveSync = async (params: {
     const result = await client.createSubscriber({
       email_address: email,
       tags: [...desiredTags, "isweb-member", "new"],
+      ...(name ? { metadata: { name } } : {}),
     });
     if (!isDryRunOutcome(result)) {
       await db.update(profiles).set({ buttondownSubscriberId: result.id }).where(eq(profiles.id, profileId));
@@ -123,8 +140,13 @@ export const runFirstProfileSaveSync = async (params: {
     return;
   }
 
+  // The one authoritative full-overwrite moment also seeds the name,
+  // merged into whatever metadata the subscriber already carries so
+  // other keys survive. The isweb-member no-op branch above leaves
+  // name to the cron, consistent with how it leaves tag drift.
   await client.updateSubscriber(subscriber.id, {
     tags: [...desiredTags, "isweb-member", "returning"],
+    ...(name ? { metadata: { ...subscriber.metadata, name } } : {}),
   });
 };
 
@@ -169,6 +191,16 @@ export type SyncLogEvent =
       to: string;
       dryRun: boolean;
     }
+  | {
+      action: "name-updated";
+      runId: string;
+      profileId: string;
+      subscriberId: string;
+      // null when the subscriber carried no metadata.name before.
+      from: string | null;
+      to: string;
+      dryRun: boolean;
+    }
   | { action: "unsubscribe-alert"; runId: string; profileId: string; email: string; programSlugsHeld: string[] }
   | { action: "skipped-missing-email"; runId: string; profileId: string }
   | { action: "skipped-already-current"; runId: string; profileId: string; subscriberId: string }
@@ -192,6 +224,9 @@ export type SyncRunSummary = {
   created: number;
   tagsUpdated: number;
   emailUpdated: number;
+  // Subscribers whose metadata.name drifted from the member's display
+  // name and was repaired (merge-preserving the rest of metadata).
+  nameUpdated: number;
   unchanged: number;
   unsubscribeAlerts: number;
   missingProfileEmail: number;
@@ -233,6 +268,8 @@ type ProfileRow = {
   // The sync suppresses CREATE for them (no new Buttondown row), but
   // still reconciles tags if a subscriber already exists.
   hidden: boolean;
+  // Mirrored verbatim into Buttondown's metadata.name; null when unset.
+  displayName: string | null;
 };
 
 type ProfileMembership = {
@@ -303,6 +340,7 @@ const loadEligibleProfiles = async (scopeProfileIds?: string[]): Promise<Profile
       email: authUsers.email,
       buttondownSubscriberId: profiles.buttondownSubscriberId,
       hidden: profiles.hidden,
+      displayName: profiles.displayName,
     })
     .from(profiles)
     .innerJoin(authUsers, eq(authUsers.id, profiles.id))
@@ -422,6 +460,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
     created: 0,
     tagsUpdated: 0,
     emailUpdated: 0,
+    nameUpdated: 0,
     unchanged: 0,
     unsubscribeAlerts: 0,
     missingProfileEmail: 0,
@@ -528,6 +567,7 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
     return;
   }
   const email = profile.email;
+  const name = desiredMetadataName(profile.displayName);
 
   // Reserved-TLD guard: skip before any client call. The client also
   // refuses these at the wire, so this layer is mainly so the summary
@@ -555,10 +595,11 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
     }
     // Catch-up create: this is the path that runs when the inline
     // first-save hook failed (or hasn't shipped yet). Tag with the
-    // managed set + isweb-member + new.
+    // managed set + isweb-member + new, and seed metadata.name.
     const result = await client.createSubscriber({
       email_address: email,
       tags: [...desired.tags, "isweb-member", "new"],
+      ...(name ? { metadata: { name } } : {}),
     });
     summary.created++;
     const subscriberId = isDryRunOutcome(result) ? null : result.id;
@@ -600,7 +641,14 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
   const { finalTags, added, removed, changed } = reconcileTags(subscriber.tags, desired.tags, managedUniverse);
   const emailMismatch = subscriber.email_address.toLowerCase() !== email.toLowerCase();
 
-  if (!changed && !emailMismatch) {
+  // Name reconcile: repair a drifted metadata.name, never blank one.
+  // The merge spreads the subscriber's existing metadata so the write
+  // preserves every other key (read-modify-write, whole-blob PATCH).
+  // Building the object inside the guard narrows `name` to a string.
+  const metadataPatch =
+    name !== undefined && subscriber.metadata?.name !== name ? { ...subscriber.metadata, name } : undefined;
+
+  if (!changed && !emailMismatch && !metadataPatch) {
     summary.unchanged++;
     log({ action: "skipped-already-current", runId, profileId, subscriberId: subscriber.id });
     return;
@@ -609,6 +657,7 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
   const patch: UpdateSubscriberInput = {};
   if (changed) patch.tags = finalTags;
   if (emailMismatch) patch.email_address = email;
+  if (metadataPatch) patch.metadata = metadataPatch;
 
   const result = await client.updateSubscriber(subscriber.id, patch);
   const dryRun = isDryRunOutcome(result);
@@ -634,6 +683,18 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
       subscriberId: subscriber.id,
       from: subscriber.email_address,
       to: email,
+      dryRun,
+    });
+  }
+  if (metadataPatch) {
+    summary.nameUpdated++;
+    log({
+      action: "name-updated",
+      runId,
+      profileId,
+      subscriberId: subscriber.id,
+      from: subscriber.metadata?.name ?? null,
+      to: metadataPatch.name,
       dryRun,
     });
   }

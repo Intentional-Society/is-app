@@ -70,7 +70,10 @@ const main = async (): Promise<void> => {
   }
   console.log();
 
-  const client = createButtondownClient({ apiKey, write: !isDryRun });
+  // Opt out of the reserved-TLD guard: the seed audience is intentionally
+  // @fixture.test against the dedicated api-tests newsletter (safety is the
+  // per-newsletter key scope + assertTestNewsletter, not that guard).
+  const client = createButtondownClient({ apiKey, write: !isDryRun, allowReservedTestEmails: true });
 
   console.log("Verifying the key resolves to the expected newsletter...");
   await assertTestNewsletter(client);
