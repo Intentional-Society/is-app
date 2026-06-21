@@ -97,6 +97,15 @@ function ProgramCard({
           </div>
         )}
 
+        {/* Explicit affordance for the detail page — the title is also a
+            link, but it doesn't read as one at a glance (#434). */}
+        <Link
+          href={{ pathname: `/programs/${program.slug}` } satisfies UrlObject}
+          className="text-sm font-medium text-foreground hover:underline focus-visible:underline"
+        >
+          Learn more <span aria-hidden="true">→</span>
+        </Link>
+
         {program.joined ? (
           <Button
             type="button"
