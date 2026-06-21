@@ -15,6 +15,7 @@
     "id": "sub_350agfqh1j9gg9k9wk5myw2vnx",
     "email_address": "dave.04@fixture.test",
     "type": "unsubscribed",
-    "tags": []
+    "tags": [],
+    "metadata": {}
   }
 }

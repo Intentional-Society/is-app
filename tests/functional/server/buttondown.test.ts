@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type ButtondownAccount,
   ButtondownApiError,
-  ButtondownConflictError,
   type ButtondownSubscriber,
   createButtondownClient,
   isDryRunOutcome,
@@ -143,7 +142,7 @@ describe("createButtondownClient", () => {
       expect(url).toBe("https://api.buttondown.com/v1/subscribers/a%2Bb%40example.com");
     });
 
-    it("projects the response to the declared four fields, dropping anything else", async () => {
+    it("projects the response to the declared fields, dropping anything else", async () => {
       const withExtras = {
         ...sampleSubscriber,
         creation_date: "2024-01-01T00:00:00Z",
@@ -155,7 +154,17 @@ describe("createButtondownClient", () => {
       const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
 
       const got = await client.getSubscriber("alice@example.com");
-      expect(got).toEqual(sampleSubscriber);
+      // metadata is a declared field and rides through; creation_date,
+      // secondary_id, and notes are still dropped.
+      expect(got).toEqual({ ...sampleSubscriber, metadata: { foo: "bar" } });
+      expect(Object.keys(got ?? {}).sort()).toEqual(["email_address", "id", "metadata", "tags", "type"]);
+    });
+
+    it("omits the metadata field when the response carries none", async () => {
+      const fetcher = mockFetch(200, sampleSubscriber);
+      const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
+
+      const got = await client.getSubscriber("alice@example.com");
       expect(Object.keys(got ?? {}).sort()).toEqual(["email_address", "id", "tags", "type"]);
     });
 
@@ -203,13 +212,20 @@ describe("createButtondownClient", () => {
       expect(fetcher).not.toHaveBeenCalled();
     });
 
-    it("throws ButtondownConflictError on 409 (duplicate email)", async () => {
-      const fetcher = mockFetch(409, { detail: "Subscriber already exists." });
+    it("surfaces a duplicate email as a 400 ButtondownApiError (Buttondown's email_already_exists)", async () => {
+      // Buttondown rejects a duplicate create with 400 email_already_exists,
+      // not 409 — see Appendix A probe 10's gold. The sync's get-before-create
+      // makes this a rare race; when it happens it throws like any other
+      // non-2xx and the next cron's lookup finds the existing subscriber.
+      const fetcher = mockFetch(400, { code: "email_already_exists" });
       const client = createButtondownClient({ apiKey: "k", write: true, fetcher });
 
-      await expect(client.createSubscriber({ email_address: "alice@example.com", tags: [] })).rejects.toBeInstanceOf(
-        ButtondownConflictError,
-      );
+      const err = await client
+        .createSubscriber({ email_address: "alice@example.com", tags: [] })
+        .then(() => null)
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ButtondownApiError);
+      expect((err as ButtondownApiError).status).toBe(400);
     });
 
     it("passes `type` through in the POST body when provided", async () => {
@@ -393,6 +409,33 @@ describe("createButtondownClient", () => {
       await client.getSubscriber("sub_abc123");
       expect(fetcher).toHaveBeenCalledTimes(1);
     });
+
+    // The manual record/seed scripts opt out of the guard so they can
+    // operate on the api-tests newsletter's @fixture.test audience.
+    // Without this, both scripts break (and seed-fixtures empties the
+    // newsletter, then can't recreate anyone). See docs Appendix A.
+    describe("allowReservedTestEmails opt-out", () => {
+      it("getSubscriber reaches the wire for a .test email when opted out", async () => {
+        const fetcher = mockFetch(200, sampleSubscriber);
+        const client = createButtondownClient({ apiKey: "k", write: true, fetcher, allowReservedTestEmails: true });
+        await client.getSubscriber("alice.01@fixture.test");
+        expect(fetcher).toHaveBeenCalledTimes(1);
+      });
+
+      it("createSubscriber reaches the wire for a .test email when opted out", async () => {
+        const fetcher = mockFetch(201, sampleSubscriber);
+        const client = createButtondownClient({ apiKey: "k", write: true, fetcher, allowReservedTestEmails: true });
+        await client.createSubscriber({ email_address: "probe-created@fixture.test", tags: ["probe-fresh"] });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+      });
+
+      it("updateSubscriber reaches the wire for a .test email patch when opted out", async () => {
+        const fetcher = mockFetch(200, sampleSubscriber);
+        const client = createButtondownClient({ apiKey: "k", write: true, fetcher, allowReservedTestEmails: true });
+        await client.updateSubscriber("sub_abc123", { email_address: "probe-renamed@fixture.test" });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 });
 
@@ -442,6 +485,9 @@ describe("createFakeButtondownClient", () => {
       email_address: "preexisting@example.com",
       type: "regular",
       tags: ["old-tag"],
+      // Real Buttondown (and the fake) always return a metadata object;
+      // an unset blob is `{}`, not absent. See Appendix A golds.
+      metadata: {},
     };
   });
 

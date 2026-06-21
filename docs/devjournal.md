@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-20 | James | Buttondown subscribers now carry the member's display name in `metadata.name`
+
+We forgot this earlier: Push `profiles.displayName` into Buttondown's `metadata.name`. Seeded on create, reconciled by the cron via PATCH, and pushed inline on profile displayName edit (`reason: "update-name"`). Adds an `allowReservedTestEmails` client opt-out just for re-recording golds. (#444)
+
 ## 2026-06-19 | James | Hidden accounts no longer surface to admins on member-facing pages
 
 Dropped the admin `includeHidden` bypass from the directory, profile pages, intentions, and My Web; hidden accounts now show only on the `/admin` pages.

@@ -11,7 +11,13 @@ import { createFakeButtondownClient } from "./buttondown-fake";
 
 const insertUserAndProfile = async (
   id: string,
-  opts: { email?: string; buttondownSubscriberId?: string | null; saved?: boolean; hidden?: boolean } = {},
+  opts: {
+    email?: string;
+    buttondownSubscriberId?: string | null;
+    saved?: boolean;
+    hidden?: boolean;
+    displayName?: string | null;
+  } = {},
 ) => {
   const email = opts.email ?? `${id}@testfake.local`;
   await db.execute(
@@ -19,6 +25,7 @@ const insertUserAndProfile = async (
   );
   await db.insert(profiles).values({
     id,
+    displayName: opts.displayName ?? null,
     lastUpdatedProfile: opts.saved === false ? null : new Date(),
     buttondownSubscriberId: opts.buttondownSubscriberId ?? null,
     hidden: opts.hidden ?? false,
@@ -90,6 +97,57 @@ describe("runFirstProfileSaveSync (inline hook)", () => {
       .from(profiles)
       .where(eq(profiles.id, profileId));
     expect(row.buttondownSubscriberId).not.toBeNull();
+  });
+
+  it("seeds metadata.name on create from the profile's display name", async () => {
+    const profileId = await makeProfile({ email: "fs-name@example.com", displayName: "Ada Lovelace" });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await db.insert(profilePrograms).values({ profileId, programId });
+
+    const client = createFakeButtondownClient({ write: true });
+    await runFirstProfileSaveSync({ profileId, email: "fs-name@example.com", client });
+
+    expect(client.effects[0]).toMatchObject({
+      kind: "create",
+      input: { email_address: "fs-name@example.com", metadata: { name: "Ada Lovelace" } },
+    });
+    const after = await client.getSubscriber("fs-name@example.com");
+    expect(after?.metadata).toEqual({ name: "Ada Lovelace" });
+  });
+
+  it("merges name into the full-overwrite PATCH, preserving other metadata", async () => {
+    const profileId = await makeProfile({ email: "fs-merge@example.com", displayName: "Grace Hopper" });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await db.insert(profilePrograms).values({ profileId, programId });
+
+    const initial: ButtondownSubscriber = {
+      id: "sub_merge",
+      email_address: "fs-merge@example.com",
+      type: "regular",
+      tags: ["legacy-active"],
+      metadata: { external_id: "crm-42" },
+    };
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+    await runFirstProfileSaveSync({ profileId, email: "fs-merge@example.com", client });
+
+    const after = await client.getSubscriber("sub_merge");
+    expect(after?.tags).toEqual(["isweb-member", "returning", "weekly"]);
+    // external_id survives the overwrite; name is added alongside it.
+    expect(after?.metadata).toEqual({ external_id: "crm-42", name: "Grace Hopper" });
+  });
+
+  it("writes no metadata.name when the display name is blank", async () => {
+    const profileId = await makeProfile({ email: "fs-blank@example.com", displayName: "   " });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await db.insert(profilePrograms).values({ profileId, programId });
+
+    const client = createFakeButtondownClient({ write: true });
+    await runFirstProfileSaveSync({ profileId, email: "fs-blank@example.com", client });
+
+    const created = client.effects[0];
+    expect(created.kind).toBe("create");
+    // Never seed an empty/whitespace name onto a fresh subscriber.
+    if (created.kind === "create") expect(created.input.metadata).toBeUndefined();
   });
 
   it("does a full-overwrite PATCH with isweb-member + returning when subscriber exists and lacks isweb-member", async () => {

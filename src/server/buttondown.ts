@@ -44,11 +44,17 @@ export type ButtondownSubscriberType = "regular" | "premium" | "unactivated" | "
 
 // Minimal projection of the subscriber object — only the fields the
 // sync reads. The API returns more, all ignored by us.
+//
+// `metadata` is Buttondown's open key-value blob on a subscriber. We
+// read it back so the cron can detect drift in the one key we write
+// (`name`); we never enumerate or depend on the others, but they must
+// survive every write — see the merge note on UpdateSubscriberInput.
 export type ButtondownSubscriber = {
   id: string;
   email_address: string;
   type: ButtondownSubscriberType;
   tags: string[];
+  metadata?: Record<string, string>;
 };
 
 export type CreateSubscriberInput = {
@@ -60,12 +66,19 @@ export type CreateSubscriberInput = {
   // create subscribers (program membership is the consent act). See
   // docs.buttondown.com — "API-driven subscriber creation."
   type?: ButtondownSubscriberType;
+  metadata?: Record<string, string>;
 };
 
 export type UpdateSubscriberInput = {
   tags?: string[];
   email_address?: string;
   type?: ButtondownSubscriberType;
+  // Whole-blob: a PATCH carrying `metadata` sets the entire metadata
+  // object. The sync never sends a partial — every name write reads
+  // the subscriber first and PATCHes `{ ...existing, name }`, so
+  // other keys are preserved regardless of whether Buttondown merges
+  // or replaces server-side. See docs/design-buttondown.md.
+  metadata?: Record<string, string>;
 };
 
 // Identity of the API key's owning newsletter, returned by
@@ -102,17 +115,6 @@ export class ButtondownApiError extends Error {
   }
 }
 
-// Thrown by createSubscriber when the email is already on the audience.
-// The sync interprets this as "fall through to update by email" — the
-// person predates the app's record of them and we need to PATCH, not
-// POST. Per the Buttondown docs, duplicate POSTs are rejected by default.
-export class ButtondownConflictError extends ButtondownApiError {
-  constructor() {
-    super(409, "Subscriber with this email already exists");
-    this.name = "ButtondownConflictError";
-  }
-}
-
 // Shape of one page of the list endpoint's response. `next` is a
 // full URL to the next page or null on the last page.
 type ListSubscribersPage = {
@@ -131,11 +133,17 @@ type ListSubscribersPage = {
 // boundary is what lets the replay deep-equal pass.
 const projectSubscriber = (raw: unknown): ButtondownSubscriber => {
   const obj = raw as Record<string, unknown>;
+  const metadata = obj.metadata as Record<string, string> | null | undefined;
   return {
     id: obj.id as string,
     email_address: obj.email_address as string,
     type: obj.type as ButtondownSubscriberType,
     tags: obj.tags as string[],
+    // Carry `metadata` through only when Buttondown returns a blob; an
+    // absent or null value leaves the field off entirely (it reads
+    // safely as `subscriber.metadata?.name`). The re-recorded golds
+    // (Appendix A) pin the real wire shape for whatever it actually is.
+    ...(metadata ? { metadata } : {}),
   };
 };
 
@@ -168,7 +176,7 @@ export interface ButtondownClient {
    * audience would be wasteful.
    */
   getSubscriber(idOrEmail: string): Promise<ButtondownSubscriber | null>;
-  /** Throws ButtondownConflictError on 409 (duplicate email). */
+  /** A duplicate email surfaces as a 400 ButtondownApiError (Buttondown's `email_already_exists`). */
   createSubscriber(input: CreateSubscriberInput): Promise<ButtondownSubscriber | DryRunOutcome<"create">>;
   updateSubscriber(id: string, patch: UpdateSubscriberInput): Promise<ButtondownSubscriber | DryRunOutcome<"update">>;
   /**
@@ -204,6 +212,12 @@ export type ButtondownClientConfig = {
   // Optional per-request telemetry sink. Constructed by the runner
   // for prod paths; tests typically leave it unset.
   logger?: (event: ButtondownHttpLogEvent) => void;
+  // Lets the manual record/seed scripts reach the api-tests
+  // newsletter's @fixture.test audience past the reserved-email guard
+  // below. Their safety is the per-newsletter key scope +
+  // assertTestNewsletter, not this guard; every prod path leaves it
+  // false. See docs/design-buttondown.md Appendix A.
+  allowReservedTestEmails?: boolean;
 };
 
 export const createButtondownClient = (config: ButtondownClientConfig): ButtondownClient => {
@@ -304,7 +318,7 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async getSubscriber(idOrEmail) {
-      if (isReservedTestEmail(idOrEmail)) {
+      if (!config.allowReservedTestEmails && isReservedTestEmail(idOrEmail)) {
         throw new ButtondownApiError(0, `Refusing to query reserved-TLD email: ${idOrEmail}`);
       }
       // The endpoint accepts either id or email at the same slot; we
@@ -320,14 +334,13 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async createSubscriber(input) {
-      if (isReservedTestEmail(input.email_address)) {
+      if (!config.allowReservedTestEmails && isReservedTestEmail(input.email_address)) {
         throw new ButtondownApiError(0, `Refusing to create reserved-TLD email: ${input.email_address}`);
       }
       if (!config.write) {
         return { dryRun: true, intent: "create", payload: input };
       }
       const res = await request("POST", "/subscribers", input);
-      if (res.status === 409) throw new ButtondownConflictError();
       if (!res.ok) {
         const detail = await res.text().catch(() => "");
         throw new ButtondownApiError(res.status, `POST subscriber: ${res.status} ${detail}`);
@@ -336,7 +349,11 @@ export const createButtondownClient = (config: ButtondownClientConfig): Buttondo
     },
 
     async updateSubscriber(id, patch) {
-      if (patch.email_address !== undefined && isReservedTestEmail(patch.email_address)) {
+      if (
+        !config.allowReservedTestEmails &&
+        patch.email_address !== undefined &&
+        isReservedTestEmail(patch.email_address)
+      ) {
         throw new ButtondownApiError(0, `Refusing to set reserved-TLD email: ${patch.email_address}`);
       }
       if (!config.write) {

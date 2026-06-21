@@ -16,7 +16,8 @@
       "id": "sub_6ng6e0cngh95hra8aa0w7ejydp",
       "email_address": "sandy.60@fixture.test",
       "type": "regular",
-      "tags": []
+      "tags": [],
+      "metadata": {}
     },
     {
       "id": "sub_7e0j9eh3t98y0rz1m2vvjdqsj0",
@@ -24,7 +25,8 @@
       "type": "regular",
       "tags": [
         "tisweb-member"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_4yv1r6fjzf8xar8tcw0n638cec",
@@ -34,7 +36,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_26qfmj2e9w90kbay51kcsa9m9a",
@@ -42,7 +45,8 @@
       "type": "regular",
       "tags": [
         "tactive"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_4vgttejn0y8apa24exes0stq8k",
@@ -54,7 +58,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_60cbg7mayj9myv2p1pz675h043",
@@ -63,13 +68,15 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_0m09zdq64f9j2904d0j6b9yhbx",
       "email_address": "camille.54@fixture.test",
       "type": "regular",
-      "tags": []
+      "tags": [],
+      "metadata": {}
     },
     {
       "id": "sub_6ntkr7vva39g0rvpsdd0g6dxr4",
@@ -80,7 +87,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_397rvagfbf8k4snnd3cx5arrq8",
@@ -90,7 +98,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_27wqvz23ec8j6rqb51g1nd58dz",
@@ -100,7 +109,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_372qyw5y4z9t3reb8mrg8ksepb",
@@ -108,7 +118,8 @@
       "type": "regular",
       "tags": [
         "tactive"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_0trh6dbg858ahrajex6bhrjpkb",
@@ -116,7 +127,8 @@
       "type": "regular",
       "tags": [
         "tisweb-member"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_6gy24t1dk49mq847t9msrkgv7c",
@@ -127,7 +139,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_7rt62xtxdv9c8vgmv06q4zmz5f",
@@ -136,7 +149,8 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_6pp48s7v5g90etp8t9829bh17h",
@@ -146,13 +160,15 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_1jr9w5n9699yvaa7n9h5qn8197",
       "email_address": "sam.45@fixture.test",
       "type": "regular",
-      "tags": []
+      "tags": [],
+      "metadata": {}
     },
     {
       "id": "sub_7hgfdy5tv4911v0vkh8qjt8q5d",
@@ -162,7 +178,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_0s893p2neq8198aar5fys1sfsz",
@@ -170,7 +187,8 @@
       "type": "regular",
       "tags": [
         "tisweb-member"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_6dy6f7a3my805tbq735nzbkq8g",
@@ -182,7 +200,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_41511dkk919revc8b93taad8e8",
@@ -193,7 +212,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_34r83nn51y82t83kj6m46f6vzx",
@@ -203,7 +223,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_09etdnny7w9169ddns60ktpv8k",
@@ -211,7 +232,8 @@
       "type": "regular",
       "tags": [
         "tactive"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_3ne4hf08aj830vm7s8evv49573",
@@ -222,7 +244,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_7ep0a9rbnn94fsgnnrn6y62q21",
@@ -231,7 +254,8 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2gamfzex0x9jesjda40c7pjfrq",
@@ -242,7 +266,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2pchfjmzmx9rdb4dvtgdqa752z",
@@ -250,7 +275,8 @@
       "type": "regular",
       "tags": [
         "tisweb-member"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_08a4p81qjh8rjrfwt4p42rhgre",
@@ -260,13 +286,15 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_3ghgezaqcq9m2tp60jzwy7fnra",
       "email_address": "grace.33@fixture.test",
       "type": "regular",
-      "tags": []
+      "tags": [],
+      "metadata": {}
     },
     {
       "id": "sub_1w7xzkd8068z5tarsaftgwwnx4",
@@ -276,7 +304,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2pgynycqwa85av3crvk526mtzy",
@@ -288,7 +317,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_3w1m0b6cf09j9b6ejxrvsdsyzw",
@@ -299,7 +329,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_43v09xmwzw83ab8ndryqz7fx0w",
@@ -308,7 +339,8 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2rkv413ngy97nbrbs8asnwzn6j",
@@ -316,7 +348,8 @@
       "type": "regular",
       "tags": [
         "tactive"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_4rtpqyhh639jg8cvrq307z8630",
@@ -326,7 +359,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2t2y99wc7q9f5vq3a80tjffvbw",
@@ -337,7 +371,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_1a9r634hb48j7vpy2akjb1hdv2",
@@ -345,7 +380,8 @@
       "type": "regular",
       "tags": [
         "tisweb-member"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_0ww542s4tk9esaet5sm3h3hbkw",
@@ -356,7 +392,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_297s8mqz0z9rj9b4bt9w28p0kr",
@@ -364,7 +401,8 @@
       "type": "regular",
       "tags": [
         "tactive"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_1x68c8jeqa9ppvc5nt4xchv33t",
@@ -374,7 +412,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2vkzmy7w6z9dqr8h20myh8ss0y",
@@ -385,7 +424,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2xrv888cad80jttpzf2jb3h66d",
@@ -394,7 +434,8 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_1q5qpnhaqc8t39rc3hatbpq1a9",
@@ -406,7 +447,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_1jvjvyjv2r9qg8x684xykpa1c2",
@@ -416,13 +458,15 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_64xw5qnpd990gbx46ynfbasz91",
       "email_address": "quinn.17@fixture.test",
       "type": "regular",
-      "tags": []
+      "tags": [],
+      "metadata": {}
     },
     {
       "id": "sub_1s40rgp3p59ebvha150wsrksd2",
@@ -432,7 +476,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_3nr0ssk2rp8x6tznv5vgbbrxzx",
@@ -441,7 +486,8 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_0e7xt0wcbb9499mr4xzgss1k1z",
@@ -451,7 +497,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_619tbm3xgr88yt5c5bf3jtnj42",
@@ -462,7 +509,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_2bf7esrez98yqskzragv3xcnv1",
@@ -472,7 +520,8 @@
         "tarts-in-is",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_3yxac23tyr8wmr8mkgxvs2hv3x",
@@ -480,7 +529,8 @@
       "type": "regular",
       "tags": [
         "tactive"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_4pkapqcwaj8bbstq10evb7d78k",
@@ -488,7 +538,8 @@
       "type": "regular",
       "tags": [
         "tisweb-member"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_6e0ymqvhme8natbgntbergg6mt",
@@ -498,7 +549,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_34t0e9feej9aatyeq7zkjk9p1e",
@@ -509,7 +561,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_5y5vwt0bp09xp857y43dvrd91j",
@@ -518,7 +571,8 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_4yvr49xjv892fb33jmwkhqzm0b",
@@ -530,7 +584,8 @@
         "tisweb-member",
         "tpod-program",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_6x7x44k4xy8kptzmzwv9261p41",
@@ -540,13 +595,15 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_350agfqh1j9gg9k9wk5myw2vnx",
       "email_address": "dave.04@fixture.test",
       "type": "unsubscribed",
-      "tags": []
+      "tags": [],
+      "metadata": {}
     },
     {
       "id": "sub_3tzvveppjh994t7yp4mn8a7mwq",
@@ -554,7 +611,8 @@
       "type": "regular",
       "tags": [
         "tisweb-member"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_0vnn0jm7y99z8rge7fsbc3f5px",
@@ -563,7 +621,8 @@
       "tags": [
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     },
     {
       "id": "sub_1psvey6mfj8dza83gkp8hjbktk",
@@ -573,7 +632,8 @@
         "tcommunity-calls",
         "tisweb-member",
         "tweekly-web-updates"
-      ]
+      ],
+      "metadata": {}
     }
   ]
 }
