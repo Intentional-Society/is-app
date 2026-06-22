@@ -14,10 +14,16 @@ import { profiles } from "./schema";
 export const AVATAR_BUCKET = "avatars";
 
 // TTL handed to Supabase when signing, and how long a signed URL is
-// trusted from our cache. The cache window is deliberately shorter
-// than the TTL so a URL is re-signed before it can expire mid-use.
-const SIGN_TTL_SECONDS = 24 * 60 * 60;
-const CACHE_TTL_MS = 23 * 60 * 60 * 1000;
+// trusted from our cache. Re-signing rotates the URL's `?token=`, which
+// is part of next/image's optimizer cache key — so every rotation forces
+// a full re-fetch of each avatar's source object from Storage (the egress
+// driver behind #382). A 5-day TTL keeps rotation rare; pair it with a
+// high `images.minimumCacheTTL` so a variant is never re-fetched within a
+// URL's life. Short enough that a leaked avatar URL still dies within the
+// week. The cache window sits an hour under the TTL so a URL is re-signed
+// before it can expire mid-use.
+const SIGN_TTL_SECONDS = 5 * 24 * 60 * 60;
+const CACHE_TTL_MS = SIGN_TTL_SECONDS * 1000 - 60 * 60 * 1000;
 
 type CacheEntry = { url: string; expiresAt: number };
 

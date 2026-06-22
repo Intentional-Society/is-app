@@ -74,7 +74,7 @@ downscaling on top.
 
 ## Key decisions
 
-### 1. Private bucket, signed URLs (24h TTL)
+### 1. Private bucket, signed URLs (5-day TTL)
 
 The `avatars` bucket is **private**. Objects are reachable only via a
 **signed URL** — a time-limited, HMAC-signed link minted server-side.
@@ -88,8 +88,9 @@ but it **expires**: a URL that leaks via a `Referer` header, browser
 history, or a pasted link stops working. A public bucket can't offer
 that — a leaked public URL is live until the object is deleted.
 
-TTL: **24 hours**. Long enough that re-signing is rare; short enough
-that a leaked link dies within a day.
+TTL: **5 days**. Long enough that re-signing is rare; short enough that
+a leaked link dies within the week. (Originally 24h; lengthened in
+response to Storage egress — see the optimizer-cache note below and #382.)
 
 Performance — the member directory renders every member's avatar at
 once, so signing must not become N round-trips:
@@ -103,9 +104,15 @@ once, so signing must not become N round-trips:
   `use cache`). Signing then fires roughly once per TTL per warm
   instance — not once per page view. The directory's hot path does
   zero Storage round-trips.
-- The long TTL also keeps `next/image`'s optimizer cache stable: that
-  cache is keyed by source URL, so an hourly-churning URL would force
-  constant re-optimization. A 24h URL does not.
+- The signed URL's `?token=` is part of `next/image`'s optimizer cache
+  key, so each rotation forces a full re-fetch of every avatar's source
+  object from Storage. The original 24h rotation did this daily; combined
+  with the optimizer's 4h default `minimumCacheTTL`, it was the dominant
+  Storage-egress driver (#382). The fix is two-sided: a 5-day sign TTL
+  (rotate ~5× less often) plus a 31-day `images.minimumCacheTTL` in
+  `next.config.ts` so a variant is never re-fetched within a URL's life.
+  A long `minimumCacheTTL` is safe because the object path is immutable
+  (random UUID per upload), so there is nothing to invalidate.
 
 A per-upload random filename means a replaced avatar gets a new path,
 hence a new cache key, so a replace shows immediately rather than
@@ -246,7 +253,7 @@ avatar a new path, so a replace shows immediately.
    used by `getProfileForSelf` / `getProfileForMember` / `listMembers`.
    It batches cache-miss paths into one `createSignedUrls` call and
    caches each signed URL keyed by object path with an expiry near the
-   24h TTL; a null `avatarPath` yields `null`. Single-profile callers
+   5-day TTL; a null `avatarPath` yields `null`. Single-profile callers
    pass a one-element array. One chokepoint keeps a future scheme
    change to a single function.
 4. **Upload endpoint** — `POST /api/me/avatar` in `src/server/api.ts`,
