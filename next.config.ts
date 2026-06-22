@@ -88,6 +88,14 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   images: {
     remotePatterns,
+    // Hold optimized avatar variants for 31 days instead of the 4h
+    // default. Safe because avatar object paths are immutable — a replace
+    // mints a new random-UUID path (hence a new URL and cache key), so a
+    // stale variant is never served. Without this, each variant expires
+    // every 4h and re-fetches its full 1024² source from Storage; that
+    // intra-day churn was the bulk of our Storage egress (#382). Paired
+    // with the 5-day signed-URL TTL in avatars.ts.
+    minimumCacheTTL: 2_678_400,
     // The local Supabase Storage container lives on 127.0.0.1, which
     // Next 16's optimizer blocks as an SSRF guard. Allow it in dev
     // only — production avatars come from the public *.supabase.co host.
