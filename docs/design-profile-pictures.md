@@ -74,7 +74,7 @@ downscaling on top.
 
 ## Key decisions
 
-### 1. Private bucket, signed URLs (24h TTL)
+### 1. Private bucket, signed URLs (5-day TTL)
 
 The `avatars` bucket is **private**. Objects are reachable only via a
 **signed URL** — a time-limited, HMAC-signed link minted server-side.
@@ -253,7 +253,7 @@ avatar a new path, so a replace shows immediately.
    used by `getProfileForSelf` / `getProfileForMember` / `listMembers`.
    It batches cache-miss paths into one `createSignedUrls` call and
    caches each signed URL keyed by object path with an expiry near the
-   24h TTL; a null `avatarPath` yields `null`. Single-profile callers
+   5-day TTL; a null `avatarPath` yields `null`. Single-profile callers
    pass a one-element array. One chokepoint keeps a future scheme
    change to a single function.
 4. **Upload endpoint** — `POST /api/me/avatar` in `src/server/api.ts`,
