@@ -37,7 +37,7 @@ jobs:
       # root when the dispatched ref has no open PR (e.g., direct SHA).
       pr_url: ${{ steps.lookup.outputs.pr_url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           # Need history beyond the dispatched ref so we can diff
@@ -125,7 +125,7 @@ jobs:
       name: prod-db    # required-reviewer gate lives here
       url: ${{ needs.prep.outputs.pr_url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       - uses: actions/setup-node@v6
