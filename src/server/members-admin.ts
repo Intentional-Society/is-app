@@ -115,9 +115,11 @@ export const deleteMemberAccount = async (
   await db.delete(profiles).where(eq(profiles.id, targetId));
 
   const { error } = await supabaseAdmin.auth.admin.deleteUser(targetId);
-  if (error) {
-    // The profile is already gone; surface the auth-delete failure so an
-    // operator can clean up the orphaned auth.users row.
+  // A 404 means the auth user is already gone — the end state we want — so
+  // treat it as success (keeps the delete idempotent and tolerant of an
+  // auth row that was never fully provisioned by GoTrue). Any other error is
+  // a real failure; surface it, though the profile is already deleted.
+  if (error && error.status !== 404) {
     throw new Error(`deleteMemberAccount: auth deleteUser failed for ${targetId}: ${error.message}`);
   }
 

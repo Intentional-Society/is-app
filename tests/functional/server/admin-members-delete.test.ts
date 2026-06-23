@@ -105,6 +105,20 @@ describe("DELETE /api/admin/members/:id", () => {
     await db.delete(programs).where(eq(programs.id, programId));
   });
 
+  it("treats a 404 from auth deleteUser as success (idempotent)", async () => {
+    await insertMember(target, { displayName: "Ghost" });
+    // The auth user is already gone (e.g. never fully provisioned); the
+    // profile delete still completes and the call succeeds.
+    mockDeleteUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: { status: 404, message: "User not found" },
+    } as never);
+
+    const res = await app.request(`/api/admin/members/${target}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+    expect(await profileExists(target)).toBe(false);
+  });
+
   it("cascades relations and anonymizes invites the member created", async () => {
     const other = randomUUID();
     await insertMember(target, { displayName: "Target" });
