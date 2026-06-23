@@ -30,6 +30,9 @@ export function SignupForm({ initialCode, intro }: { initialCode: string; intro:
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
 
+  // Whether the code arrived prefilled from the invite link.
+  const prefilled = initialCode.trim().length > 0;
+
   const checkCode = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalized = codeInput.trim().toUpperCase();
@@ -142,27 +145,37 @@ export function SignupForm({ initialCode, intro }: { initialCode: string; intro:
   } else {
     const checking = step.kind === "code-checking";
     const ready = codeInput.trim().length === INVITE_CODE_LENGTH;
+    const codeError = step.kind === "enter-code" ? step.error : undefined;
+    // Hide the code field when it arrived prefilled from the invite link and
+    // is a complete code that hasn't errored — the user doesn't need to see
+    // or touch it (#419). A malformed or rejected prefilled code reveals the
+    // field so they can fix it; an empty (no-code) arrival shows it as normal.
+    const showCodeField = !prefilled || !ready || Boolean(codeError);
     content = (
       <form onSubmit={checkCode} className="flex w-full flex-col gap-3">
-        <Label htmlFor="code">Invite code</Label>
-        <Input
-          id="code"
-          type="text"
-          required
-          autoComplete="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          value={codeInput}
-          onChange={(event) => setCodeInput(event.target.value)}
-          disabled={checking}
-          className="font-mono uppercase"
-        />
+        {showCodeField && (
+          <>
+            <Label htmlFor="code">Invite code</Label>
+            <Input
+              id="code"
+              type="text"
+              required
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              value={codeInput}
+              onChange={(event) => setCodeInput(event.target.value)}
+              disabled={checking}
+              className="font-mono uppercase"
+            />
+          </>
+        )}
         <Button type="submit" disabled={checking || !ready}>
           {checking ? "Checking…" : ready ? "Sign up!" : "Enter invite code…"}
         </Button>
-        {step.kind === "enter-code" && step.error && (
+        {codeError && (
           <p role="alert" className="text-base text-destructive">
-            {step.error}
+            {codeError}
           </p>
         )}
       </form>
