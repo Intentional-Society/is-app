@@ -3,6 +3,15 @@ name: E2E Tests
 on:
   deployment_status:
 
+# Serialize e2e across all branches: the suite runs against the shared prod
+# Supabase DB and drives two fixed seeded accounts, resetting their state
+# mid-run. Two overlapping runs clobber each other's accounts and fail (#358).
+# A single global group queues runs instead; cancel-in-progress: false so no
+# deploy loses its e2e result.
+concurrency:
+  group: e2e-shared-prod-db
+  cancel-in-progress: false
+
 # See ci.yml for the rationale. upload-artifact@v4 works with contents:
 # read — it doesn't need write scope on any top-level resource.
 permissions:
