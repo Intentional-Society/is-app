@@ -8,10 +8,12 @@
 **Status:** Decided 2026-06-12 (Blake, after discussion with James); revised same day after peer
 review; preflight-reconciled 2026-06-16; **multi-agent review (Quill + Margo + Forge) reconciled
 2026-06-17 — all 14 threads decision-complete; only Thread 14 (`/ship` ask-path proof) is
-execution-gated and resolves inside the implementation PR.** Supersedes the earlier bootstrap draft
+execution-gated and resolves inside the implementation PR.** **Thread 14 RESOLVED 2026-06-24:** the
+ask-path proof passed against the real PR #433 merge (3 cold `/ship 433` runs); the `/ship` step-10
+Y/n was deleted in the #353 fast-follow (see §2 + Decision log). Supersedes the earlier bootstrap draft
 (which removed `disable-model-invocation: true` from all three Skills uniformly). **Implemented in
 this PR** (#353): `/commit` + `/pr` Step 0 + delegation marker, `/ship` ask-gate + required
-pre-merge narration (Y/n retained pending the Thread-14 proof — see §2), docs v1.1 sweep, and the
+pre-merge narration (Y/n retained additively in #353; deleted in the #353 fast-follow after the Thread-14 proof passed 2026-06-24 — see §2 + Decision log), docs v1.1 sweep, and the
 four NL-routing evals. Review record: `.scratch/skill-nl-invocation-review-roundtable.md`.
 **Tracking issue:** #353 ("Allow 0-to-3 skills to be model-invoked") — the implementation PR
 `Closes #353`.
@@ -196,9 +198,9 @@ observed.
   Per validated fact 2 this forces a human permission prompt — showing the literal merge command —
   on any `gh pr merge` by any agent path, un-weakenable by local settings.
 - **Amend `/ship` step 10 — delete the conversational Y/n** (supersedes the PR #133 step-10
-  decision — flag for James in the PR). **⚠️ Shipped state (#353): the Y/n is RETAINED — this
-  deletion is gated on the Thread-14 proof below and happens only after it passes; the shipped
-  `/ship` keeps the Y/n with the ask-rule additive (mitigation #1).** The harness permission prompt
+  decision — flag for James in the PR). **✅ Resolved: in #353 the Y/n was RETAINED additively
+  (mitigation #1); the Thread-14 proof passed 2026-06-24 (against the real PR #433 merge) and the
+  #353 fast-follow DELETED the Y/n — the harness prompt is now the sole confirmation.** The harness permission prompt
   on the merge command (step 11) becomes the single merge confirmation for **both** paths
   (PR pre-existed / PR created this run), replacing the path-dependent Y/n logic. This is the same
   single-confirmation outcome James argued for in #133, relocated from model to harness.
@@ -225,6 +227,14 @@ observed.
   same PR. **If the proof fails:** keep the Y/n and treat the ask rule as additive (mitigation #1 —
   accept the rare double-prompt); Forge brings 2 more options (candidates: a PreToolUse merge-guard
   hook; narrowing/strengthening the matcher) and Blake chooses.
+  **✅ RESULT (2026-06-24):** the proof PASSED — run live with Blake against the **real PR #433 merge**
+  (a deviation from the planned throwaway PR: the proof and the production ship were the same event),
+  as a **3-run cold ask-path proof**. (a) narration shown every run; (b) the `ask` fired on
+  `gh pr merge 433` before every merge; (c) it fired even with `Bash(gh pr merge *)` in the local
+  `allow` (Run 2); (e) declines (Runs 1–2) left #433 unmerged, approve (Run 3) merged it; (d) bypass
+  optional, not run. The fallback (keep Y/n) was not needed. The Y/n deletion shipped as a
+  **fast-follow PR** (not the same PR — the harness proof can only be exercised by a real `/ship`
+  merge of an actual green PR). Peer-verify (Quill/Margo) happens at the fast-follow review.
 - **No broad `allowed-tools` on `/ship` (Thread 8).** Do not add `allowed-tools: Bash(gh *)` (or any
   `gh` grant) to `/ship` — `ask` beats `allow` regardless, but avoid the confusing race. The
   checked-in `ask` rule loads in **every** session including headless CI; harmless because an `ask`
@@ -326,6 +336,12 @@ confirms the captured evidence before the Y/n deletion is accepted:
 - (e) the human declines and no merge-side mutation occurs.
 If any of (a)–(e) can't be shown, **do not delete the Y/n** — keep it, treat the ask as additive
 (mitigation #1), and bring Blake the other two options.
+
+**✅ PASSED 2026-06-24.** Executed as 3 cold `/ship 433` runs against the real PR #433 merge (proof =
+production ship). (a)/(b) narration + `ask` fired before the merge every run; (c) `ask` beat a local
+`Bash(gh pr merge *)` allow on Run 2; (e) Runs 1–2 declined → #433 unmerged, Run 3 approved → merged
+(commit `20361c4`); (d) bypass not run (optional). Evidence: `.scratch/ship-proof-results.md`. The
+Y/n was deleted in the #353 fast-follow.
 
 **Non-blocking impl-verification (Thread 7) — does not gate the PR.** Confirm `<command-name>` is
 visible inside the rendered SKILL.md turn AND absent on Skill-tool/NL invocation (so its presence
@@ -433,8 +449,9 @@ One PR, two commits:
    `commit`/`pr` SKILL.md edits (remove flag, verbatim descriptions, Step 0) + the single-use
    delegation marker (`/pr` sets before delegating; `/commit` consumes+clears at Step 0).
 2. `feat(skills): harness-enforced merge confirmation + skill routing docs + evals` —
-   `.claude/settings.json`, `.gitignore` negation, `/ship` step-10 amendment **(Y/n deletion gated
-   on the Thread-14 proof)** + `/ship` delegation-marker set, CLAUDE.md, `strategy-committing.md`,
+   `.claude/settings.json`, `.gitignore` negation, `/ship` step-10 amendment **(Y/n retained
+   additively in #353; deleted in the #353 fast-follow after the Thread-14 proof passed 2026-06-24)** +
+   `/ship` delegation-marker set, CLAUDE.md, `strategy-committing.md`,
    `strategy-security.md` line, `spec-portable-ai-procedures.md` v1.1 + SKILL.md description sweep,
    **4 NL-routing cases in `evals/evals.json`** (commit-4, commit-5, pr-8, ship-4), devjournal.
    PR body: the two deferred guardrail evals are tracked in #396 (comment `4728284766`), not here.
@@ -453,8 +470,9 @@ answers James's #353 concern that a confirmation prompt would be cumbersome in 9
   Step 0. Never a sticky session flag (a stale marker would wrongly skip the gate).
 - `/ship` keeps `disable-model-invocation: true`; the merge ask-rules live in **checked-in**
   `.claude/settings.json`.
-- The `/ship` Y/n deletion is **gated on the Thread-14 proof** (Forge runs in a disposable tree;
-  peer-verified). If the proof can't be shown, keep the Y/n and make the ask rule additive.
+- The `/ship` Y/n deletion was **gated on the Thread-14 proof** — which **passed 2026-06-24** (against
+  the real PR #433 merge); the Y/n was deleted in the #353 fast-follow, leaving the harness `ask` as
+  the sole merge confirmation. (Had it failed, the fallback was to keep the Y/n + additive ask.)
 - Explicit slash invocation stays prompt-free for all three Skills (the merge permission prompt
   inside `/ship` is the one deliberate exception — it *is* the merge confirmation).
 - **Implement from fresh `origin/main`.** At planning time (2026-06-17) local `main` was 8 commits
@@ -503,5 +521,14 @@ answers James's #353 concern that a confirmation prompt would be cumbersome in 9
   `/ship` against `allowed-tools: Bash(gh *)` (F4) and a shipped-state clarifier at §2 that the
   Y/n is retained pending the Thread-14 proof (F5). Considered nonce-handshake (fencing token) and
   no-file in-context directive; rejected as over/under-engineered for a low-severity edge.
+- 2026-06-24 (Thread-14 proof + Y/n deletion — Blake + working session) — the `/ship` ask-path proof
+  was executed live against the **real PR #433 merge** as a **3-run cold ask-path proof** (Run 1
+  baseline → decline; Run 2 local `allow` added → `ask` still fired → decline; Run 3 baseline →
+  approve → merged, commit `20361c4`). PASSED: the harness `ask` fired before every merge and beat the
+  local `allow`; declines left #433 unmerged. Two honest deviations from the plan, both forced by the
+  mechanism (the harness proof can only be exercised by a real `/ship` merge of an actual green PR):
+  the proof ran against the real merge (not a throwaway PR), and the Y/n deletion shipped as a
+  **fast-follow PR** rather than the same PR. Mitigation fallback not needed. Evidence:
+  `.scratch/ship-proof-results.md`; roundtable Thread 14 → ✅ RESOLVED.
 - Prior context: PRs #304/#305 shipped the Skills; explicit-only invocation was P0.4 from
   PR #133 — this spec is a deliberate, dated revision of it.
