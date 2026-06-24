@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { RelationCandidatesFeed } from "@/lib/api-types";
@@ -22,6 +23,7 @@ import { RELATION_CANDIDATES_QUERY_KEY, RELATION_SUBGRAPH_QUERY_KEY, relationVal
 export type RelatingTarget = {
   id: string;
   displayName: string | null;
+  avatarUrl?: string | null;
   hintAttribution?: string | null;
   currentValue?: RelationValue | null;
 };
@@ -201,9 +203,16 @@ export function RelatingDialog({ target, onClose, onRelated, deferGraphCommit }:
           >
             <X className="h-4 w-4" />
           </Dialog.Close>
-          <Dialog.Title className="pr-8 font-heading text-base font-medium">
-            Who is <span className="font-semibold">{target?.displayName ?? "this member"}</span> to you?
-          </Dialog.Title>
+          <div className="flex items-center gap-2 pr-8">
+            <Avatar
+              name={target?.displayName ?? null}
+              url={target?.avatarUrl ?? null}
+              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-muted-foreground"
+            />
+            <Dialog.Title className="font-heading text-base font-medium">
+              Who is <span className="font-semibold">{target?.displayName ?? "this member"}</span> to you?
+            </Dialog.Title>
+          </div>
           {target?.hintAttribution && (
             <p id="relating-attribution" className="mt-1 text-sm text-muted-foreground">
               ({target.hintAttribution})
