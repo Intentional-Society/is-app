@@ -50,7 +50,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 9. **If no open PR for this branch — draft and create.**
 
-    Draft a PR title, body, and reviewer list for human approval, then run `gh pr create`.
+    Draft a PR title, body, and reviewer list for human approval, then run `gh pr create` (always assigning the PR to its opener — see **Assignee** below).
 
     **Title:** same Conventional Commit-style headline rule as `/commit`. `<type>[(scope)]: <imperative summary>`, ≤70 chars, including `!` for breaking changes. The title is durable: GitHub uses it verbatim as the merge commit subject (`merge_commit_title: PR_TITLE`).
 
@@ -116,17 +116,19 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
     **Echo the resolution** as one line before `gh pr create`, so the human always sees what got resolved:
 
     ```text
-    → Requesting review from james-baker, benjifriedman. Proceeding.
+    → Assigning to <self>; requesting review from james-baker, benjifriedman. Proceeding.
     ```
 
-    Pass the resolved list to `gh pr create --reviewer <login1>,<login2>,...` (no `@` prefix, no spaces inside the `--reviewer` value); omit the flag entirely when the list is empty.
+    Pass the resolved list to `gh pr create --reviewer <login1>,<login2>,... --assignee @me` (no `@` prefix on reviewer logins, no spaces inside the `--reviewer` value); omit `--reviewer` when the list is empty, but **always keep `--assignee @me`**.
+
+    **Assignee — always assign the PR to its opener (you).** `gh pr create` leaves the Assignees field empty by default, so PRs end up owned by no one — the gap this fixes. Always pass `--assignee @me`; it resolves to the authenticated `gh` user running `/pr` (= `self` in the team cache) without a lookup. Unconditional, no picker needed: the opener is the person driving the PR (addressing review, shipping it). Distinct from reviewers — the reviewer list may be empty, the assignee never is. (If `/pr` runs on a branch authored by someone else, the executor is still the assignee: they're driving it now; the commit author field records original authorship.)
 
     **Failure handling.**
 
     - If the cache file is missing or unreadable, regenerate it via the cold-cache path above. If regeneration fails (network, rate limit, gh unauthenticated), fall back to a bare `Reviewers (comma-separated logins or blank):` prompt with no picker — the Skill still works, just less ergonomically.
     - If `gh pr create --reviewer` rejects a login (typo, no longer a collaborator), refresh the cache, surface the exact `gh` error + the refreshed picker, and re-ask. Don't retry blindly.
 
-    Present the full draft (title + body + reviewers) for human Y/n approval before `gh pr create`. On approval, run `gh pr create` with `--reviewer` when the list is non-empty.
+    Present the full draft (title + body + reviewers) for human Y/n approval before `gh pr create`. On approval, run `gh pr create` with `--assignee @me` always, plus `--reviewer` when the reviewer list is non-empty.
 
 10. **If an open PR for this branch exists — comment-by-default, body-update only on material scope change.**
 
