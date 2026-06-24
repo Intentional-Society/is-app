@@ -47,6 +47,13 @@ describe("RelatingDialog — No Relationship option", () => {
     expect(screen.queryByRole("button", { name: /No Relationship/ })).toBeNull();
   });
 
+  it("shows the member's avatar in the header (#420)", () => {
+    // No photo set → the Avatar falls back to initials, distinct from the
+    // "Who is Bao Tran to you?" title text.
+    renderDialog({ id: "m1", displayName: "Bao Tran" });
+    expect(screen.getByText("BT")).toBeVisible();
+  });
+
   it("removes via DELETE and closes the dialog on success", async () => {
     $delete.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
     const { onClose } = renderDialog({ id: "m1", displayName: "Ada", currentValue: 3 });

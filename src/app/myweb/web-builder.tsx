@@ -39,6 +39,7 @@ const buildHintAttribution = (candidate: RelationCandidate): string | null => {
 const targetFromCandidate = (candidate: RelationCandidate): RelatingTarget => ({
   id: candidate.id,
   displayName: candidate.displayName,
+  avatarUrl: candidate.avatarUrl,
   hintAttribution: buildHintAttribution(candidate),
 });
 
