@@ -117,4 +117,6 @@ v1 is Claude-only — no multi-vendor matrix.
 
 ### Related Skills
 
-The `/commit` Skill (`.claude/skills/commit/SKILL.md`) encodes both rules above, plus the suspicious-file blocker, the combined-expand+contract refusal, and the single bundled human approval checkpoint. Run it explicitly as `/commit [issue-or-context]`.
+The `/commit` Skill (`.claude/skills/commit/SKILL.md`) encodes both rules above, plus the suspicious-file blocker, the combined-expand+contract refusal, and the single bundled human approval checkpoint.
+
+**How to invoke.** `/commit` and `/pr` respond to a slash command (`/commit [issue-or-context]`) **or** to natural language ("commit this", "open a PR for this branch"). You can pass context either way: a PR link, an issue number (`/commit #142`), or plain-language guidance — including commit-splitting instructions like "commit these changes in multiple steps as follows: …". When invoked by natural language, the skill asks a one-tap intent confirmation (Step 0) before doing anything; explicit slash commands skip it. To turn the confirmation off on your machine, choose "Proceed and don't ask again" once (it creates the gitignored `.claude/skip-nl-confirm-commit-pr.local`), or delete that file to turn it back on — it skips only the intent confirmation, never the approval checkpoints. `/ship` is **explicit-only**: type `/ship` to merge; natural-language "ship it" will route you to type it. Full design: [plan-skill-nl-invocation.md](plan-skill-nl-invocation.md).
