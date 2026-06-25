@@ -32,7 +32,7 @@ jobs:
       github.event.deployment_status.state == 'success' &&
       contains(fromJSON('["Production","Preview"]'), github.event.deployment_status.environment)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 24
