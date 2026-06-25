@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 import { attachAvatarUrls, clearAvatar } from "./avatars";
 import { db } from "./db";
-import { profiles } from "./schema";
+import { invites, profiles } from "./schema";
 import { E2E_EMAILS } from "./test-reset";
 
 export type AdminMember = {
@@ -112,6 +112,16 @@ export const deleteMemberAccount = async (
   // statement, so its cascade runs without a multi-statement transaction
   // over the pooler (docs/strategy-db-transactions.md).
   await clearAvatar(targetId);
+
+  // Clear the redemption pair on any invite this member redeemed before the
+  // profile delete. The redeemed_by FK is ON DELETE SET NULL, but redeemed_at
+  // has no FK, so the cascade alone would null one and leave the other —
+  // violating the invites_redemption_pair check ((redeemed_by IS NULL) =
+  // (redeemed_at IS NULL)) and aborting the whole DELETE. Since most members
+  // join via an invite, without this no normally-onboarded member is
+  // deletable. The invite reverts to unredeemed; its created_by survives.
+  await db.update(invites).set({ redeemedBy: null, redeemedAt: null }).where(eq(invites.redeemedBy, targetId));
+
   await db.delete(profiles).where(eq(profiles.id, targetId));
 
   const { error } = await supabaseAdmin.auth.admin.deleteUser(targetId);

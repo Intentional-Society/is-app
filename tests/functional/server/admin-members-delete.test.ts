@@ -147,6 +147,39 @@ describe("DELETE /api/admin/members/:id", () => {
     await removeMember(other);
   });
 
+  it("deletes a member who redeemed an invite (redemption-pair check)", async () => {
+    // Regression for the #454 review: redeemed_by FK is ON DELETE SET NULL
+    // but redeemed_at has no FK, so the cascade alone leaves the pair
+    // inconsistent and the invites_redemption_pair check aborts the delete.
+    // Most members onboard by redeeming an invite, so this is the common case.
+    const inviter = randomUUID();
+    await insertMember(inviter, { displayName: "Inviter" });
+    await insertMember(target, { displayName: "Redeemer" });
+    const inviteId = randomUUID();
+    await db.insert(invites).values({
+      id: inviteId,
+      code: `code-${inviteId.slice(0, 8)}`,
+      createdBy: inviter,
+      note: "welcome",
+      expiresAt: new Date(Date.now() + 86_400_000),
+      redeemedBy: target,
+      redeemedAt: new Date(),
+    });
+
+    const res = await app.request(`/api/admin/members/${target}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+    expect(await profileExists(target)).toBe(false);
+    // The invite survives with its redemption cleared (pair stays consistent)
+    // and its creator intact.
+    const [invite] = await db.select().from(invites).where(eq(invites.id, inviteId));
+    expect(invite.redeemedBy).toBeNull();
+    expect(invite.redeemedAt).toBeNull();
+    expect(invite.createdBy).toBe(inviter);
+
+    await db.delete(invites).where(eq(invites.id, inviteId));
+    await removeMember(inviter);
+  });
+
   it("refuses self-delete with 403", async () => {
     const res = await app.request(`/api/admin/members/${admin}`, { method: "DELETE" });
     expect(res.status).toBe(403);
