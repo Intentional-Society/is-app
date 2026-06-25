@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-25 | Ola | Admins can delete a member account
+
+Admins permanently delete a member from `/admin/members` (#185, #454): clear avatar → clear the redemption pair on invites the member redeemed → delete the profile (FK cascade drops memberships/relations/hints, null-sets invite `created_by`) → delete the auth user. Profile-first because `profiles → auth.users` is `ON DELETE NO ACTION`; `deleteUser` is idempotent on a 404. The redemption-pair clear is load-bearing: `redeemed_by` is `ON DELETE SET NULL` but `redeemed_at` has no FK, so the cascade alone violates `invites_redemption_pair` and no onboarded member is deletable (caught post-merge on #454). Guards mirror `setAdminStatus` — no self-delete (use deactivate), no deleting a fellow admin.
+
 ## 2026-06-22 | James | Cut avatar Storage egress: longer signed-URL TTL + high optimizer cache TTL
 
 Avatar signed URLs rotate a `?token=` that's part of next/image's optimizer cache key, and the optimizer's default `minimumCacheTTL` is 4h — so every avatar's 1024² source was re-fetched from Storage daily (rotation) and again every 4h (expiry), blowing the free-plan egress quota during the Convening. Fix: `SIGN_TTL_SECONDS` 24h → 5 days, and `images.minimumCacheTTL` → 31 days (safe — object paths are immutable). The durable fix (a tokenless proxy route) stays open as #382.
