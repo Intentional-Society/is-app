@@ -2,11 +2,13 @@
 
 > Design RFC for encoding the team's check-in workflow as three Claude Code Skills. Reviewed via PR #133. This document supersedes prior v1–v4 drafts.
 
+> **v1.1 revision (2026-06, issue #353):** the invocation policy below is revised from "all three Skills explicit-only" to a **two-tier** model — `/commit` and `/pr` are natural-language-invocable behind a Step 0 intent confirmation, while `/ship` stays explicit-only (`disable-model-invocation: true`) backed by a checked-in `gh pr merge` permission `ask` rule. Statements updated for v1.1 are marked inline; the original PR #133 review table (Appendix A) is preserved as the historical record. Full design: [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md).
+
 ## 1. Overview
 
 ### Problem statement
 
-Team members using AI coding assistants follow the team's check-in conventions only as well as their personal prompting and memory allow. Execution drifts across teammates and across tool-switches. v1 encodes the check-in workflow as three Claude Code Skills (`/commit`, `/pr`, `/ship`) that any teammate using Claude Code can invoke explicitly to get the same behavior.
+Team members using AI coding assistants follow the team's check-in conventions only as well as their personal prompting and memory allow. Execution drifts across teammates and across tool-switches. v1 encodes the check-in workflow as three Claude Code Skills (`/commit`, `/pr`, `/ship`) that any teammate using Claude Code can invoke to get the same behavior — by slash command, or (for `/commit` and `/pr`, per the v1.1 revision) by natural language.
 
 ### Goals
 
@@ -35,7 +37,7 @@ Team members using AI coding assistants follow the team's check-in conventions o
 
 - Claude Code Skills are the only v1 execution surface. No `.claude/commands/*`.
 - Argument shapes are documented in each `SKILL.md` body's Invocation section. `argument-hint` and `$ARGUMENTS` are slash-command-format affordances; v1 does not use them.
-- Each Skill sets `disable-model-invocation: true` in frontmatter — explicit invocation only. Natural-language phrasings are guidance for the human reading the Skill, not triggers the Skill responds to automatically. If Claude Code's current Skills implementation does not recognize this frontmatter key, the Skill body documents the equivalent explicit-invocation requirement.
+- **(Revised v1.1, #353.)** Invocation is two-tier. `/commit` and `/pr` omit `disable-model-invocation` and are natural-language-invocable, gated by a model-invoked **Step 0** intent confirmation (skipped on a verified slash entry, a live single-use delegation marker, or the local opt-out file `.claude/skip-nl-confirm-commit-pr.local`). `/ship` keeps `disable-model-invocation: true` — explicit invocation only — backed by a checked-in `.claude/settings.json` `ask` rule on `gh pr merge`. (Original v1: all three set the flag and natural-language phrasings were guidance only.)
 - `npm test` is the local gate as authored in `package.json` (lint + typecheck + dev-DB setup + Vitest + Playwright e2e). If `npm test` is too slow or flake-prone, the team fixes `npm test`, not the Skill's gate.
 - `gh` (GitHub CLI) is required for GitHub-side operations. Unavailability or unauthenticated state is a hard stop with a clear next command (`gh auth login` / `gh auth status`).
 - Branch protection requires up-to-date branches before merge. Rebase is the normal pre-push action; merge-to-update is a human-judgment override (active review, recurring conflicts, or rebase would misrepresent commits).
@@ -50,10 +52,10 @@ Team members using AI coding assistants follow the team's check-in conventions o
 ### Tool/platform assumptions (Claude Code Skills only)
 
 - Project Skills live at `.claude/skills/<name>/SKILL.md`.
-- Each `SKILL.md` has YAML frontmatter with `name`, `description`, and `disable-model-invocation: true` (or equivalent body documentation if the key is unrecognized).
+- Each `SKILL.md` has YAML frontmatter with `name` and `description`; `/ship` additionally sets `disable-model-invocation: true` (v1.1, #353 — `/commit` and `/pr` no longer set it; see the invocation-policy note above).
 - The directory name is the slash-style invocation name: `/commit`, `/pr`, `/ship`.
 - The `SKILL.md` body contains Invocation → Steps → Failure modes → `## Depends on` footer.
-- Side-effecting Skills require explicit invocation: `/commit ...`, `/pr ...`, `/ship ...`. Natural-language matches do not fire them.
+- **(Revised v1.1, #353.)** `/ship` (highest-risk, merge-to-prod) requires explicit invocation: `/ship ...`. `/commit` and `/pr` also accept natural-language intent, gated by the Step 0 confirmation; explicit slash invocation and delegated calls skip the confirmation.
 - `argument-hint` and `$ARGUMENTS` are slash-command-format keys that do not apply to Skills. Argument shapes are documented in the `SKILL.md` body.
 - `gh` (GitHub CLI) is required for GitHub-side work; unavailability or unauthenticated state is a hard stop.
 
@@ -87,7 +89,7 @@ Three new executable artifacts:
   ship/SKILL.md
 ```
 
-Each `SKILL.md` has YAML frontmatter (`name`, `description`, `disable-model-invocation: true`) and a body structured as: Invocation → Steps → Failure modes → `## Depends on` footer. Optional bundled `references/<topic>.md` files inside a skill folder are allowed if the body exceeds the ~500-line soft cap from `skill-creator`; v1 does not pre-create them.
+Each `SKILL.md` has YAML frontmatter (`name`, `description`; `disable-model-invocation: true` on `/ship` only — v1.1, #353) and a body structured as: Invocation → Steps → Failure modes → `## Depends on` footer. Optional bundled `references/<topic>.md` files inside a skill folder are allowed if the body exceeds the ~500-line soft cap from `skill-creator`; v1 does not pre-create them.
 
 Edits to existing files (the only other artifacts in this PR):
 
@@ -104,11 +106,11 @@ Not in v1: `docs/ai-procedures/` tree, index file, `AGENTS.md`, `.agents/skills/
 Each Skill is built using Anthropic's `skill-creator` workflow:
 
 1. Capture trigger intent — the explicit user inputs that should fire the Skill via `/<name>`.
-2. Draft `SKILL.md` with frontmatter (`name`, `description`, `disable-model-invocation: true`) and an imperative body following the Invocation → Steps → Failure modes → `Depends on` shape. Keep each body under the 500-line soft cap.
+2. Draft `SKILL.md` with frontmatter (`name`, `description`; add `disable-model-invocation: true` only for explicit-only Skills like `/ship` — v1.1, #353) and an imperative body following the Invocation → Steps → Failure modes → `Depends on` shape. Keep each body under the 500-line soft cap.
 3. Write 2–3 realistic eval prompts in `evals/evals.json`: happy path, refusal, one edge case.
 4. Run with-skill vs baseline subagents in parallel; capture outputs.
 5. Review outputs via `eval-viewer/generate_review.py`; iterate the body based on feedback.
-6. Run the description-optimization loop via `scripts/run_loop.py`. With `disable-model-invocation: true`, this tunes the description for human readability and slash-invocation discoverability rather than for natural-language firing.
+6. Run the description-optimization loop via `scripts/run_loop.py`. For `/ship` (`disable-model-invocation: true`) this tunes the description for human readability and slash-invocation discoverability; for `/commit` and `/pr` (natural-language-invocable, v1.1 #353) it also tunes for correct natural-language firing.
 7. Forward-test each Skill on realistic prompts before shipping.
 8. Do not add README, changelog, quick-reference, or auxiliary docs inside Skill folders.
 
@@ -149,7 +151,7 @@ The three Skills delegate downward: `/ship` calls `/pr` if needed; `/pr` calls `
 - `#<N>` or bare `<N>`: treat as an issue number; resolve with `gh issue view <N>`.
 - Text: use as plain-language context for branch naming, issue-lookup hints, and commit-message draft.
 
-Argument is cached for `/pr` and `/ship` in the same session. Natural-language phrasings ("commit this for issue 142") are guidance for the human, not triggers — the Skill fires only on explicit `/commit` slash invocation per `disable-model-invocation: true`.
+Argument is cached for `/pr` and `/ship` in the same session. **(Revised v1.1, #353.)** `/commit` is natural-language-invocable: NL intent ("commit this for issue 142") fires it through a model-invoked Step 0 intent confirmation; explicit `/commit` and delegated calls skip the confirmation.
 
 **Steps.**
 
@@ -281,7 +283,7 @@ No `--squash` flag. Repo PR settings disable squash and rebase merging (only mer
 7. If a schema expand from `/commit` is pending and not yet deployed, run `npm run prod:db:expand` to dispatch the `forward-migrate-prod-schema-expansion` workflow against the pushed branch. Surface the workflow run URL, PR link, and migration SQL approval context to the human. Wait for the maintainer approval in the `prod-db` environment (the workflow pauses on a review gate before prod credentials are injected). Once the workflow completes successfully, wait for the next `e2e.yml` run on the post-deploy commit and require it to pass before continuing.
 8. Wait for CI via `gh pr checks <N> --watch`. The required check (`Lint & Functional Tests`) plus every visible advisory check (E2E, CodeQL, and any others present) must be green. Wait up to 5 minutes for pending advisories. After 5 minutes, present three options: `wait+5`, `troubleshoot`, `abort`. There is no `proceed` option.
 9. Docs-only PR handling: if the PR's diff is confined to `docs/**` and root `CLAUDE.md`, `ci.yml`'s `dorny/paths-filter` step skips test steps but still posts `Lint & Functional Tests` green within seconds. Vercel preview is skipped per `vercel.json`'s `ignoreCommand`, so no preview `deployment_status` event fires and preview `e2e.yml` does not run. `/ship` treats the absent pre-merge advisory checks as expected per `docs/doc-github.md`'s docs-only rule; proceed on required-green.
-10. Confirmation policy: if `/ship` opened the PR during this same run (via delegated `/pr` create), present a final Y/n merge confirmation. If the PR pre-existed at `/ship` invocation, the `/ship` invocation itself is the merge confirmation — narrate the merge in one line and proceed.
+10. Confirmation policy **(Revised v1.2, #353 fast-follow — the conversational Y/n was removed after the Thread-14 proof passed 2026-06-24).** The checked-in `.claude/settings.json` `ask` rule on `gh pr merge` (step 11) is the **sole** merge confirmation in every case (PR pre-existed or was created this run): narrate the merge in one line, then the harness permission prompt on the merge command confirms it. No separate conversational Y/n. See `docs/plan-skill-nl-invocation.md`.
 11. Merge: `gh pr merge <N> --merge --delete-branch`. Do not pass `--merge-title` or `--body` flags — GitHub uses the PR title and body verbatim per the repo's `merge_commit_title: PR_TITLE` / `merge_commit_message: PR_BODY` settings. Never `--admin`, `--auto`, force-merge, `--squash` (repo-disabled), or branch-protection bypass.
 12. Tidy: `git switch main && git pull --ff-only`; `git branch -d <feature-branch>` if the local branch still exists and is fully merged. Confirm the remote branch was deleted (`delete_branch_on_merge: true` should handle it automatically).
 13. Capture the merge SHA (`git log -1 --format=%H` on `main` after `git pull`). Run `gh run list --branch main --commit <merge-sha> --limit 10` to discover post-merge runs.
@@ -310,7 +312,7 @@ Each P0 row references the §4 step(s) or section(s) that satisfy it and the PR 
 | P0.1 | v1 surface is Claude Code Skills only; no Codex / Copilot / AGENTS.md / Aider / adapter architecture | §1, §2, §3 | `3211314771`, `3211556445`, `3206339198`, `3206341799` |
 | P0.2 | Canonical procedure content lives in `.claude/skills/<name>/SKILL.md`; no docs-tier procedure tree, no index file | §3 File layout | `3211278267`, `3211334197`, `3211336168` |
 | P0.3 | Argument shapes documented in SKILL.md body Invocation sections; no `.claude/commands/*`; no `argument-hint`; no `$ARGUMENTS` | §4.1, §4.2, §4.3 Invocation | `3211328311`, `3211383252`, `3211510381`, `3211537639` |
-| P0.4 | Skills set `disable-model-invocation: true`; firing only on explicit slash invocation | §2, §3, §4 Invocation | `3211328311` |
+| P0.4 | **(Revised v1.1, #353.)** Two-tier invocation: `/ship` keeps `disable-model-invocation: true` (explicit-only) + a checked-in `gh pr merge` `ask` rule; `/commit` and `/pr` are natural-language-invocable behind a Step 0 intent confirmation. The original P0.4 (all three explicit-only) is superseded — see `docs/plan-skill-nl-invocation.md`. | §2, §3, §4 Invocation | `3211328311` |
 | P0.5 | `/commit` auto-branches on `main`, stages explicit paths, applies the suspicious-file blocker list, runs a single human approval checkpoint with payload + message + devjournal bundled, commits, pushes | §4.1 Steps | `3211344951`, `3211395406`, `3211451058`, `3211455859`, `3211441775` |
 | P0.6 | `/commit` protects against accidental payload inclusion via deterministic staging + post-stage verification + post-commit verification | §4.1 Steps 5–8, 14–17 | Blake Thread 9 |
 | P0.7 | `npm test` is the local gate everywhere | §4.1 Steps, §4.2 Steps, §4.3 Steps | `3206302965`, `3211409060`, `3270728996` |
@@ -344,7 +346,7 @@ Every James-authored comment from PR #133 plus the two post-ledger comments (`32
 | [`3270728996`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3270728996) | §1 Constraints | Accept (Blake confirmation) | "Keeping `npm test` the authority." |
 | [`3206339198`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3206339198) | §1 Non-goals | Accept | AGENTS.md dropped. |
 | [`3211278267`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3211278267) | §3 | Accept | "Procedure" term dropped in favor of "Skill" as the v1 unit. |
-| [`3211328311`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3211328311) | §2, §3 | Accept (endorsement) | Skills format chosen; `disable-model-invocation: true` set in frontmatter. |
+| [`3211328311`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3211328311) | §2, §3 | Accept (endorsement) | Skills format chosen; `disable-model-invocation: true` set in frontmatter. **(v1.1, #353: now `/ship` only — `/commit` and `/pr` are natural-language-invocable; see `docs/plan-skill-nl-invocation.md`.)** |
 | [`3211334197`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3211334197) | §3 | Accept | Folder-per-skill is required by Skills format; no outer adapter layer. |
 | [`3211336168`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3211336168) | §3 | Accept | No `docs/ai-procedures/index.md`. |
 | [`3211344951`](https://github.com/Intentional-Society/is-app/pull/133#discussion_r3211344951) | §4.1 Steps | Accept | `/commit` auto-branches on `main` and pushes. |
@@ -384,7 +386,7 @@ Every James-authored comment from PR #133 plus the two post-ledger comments (`32
 
 **B.1 — Happy path: `/ship "fix profile lookup"` from a dirty `main`.**
 
-User invokes `/ship "fix profile lookup"` while on `main` with uncommitted changes. `/ship` delegates to `/pr`, which delegates to `/commit "fix profile lookup"`. `/commit` parses the context, auto-creates branch `fix-profile-lookup`, runs the suspicious-file blocker check (clean), stages explicit paths, verifies the staged set is non-empty, runs `npm test` (pass), drafts the commit message with `Summary: Fix profile lookup returning undefined for unauthenticated users.` plus `Why:` / `Behavior:` / `Test Plan:` sections, appends the `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` trailer, shows the bundled approval block (message + staged payload + no devjournal since this is a bugfix), human approves, commits, verifies no stray changes, pushes. `/pr` resumes: fetches `origin/main` (no-op for a fresh branch), drafts the PR title (`Fix profile lookup returning undefined for unauthenticated users`) and body for human approval, runs `gh pr create`, prints the URL, stops. `/ship` resumes: waits for `Lint & Functional Tests` + E2E + CodeQL to turn green (3 minutes), recognizes the PR was created during this run, prompts the merge confirmation Y/n, runs `gh pr merge --merge --delete-branch`, tidies (`git switch main && git pull --ff-only && git branch -d fix-profile-lookup`), captures merge SHA, runs `gh run list --branch main --commit <sha>` and `gh run watch <id>` for up to 5 minutes. Within 90 seconds: Vercel production deploy ✓, post-deploy e2e ✓. Reports merge SHA + Vercel production URL + "main: green."
+User invokes `/ship "fix profile lookup"` while on `main` with uncommitted changes. `/ship` delegates to `/pr`, which delegates to `/commit "fix profile lookup"`. `/commit` parses the context, auto-creates branch `fix-profile-lookup`, runs the suspicious-file blocker check (clean), stages explicit paths, verifies the staged set is non-empty, runs `npm test` (pass), drafts the commit message with `Summary: Fix profile lookup returning undefined for unauthenticated users.` plus `Why:` / `Behavior:` / `Test Plan:` sections, appends the `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` trailer, shows the bundled approval block (message + staged payload + no devjournal since this is a bugfix), human approves, commits, verifies no stray changes, pushes. `/pr` resumes: fetches `origin/main` (no-op for a fresh branch), drafts the PR title (`Fix profile lookup returning undefined for unauthenticated users`) and body for human approval, runs `gh pr create`, prints the URL, stops. `/ship` resumes: waits for `Lint & Functional Tests` + E2E + CodeQL to turn green (3 minutes), prints the one-line pre-merge narration (PR#/title/checks), runs `gh pr merge --merge --delete-branch` — the checked-in `ask` rule prompts the human to approve the exact merge command (v1.2, #353 fast-follow; no conversational Y/n) — tidies (`git switch main && git pull --ff-only && git branch -d fix-profile-lookup`), captures merge SHA, runs `gh run list --branch main --commit <sha>` and `gh run watch <id>` for up to 5 minutes. Within 90 seconds: Vercel production deploy ✓, post-deploy e2e ✓. Reports merge SHA + Vercel production URL + "main: green."
 
 **B.2 — Supervised handoff: `/ship` with E2E pending past the wait window, then green.**
 
