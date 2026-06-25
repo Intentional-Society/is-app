@@ -44,6 +44,10 @@ test-results/
 # and re-include .claude/skills/ explicitly.
 .claude/*
 !.claude/skills/
+# checked-in shared permission rules (the /ship `gh pr merge` ask-gate, #353) — must ship in the
+# repo, so re-include it explicitly past the `.claude/*` exclusion. Per-machine overrides live in
+# .claude/settings.local.json, which stays ignored by the `.claude/*` rule above.
+!.claude/settings.json
 # per-machine Skill state (team-cache, etc.) — never commit
 .claude/skills/**/.team-cache.json
 # skill-creator generated run artifacts (Python bytecode, packaged .skill files) — never commit

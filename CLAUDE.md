@@ -63,15 +63,15 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 
 ## AI Skills
 
-Three Claude Code Skills live at `.claude/skills/` and encode the team's check-in workflow. They fire on explicit slash invocation only (`disable-model-invocation: true`).
+Three Claude Code Skills live at `.claude/skills/` and encode the team's check-in workflow. `/commit` and `/pr` are invocable by slash command **or** natural language ("commit this", "open a PR") — on the natural-language path they confirm intent first unless `.claude/skip-nl-confirm-commit-pr.local` exists (the confirmation offers a "don't ask again" option that creates that per-machine opt-out file). `/ship` is explicit-only (`disable-model-invocation: true`): on ship/merge intent, ask the human to type `/ship` — never run or simulate the merge workflow yourself.
 
 - `/commit [issue-or-context]` — stage, run `npm test`, draft a Conventional Commit-style message, bundled human approval, push. See [.claude/skills/commit/SKILL.md](.claude/skills/commit/SKILL.md).
 - `/pr [PR#|URL|issue-or-context]` — fetch + rebase if main moved, push, open or update the PR. Does not watch CI. See [.claude/skills/pr/SKILL.md](.claude/skills/pr/SKILL.md).
 - `/ship [PR#|URL|issue-or-context]` — orchestrates `/pr` (which orchestrates `/commit`), waits for CI green, merges via `gh pr merge --merge --delete-branch`, watches `main` for 5 minutes post-merge. See [.claude/skills/ship/SKILL.md](.claude/skills/ship/SKILL.md).
 
-Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-ai-procedures.md).
+Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-ai-procedures.md); natural-language-invocation design: [docs/plan-skill-nl-invocation.md](docs/plan-skill-nl-invocation.md).
 
-A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the Skills above; model-invokable, unlike the three above), is vendored verbatim at `.claude/skills/skill-creator/`, pinned to an upstream commit. Check/refresh via `node scripts/update-skill-creator.mjs --check`. See [docs/doc-skill-creator.md](docs/doc-skill-creator.md).
+A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the Skills above; model-invokable like `/commit` and `/pr` — only `/ship` is explicit-only), is vendored verbatim at `.claude/skills/skill-creator/`, pinned to an upstream commit. Check/refresh via `node scripts/update-skill-creator.mjs --check`. See [docs/doc-skill-creator.md](docs/doc-skill-creator.md).
 
 ## Key docs
 

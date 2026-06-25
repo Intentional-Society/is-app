@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-25 | Ola | Admins can delete a member account
+
+Admins permanently delete a member from `/admin/members` (#185, #454): clear avatar → clear the redemption pair on invites the member redeemed → delete the profile (FK cascade drops memberships/relations/hints, null-sets invite `created_by`) → delete the auth user. Profile-first because `profiles → auth.users` is `ON DELETE NO ACTION`; `deleteUser` is idempotent on a 404. The redemption-pair clear is load-bearing: `redeemed_by` is `ON DELETE SET NULL` but `redeemed_at` has no FK, so the cascade alone violates `invites_redemption_pair` and no onboarded member is deletable (caught post-merge on #454). Guards mirror `setAdminStatus` — no self-delete (use deactivate), no deleting a fellow admin.
+
 ## 2026-06-22 | James | Cut avatar Storage egress: longer signed-URL TTL + high optimizer cache TTL
 
 Avatar signed URLs rotate a `?token=` that's part of next/image's optimizer cache key, and the optimizer's default `minimumCacheTTL` is 4h — so every avatar's 1024² source was re-fetched from Storage daily (rotation) and again every 4h (expiry), blowing the free-plan egress quota during the Convening. Fix: `SIGN_TTL_SECONDS` 24h → 5 days, and `images.minimumCacheTTL` → 31 days (safe — object paths are immutable). The durable fix (a tokenless proxy route) stays open as #382.
@@ -31,6 +35,10 @@ Root layout sets `title.template = "IS Web: %s"`. Per-page titles live in one `s
 ## 2026-06-17 | James | Avatar signing degrades instead of 500ing under Storage load
 
 A directory browse prefetched every member card, and each prefetch render made separate Supabase Storage call; that exhausted Storage's DB pool (429), which `resolveAvatarUrls` rethrew into a page 500. Signing is now best-effort — it logs `avatar sign failed` and falls back to initials — and member cards no longer prefetch. First test example of shipping an `urgentReleasedAt` update.
+
+## 2026-06-17 | Blake | /commit and /pr go natural-language; /ship stays slash-only with a harness merge gate
+
+The `/commit` and `/pr` Skills no longer set `disable-model-invocation` — saying "commit this" or "open a PR" now routes through the Skill, which confirms intent once (Step 0) unless you create the gitignored `.claude/skip-nl-confirm-commit-pr.local` (the prompt's "don't ask again" option makes it; delete it to re-enable). The **`/ship` Skill** is deliberately unchanged on that axis — it stays explicit-only (type `/ship`; it is *not* natural-language-invocable), now prints a required pre-merge narration line, and routes its merge through a new checked-in `.claude/settings.json` `ask` rule, so every `gh pr merge` (including the one `/ship` runs) prompts a human regardless of local `allow`/bypass settings. (#353; design in docs/plan-skill-nl-invocation.md)
 
 ## 2026-06-16 | James | Update handling for active sessions
 

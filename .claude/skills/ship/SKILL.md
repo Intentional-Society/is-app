@@ -26,7 +26,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
 2. **Parse arguments; resolve target PR.** If the argument names a different branch AND the current working tree is clean, `git switch <target-branch>`. If the current working tree is dirty, refuse with a clear suggestion (commit or stash). Do not auto-stash.
 
-3. **Working-tree pre-flight.** If dirty or on `main` with no PR for the current branch, delegate to `/pr` (which delegates to `/commit` per `/pr` step 4). When `/pr` returns with a PR URL, continue.
+3. **Working-tree pre-flight.** If dirty or on `main` with no PR for the current branch, delegate to `/pr` (which delegates to `/commit` per `/pr` step 4). **Immediately before invoking `/pr`, write the delegation marker `.claude/.nl-delegation-active` as `ship\t<current ISO-8601 UTC>`** so the delegated `/pr` (and, in turn, `/commit`) doesn't re-prompt for natural-language intent the human already gave by typing `/ship`. Each skill consumes the marker on read at its Step 0 (honoring it only if <30s old) and re-writes a fresh one before its own downstream delegation; **after `/pr` returns, delete the marker if it still exists** (cleanup). When `/pr` returns with a PR URL, continue.
 
 4. **Fetch — no shallow shortcuts.** `git fetch origin main`. Do not use shallow-fetch shortcuts (`--depth=1` etc.) for freshness checks — a shallow fetch breaks `git merge-base` and was the root cause of a recent expand-workflow bug ([PR #254](https://github.com/Intentional-Society/is-app/pull/254)).
 
@@ -61,13 +61,11 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
    - Vercel preview is skipped per `vercel.json`'s `ignoreCommand`, so no preview `deployment_status` event fires and preview `e2e.yml` does not run.
    - Treat the absent pre-merge advisory checks (E2E, anything else gated on the preview deploy) as **expected** per `docs/doc-github.md`'s docs-only rule. Proceed on required-green only — do not wait for advisories that the docs-only path skipped by design.
 
-10. **Merge confirmation policy.**
+10. **Merge confirmation policy.** The checked-in `.claude/settings.json` `ask` rule on `gh pr merge` (step 11) is the **sole** merge confirmation, in every case — whether `/ship` opened the PR during this run or the PR pre-existed. Do **not** add a separate conversational Y/n; the required one-line pre-merge narration (step 11) supplies the harness prompt's context. *(History: a path-dependent Y/n for the PR-created-this-run case was kept additively until the Thread-14 actual-`/ship`-path proof passed on 2026-06-24; removed here so the harness prompt is the one confirmation and that path no longer double-prompts. See `docs/plan-skill-nl-invocation.md`.)*
 
-    - **If `/ship` opened the PR during this same run** (via delegated `/pr` create at step 3), present a final Y/n merge confirmation.
-    - **If the PR pre-existed at `/ship` invocation**, the `/ship` invocation itself is the merge confirmation. Narrate the merge in one line and proceed without a second prompt.
+11. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — then run `gh pr merge <N> --merge --delete-branch`.
 
-11. **Merge.** `gh pr merge <N> --merge --delete-branch`.
-
+    - **Harness merge confirmation.** A checked-in `.claude/settings.json` `ask` rule on `Bash(gh pr merge *)` / `PowerShell(gh pr merge *)` makes the harness prompt a human to approve this exact command in every session — un-weakenable by a local `allow` or `bypassPermissions` (precedence is deny→ask→allow, first match). The required narration above gives that prompt context. This is the durable, model-proof merge confirmation. **Never add `allowed-tools: Bash(gh *)` (or any `gh` grant) to this Skill's frontmatter** — it would let the merge run without the human prompt and silently defeat this gate. **Note (#353):** this harness prompt is now the **sole** merge confirmation — step 10's conversational Y/n was removed (#353 fast-follow) after the Thread-14 actual-`/ship`-path proof passed (2026-06-24): the `ask` fired on the real `/ship` merge command, beat a local `allow`, and the human's decline left the PR unmerged. See `docs/plan-skill-nl-invocation.md`.
     - Do **not** pass `--merge-title` or `--body` flags. GitHub uses the PR title and body verbatim per the repo's `merge_commit_title: PR_TITLE` / `merge_commit_message: PR_BODY` settings; custom flags would override that and create inconsistent history.
     - Never `--admin`, `--auto`, force-merge, `--squash` (repo-disabled), or any branch-protection bypass.
 
@@ -112,6 +110,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `docs/strategy-branching.md` (rebase-when-main-moves rule; merge-commit default)
 - `docs/doc-github.md` (PR settings: merge-commit-only; `merge_commit_title`/`merge_commit_message`; `delete_branch_on_merge: true`; `prod-db` environment + required-reviewers gate; docs-only check semantics)
 - `docs/strategy-project-management.md` (PR-merged → board "Done" automation)
+- `.claude/settings.json` (checked-in `ask` rule on `gh pr merge` — the harness merge confirmation)
 - `vercel.json` (`ignoreCommand` for docs-only PRs; `drizzle-kit migrate` ahead of `next build` on production deploys)
 - `scripts/update-main-branch-protection.mjs` (required check name `Lint & Functional Tests`; `strict_required_status_checks_policy: true`)
 - `.github/workflows/ci.yml` (required check; `dorny/paths-filter` docs-only handling)

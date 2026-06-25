@@ -1,0 +1,5 @@
+{
+  "permissions": {
+    "ask": ["Bash(gh pr merge *)", "PowerShell(gh pr merge *)"]
+  }
+}

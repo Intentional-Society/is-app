@@ -27,7 +27,7 @@ import {
   revokeInvite,
   validateNote,
 } from "./invites";
-import { listActiveMemberEmails, listMembersAdmin, setAdminStatus } from "./members-admin";
+import { deleteMemberAccount, listActiveMemberEmails, listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
   deactivateProfile,
   getProfileForMember,
@@ -278,6 +278,18 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       return c.json({ ok: true });
     },
   )
+  .delete("/members/:id", async (c) => {
+    const id = c.req.param("id");
+    if (!isUuid(id)) return c.json({ error: "id must be a UUID" }, 400);
+    const user = c.get("user");
+    const result = await deleteMemberAccount(id, user.id);
+    if ("error" in result) {
+      if (result.error === "self_delete") return c.json({ error: "self_delete" }, 403);
+      if (result.error === "is_admin") return c.json({ error: "is_admin" }, 409);
+      return c.json({ error: "not_found" }, 404);
+    }
+    return c.json({ ok: true });
+  })
   .get("/invites", async (c) => {
     const invitesList = await listAllInvitesForAdmin();
     return c.json({ invites: invitesList });

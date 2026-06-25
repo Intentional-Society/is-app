@@ -1,7 +1,6 @@
 ---
 name: pr
-description: "[is-app] Open a new PR or update an existing PR for the current branch in the Intentional Society repo. Invoke explicitly as `/pr [PR#|URL|issue-or-context]`. Always fetches `origin/main` first, rebases if main has moved (re-running `npm test` after rebase), then pushes. On a fresh branch with no open PR, drafts a Conventional Commit-style title and structured body for human approval before `gh pr create`. On an existing PR, posts a brief per-commit summary comment and only updates the PR body on material scope change (with human approval, because the body becomes the merge commit message). Delegates dirty / on-main states to `/commit`. Refuses branch-switching — that's `/ship`'s job. Does not poll CI checks. Fires only on explicit `/pr` invocation."
-disable-model-invocation: true
+description: "[is-app] Open or update the PR for the current branch: fetch + rebase on main, re-test if rebased, drafted title/body with human approval. Delegates uncommitted changes to /commit; never switches branches or merges. Use for any PR intent — \"open a PR for this\", or `/pr #142`."
 ---
 
 # /pr
@@ -21,9 +20,17 @@ Argument resolution order:
 
 No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow; `/pr` stops after opening or updating the PR.
 
-Natural-language phrasings ("open the PR for this branch", "make a PR") are guidance, not triggers. With `disable-model-invocation: true`, this Skill fires only on explicit `/pr`.
+**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR"). On the natural-language path the model-invoked **Step 0** confirms intent first (see Steps); explicit `/pr` and delegated calls (`/ship` → `/pr`) skip it.
 
 ## Steps
+
+0. **NL intent gate (model-invoked only).** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
+
+   - **Verified slash entry** — a `<command-name>` tag for `/pr` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate).
+   - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 later.
+   - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
+
+   When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: *[detected context — echo any user guidance]*?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects). The standard note text and the intent-vs-content rationale are identical to `/commit`'s Step 0. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.
 
 1. **Check `gh` auth.** `gh auth status`. If it fails, refuse and print `gh auth login` as the suggested next command.
 
@@ -31,7 +38,7 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
 
 3. **Refuse to switch branches.** If the resolved PR is on a branch different from the current checkout, refuse — `/pr` does not switch branches. Name both branches and suggest `/ship <PR#>` (which is allowed to switch when the working tree is clean).
 
-4. **Working-tree pre-flight.** If `git status --porcelain` is non-empty OR HEAD is `main`, delegate to `/commit` with the same argument. When `/commit` returns, continue with this Skill from step 5.
+4. **Working-tree pre-flight.** If `git status --porcelain` is non-empty OR HEAD is `main`, delegate to `/commit` with the same argument. **Immediately before invoking `/commit`, write the delegation marker `.claude/.nl-delegation-active` as `pr\t<current ISO-8601 UTC>`** so `/commit`'s Step 0 doesn't re-prompt for intent the human already gave to `/pr`. `/commit` consumes it on read; **after `/commit` returns, delete the marker if it still exists** (belt-and-suspenders cleanup so a crashed delegation can't leave it behind). When `/commit` returns, continue with this Skill from step 5.
 
 5. **Fetch.** `git fetch origin main`.
 
@@ -43,7 +50,7 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
 
 9. **If no open PR for this branch — draft and create.**
 
-    Draft a PR title, body, and reviewer list for human approval, then run `gh pr create`.
+    Draft a PR title, body, and reviewer list for human approval, then run `gh pr create` (always assigning the PR to its opener — see **Assignee** below).
 
     **Title:** same Conventional Commit-style headline rule as `/commit`. `<type>[(scope)]: <imperative summary>`, ≤70 chars, including `!` for breaking changes. The title is durable: GitHub uses it verbatim as the merge commit subject (`merge_commit_title: PR_TITLE`).
 
@@ -109,17 +116,19 @@ Natural-language phrasings ("open the PR for this branch", "make a PR") are guid
     **Echo the resolution** as one line before `gh pr create`, so the human always sees what got resolved:
 
     ```text
-    → Requesting review from james-baker, benjifriedman. Proceeding.
+    → Assigning to <self>; requesting review from james-baker, benjifriedman. Proceeding.
     ```
 
-    Pass the resolved list to `gh pr create --reviewer <login1>,<login2>,...` (no `@` prefix, no spaces inside the `--reviewer` value); omit the flag entirely when the list is empty.
+    Pass the resolved list to `gh pr create --reviewer <login1>,<login2>,... --assignee @me` (no `@` prefix on reviewer logins, no spaces inside the `--reviewer` value); omit `--reviewer` when the list is empty, but **always keep `--assignee @me`**.
+
+    **Assignee — always assign the PR to its opener (you).** `gh pr create` leaves the Assignees field empty by default, so PRs end up owned by no one — the gap this fixes. Always pass `--assignee @me`; it resolves to the authenticated `gh` user running `/pr` (= `self` in the team cache) without a lookup. Unconditional, no picker needed: the opener is the person driving the PR (addressing review, shipping it). Distinct from reviewers — the reviewer list may be empty, the assignee never is. (If `/pr` runs on a branch authored by someone else, the executor is still the assignee: they're driving it now; the commit author field records original authorship.)
 
     **Failure handling.**
 
     - If the cache file is missing or unreadable, regenerate it via the cold-cache path above. If regeneration fails (network, rate limit, gh unauthenticated), fall back to a bare `Reviewers (comma-separated logins or blank):` prompt with no picker — the Skill still works, just less ergonomically.
     - If `gh pr create --reviewer` rejects a login (typo, no longer a collaborator), refresh the cache, surface the exact `gh` error + the refreshed picker, and re-ask. Don't retry blindly.
 
-    Present the full draft (title + body + reviewers) for human Y/n approval before `gh pr create`. On approval, run `gh pr create` with `--reviewer` when the list is non-empty.
+    Present the full draft (title + body + reviewers) for human Y/n approval before `gh pr create`. On approval, run `gh pr create` with `--assignee @me` always, plus `--reviewer` when the reviewer list is non-empty.
 
 10. **If an open PR for this branch exists — comment-by-default, body-update only on material scope change.**
 
