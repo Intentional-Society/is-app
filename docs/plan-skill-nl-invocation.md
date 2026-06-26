@@ -15,6 +15,8 @@ Y/n was deleted in the #353 fast-follow (see §2 + Decision log). Supersedes the
 this PR** (#353): `/commit` + `/pr` Step 0 + delegation marker, `/ship` ask-gate + required
 pre-merge narration (Y/n retained additively in #353; deleted in the #353 fast-follow after the Thread-14 proof passed 2026-06-24 — see §2 + Decision log), docs v1.1 sweep, and the
 four NL-routing evals. Review record: `.scratch/skill-nl-invocation-review-roundtable.md`.
+
+> **⚠️ Update 2026-06-26 (Thread 15 — RESOLVED).** The "Thread-14 proof passed → Y/n deleted → harness `ask` is the sole/durable confirmation" framing here is **incomplete**: that proof ran one merge per fresh session and never tested a **2nd same-session merge**. A later silent merge (PR #460) triggered a re-test (Thread 15): in **default** mode the `ask` **does** fire per-merge (verified 2026-06-26), but `auto` mode auto-approves it and "don't ask again" silences it for the session — **#460 was an auto-mode session, not a gate defect.** **Decision (Blake): keep #459 (no Y/n); the default-mode `ask` is sufficient for normal use; document the caveat.** So the `ask` is the confirmation **under default mode**, not an absolute gate. Full record: **#463** (with the precise Y/n-restore recipe) and `.scratch/skill-nl-invocation-review-roundtable.md` Thread 15.
 **Tracking issue:** #353 ("Allow 0-to-3 skills to be model-invoked") — the implementation PR
 `Closes #353`.
 **Relevant files:** `.claude/skills/{commit,pr,ship}/SKILL.md`, `CLAUDE.md`, `.gitignore`,
