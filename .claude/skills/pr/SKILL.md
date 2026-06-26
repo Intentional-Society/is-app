@@ -20,11 +20,15 @@ Argument resolution order:
 
 No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow; `/pr` stops after opening or updating the PR.
 
-**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR"). On the natural-language path the model-invoked **Step 0** confirms intent first (see Steps); explicit `/pr` and delegated calls (`/ship` → `/pr`) skip it.
+**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR") — **including when *you* offered to open a PR and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the PR with ad-hoc `git`/`gh` commands. On **every** model-invoked (natural-language) run, **announce `Using /pr` as your first line** (Step 0) so the human can see the Skill fired. On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/pr` and delegated calls (`/ship` → `/pr`) skip the *confirmation*, but the announcement still applies to any model-invoked run.
 
 ## Steps
 
-0. **NL intent gate (model-invoked only).** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
+0. **Announce + NL intent gate (model-invoked only).**
+
+   **Announcement — always, on every model-invoked run.** When this Skill is invoked via the `Skill` tool (the natural-language / model-invoked path — a typed `/pr` does not go through the `Skill` tool), the **first visible line of your response must be `Using /pr`.** This is unconditional on the model-invoked path: the opt-out file and the delegation marker below suppress only the *confirmation*, never this announcement. It lets the human always tell the Skill fired — and an ad-hoc `gh pr create` can't honestly print it, so it doubles as the forcing function that keeps this flow inside the Skill.
+
+   **Intent gate.** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
 
    - **Verified slash entry** — a `<command-name>` tag for `/pr` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate).
    - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 later.

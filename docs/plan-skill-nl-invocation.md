@@ -17,6 +17,9 @@ pre-merge narration (Y/n retained additively in #353; deleted in the #353 fast-f
 four NL-routing evals. Review record: `.scratch/skill-nl-invocation-review-roundtable.md`.
 
 > **⚠️ Update 2026-06-26 (Thread 15 — RESOLVED).** The "Thread-14 proof passed → Y/n deleted → harness `ask` is the sole/durable confirmation" framing here is **incomplete**: that proof ran one merge per fresh session and never tested a **2nd same-session merge**. A later silent merge (PR #460) triggered a re-test (Thread 15): in **default** mode the `ask` **does** fire per-merge (verified 2026-06-26), but `auto` mode auto-approves it and "don't ask again" silences it for the session — **#460 was an auto-mode session, not a gate defect.** **Decision (Blake): keep #459 (no Y/n); the default-mode `ask` is sufficient for normal use; document the caveat.** So the `ask` is the confirmation **under default mode**, not an absolute gate. Full record: **#463** (with the precise Y/n-restore recipe) and `.scratch/skill-nl-invocation-review-roundtable.md` Thread 15.
+
+> **⚠️ Update 2026-06-25 (Thread 16 — announcement + affirmation routing).** Two natural-language-path gaps surfaced in use (the latter observed on the #459 commit): **(a) routing** — when the *assistant* offers to commit/PR and the human replies a bare "yes"/"go ahead", the model can read it as approval of its *own* ad-hoc plan and run `git`/`gh` directly instead of routing through the Skill; the trigger phrase came from the assistant, not the human, so the affirmation gets disconnected from it. **(b) observability** — even when the Skill does fire, nothing visibly says so (Step 0's confirmation is suppressed by the opt-out file, by delegation, and on the slash path), so the human can't tell the Skill ran vs. a hand-rolled commit. **Fix (model-level, same tier as the existing gates — no harness change):** the routing rule now explicitly covers "assistant offered → human affirmed" (CLAUDE.md + both SKILL.md "Invocation paths" + spec §2 constraint), and every model-invoked `/commit` / `/pr` run must announce `Using /commit` / `Using /pr` as its **first line** — **unconditional on the NL path, not silenced by the opt-out file or the delegation marker** (those suppress only Step 0's *confirmation*). The announcement doubles as a forcing function: an ad-hoc commit can't honestly print it. Evals: commit-4/pr-8 now assert the announcement; commit-6/pr-9 assert affirmation-after-offer routing; commit-5(c) asserts the announcement survives the opt-out. Net eval counts: commit 5→6, pr 8→9 (still ≥3/skill for #396 Plan PR 2). A Skill-tool `PreToolUse` hook remains the deferred hardening if drift recurs.
+
 **Tracking issue:** #353 ("Allow 0-to-3 skills to be model-invoked") — the implementation PR
 `Closes #353`.
 **Relevant files:** `.claude/skills/{commit,pr,ship}/SKILL.md`, `CLAUDE.md`, `.gitignore`,
@@ -326,6 +329,12 @@ git restore README.md && git switch main && git branch -D test/nl-checklist
 7. **Delegation doesn't double-prompt (Thread 1).** Typed `/pr` on a dirty tree → `/pr` delegates
    to `/commit` and `/commit` does **not** fire Step 0 (the single-use marker is consumed); then a
    fresh standalone NL "commit this" **does** fire Step 0 (no stale marker). Stop at each.
+8. **Affirmation-after-offer routes + announces (Thread 16).** In a fresh session the assistant
+   offers ("Want me to commit this?") and the human replies only "yes" → the assistant invokes
+   `/commit` **via the Skill tool** (not an ad-hoc `git commit`), its **first line is `Using
+   /commit`**, then Step 0 fires. Repeat with "open a PR?" → "yes" → `/pr`, first line `Using /pr`.
+   With the opt-out file present, the `Using /…` line **still appears** even though Step 0's
+   confirmation is skipped (the announcement is not gated by the opt-out). Stop at Step 0 each time.
 
 **Thread 14 — `/ship` ask-path proof (GATES the Y/n deletion; disposable tree, peer-verified).**
 Forge runs this in the impl PR against a throwaway PR; a peer reviewer (Quill/Margo) independently
@@ -532,5 +541,16 @@ answers James's #353 concern that a confirmation prompt would be cumbersome in 9
   the proof ran against the real merge (not a throwaway PR), and the Y/n deletion shipped as a
   **fast-follow PR** rather than the same PR. Mitigation fallback not needed. Evidence:
   `.scratch/ship-proof-results.md`; roundtable Thread 14 → ✅ RESOLVED.
+- 2026-06-25 (Thread 16 — announcement + affirmation routing — Blake) — fixed the "assistant
+  offers → human says 'yes' → Skill may not fire, or fires invisibly" gap (observed on the #459
+  commit). Added an explicit "a bare affirmation of the assistant's own offer is the trigger; route
+  through the Skill tool, never ad-hoc git/gh" routing rule to CLAUDE.md + both SKILL.md "Invocation
+  paths" + spec §2, and a required `Using /commit` / `Using /pr` first-line announcement on every
+  model-invoked run — **unconditional on the NL path** (the opt-out file and delegation marker
+  suppress only Step 0's confirmation, never the announcement; the announcement is also the forcing
+  function that keeps the flow inside the Skill, since an ad-hoc commit can't honestly print it).
+  Evals updated: commit-4, commit-5(c), commit-6 (new), pr-8, pr-9 (new). Net counts commit 5→6,
+  pr 8→9 (≥3/skill for #396 Plan PR 2). Model-level, no harness change; a Skill-tool `PreToolUse`
+  hook stays the deferred hardening if drift recurs.
 - Prior context: PRs #304/#305 shipped the Skills; explicit-only invocation was P0.4 from
   PR #133 — this spec is a deliberate, dated revision of it.
