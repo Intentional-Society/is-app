@@ -130,6 +130,8 @@ the post-NL repo state, which is now live. **Verified post-NL state (don't re-de
 ## PR 2 — Deterministic structural gate
 
 > Tracked in #396. Reference that issue in the PR body.
+> **Prerequisite:** `skill-nl-announce-affirmation` must be merged first — it edits `/commit`
+> and `/pr` SKILL.md, which this gate reads. Check `gh pr list` before branching.
 
 A Vitest test in the existing functional suite (so it reports through the already-required
 `Lint & Functional Tests` check — no new workflow, no Python, no secrets). Scoped to an explicit
@@ -150,14 +152,13 @@ skill contract. Assertions, each traceable to `docs/spec-portable-ai-procedures.
 Deliberately *not* asserted (judgment/LLM territory, per spec L115): description quality,
 `## Depends on` accuracy, "passes its eval set", self-hosting, eval realism.
 
-## PR 3 — Light drift detection + local eval surfacing
+## PR 3 — Local eval surfacing in `/commit`
 
 > Tracked in #396. Reference that issue in the PR body.
+> **Scope decision (2026-06-26):** The drift-detection workflow (`.github/workflows/skill-creator-drift.yml`)
+> is deferred — low ROI for a small team; `node scripts/update-skill-creator.mjs --check` runs
+> manually when needed. PR 3 is the `/commit` surfacing edit only.
 
-- `.github/workflows/skill-creator-drift.yml`: **weekly** schedule (matches the Dependabot
-  rhythm) + `workflow_dispatch`. Runs `node scripts/update-skill-creator.mjs --check`; on
-  non-zero, opens **or updates** a single tracking issue with the compare URL and the refresh
-  command. Default `GITHUB_TOKEN` suffices (issues only — no PR, no token gymnastics).
 - `/commit` SKILL.md: when the staged payload touches `.claude/skills/skill-creator/**`, surface
   in the approval block: "skill-creator changed — run the `evals/skill-creator.evals.json`
   acceptance evals and capture results in the Test Plan." Same pattern as the existing
@@ -238,9 +239,11 @@ unverified — spike before committing to this PR.
 
 ## Decision log
 
+- 2026-06-26 — Blake: Thread 15 resolved — two-merge same-session test (default mode) showed
+  harness `ask` fires per-merge; #460 was `auto` mode. Y/n stays deleted (#459 stands). PR 3
+  drift workflow deferred (low ROI for small team); PR 3 = `/commit` surfacing edit only.
 - 2026-06-24 — Blake: NL-invocation prereq satisfied (#353/#433/#459/#460); PRs 2–3 unblocked.
-  Post-NL state verified (see Sequencing note). Thread 15 (harness ask per-session issue) is a
-  separate follow-up; does not block #396 work.
+  Post-NL state verified (see Sequencing note).
 - 2026-06-12 — Blake: NL-invocation revision is implemented between PR 1 and PR 2; PRs 2–3
   target the post-NL repo state (see Sequencing note).
 - 2026-06-12 — Blake: vendor over submodule/subtree/plugin; vendor-first sequencing (evals with
