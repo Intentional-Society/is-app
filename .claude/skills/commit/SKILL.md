@@ -19,13 +19,17 @@ The leaf Skill in the commit → PR → ship chain. `/commit` is the only place 
 
 Cache the argument for `/pr` and `/ship` in this session so chained invocations reuse the same context.
 
-**Invocation paths.** This Skill fires on an explicit `/commit` **and** on natural-language commit intent ("commit this", "commit these changes in two commits: X then Y"). On the natural-language path the model-invoked **Step 0** confirms intent first (see Steps); explicit `/commit` and delegated calls skip it.
+**Invocation paths.** This Skill fires on an explicit `/commit` **and** on natural-language commit intent ("commit this", "commit these changes in two commits: X then Y") — **including when *you* offered to commit and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the commit with ad-hoc `git` commands. On **every** model-invoked (natural-language) run, **announce `Using /commit` as your first line** (Step 0) so the human can see the Skill fired. On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/commit` and delegated calls skip the *confirmation*, but the announcement still applies to any model-invoked run.
 
 ## Steps
 
 Run these in order. Each step's failure mode is in the Failure modes section below.
 
-0. **NL intent gate (model-invoked only).** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
+0. **Announce + NL intent gate (model-invoked only).**
+
+   **Announcement — always, on every model-invoked run.** When this Skill is invoked via the `Skill` tool (the natural-language / model-invoked path — a typed `/commit` does not go through the `Skill` tool), the **first visible line of your response must be `Using /commit`.** This is unconditional on the model-invoked path: the opt-out file and the delegation marker below suppress only the *confirmation*, never this announcement. It lets the human always tell the Skill fired — and an ad-hoc `git commit` can't honestly print it, so it doubles as the forcing function that keeps this flow inside the Skill.
+
+   **Intent gate.** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
 
    - **Verified slash entry** — a `<command-name>` tag for `/commit` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate — a redundant confirm is harmless, a missed one isn't).
    - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/pr` or `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 on a later standalone run.

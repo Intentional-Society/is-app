@@ -32,14 +32,21 @@
           "eval_name": "nl-commit-intent-routes-through-skill-with-step-0",
           "prompt": "let's commit this",
           "preconditions": "Dirty feature branch (not main) with a few related edits; no .env or generated artifacts; gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local` opt-out file; not a delegated call (no `.claude/.nl-delegation-active` marker); invoked by natural language (model/Skill-tool invocation, not a typed `/commit`).",
-          "expected_output": "The /commit Skill is invoked (the model routes the NL intent through the Skill rather than running an ad-hoc git sequence). Its FIRST action is the Step 0 intent gate via AskUserQuestion (\"Run /commit with: <detected context>?\") — no `gh auth`, no `git` commands run before it. Choosing Stop ends with zero side effects (no branch created, nothing staged, `git status` unchanged). Choosing Proceed continues into step 1 onward."
+          "expected_output": "The /commit Skill is invoked (the model routes the NL intent through the Skill rather than running an ad-hoc git sequence). Its first visible line is the announcement `Using /commit`. Its first ACTION (after that line) is the Step 0 intent gate via AskUserQuestion (\"Run /commit with: <detected context>?\") — no `gh auth`, no `git` commands run before it. Choosing Stop ends with zero side effects (no branch created, nothing staged, `git status` unchanged). Choosing Proceed continues into step 1 onward."
         },
         {
           "id": "commit-5-nl-step-0-skip-conditions",
           "eval_name": "step-0-skips-on-slash-delegation-and-opt-out",
           "prompt": "(three sub-scenarios — see preconditions)",
           "preconditions": "Dirty feature branch; gh authenticated. Three sub-scenarios:\n  (a) Explicit slash: the human types `/commit` (a `<command-name>` tag is present in the turn).\n  (b) Delegation: `/pr` (or `/ship`->`/pr`) delegated here and created `.claude/.nl-delegation-active` immediately before the call.\n  (c) Opt-out: `.claude/skip-nl-confirm-commit-pr.local` exists; invoked by natural language.",
-          "expected_output": "In all three sub-scenarios the Step 0 intent confirmation does NOT fire and the Skill begins at step 1. In (b) the Skill deletes `.claude/.nl-delegation-active` on read (clear-on-read) so it cannot leak into a later standalone NL invocation. In (c) the opt-out file is left untouched. Control: a natural-language invocation with none of these conditions present DOES fire Step 0 (covered by commit-4)."
+          "expected_output": "In all three sub-scenarios the Step 0 intent confirmation does NOT fire and the Skill begins at step 1. In (b) the Skill deletes `.claude/.nl-delegation-active` on read (clear-on-read) so it cannot leak into a later standalone NL invocation. In (c) the opt-out file is left untouched. The announcement is NOT gated like the confirmation: in both model-invoked sub-scenarios ((b) delegation and (c) opt-out — both reached via the Skill tool) the first visible line is still `Using /commit`, because the opt-out file and delegation marker suppress only the Step 0 confirmation, never the announcement; in (a), the typed-slash path, no announcement is required. Control: a natural-language invocation with none of these conditions present DOES fire Step 0 (covered by commit-4)."
+        },
+        {
+          "id": "commit-6-nl-affirmation-after-offer-routes-and-announces",
+          "eval_name": "assistant-offer-then-human-yes-routes-through-skill-and-announces",
+          "prompt": "(assistant turn) \"Want me to commit this?\" then (human turn) \"yes, go ahead\"",
+          "preconditions": "Mid-conversation: the assistant has just finished a change and offered to commit it; the human replies only with a bare affirmation (\"yes\" / \"go ahead\" / \"do it\") and does NOT repeat the word \"commit\". Dirty feature branch (not main); gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local`; no `.claude/.nl-delegation-active` marker.",
+          "expected_output": "The bare affirmation is treated as the commit trigger: the model invokes the /commit Skill via the Skill tool and does NOT hand-roll the commit with an ad-hoc `git add`/`git commit`/`git push` sequence. The first visible line is the announcement `Using /commit`, followed by the Step 0 intent gate. This guards the reported failure mode — the model reading a bare \"yes\" to its own offer as approval of an ad-hoc plan and committing directly, with no visible sign the Skill ran."
         }
       ]
     },
@@ -102,7 +109,14 @@
           "eval_name": "nl-pr-intent-routes-through-skill-with-step-0",
           "prompt": "open a PR for this branch",
           "preconditions": "On a feature branch with commits to push and no open PR; tree may be clean or dirty; gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local` opt-out file; not a delegated call (no `.claude/.nl-delegation-active` marker); invoked by natural language (Skill-tool invocation, not a typed `/pr`).",
-          "expected_output": "The /pr Skill is invoked (NL intent routed through the Skill). Its FIRST action is the Step 0 intent gate via AskUserQuestion (\"Open a PR with: <detected context>?\") — no `gh auth`, no `git fetch`/`push`, no `gh pr create` before it. Choosing Stop ends cleanly with zero side effects (no push, no PR created). Choosing Proceed continues into step 1 onward."
+          "expected_output": "The /pr Skill is invoked (NL intent routed through the Skill). Its first visible line is the announcement `Using /pr`. Its first ACTION (after that line) is the Step 0 intent gate via AskUserQuestion (\"Open a PR with: <detected context>?\") — no `gh auth`, no `git fetch`/`push`, no `gh pr create` before it. Choosing Stop ends cleanly with zero side effects (no push, no PR created). Choosing Proceed continues into step 1 onward."
+        },
+        {
+          "id": "pr-9-nl-affirmation-after-offer-routes-and-announces",
+          "eval_name": "assistant-offer-then-human-yes-routes-through-skill-and-announces",
+          "prompt": "(assistant turn) \"Want me to open a PR for this?\" then (human turn) \"yes\"",
+          "preconditions": "Mid-conversation: the assistant has just pushed commits and offered to open a PR; the human replies only with a bare affirmation (\"yes\" / \"go ahead\") and does NOT repeat \"PR\". On a feature branch with commits and no open PR; gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local`; no `.claude/.nl-delegation-active` marker.",
+          "expected_output": "The bare affirmation is treated as the PR trigger: the model invokes the /pr Skill via the Skill tool and does NOT hand-roll the PR with an ad-hoc `git push` + `gh pr create`. The first visible line is the announcement `Using /pr`, followed by the Step 0 intent gate. Guards against the model reading a bare \"yes\" to its own offer as approval of an ad-hoc plan and opening the PR directly, with no visible sign the Skill ran."
         }
       ]
     },

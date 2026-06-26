@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-26 | Blake | /commit and /pr announce "Using /…" on NL runs and catch bare-"yes" affirmations
+
+Every natural-language `/commit` / `/pr` run now prints `Using /commit` / `Using /pr` as its first line, and a bare "yes"/"go ahead" to the assistant's *own* commit/PR offer is treated as a trigger that routes through the Skill rather than an ad-hoc git/gh sequence. The announcement is unconditional on the NL path — the opt-out file and delegation marker still silence only Step 0's confirmation, never the announcement (Thread 16; follow-on to the 2026-06-17 NL-invocation entry).
+
 ## 2026-06-25 | Ola | Admins can delete a member account
 
 Admins permanently delete a member from `/admin/members` (#185, #454): clear avatar → clear the redemption pair on invites the member redeemed → delete the profile (FK cascade drops memberships/relations/hints, null-sets invite `created_by`) → delete the auth user. Profile-first because `profiles → auth.users` is `ON DELETE NO ACTION`; `deleteUser` is idempotent on a 404. The redemption-pair clear is load-bearing: `redeemed_by` is `ON DELETE SET NULL` but `redeemed_at` has no FK, so the cascade alone violates `invites_redemption_pair` and no onboarded member is deletable (caught post-merge on #454). Guards mirror `setAdminStatus` — no self-delete (use deactivate), no deleting a fellow admin.
