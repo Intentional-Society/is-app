@@ -18,7 +18,7 @@ four NL-routing evals. Review record: `.scratch/skill-nl-invocation-review-round
 
 > **⚠️ Update 2026-06-26 (Thread 15 — RESOLVED).** The "Thread-14 proof passed → Y/n deleted → harness `ask` is the sole/durable confirmation" framing here is **incomplete**: that proof ran one merge per fresh session and never tested a **2nd same-session merge**. A later silent merge (PR #460) triggered a re-test (Thread 15): in **default** mode the `ask` **does** fire per-merge (verified 2026-06-26), but `auto` mode auto-approves it and "don't ask again" silences it for the session — **#460 was an auto-mode session, not a gate defect.** **Decision (Blake): keep #459 (no Y/n); the default-mode `ask` is sufficient for normal use; document the caveat.** So the `ask` is the confirmation **under default mode**, not an absolute gate. Full record: **#463** (with the precise Y/n-restore recipe) and `.scratch/skill-nl-invocation-review-roundtable.md` Thread 15.
 
-> **⚠️ Update 2026-06-25 (Thread 16 — announcement + affirmation routing).** Two natural-language-path gaps surfaced in use (the latter observed on the #459 commit): **(a) routing** — when the *assistant* offers to commit/PR and the human replies a bare "yes"/"go ahead", the model can read it as approval of its *own* ad-hoc plan and run `git`/`gh` directly instead of routing through the Skill; the trigger phrase came from the assistant, not the human, so the affirmation gets disconnected from it. **(b) observability** — even when the Skill does fire, nothing visibly says so (Step 0's confirmation is suppressed by the opt-out file, by delegation, and on the slash path), so the human can't tell the Skill ran vs. a hand-rolled commit. **Fix (model-level, same tier as the existing gates — no harness change):** the routing rule now explicitly covers "assistant offered → human affirmed" (CLAUDE.md + both SKILL.md "Invocation paths" + spec §2 constraint), and every model-invoked `/commit` / `/pr` run must announce `Using /commit` / `Using /pr` as its **first line** — **unconditional on the NL path, not silenced by the opt-out file or the delegation marker** (those suppress only Step 0's *confirmation*). The announcement doubles as a forcing function: an ad-hoc commit can't honestly print it. Evals: commit-4/pr-8 now assert the announcement; commit-6/pr-9 assert affirmation-after-offer routing; commit-5(c) asserts the announcement survives the opt-out. Net eval counts: commit 5→6, pr 8→9 (still ≥3/skill for #396 Plan PR 2). A Skill-tool `PreToolUse` hook remains the deferred hardening if drift recurs.
+> **⚠️ Update 2026-06-25 (Thread 16 — announcement + affirmation routing).** Two natural-language-path gaps surfaced in use (the latter observed on the #459 commit): **(a) routing** — when the *assistant* offers to commit/PR and the human replies a bare "yes"/"go ahead", the model can read it as approval of its *own* ad-hoc plan and run `git`/`gh` directly instead of routing through the Skill; the trigger phrase came from the assistant, not the human, so the affirmation gets disconnected from it. **(b) observability** — even when the Skill does fire, nothing visibly says so (Step 0's confirmation is suppressed by the opt-out file, by delegation, and on the slash path), so the human can't tell the Skill ran vs. a hand-rolled commit. **Fix (model-level, same tier as the existing gates — no harness change):** the routing rule now explicitly covers "assistant offered → human affirmed" (CLAUDE.md + both SKILL.md "Invocation paths" + spec §2 constraint), and every model-invoked `/commit` / `/pr` run must announce `Using /commit` / `Using /pr` as its **first line** — **unconditional on the NL path, not silenced by the opt-out file or the delegation marker** (those suppress only Step 0's *confirmation*). The announcement doubles as a forcing function: an ad-hoc commit can't honestly print it. Evals: commit-4/pr-8 now assert the announcement; commit-6/pr-9 assert affirmation-after-offer routing; commit-5(c) asserts the announcement survives the opt-out; commit-7 is the over-trigger negative control (a bare "yes" to a *non-commit* offer must NOT fire `/commit`). Net eval counts: commit 5→7, pr 8→9 (still ≥3/skill for #396 Plan PR 2). The verification checklist gains scenarios 8 (affirmation routes + announces) and 9 (over-trigger guard), and its fixture now uses a bespoke disposable file instead of editing README. A Skill-tool `PreToolUse` hook remains the deferred hardening if drift recurs.
 
 **Tracking issue:** #353 ("Allow 0-to-3 skills to be model-invoked") — the implementation PR
 `Closes #353`.
@@ -26,6 +26,54 @@ four NL-routing evals. Review record: `.scratch/skill-nl-invocation-review-round
 `.claude/settings.json` (new), `evals/evals.json`, `docs/strategy-committing.md`,
 `docs/strategy-security.md`, `docs/spec-portable-ai-procedures.md`. Per-machine opt-out marker
 (gitignored, never committed): `.claude/skip-nl-confirm-commit-pr.local`.
+
+---
+
+## 🧭 Pick-up guide — Thread 16, active until merged (delete this section on merge)
+
+**Single artifact for resuming this work in a fresh session.** If you're a new agent/teammate
+taking this over, read this section top-to-bottom; it links everything else you need.
+
+**What the change is.** Every natural-language `/commit` / `/pr` run now announces `Using /commit`
+/ `Using /pr` as its **first line**, and a bare "yes"/"go ahead" to the assistant's *own* commit/PR
+offer is a trigger that must route through the Skill tool (never ad-hoc `git`/`gh`) — scoped so it
+does **not** over-trigger on a "yes" to an unrelated offer (a refactor, rename, search). **Why:** a
+bare affirmation of the assistant's own offer used to get disconnected from the original request, so
+the Skill might not fire (an ad-hoc commit bypassing the guardrails) or fire invisibly (you couldn't
+tell) — the #459 commit incident. Full rationale: the Thread 16 ⚠️ note above.
+
+**Where it lives.** Branch **`skill-nl-announce-affirmation`**. Commit **`ba9dc59`** (core change:
+announcement + affirmation routing + docs/evals) **+ one follow-up commit** (the `commit-7`
+over-trigger eval, the README→disposable-fixture recipe refactor, the over-trigger *scope* clauses,
+and this guide). **No PR opened yet.**
+
+**Change surface (what to read to understand the behavior):** `CLAUDE.md` "AI Skills";
+`.claude/skills/commit/SKILL.md` + `.claude/skills/pr/SKILL.md` ("Invocation paths" + Step 0
+announcement + the over-trigger scope clause); `docs/spec-portable-ai-procedures.md` §2 constraint;
+`docs/strategy-committing.md` "How to invoke"; `evals/evals.json` (`commit-4..7`, `pr-8`, `pr-9`);
+this doc (Thread 16 note + the **Verification checklist** below).
+
+**Remaining actions until merge (in order):**
+
+1. **Run the Verification checklist below** — the cold-session recipe (scenarios 1–9). These are
+   *behavioral* checks a model-level guardrail needs; they can't be self-verified by the agent that
+   wrote the change. **Fresh session per scenario, no priming.** Priorities: scenario 8
+   (affirmation-after-offer routes + announces) run **~3× cold**; scenario 4 (announcement survives
+   the opt-out); scenario 6 (slash path: no announcement/Step 0); scenario 5 (`/ship` stays gated);
+   scenario 9 (over-trigger guard). Use the disposable fixture in the checklist's **Fixture** block
+   (`_nl_routing_fixture.md` on a throwaway `test/nl-checklist` branch — **never** edit README; safe
+   even if interrupted). **Stop at Step 0** so nothing commits. Already green (structural, captured
+   in `ba9dc59`): `npm test`, Biome, JSON/eval-counts.
+2. **Reviewer independently re-runs one scenario** before approval — the standing backstop (the
+   Test Plan rule is itself a model-level guardrail, so one outside observation is the real check).
+3. **`/pr`** to open the PR (drafts title/body, assigns `@me`, reviewer picker; stops before merge).
+4. **`/ship`** to merge (explicit-only; the harness merge gate confirms in default permission mode).
+
+**Conservative duration:** recipe **~25–45 min** minimal / **~40–70 min** thorough; reviewer
+re-run **~5–10 min**.
+
+**Fixture-design rationale** (why a bespoke disposable file beats modify-and-revert of README, and
+why a disposable worktree beats both): `.scratch/note-throwaway-test-fixtures.md` (gitignored).
 
 ---
 
@@ -299,14 +347,18 @@ scenario's observed outcome (provenance rules apply), **and the human reviewer r
 scenario of their choice before approving** — that single independent observation is the actual
 backstop, since the Test Plan rule is itself a model-level guardrail.
 
-**Fixture (copy-paste; the dirtied file must be tracked — `.scratch/` is gitignored and won't
-show as a change):**
+**Fixture (copy-paste; uses a bespoke disposable file — never a real doc like README. A
+botched or forgotten cleanup then leaves obvious junk rather than a silent edit to a meaningful
+file, there is no `git restore` collateral on unrelated edits, and the whole `test/nl-checklist`
+branch is thrown away at the end so even a stray commit is contained. The file is untracked but
+*not* gitignored, so it shows in `git status --short` as a payload — unlike a `.scratch/` file,
+which is ignored and wouldn't):**
 
 ```
-git switch -c test/nl-checklist
-echo "" >> README.md
-# ...scenarios 1–4, fresh session each...
-git restore README.md && git switch main && git branch -D test/nl-checklist
+git switch -c test/nl-checklist        # branch from the code under test: main post-merge; the feature branch pre-merge
+echo "throwaway nl-routing fixture" > _nl_routing_fixture.md   # untracked, not ignored → shows as a payload
+# ...scenarios below, fresh session each; STOP at Step 0 so nothing is staged or committed...
+rm -f _nl_routing_fixture.md && git switch - && git branch -D test/nl-checklist
 ```
 
 1. **NL commit routes + confirms.** "let's commit this" → `/commit` loads via the Skill tool;
@@ -335,6 +387,12 @@ git restore README.md && git switch main && git branch -D test/nl-checklist
    /commit`**, then Step 0 fires. Repeat with "open a PR?" → "yes" → `/pr`, first line `Using /pr`.
    With the opt-out file present, the `Using /…` line **still appears** even though Step 0's
    confirmation is skipped (the announcement is not gated by the opt-out). Stop at Step 0 each time.
+9. **Over-trigger guard (Thread 16; negative control for scenario 8).** In a fresh session the
+   assistant offers a **non-commit** action ("Want me to refactor that helper while I'm in here?")
+   and the human replies only "yes" → the assistant does (or clarifies the scope of) the refactor
+   and **does NOT** fire `/commit`: no `Using /commit`, no `Skill(commit)`, no Step 0, no staging.
+   Confirms the affirmation-is-the-trigger rule fires only on the assistant's own **commit/PR**
+   offers, not on affirmations of unrelated offers.
 
 **Thread 14 — `/ship` ask-path proof (GATES the Y/n deletion; disposable tree, peer-verified).**
 Forge runs this in the impl PR against a throwaway PR; a peer reviewer (Quill/Margo) independently
@@ -552,5 +610,13 @@ answers James's #353 concern that a confirmation prompt would be cumbersome in 9
   Evals updated: commit-4, commit-5(c), commit-6 (new), pr-8, pr-9 (new). Net counts commit 5→6,
   pr 8→9 (≥3/skill for #396 Plan PR 2). Model-level, no harness change; a Skill-tool `PreToolUse`
   hook stays the deferred hardening if drift recurs.
+- 2026-06-26 (Thread 16 follow-up — over-trigger control + fixture hardening — Blake) — added
+  `commit-7` (negative control: a bare "yes" to a *non-commit* assistant offer must NOT fire
+  `/commit`, guarding commit-6 against over-triggering) and checklist scenario 9 to match. Net
+  count commit 6→7. Also refactored the verification-checklist fixture off README-modify-and-revert
+  onto a bespoke disposable file (`_nl_routing_fixture.md`, untracked but not gitignored, on a
+  throwaway `test/nl-checklist` branch) — smaller blast radius, no `git restore` collateral, and a
+  missed cleanup leaves obvious junk instead of a silent edit to a real doc. Rationale in
+  `.scratch/note-throwaway-test-fixtures.md`.
 - Prior context: PRs #304/#305 shipped the Skills; explicit-only invocation was P0.4 from
   PR #133 — this spec is a deliberate, dated revision of it.
