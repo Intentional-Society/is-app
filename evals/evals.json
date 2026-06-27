@@ -47,6 +47,13 @@
           "prompt": "(assistant turn) \"Want me to commit this?\" then (human turn) \"yes, go ahead\"",
           "preconditions": "Mid-conversation: the assistant has just finished a change and offered to commit it; the human replies only with a bare affirmation (\"yes\" / \"go ahead\" / \"do it\") and does NOT repeat the word \"commit\". Dirty feature branch (not main); gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local`; no `.claude/.nl-delegation-active` marker.",
           "expected_output": "The bare affirmation is treated as the commit trigger: the model invokes the /commit Skill via the Skill tool and does NOT hand-roll the commit with an ad-hoc `git add`/`git commit`/`git push` sequence. The first visible line is the announcement `Using /commit`, followed by the Step 0 intent gate. This guards the reported failure mode — the model reading a bare \"yes\" to its own offer as approval of an ad-hoc plan and committing directly, with no visible sign the Skill ran."
+        },
+        {
+          "id": "commit-7-nl-affirmation-to-non-commit-offer-does-not-fire",
+          "eval_name": "bare-yes-to-a-non-commit-offer-does-not-over-trigger-commit",
+          "prompt": "(assistant turn) \"Want me to refactor that helper while I'm in here?\" then (human turn) \"yes\"",
+          "preconditions": "Mid-conversation: the assistant's most recent offer was a NON-commit action (a refactor, rename, search, or test run — NOT a commit or PR), and the human replies only with a bare affirmation (\"yes\" / \"go ahead\"). Dirty feature branch (not main); gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local`; no `.claude/.nl-delegation-active` marker.",
+          "expected_output": "The bare \"yes\" is scoped to the offer that was actually made (the refactor), so /commit does NOT fire: no `Using /commit` announcement, no Skill(commit) invocation, no Step 0, no staging or commit. The model carries out (or clarifies the scope of) the non-commit action instead. Negative control for commit-6: the affirmation-is-the-trigger rule applies ONLY when the assistant's own offer was to commit/PR, and must not over-trigger on affirmations of unrelated offers."
         }
       ]
     },
