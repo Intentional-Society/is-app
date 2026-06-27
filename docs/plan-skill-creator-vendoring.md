@@ -130,6 +130,8 @@ the post-NL repo state, which is now live. **Verified post-NL state (don't re-de
 ## PR 2 — Deterministic structural gate
 
 > Tracked in #396. Reference that issue in the PR body.
+> **Start from `main`** after this plan doc is current (PR #468 merged). `skill-nl-announce-affirmation` is independent — no sequencing constraint in either direction (see decision log 2026-06-26).
+
 A Vitest test in the existing functional suite (so it reports through the already-required
 `Lint & Functional Tests` check — no new workflow, no Python, no secrets). Scoped to an explicit
 allowlist `{commit, pr, ship}`; skill-creator is upstream's artifact and is **not** held to our
@@ -236,6 +238,7 @@ unverified — spike before committing to this PR.
 
 ## Decision log
 
+- 2026-06-26 — Blake: Prereq correction — `skill-nl-announce-affirmation` is not required before PR 2 or PR 3. PR 2's assertions (key absence, section order, eval count ≥3) are insensitive to Step 0 announce content; eval ≥3 threshold is already satisfied (5/8/4). PR #468 is a procedural prerequisite (implementer should start from current `main`) but not a technical one.
 - 2026-06-26 — Blake: Thread 15 resolved — two-merge same-session test (default mode) showed
   harness `ask` fires per-merge; #460 was `auto` mode. Y/n stays deleted (#459 stands). PR 3
   drift workflow deferred (low ROI for small team); PR 3 = `/commit` surfacing edit only.
