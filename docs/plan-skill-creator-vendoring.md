@@ -131,7 +131,7 @@ the post-NL repo state, which is now live. **Verified post-NL state (don't re-de
 
 > Tracked in #396. Reference that issue in the PR body.
 > **Prerequisite:** `skill-nl-announce-affirmation` must be merged first — it edits `/commit`
-> and `/pr` SKILL.md, which this gate reads. Check `gh pr list` before branching.
+> and `/pr` SKILL.md, which this gate reads.
 
 A Vitest test in the existing functional suite (so it reports through the already-required
 `Lint & Functional Tests` check — no new workflow, no Python, no secrets). Scoped to an explicit
