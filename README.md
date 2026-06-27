@@ -28,7 +28,7 @@ npm install
 npm run setup
 ```
 
-Generates `.env.local` with the deterministic local Supabase defaults. Safe to re-run.
+Generates `.env.local` with the deterministic local Supabase defaults, installs the Playwright Chromium browser for e2e tests, and applies local workflow setup. Safe to re-run.
 
 ### 4. Run
 
