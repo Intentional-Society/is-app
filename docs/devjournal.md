@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-27 | Blake | Local setup installs Playwright Chromium
+
+`npm run setup` now installs the Playwright Chromium browser binary that local e2e tests require, so a fresh checkout that has run `npm install` and setup can run `npm test` without a separate browser-install step. The setup script remains the home for required local setup gaps plus selected defense-in-depth checks such as lefthook.
+
 ## 2026-06-25 | Ola | Admins can delete a member account
 
 Admins permanently delete a member from `/admin/members` (#185, #454): clear avatar → clear the redemption pair on invites the member redeemed → delete the profile (FK cascade drops memberships/relations/hints, null-sets invite `created_by`) → delete the auth user. Profile-first because `profiles → auth.users` is `ON DELETE NO ACTION`; `deleteUser` is idempotent on a 404. The redemption-pair clear is load-bearing: `redeemed_by` is `ON DELETE SET NULL` but `redeemed_at` has no FK, so the cascade alone violates `invites_redemption_pair` and no onboarded member is deletable (caught post-merge on #454). Guards mirror `setAdminStatus` — no self-delete (use deactivate), no deleting a fellow admin.

@@ -8,7 +8,7 @@ Intentional Society web application — an authenticated app for a small, global
 
 ## Commands
 
-- `npm run setup` — one-time: generate `.env.local` with local Supabase defaults (idempotent)
+- `npm run setup` — one-time: generate `.env.local`, install Playwright Chromium, and apply local workflow setup (idempotent)
 - `npm run make_lane_inside_worktree` — one-time: turn the current git worktree into an isolated parallel "lane" (own Supabase stack + ports); see `docs/strategy-worktree-lanes.md`
 - `npm run dev` — start local Supabase (if needed) + dev server (http://localhost:3000)
 - `npm run build` — production build

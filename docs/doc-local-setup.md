@@ -32,13 +32,13 @@ npm install
 
 ---
 
-## Generate the local environment file
+## Run local setup
 
 ```bash
 npm run setup
 ```
 
-This creates `.env.local` with the deterministic defaults that the local Supabase stack uses. Safe to re-run — it skips the file if it already exists. The generated values:
+This creates `.env.local` with the deterministic defaults that the local Supabase stack uses, installs the Playwright Chromium browser binary for e2e tests, wires local git hooks, and applies small local git config. Safe to re-run — it skips the env file if it already exists and Playwright only downloads browsers when missing or outdated. The generated values:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
@@ -132,6 +132,9 @@ Stopping is optional — the containers are lightweight and persist safely betwe
 
 **`.env.local` has wrong values**
 : Delete it and re-run `npm run setup` to regenerate from the known-good defaults.
+
+**Playwright says the browser executable does not exist**
+: Re-run `npm run setup`, or repair just the browser binary with `npx playwright install chromium`.
 
 ---
 

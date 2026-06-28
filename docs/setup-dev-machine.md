@@ -109,4 +109,10 @@ We use [Claude Code](https://claude.ai/code) as our AI coding assistant, configu
 
 ---
 
-Once the prerequisites above are installed, clone the repo and run `npm install` followed by `npm run setup` to generate your local `.env.local` with the deterministic local Supabase defaults. Then `npm run dev`. See the [README](../README.md) for the full walkthrough.
+Once the prerequisites above are installed, clone the repo and run `npm install` followed by `npm run setup` to prepare the local checkout. Then `npm run dev`. See the [README](../README.md) for the full walkthrough.
+
+`npm run setup` creates `.env.local` with deterministic local Supabase defaults and installs the Playwright Chromium browser binary used by `npm test` and `npm run test:e2e`. That install is safe to re-run; Playwright only downloads when the expected browser is missing or outdated. If the browser install ever fails independently, repair it with:
+
+```bash
+npx playwright install chromium
+```

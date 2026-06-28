@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // One-time setup for new developers. Safe to re-run — every step is idempotent.
 // Extend by adding more step functions below and calling them from main().
+// This script is the canonical place for required local setup gaps that
+// `npm install` does not cover, plus selected defense-in-depth checks that keep
+// local workflow tooling reliable.
 
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, readFileSync } from "node:fs";
@@ -11,9 +14,8 @@ const repoRoot = resolve(import.meta.dirname, "..");
 function ensureLefthookInstalled() {
   // Wires lefthook's binary into .git/hooks. Re-running is a no-op.
   // Note: lefthook's own postinstall already does this during `npm install`
-  // (skipped only when CI=true). Calling it here too is defense-in-depth +
-  // explicit documentation of intent — see PR #307 discussion and #285 for
-  // the broader "extra setup steps beyond npm install" policy question.
+  // (skipped only when CI=true). Calling it here too is deliberate
+  // defense-in-depth: missing hooks are a silent local quality failure.
   const result = spawnSync("npx", ["lefthook", "install"], {
     cwd: repoRoot,
     stdio: "inherit",
@@ -23,6 +25,22 @@ function ensureLefthookInstalled() {
     console.error("  lefthook install failed — pre-commit formatting will not run");
     process.exit(1);
   }
+}
+
+function ensurePlaywrightBrowsersInstalled() {
+  // Playwright's npm package does not install browser binaries. The e2e suite
+  // uses Chromium only, so keep setup lean by installing just that browser.
+  const result = spawnSync("npx", ["--no-install", "playwright", "install", "chromium"], {
+    cwd: repoRoot,
+    stdio: "inherit",
+    shell: true,
+  });
+  if (result.status !== 0) {
+    console.error("  playwright browser install failed — e2e tests will not run");
+    console.error("  Fix: run `npx playwright install chromium` and retry `npm run setup`.");
+    process.exit(1);
+  }
+  console.log("  Playwright Chromium browser installed/current");
 }
 
 function ensureGitBlameIgnoreConfig() {
@@ -131,14 +149,17 @@ function main() {
   console.log("1. Environment file");
   ensureLocalEnv();
 
-  console.log("\n2. Git hooks (lefthook)");
+  console.log("\n2. Playwright browser binaries");
+  ensurePlaywrightBrowsersInstalled();
+
+  console.log("\n3. Git hooks (lefthook)");
   ensureLefthookInstalled();
 
-  console.log("\n3. Git blame ignore-revs config");
+  console.log("\n4. Git blame ignore-revs config");
   ensureGitBlameIgnoreConfig();
 
   if (process.platform === "win32") {
-    console.log("\n4. Windows Supabase port reservation (advisory)");
+    console.log("\n5. Windows Supabase port reservation (advisory)");
     if (isBaseWorktree()) {
       checkWindowsSupabasePortReservation();
     } else {
