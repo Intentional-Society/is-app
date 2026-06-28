@@ -116,3 +116,9 @@ Once the prerequisites above are installed, clone the repo and run `npm install`
 ```bash
 npx playwright install chromium
 ```
+
+Local dev/test entry points also check that `node_modules` is current with `package-lock.json` before invoking dependency binaries such as Biome. The check compares `package-lock.json` against npm's installed copy at `node_modules/.package-lock.json`; if the repo lockfile is newer, run:
+
+```bash
+npm install
+```

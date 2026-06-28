@@ -136,6 +136,9 @@ Stopping is optional — the containers are lightweight and persist safely betwe
 **Playwright says the browser executable does not exist**
 : Re-run `npm run setup`, or repair just the browser binary with `npx playwright install chromium`.
 
+**A command says `package-lock.json` is newer than `node_modules`**
+: Run `npm install`. Local dev/test commands compare the repo lockfile with npm's installed copy at `node_modules/.package-lock.json` before invoking dependency binaries.
+
 ---
 
 ## Seed development data
