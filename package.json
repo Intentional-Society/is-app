@@ -34,12 +34,12 @@
     "special:buttondown:record-api": "vitest run --config vitest.manual.config.ts tests/manual/buttondown-api-golds.test.ts"
   },
   "dependencies": {
-    "@base-ui/react": "^1.5.0",
-    "@hono/node-server": "^2.0.4",
-    "@mdxeditor/editor": "^4.0.3",
-    "@sentry/nextjs": "^10.57.0",
+    "@base-ui/react": "^1.6.0",
+    "@hono/node-server": "^2.0.5",
+    "@mdxeditor/editor": "^4.0.4",
+    "@sentry/nextjs": "^10.59.0",
     "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.107.0",
+    "@supabase/supabase-js": "^2.108.2",
     "@tanstack/react-query": "^5.101.0",
     "@vercel/functions": "^3.7.1",
     "@xyflow/react": "^12.11.0",
@@ -48,8 +48,8 @@
     "cmdk": "^1.1.1",
     "d3-force": "^3.0.0",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.25",
-    "lucide-react": "^1.18.0",
+    "hono": "^4.12.26",
+    "lucide-react": "^1.21.0",
     "next": "^16.2.9",
     "next-axiom": "^1.10.0",
     "postgres": "^3.4.8",
@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.0",
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.61.0",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.20",
     "@testing-library/jest-dom": "^6.9.1",
@@ -81,10 +81,10 @@
     "drizzle-kit": "^0.31.10",
     "jsdom": "^29.1.1",
     "lefthook": "^2.1.9",
-    "supabase": "^2.106.0",
+    "supabase": "^2.107.0",
     "tailwindcss": "^4",
     "typescript": "^6.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   },
   "optionalDependencies": {
     "@tailwindcss/oxide-darwin-arm64": "^4.2.2"
