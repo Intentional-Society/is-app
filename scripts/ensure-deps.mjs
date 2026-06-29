@@ -26,6 +26,8 @@ export function checkDependencyState(root = repoRoot) {
   const lockMtime = statSync(lockfile).mtimeMs;
   const installedMtime = statSync(installedLock).mtimeMs;
 
+  // Git branch switches can refresh package-lock.json's mtime even when
+  // dependencies already match; this may over-report, but fails safely.
   if (lockMtime > installedMtime) {
     return {
       ok: false,

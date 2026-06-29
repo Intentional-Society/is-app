@@ -5,10 +5,15 @@
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { checkDependencyState } from "../../../scripts/ensure-deps.mjs";
+
+const HERE = fileURLToPath(new URL(".", import.meta.url));
+const PROJECT_ROOT = resolve(HERE, "..", "..", "..");
+const PACKAGE_JSON = resolve(PROJECT_ROOT, "package.json");
 
 const tempRoots: string[] = [];
 
@@ -72,10 +77,14 @@ describe("checkDependencyState", () => {
 });
 
 describe("package script wiring", () => {
-  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+  const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
 
   it("runs before dev:db preflight work", () => {
     expect(packageJson.scripts["dev:db"]).toMatch(/^node scripts\/ensure-deps\.mjs && /);
+  });
+
+  it("runs before format so direct Biome writes catch stale dependencies first", () => {
+    expect(packageJson.scripts.format).toMatch(/^node scripts\/ensure-deps\.mjs && /);
   });
 
   it("runs before lint so npm test catches stale dependencies before invoking Biome", () => {

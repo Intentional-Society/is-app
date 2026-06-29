@@ -20,7 +20,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "node scripts/ensure-deps.mjs && biome check .",
-    "format": "biome check --write .",
+    "format": "node scripts/ensure-deps.mjs && biome check --write .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "npm run lint && npm run typecheck && npm run dev:db && vitest run && playwright test",
     "test:functional": "npm run dev:db && vitest run",
