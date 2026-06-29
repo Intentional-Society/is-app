@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-27 | Blake | Local preflight catches stale node_modules
+
+`scripts/ensure-deps.mjs` now checks npm's installed lockfile (`node_modules/.package-lock.json`) against the repo `package-lock.json` before local dev/test entry points invoke dependency binaries. `npm run dev` catches stale installs through `dev:db`; `npm test` catches them before Biome through `lint`. If a dependency changed since the last install, the fix is `npm install`. (#288)
+
 ## 2026-06-27 | Blake | Local setup installs Playwright Chromium
 
 `npm run setup` now installs the Playwright Chromium browser binary that local e2e tests require, so a fresh checkout that has run `npm install` and setup can run `npm test` without a separate browser-install step. The setup script remains the home for required local setup gaps plus selected defense-in-depth checks such as lefthook.
