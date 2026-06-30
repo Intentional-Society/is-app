@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-30 | James | e2e stubs avatar image-optimizer fetches
+
+e2e mocks `/_next/image` except the avatar canary, to stop CI driving prod Storage egress.
+
 ## 2026-06-27 | Blake | Local preflight catches stale node_modules
 
 `scripts/ensure-deps.mjs` now checks npm's installed lockfile (`node_modules/.package-lock.json`) against the repo `package-lock.json` before local dev/test entry points invoke dependency binaries. `npm run dev` catches stale installs through `dev:db`; `npm test` catches them before Biome through `lint`. If a dependency changed since the last install, the fix is `npm install`. (#288)

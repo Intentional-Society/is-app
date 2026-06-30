@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./helpers/fixtures";
 import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 // These tests exercise the authed invite UI end-to-end against the

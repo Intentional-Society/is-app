@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./helpers/fixtures";
 import { signInAs } from "./helpers/session";
 
 // Password-reset flow. Like the other auth specs, Supabase's auth

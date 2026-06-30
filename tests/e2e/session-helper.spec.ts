@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./helpers/fixtures";
 import { expectAuthed, signInAs } from "./helpers/session";
 
 // Sanity test for the session helper itself. Signed-in specs build on

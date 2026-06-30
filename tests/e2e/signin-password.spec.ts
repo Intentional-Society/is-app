@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/fixtures";
 
 // /signin is public, so these tests run without a session. The Supabase
 // auth endpoints are intercepted at the Playwright level, which lets us

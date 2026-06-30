@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./helpers/fixtures";
 import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 // Exercises the history-aware breadcrumb back link from #274. /me
