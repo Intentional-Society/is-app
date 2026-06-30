@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./helpers/fixtures";
 import { resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 // The multi-step welcome flow (#166): a fresh user is routed through

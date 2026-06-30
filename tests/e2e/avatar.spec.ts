@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 
+import { expect, test } from "./helpers/fixtures";
 import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
 
 // Profile-picture upload (#131): a member picks a photo, confirms the
@@ -8,6 +8,12 @@ import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
 // seeded user starting clean, so reset per-test.
 
 test.describe.configure({ mode: "serial" });
+
+// The canary: opt out of the suite-wide /_next/image stub so this spec
+// drives the real optimizer → Storage → render path end to end. The
+// naturalWidth assertion below would catch the optimizer rejecting the
+// upstream image (e.g. #469). See tests/e2e/helpers/fixtures.ts.
+test.use({ mockImages: false });
 
 test.beforeEach(async ({ baseURL }) => {
   if (!baseURL) throw new Error("avatar.spec.ts: baseURL is not configured");
