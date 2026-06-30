@@ -1,5 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
-
+import { expect, type Page, test } from "./helpers/fixtures";
 import { resetSeededUsers, signInAs } from "./helpers/session";
 
 // Smoke test for the admin surface: the seeded admin user can reach the

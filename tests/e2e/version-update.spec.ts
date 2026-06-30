@@ -1,5 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
-
+import { expect, type Page, test } from "./helpers/fixtures";
 import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 // The live-deploy update UX (docs/strategy-deployment.md): the bottom

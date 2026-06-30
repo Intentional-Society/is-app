@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./helpers/fixtures";
 import { completeWelcome, signInAs, TIMEOUT_MS } from "./helpers/session";
 
 test("sign-out button signs the user out and lands on /signin", async ({ page }) => {

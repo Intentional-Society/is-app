@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./helpers/fixtures";
 import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
 
 // Every page sets a distinct <title> ("IS Web: <page>") so the browser
