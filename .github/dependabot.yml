@@ -25,6 +25,13 @@ updates:
       # PR per transitively-related package. Majors still land as their
       # own PRs so the breaking-change review happens in isolation.
       minor-and-patch:
+        # sharp is quarantined into its own PR, not ignored: 0.35.x corrupts
+        # uploaded avatars on Vercel (#469) and fails e2e every week. Isolating
+        # it keeps the rest of the batch mergeable while leaving a standalone
+        # sharp PR whose e2e status tells us the moment the corruption is fixed
+        # upstream — then drop this exclude and merge the bump.
+        exclude-patterns:
+          - "sharp"
         update-types:
           - patch
           - minor
