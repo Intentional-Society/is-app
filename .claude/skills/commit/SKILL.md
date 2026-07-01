@@ -1,6 +1,6 @@
 ---
 name: commit
-description: "[is-app] Stage, commit, and push the current changes via the team's guarded workflow: local `npm test` gate, suspicious-file checks, one bundled human approval, auto-branch from main. Use for any commit/push intent — \"commit this\", \"commit in two steps: X then Y\", or `/commit #142`."
+description: "[is-app] Stage, commit, and push the current changes via the team's guarded workflow: local `npm test` gate, suspicious-file checks, one bundled human approval, auto-branch from main. Use for any commit/push intent — \"commit this\", \"commit in two steps: X then Y\", or `/commit #142`. Announce `Using /commit` as you route, before the Skill call."
 ---
 
 # /commit
@@ -19,7 +19,7 @@ The leaf Skill in the commit → PR → ship chain. `/commit` is the only place 
 
 Cache the argument for `/pr` and `/ship` in this session so chained invocations reuse the same context.
 
-**Invocation paths.** This Skill fires on an explicit `/commit` **and** on natural-language commit intent ("commit this", "commit these changes in two commits: X then Y") — **including when *you* offered to commit and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the commit with ad-hoc `git` commands. Scope it to your own commit offer: a bare "yes" to an *unrelated* offer (a refactor, rename, or search) is **not** a commit trigger — don't fire `/commit` on it. On **every** model-invoked (natural-language) run, **announce `Using /commit` as your first line** (Step 0) so the human can see the Skill fired. On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/commit` and delegated calls skip the *confirmation*, but the announcement still applies to any model-invoked run.
+**Invocation paths.** This Skill fires on an explicit `/commit` **and** on natural-language commit intent ("commit this", "commit these changes in two commits: X then Y") — **including when *you* offered to commit and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the commit with ad-hoc `git` commands. Scope it to your own commit offer: a bare "yes" to an *unrelated* offer (a refactor, rename, or search) is **not** a commit trigger — don't fire `/commit` on it. On **every** model-invoked (natural-language) run, **announce `Using /commit` as you route — the first line of the message in which you call the `Skill` tool, before the call** so the human can see the Skill fired (a delegated call is the exception — the parent announces the handoff; see Step 0). On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/commit` and delegated calls skip the *confirmation*, but the announcement still applies to any model-invoked run.
 
 ## Steps
 
@@ -27,7 +27,7 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
 
 0. **Announce + NL intent gate (model-invoked only).**
 
-   **Announcement — always, on every model-invoked run.** When this Skill is invoked via the `Skill` tool (the natural-language / model-invoked path — a typed `/commit` does not go through the `Skill` tool), the **first visible line of your response must be `Using /commit`.** This is unconditional on the model-invoked path: the opt-out file and the delegation marker below suppress only the *confirmation*, never this announcement. It lets the human always tell the Skill fired — and an ad-hoc `git commit` can't honestly print it, so it doubles as the forcing function that keeps this flow inside the Skill.
+   **Announcement — at the routing decision; backstop here.** You should already have announced `Using /commit` as you routed — the first line of the message in which you invoked the `Skill` tool, before the call (see CLAUDE.md / Invocation paths). **If you have not, announce it now as the first visible line of your response** — exactly once, never doubled. **Exception — delegated calls:** when the delegation marker (below) is present (a parent `/pr`/`/ship` set it), do **not** announce — the parent already printed `Using /commit — delegated from /pr` on your behalf. The opt-out file does **not** suppress the announcement (it suppresses only the *confirmation* below); only delegation does. The announcement is the forcing function that keeps this flow inside the Skill — an ad-hoc `git commit` can't honestly print it.
 
    **Intent gate.** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
 
