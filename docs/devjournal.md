@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-06-30 | James | Dependabot quarantines `sharp` into its own weekly PR
+
+`sharp` now opens as a standalone Dependabot PR (excluded from the `minor-and-patch` group) instead of reddening the whole weekly batch, because 0.35.x corrupts uploaded avatars on Vercel (#469); it's a quarantine, not an `ignore`, so the isolated PR's e2e status still signals when the bump is safe to adopt.
+
 ## 2026-06-30 | James | e2e stubs avatar image-optimizer fetches
 
 e2e mocks `/_next/image` except the avatar canary, to stop CI driving prod Storage egress.
