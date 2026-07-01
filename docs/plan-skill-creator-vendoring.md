@@ -1,6 +1,7 @@
 # Plan: Vendor `skill-creator` + Drift Management + Skill Eval Gates
 
-**Status:** Proposed 2026-06-12 (Blake, drafted with Claude). Not yet implemented.
+**Status:** PR 1 shipped (#395, 2026-06-14). NL-invocation prereq shipped (#353/#433/#459/#460,
+2026-06-24). PRs 2–3 ready to implement; PRs 4–5 deferred. See #396.
 **Relevant files:** `.claude/skills/`, `evals/`, `scripts/`, `.github/workflows/`,
 `docs/spec-portable-ai-procedures.md`
 
@@ -63,28 +64,32 @@ without silent drift.
    bot-opened drift PR, and a scheduled eval run would need a custom headless job, not that action.
 3. No skill eval — structural or behavioral — runs in CI today. The behavioral evals for
    PR #304 were run locally by the author per the skill-creator workflow.
-4. The NL-invocation revision (`.scratch/skill-nl-invocation-bootstrap.md`, decided 2026-06-12,
-   unimplemented) will remove `disable-model-invocation: true` from `/commit` and `/pr` and keep
-   it on `/ship`. Any gate asserting that key must be per-skill, not uniform.
+4. The NL-invocation revision (**implemented 2026-06-24**, #353/#433/#459/#460;
+   `docs/plan-skill-nl-invocation.md`) removed `disable-model-invocation: true` from `/commit`
+   and `/pr` and kept it on `/ship`. Any gate asserting that key must be per-skill, not uniform.
 5. Upstream skill-creator bundles `SKILL.md`, `LICENSE.txt` (Apache-2.0), `agents/`, `assets/`,
    `eval-viewer/`, `references/`, and `scripts/` (all Python). Python is needed only when a human
    runs those scripts — never by CI or the app.
 
-## Sequencing note (decided 2026-06-12)
+## Sequencing note (decided 2026-06-12; NL prereq satisfied 2026-06-24)
 
-The NL-invocation revision (`.scratch/skill-nl-invocation-bootstrap.md`) is implemented **between
-PR 1 and PR 2**. PRs 2 and 3 are therefore written against the post-NL state of the repo, and
-their implementer must first check how that revision actually landed:
+The NL-invocation revision was implemented between PR 1 and PR 2 as planned. PRs 2 and 3 target
+the post-NL repo state, which is now live. **Verified post-NL state (don't re-derive):**
 
-- **PR 2:** the invocation-policy expectation table is read from the *implemented* skills —
-  expected: `disable-model-invocation` absent on `/commit` and `/pr`, `true` on `/ship`. The
-  spec will have been revised to v1.1; re-derive the section/line citations below from the
-  revised `docs/spec-portable-ai-procedures.md` rather than trusting this doc's line numbers.
-- **PR 3:** the `/commit` body will have gained a Step 0 (NL intent gate) and a new description;
-  read the current body before editing, place the skill-creator surfacing in the approval-block
-  step (not near Step 0), and confirm 500-line headroom.
-- Both: the NL work checks in `.claude/settings.json` (with a `!.claude/settings.json` gitignore
-  negation) — expected state, not a surprise to "fix".
+- **PR 2:** invocation-policy expectation table — `disable-model-invocation` absent on `/commit`
+  and `/pr`; `true` on `/ship`. Eval counts verified: commit=5, pr=8, ship=4 (all ≥3). Line
+  counts verified: commit=198, pr=163, ship=121 (all well under 500). Re-derive
+  `docs/spec-portable-ai-procedures.md` section/line citations at implementation time.
+- **PR 3:** `/commit` has Step 0 at lines 28–43 and the approval block at Step 14 (line 105).
+  Place the skill-creator surfacing inside **Step 14** (approval block), not near Step 0. Current
+  line count is 198; ample headroom to 500.
+- Both: `.claude/settings.json` is tracked (explicit `!.claude/settings.json` gitignore negation
+  added by #353) — expected state, not a surprise to "fix".
+- **Resolved issue (know it):** Thread 15 (`.scratch/skill-nl-invocation-review-roundtable.md`;
+  issue #463) is **RESOLVED** — a two-merge same-session test (2026-06-26) showed the harness
+  `ask` on `gh pr merge` **does** fire per-merge in **default** mode; PR #460 merged silently
+  because that session was in **`auto` mode** (auto-approves), not a gate defect. Decision: **keep
+  #459 (no Y/n)**; the default-mode `ask` is the confirmation. No `/ship` step-10 change needed.
 
 ---
 
@@ -125,6 +130,7 @@ their implementer must first check how that revision actually landed:
 ## PR 2 — Deterministic structural gate
 
 > Tracked in #396. Reference that issue in the PR body.
+> **Start from `main`** after this plan doc is current (PR #468 merged). `skill-nl-announce-affirmation` is independent — no sequencing constraint in either direction (see decision log 2026-06-26).
 
 A Vitest test in the existing functional suite (so it reports through the already-required
 `Lint & Functional Tests` check — no new workflow, no Python, no secrets). Scoped to an explicit
@@ -145,14 +151,13 @@ skill contract. Assertions, each traceable to `docs/spec-portable-ai-procedures.
 Deliberately *not* asserted (judgment/LLM territory, per spec L115): description quality,
 `## Depends on` accuracy, "passes its eval set", self-hosting, eval realism.
 
-## PR 3 — Light drift detection + local eval surfacing
+## PR 3 — Local eval surfacing in `/commit`
 
 > Tracked in #396. Reference that issue in the PR body.
+> **Scope decision (2026-06-26):** The drift-detection workflow (`.github/workflows/skill-creator-drift.yml`)
+> is deferred — low ROI for a small team; `node scripts/update-skill-creator.mjs --check` runs
+> manually when needed. PR 3 is the `/commit` surfacing edit only.
 
-- `.github/workflows/skill-creator-drift.yml`: **weekly** schedule (matches the Dependabot
-  rhythm) + `workflow_dispatch`. Runs `node scripts/update-skill-creator.mjs --check`; on
-  non-zero, opens **or updates** a single tracking issue with the compare URL and the refresh
-  command. Default `GITHUB_TOKEN` suffices (issues only — no PR, no token gymnastics).
 - `/commit` SKILL.md: when the staged payload touches `.claude/skills/skill-creator/**`, surface
   in the approval block: "skill-creator changed — run the `evals/skill-creator.evals.json`
   acceptance evals and capture results in the Test Plan." Same pattern as the existing
@@ -233,6 +238,12 @@ unverified — spike before committing to this PR.
 
 ## Decision log
 
+- 2026-06-26 — Blake: Prereq correction — `skill-nl-announce-affirmation` is not required before PR 2 or PR 3. PR 2's assertions (key absence, section order, eval count ≥3) are insensitive to Step 0 announce content; eval ≥3 threshold is already satisfied (5/8/4). PR #468 is a procedural prerequisite (implementer should start from current `main`) but not a technical one.
+- 2026-06-26 — Blake: Thread 15 resolved — two-merge same-session test (default mode) showed
+  harness `ask` fires per-merge; #460 was `auto` mode. Y/n stays deleted (#459 stands). PR 3
+  drift workflow deferred (low ROI for small team); PR 3 = `/commit` surfacing edit only.
+- 2026-06-24 — Blake: NL-invocation prereq satisfied (#353/#433/#459/#460); PRs 2–3 unblocked.
+  Post-NL state verified (see Sequencing note).
 - 2026-06-12 — Blake: NL-invocation revision is implemented between PR 1 and PR 2; PRs 2–3
   target the post-NL repo state (see Sequencing note).
 - 2026-06-12 — Blake: vendor over submodule/subtree/plugin; vendor-first sequencing (evals with
