@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-02 | Blake | Required structural gate for the team Skills
+
+A new `functional-skills` Vitest project (`tests/functional/skills/skill-contract.test.ts`) holds `/commit`, `/pr`, and `/ship` to their SKILL.md structure — frontmatter, invocation policy, section order, ≥3 evals each — so a structural break now fails the required `Lint & Functional Tests` check (skill-creator, vendored upstream, is exempt). (#396)
+
 ## 2026-07-02 | Blake | NL `/commit`/`/pr` announce at the routing decision; delegation announces once per hop
 
 The `Using /commit` / `Using /pr` announcement now fires at the **routing decision** (the first line of the message that invokes the `Skill` tool, before the call), with Step 0 as a conditional backstop rather than the primary site. On the `/ship` → `/pr` → `/commit` cascade the **parent** announces each handoff (`Using /commit — delegated from /pr`) and the delegated child suppresses its own announcement, so each hop announces exactly once — the delegation marker now silences both the child's confirmation and its self-announce (the opt-out file still silences only the confirmation, never the announcement). Supersedes the delegation half of the 2026-06-26 entry (same PR #484).
