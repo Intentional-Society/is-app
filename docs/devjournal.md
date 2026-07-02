@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-02 | Blake | NL `/commit`/`/pr` announce at the routing decision; delegation announces once per hop
+
+The `Using /commit` / `Using /pr` announcement now fires at the **routing decision** (the first line of the message that invokes the `Skill` tool, before the call), with Step 0 as a conditional backstop rather than the primary site. On the `/ship` → `/pr` → `/commit` cascade the **parent** announces each handoff (`Using /commit — delegated from /pr`) and the delegated child suppresses its own announcement, so each hop announces exactly once — the delegation marker now silences both the child's confirmation and its self-announce (the opt-out file still silences only the confirmation, never the announcement). Supersedes the delegation half of the 2026-06-26 entry (same PR #484).
+
 ## 2026-06-30 | James | Dependabot quarantines `sharp` into its own weekly PR
 
 `sharp` now opens as a standalone Dependabot PR (excluded from the `minor-and-patch` group) instead of reddening the whole weekly batch, because 0.35.x corrupts uploaded avatars on Vercel (#469); it's a quarantine, not an `ignore`, so the isolated PR's e2e status still signals when the bump is safe to adopt.
@@ -22,7 +26,7 @@ e2e mocks `/_next/image` except the avatar canary, to stop CI driving prod Stora
 
 ## 2026-06-26 | Blake | /commit and /pr announce "Using /…" on NL runs and catch bare-"yes" affirmations
 
-Every natural-language `/commit` / `/pr` run now prints `Using /commit` / `Using /pr` as its first line, and a bare "yes"/"go ahead" to the assistant's *own* commit/PR offer is treated as a trigger that routes through the Skill rather than an ad-hoc git/gh sequence. The announcement is unconditional on the NL path — the opt-out file and delegation marker still silence only Step 0's confirmation, never the announcement (Thread 16; follow-on to the 2026-06-17 NL-invocation entry).
+Every natural-language `/commit` / `/pr` run now prints `Using /commit` / `Using /pr` as its first line, and a bare "yes"/"go ahead" to the assistant's *own* commit/PR offer is treated as a trigger that routes through the Skill rather than an ad-hoc git/gh sequence. The announcement is unconditional on the NL path — the opt-out file and delegation marker still silence only Step 0's confirmation, never the announcement (Thread 16; follow-on to the 2026-06-17 NL-invocation entry). **Superseded (2026-07-02, same PR #484):** the "never the announcement" clause holds for the opt-out file but **not** for delegation — the delegation marker now suppresses the *child's* self-announcement, with the parent announcing the handoff instead. See the 2026-07-02 entry.
 
 ## 2026-06-25 | Ola | Admins can delete a member account
 
