@@ -77,12 +77,17 @@ The NL-invocation revision was implemented between PR 1 and PR 2 as planned. PRs
 the post-NL repo state, which is now live. **Verified post-NL state (don't re-derive):**
 
 - **PR 2:** invocation-policy expectation table — `disable-model-invocation` absent on `/commit`
-  and `/pr`; `true` on `/ship`. Eval counts verified: commit=5, pr=8, ship=4 (all ≥3). Line
-  counts verified: commit=198, pr=163, ship=121 (all well under 500). Re-derive
+  and `/pr`; `true` on `/ship`. Eval counts on current `main`: commit=5, pr=8, ship=4 (all ≥3).
+  Line counts: commit=198, pr=163, ship=121 (all well under 500). Re-derive
   `docs/spec-portable-ai-procedures.md` section/line citations at implementation time.
-- **PR 3:** `/commit` has Step 0 at lines 28–43 and the approval block at Step 14 (line 105).
-  Place the skill-creator surfacing inside **Step 14** (approval block), not near Step 0. Current
-  line count is 198; ample headroom to 500.
+  **If PR #484 (`skill-nl-announce-affirmation`) has merged first:** counts become 8/9/6 (still
+  ≥3); it touches `/ship` SKILL.md too, but body-only (delegation narration) — the
+  `disable-model-invocation: true` frontmatter is unchanged, so the expectation table holds. It
+  also edits spec §2, so re-deriving the citations matters more.
+- **PR 3:** `/commit` has Step 0 at lines 28–43 and the approval block at Step 14 (line 105 on
+  `main`; ~109 after PR #484, a +4 shift entirely above Step 14). Place the skill-creator
+  surfacing inside **Step 14** (approval block), not near Step 0. Current line count is 198;
+  ample headroom to 500.
 - Both: `.claude/settings.json` is tracked (explicit `!.claude/settings.json` gitignore negation
   added by #353) — expected state, not a surprise to "fix".
 - **Resolved issue (know it):** Thread 15 (`.scratch/skill-nl-invocation-review-roundtable.md`;
@@ -143,10 +148,14 @@ skill contract. Assertions, each traceable to `docs/spec-portable-ai-procedures.
    expectation table in the test**, encoding the post-NL-revision state (commit/pr: key absent,
    ship: `true`) — verify against the implemented skills per the sequencing note above.
 3. Frontmatter `name` matches the directory name.
-4. Body sections in order: Invocation → Steps → Failure modes → `## Depends on`.
+4. Body sections in order: Invocation → Steps → Failure modes → `## Depends on`. Assert this as a
+   **subsequence**, not adjacency — real skills interleave extra `##` sections (e.g. `Stash
+   safety`, `Devjournal trigger list`) between the four required ones.
 5. Body >500 lines → **warn only** (spec calls it a soft cap; visible in CI logs, never red).
 6. `evals/evals.json` and `evals/skill-creator.evals.json`: every `skill_path` resolves; **≥3
-   evals per skill**.
+   evals per skill**. Note the shape: `evals.json` has **one `skill_path` per skill** with the
+   eval cases nested under it (3 `skill_path` entries, not one per eval) — count cases *within*
+   each skill's group, don't count `skill_path` occurrences.
 
 Deliberately *not* asserted (judgment/LLM territory, per spec L115): description quality,
 `## Depends on` accuracy, "passes its eval set", self-hosting, eval realism.
@@ -238,6 +247,7 @@ unverified — spike before committing to this PR.
 
 ## Decision log
 
+- 2026-07-01 — Blake: Studied PR #484 (`skill-nl-announce-affirmation`, now open — announce at the routing decision + delegation narration + semantic over-trigger evals). Confirmed still independent of PRs 2/3 (verified assertion-by-assertion). Corrections folded into the Sequencing note and PR 2 assertions: post-#484 eval counts are 8/9/6 (not 5/8/4); #484 touches `/ship` SKILL.md body-only (frontmatter untouched); Step 14 shifts +4 (→~109). Also hardened two PR 2 assertions against the real file shapes: section-order is a subsequence check, and `evals.json` nests cases under one `skill_path` per skill (count within group).
 - 2026-06-26 — Blake: Prereq correction — `skill-nl-announce-affirmation` is not required before PR 2 or PR 3. PR 2's assertions (key absence, section order, eval count ≥3) are insensitive to Step 0 announce content; eval ≥3 threshold is already satisfied (5/8/4). PR #468 is a procedural prerequisite (implementer should start from current `main`) but not a technical one.
 - 2026-06-26 — Blake: Thread 15 resolved — two-merge same-session test (default mode) showed
   harness `ask` fires per-merge; #460 was `auto` mode. Y/n stays deleted (#459 stands). PR 3
