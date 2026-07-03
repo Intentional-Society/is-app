@@ -29,6 +29,13 @@ commits. After a refresh: review the diff, run the acceptance evals in
 `evals/skill-creator.evals.json` and capture results in the commit's Test Plan, then ship via
 `/commit`.
 
+You don't have to remember to run `--check`: a monthly workflow
+(`.github/workflows/skill-creator-drift.yml`, 05:07 UTC on the 1st; manual via
+`gh workflow run skill-creator-drift.yml`) runs it and opens a tracking issue — labeled
+`dependencies` + `skill-creator-drift`, one open at a time (deduped by the qualifier label) —
+when the pin falls behind upstream. It never syncs files or opens PRs; refreshing stays the
+human-run procedure above.
+
 ## Running its scripts (authoring time only)
 
 The bundled `scripts/*.py` and `eval-viewer/` need **Python 3 with PyYAML**
