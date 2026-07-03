@@ -13,6 +13,13 @@ class ResizeObserverStub {
 }
 vi.stubGlobal("ResizeObserver", ResizeObserverStub);
 
+// jsdom never runs layout, so clientWidth is always 0 — useCanvasBox reads that
+// as "nothing measured yet" and keeps dims null, which (see #479) now gates
+// WebGraphCanvas out of the tree entirely. Stub a plausible measured width so
+// the canvas (and the controls inside it this suite drives) mounts as it would
+// in a real browser.
+Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, value: 1000 });
+
 // The d3-force simulation runs a timer and mutates positions — none of which
 // this component-level suite asserts on (the layout math is unit-tested
 // separately). Stub the module to an inert chainable so building the sim is a

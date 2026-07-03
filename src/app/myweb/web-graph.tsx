@@ -395,140 +395,148 @@ export function WebGraph({
         }}
         className="mx-auto overflow-hidden rounded border border-border bg-canvas [--xy-background-color:var(--color-canvas)]"
       >
-        <WebGraphCanvas
-          subgraph={filtered}
-          litNodeIds={pathNodeIds}
-          litEdgeIds={pathEdgeIds}
-          dimUnlit={dimUnlit}
-          labeledNodeIds={labeledNodeIds}
-          selectedNodeId={selectedNodeId}
-          hoverNodeIds={hoveredNodeIds}
-          hoverEdgeId={hoverEdgeId}
-          edgeInteraction={edgeInteraction}
-          normalize={normalize}
-          onReady={handleCanvasReady}
-          // Hover previews a number on desktop (off while an edge is selected).
-          onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
-          onEdgeMouseLeave={() => endPreviewSoon()}
-          // Click/tap a line selects it and shows its number; a second click on
-          // the selected line opens the relating dialog (clicking the number
-          // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
-          onEdgeClick={(_event, edge) => {
-            clearPreviewTimer();
-            // Selecting an edge supersedes any node selection.
-            setSelectedNodeId(null);
-            if (selectedEdgeId === edge.id) {
-              const d = edge.data;
-              if (d?.isOutgoing) {
-                onOpenRelating({
-                  id: d.relateeId,
-                  displayName: d.relateeName,
-                  currentValue: isRelationValue(d.value) ? d.value : null,
-                });
+        {/* Gated on dims so ReactFlow never mounts into a box whose size isn't
+         * resolved yet — mounting it before the first measurement lands (this
+         * div's width/height above are still undefined) makes ReactFlow log its
+         * "parent needs a width and a height" warning (#004, see #479). Once
+         * dims resolves it stays non-null, so this never unmounts the canvas
+         * afterward — only the pre-measurement frame skips it. */}
+        {dims && (
+          <WebGraphCanvas
+            subgraph={filtered}
+            litNodeIds={pathNodeIds}
+            litEdgeIds={pathEdgeIds}
+            dimUnlit={dimUnlit}
+            labeledNodeIds={labeledNodeIds}
+            selectedNodeId={selectedNodeId}
+            hoverNodeIds={hoveredNodeIds}
+            hoverEdgeId={hoverEdgeId}
+            edgeInteraction={edgeInteraction}
+            normalize={normalize}
+            onReady={handleCanvasReady}
+            // Hover previews a number on desktop (off while an edge is selected).
+            onEdgeMouseEnter={(_event, edge) => previewEdge(edge.id)}
+            onEdgeMouseLeave={() => endPreviewSoon()}
+            // Click/tap a line selects it and shows its number; a second click on
+            // the selected line opens the relating dialog (clicking the number
+            // does the same). Tap within the edge's interactionWidth (±5px) on mobile.
+            onEdgeClick={(_event, edge) => {
+              clearPreviewTimer();
+              // Selecting an edge supersedes any node selection.
+              setSelectedNodeId(null);
+              if (selectedEdgeId === edge.id) {
+                const d = edge.data;
+                if (d?.isOutgoing) {
+                  onOpenRelating({
+                    id: d.relateeId,
+                    displayName: d.relateeName,
+                    currentValue: isRelationValue(d.value) ? d.value : null,
+                  });
+                }
+                return;
               }
-              return;
-            }
-            setSelectedEdgeId(edge.id);
-          }}
-          onPaneClick={() => clearSelection()}
-          onNodeClick={(_event, node) => {
-            // Select the node (re-click toggles off): lights its path back to
-            // you and dims the rest. No viewport pan; clears any edge
-            // selection. Double-click still opens the member's profile.
-            clearPreviewTimer();
-            setHoverEdgeId(null);
-            setSelectedEdgeId(null);
-            setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
-          }}
-          onNodeMouseEnter={(_event, node) => setHoverNodeId(node.id)}
-          onNodeMouseLeave={() => setHoverNodeId(null)}
-          onNodeDoubleClick={(_event, node) => {
-            const slug = node.data.slug ?? node.data.id;
-            router.push(`/members/${slug}`);
-          }}
-        >
-          {/* Built-in +/-/fit-view buttons for users who can't or don't
-           * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
-           * is hidden — selection and connection are already disabled. */}
-          <Controls position="top-left" showInteractive={false} />
-          {/* Edit/Done in the lower-left corner so the toggle rides with the
-           * graph chrome and the page below stays clear for the feed. Same
-           * affordance in both modes, different label. The Done button carries
-           * the welcome tour's finishing-step anchor (data-tour). */}
-          <Panel position="bottom-left" className="flex flex-col items-start gap-2">
-            {doneError && (
-              <p
-                role="alert"
-                className="max-w-[16rem] rounded border border-border bg-background/90 p-2 text-sm text-destructive"
-              >
-                Couldn&apos;t save your update — your relationships are still saved.
-              </p>
-            )}
-            {mode === "edit" ? (
-              <Button variant="secondary" data-tour="done-button" disabled={donePending} onClick={onDone}>
-                {donePending ? "Saving…" : "Done"}
-              </Button>
-            ) : (
-              <Button onClick={onEdit}>Edit</Button>
-            )}
-          </Panel>
-          <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
-            {/* Click-to-toggle (not hover) so the hints stay reachable on
-             * touch devices where hover doesn't exist. */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
-              aria-expanded={hintOpen}
-              aria-controls="web-graph-hints"
-              onClick={() => setHintOpen((h) => !h)}
-              className="rounded-full border border-border bg-background/90 font-bold"
-            >
-              ?
-            </Button>
-            {hintOpen && (
-              <div
-                id="web-graph-hints"
-                className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
-              >
-                <ul className="flex flex-col gap-1">
-                  <li>Drag the background to pan.</li>
-                  <li>Drag a circle to reposition it.</li>
-                  <li>Scroll or pinch to zoom.</li>
-                  <li>Single-click a circle to highlight its path to you.</li>
-                  <li>Double-click a circle to open their profile.</li>
-                  <li>
-                    <span className="font-medium text-foreground">Friends-of-friends</span> adds your connections&apos;
-                    connections.
-                  </li>
-                  <li>
-                    Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship
-                    depths.
-                  </li>
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHintOpen(false);
-                    onReplayTour();
-                  }}
-                  className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+              setSelectedEdgeId(edge.id);
+            }}
+            onPaneClick={() => clearSelection()}
+            onNodeClick={(_event, node) => {
+              // Select the node (re-click toggles off): lights its path back to
+              // you and dims the rest. No viewport pan; clears any edge
+              // selection. Double-click still opens the member's profile.
+              clearPreviewTimer();
+              setHoverEdgeId(null);
+              setSelectedEdgeId(null);
+              setSelectedNodeId((cur) => (cur === node.id ? null : node.id));
+            }}
+            onNodeMouseEnter={(_event, node) => setHoverNodeId(node.id)}
+            onNodeMouseLeave={() => setHoverNodeId(null)}
+            onNodeDoubleClick={(_event, node) => {
+              const slug = node.data.slug ?? node.data.id;
+              router.push(`/members/${slug}`);
+            }}
+          >
+            {/* Built-in +/-/fit-view buttons for users who can't or don't
+             * want to scroll-zoom (trackpad pinch, mouse wheel). Lock toggle
+             * is hidden — selection and connection are already disabled. */}
+            <Controls position="top-left" showInteractive={false} />
+            {/* Edit/Done in the lower-left corner so the toggle rides with the
+             * graph chrome and the page below stays clear for the feed. Same
+             * affordance in both modes, different label. The Done button carries
+             * the welcome tour's finishing-step anchor (data-tour). */}
+            <Panel position="bottom-left" className="flex flex-col items-start gap-2">
+              {doneError && (
+                <p
+                  role="alert"
+                  className="max-w-[16rem] rounded border border-border bg-background/90 p-2 text-sm text-destructive"
                 >
-                  Replay guided tour
-                </button>
-              </div>
-            )}
-          </Panel>
-          <WebGraphControls
-            hops={view.hops}
-            onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
-            valueFilter={valueFilter}
-            onToggleValue={toggleValue}
-            spacing={spacing}
-            onSpacingChange={setSpacing}
-          />
-        </WebGraphCanvas>
+                  Couldn&apos;t save your update — your relationships are still saved.
+                </p>
+              )}
+              {mode === "edit" ? (
+                <Button variant="secondary" data-tour="done-button" disabled={donePending} onClick={onDone}>
+                  {donePending ? "Saving…" : "Done"}
+                </Button>
+              ) : (
+                <Button onClick={onEdit}>Edit</Button>
+              )}
+            </Panel>
+            <Panel position="bottom-right" className="flex flex-row-reverse items-end gap-2">
+              {/* Click-to-toggle (not hover) so the hints stay reachable on
+               * touch devices where hover doesn't exist. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={hintOpen ? "Hide canvas tips" : "Show canvas tips"}
+                aria-expanded={hintOpen}
+                aria-controls="web-graph-hints"
+                onClick={() => setHintOpen((h) => !h)}
+                className="rounded-full border border-border bg-background/90 font-bold"
+              >
+                ?
+              </Button>
+              {hintOpen && (
+                <div
+                  id="web-graph-hints"
+                  className="flex max-w-[18rem] flex-col gap-2 rounded border border-border bg-background/90 p-2 text-sm text-muted-foreground"
+                >
+                  <ul className="flex flex-col gap-1">
+                    <li>Drag the background to pan.</li>
+                    <li>Drag a circle to reposition it.</li>
+                    <li>Scroll or pinch to zoom.</li>
+                    <li>Single-click a circle to highlight its path to you.</li>
+                    <li>Double-click a circle to open their profile.</li>
+                    <li>
+                      <span className="font-medium text-foreground">Friends-of-friends</span> adds your
+                      connections&apos; connections.
+                    </li>
+                    <li>
+                      Toggle <span className="font-medium text-foreground">1–4</span> to show only those relationship
+                      depths.
+                    </li>
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHintOpen(false);
+                      onReplayTour();
+                    }}
+                    className="self-start text-foreground underline underline-offset-2 hover:text-primary"
+                  >
+                    Replay guided tour
+                  </button>
+                </div>
+              )}
+            </Panel>
+            <WebGraphControls
+              hops={view.hops}
+              onHopsChange={(hops) => setView((v) => ({ ...v, hops }))}
+              valueFilter={valueFilter}
+              onToggleValue={toggleValue}
+              spacing={spacing}
+              onSpacingChange={setSpacing}
+            />
+          </WebGraphCanvas>
+        )}
       </div>
     </div>
   );
