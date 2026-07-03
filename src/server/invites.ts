@@ -113,8 +113,9 @@ export const createInvite = async (params: {
   //
   // The invite and its hint rows are written in a single statement (a
   // writable CTE), not a db.transaction: a multi-statement transaction
-  // over the Supabase transaction pooler can be silently discarded.
-  // See docs/strategy-db-transactions.md.
+  // over the Supabase transaction pooler was observed silently
+  // discarding its writes (May 2026, #149). See
+  // docs/strategy-db-transactions.md.
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = generateInviteCode();
     try {

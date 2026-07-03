@@ -6,8 +6,10 @@ on:
 # Serialize e2e across all branches: the suite runs against the shared prod
 # Supabase DB and drives two fixed seeded accounts, resetting their state
 # mid-run. Two overlapping runs clobber each other's accounts and fail (#358).
-# A single global group queues runs instead; cancel-in-progress: false so no
-# deploy loses its e2e result.
+# A single global group queues runs instead; cancel-in-progress: false lets a
+# running suite finish. GitHub keeps one queued run per group, so when deploys
+# stack up the superseded queued runs are cancelled — the newest deploy still
+# gets its result.
 concurrency:
   group: e2e-shared-prod-db
   cancel-in-progress: false

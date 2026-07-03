@@ -6,9 +6,14 @@ pooler. **Read this before adding any `db.transaction(...)` call.**
 ## TL;DR — the rule
 
 The default `db` client (`src/server/db.ts`) connects through the Supabase
-**transaction pooler**. A multi-statement `BEGIN…COMMIT` over that pooler can be
-**silently mishandled**: the writes disappear with no error while the
-transaction still reports success, or it aborts part-way through.
+**transaction pooler**. In May 2026 we observed a multi-statement
+`BEGIN…COMMIT` over that pooler being **silently mishandled**: writes
+disappearing with no error while the transaction still reported success, and
+the loud sibling — aborting part-way through with `25P02`. The anomaly has not
+reproduced since and its mechanism was never confirmed, but the failure mode is
+silent data loss and the safe patterns below are cheap — so we treat the
+combination as unsafe **by policy**, not because the bug is known to still
+exist.
 
 So:
 
@@ -29,33 +34,39 @@ transaction pooler — nothing else.*
 ## Background — why this doc exists (the #149 investigation)
 
 `#149` was an intermittent e2e failure: Playwright's `waitForURL('/welcome')`
-timed out after 20s, seemingly at random, for weeks. The investigation ran long
-and took several false starts — RSC streaming, the Next.js router, caching, and
-read replicas were all chased and ruled out.
+timed out, seemingly at random, for weeks. The investigation ran long and took
+several false starts — RSC streaming, the Next.js router, caching, and read
+replicas were all chased and ruled out. It resolved into **two separate bugs
+sharing one symptom** (a welcome-flow read seeing profile state the e2e reset
+had just cleared, so `/` skipped the redirect to `/welcome`):
 
-The actual chain:
+**Bug 1 — the reset's `db.transaction` intermittently lost its writes**
+(May 2026). `resetE2EUsers` wrapped its `DELETE` + `UPDATE` in a
+`db.transaction(...)` over the transaction pooler. A diagnostic probe caught
+the reset returning **HTTP 200 with a stale `bio`** — the UPDATE's `RETURNING`
+reported the row touched, yet the read-back milliseconds later saw the old
+value with an `updated_at` older than the reset. Production logs (Axiom) also
+showed the *loud* variant: `POST /api/_test/reset` returning 500 with a
+Postgres `25P02` ("current transaction is aborted") error. The reset never
+needed atomicity, so #173 replaced the transaction with two plain autocommit
+statements. The probe's anomaly assertion — still armed in
+`tests/e2e/helpers/session.ts` — has been silent across thousands of resets
+since 2026-05-16.
 
-- The e2e suite resets two seeded users between tests via
-  `POST /api/_test/reset` → `resetE2EUsers()`, which wiped `profiles` fields
-  including `bio`.
-- The `/` route redirects to `/welcome` when `bio` is null. Tests rely on the
-  reset having nulled `bio`.
-- `resetE2EUsers` wrapped its `DELETE` + `UPDATE` in a `db.transaction(...)`.
-- Intermittently that transaction **did not persist** — the reset returned HTTP
-  200, but `bio` was never cleared. The next test signed in, `/` saw a stale
-  non-null `bio`, did not redirect, and `waitForURL('/welcome')` hung for 20s.
+**Bug 2 — concurrent e2e runs clobbering each other** (every remaining #149
+failure, May–June 2026). The suite drives two fixed seeded accounts in the
+shared prod DB, and `e2e.yml` had no concurrency control — so two deploys
+minutes apart ran two suites at once, and one run's reset/welcome writes landed
+mid-test in the other. Retro-analysis showed every #149-signature failure on a
+trusted branch after #173 coincided with an overlapping run. This mechanism
+produced the "impossible" traces (a write visible to one read, gone from the
+next) that were chased as pooler stale-read anomalies — the database behaved
+correctly the whole time; the unmodeled writer was the other CI run. Fixed by
+#358: a global concurrency group in `e2e.yml` serializes e2e runs.
 
-A diagnostic probe added to `resetE2EUsers` caught the failure with the reset
-endpoint returning **200 and a stale `bio`** — the transaction reporting success
-while its write was gone. Production logs (Axiom) also showed the *loud*
-variant: `POST /api/_test/reset` returning 500 with a Postgres `25P02`
-("current transaction is aborted") error.
-
-The fix for the reset: it never needed atomicity, so `db.transaction` was
-dropped in favour of two plain autocommit statements. `#149` stopped.
-
-But the same `db.transaction`-over-the-pooler hazard applies to *real*
-application transactions. This doc exists so those are written safely.
+Bug 1 is why this doc exists: the same `db.transaction`-over-the-pooler hazard
+applies to *real* application transactions, so those are written safely by
+construction.
 
 ## The mechanism
 
@@ -80,7 +91,10 @@ watches the wire for `BEGIN` and `COMMIT` to know when to pin and release.
 To run `BEGIN; stmt; stmt; COMMIT` correctly, transaction mode must pin **one**
 backend for the whole sequence. When that pinning desyncs — statements routed to
 different backends, or the `COMMIT` not reaching the backend that holds the
-writes — the transaction is mishandled. Observed results:
+writes — the transaction is mishandled. The desync itself is our working model,
+never confirmed from traces (see
+[What we are and aren't sure of](#what-we-are-and-arent-sure-of)); the two
+result shapes below were observed directly:
 
 - **Silent discard** — the transaction appears to commit (no error; `RETURNING`
   even returns row data), but the writes were never persisted.
@@ -96,11 +110,17 @@ implicit transaction, atomically. Single statements are immune.
 
 - **Sure:** `resetE2EUsers`' `db.transaction` intermittently failed to persist
   (probe-observed: HTTP 200 + stale data) and intermittently aborted with
-  `25P02` (Axiom-observed). Dropping the transaction fixed it.
+  `25P02` (Axiom-observed). Dropping the transaction fixed it: the read-back
+  assertion has stayed silent since 2026-05-16.
+- **Sure:** every `#149`-signature failure *after* the transaction was dropped
+  was cross-run clobbering (#358), fixed by serializing e2e runs — those
+  failures say nothing about the pooler.
 - **Working model, not proven:** the precise trigger — the *first* error that
   aborted the transaction — was never captured in logs. The backend-split
   explanation above is the most coherent fit but is not confirmed from our own
-  traces.
+  traces. The direct evidence is the mid-May 2026 probe captures; the anomaly
+  never reproduced after #173, and Supavisor is a managed component that
+  changes underneath us, so whether the hazard still exists today is unknown.
 - **Related, not identical:** [supabase/supabase#43753](https://github.com/supabase/supabase/issues/43753)
   reports transaction-pooler transactions silently discarding writes. It is
   filed for `SERIALIZABLE` isolation and is untriaged; our transactions run
@@ -220,6 +240,10 @@ lives in a migration rather than TypeScript.
 
 ### 3. The `dbTx` client — session pooler (when logic must stay in TS)
 
+**Status: design, not yet wired.** Nothing in `src/` defines `dbTx` or
+`SESSION_DATABASE_URL` today — implement the client below and add the env var
+(Vercel + `.env.local`) before first use.
+
 When neither of the above fits and the logic must stay in TypeScript with
 `db.transaction(...)`, run it over a **second client pointed at the session
 pooler**, where multi-statement transactions are sound:
@@ -258,8 +282,9 @@ await db.transaction(async (tx) => {
 });
 ```
 
-This is the `#149` bug. A single `await db.insert(...)` is fine; the
-`transaction` wrapper around multiple statements is not.
+This is the bug that hit `resetE2EUsers` (#149, bug 1). A single
+`await db.insert(...)` is fine; the `transaction` wrapper around multiple
+statements is not.
 
 ## Connection options reference
 
@@ -271,14 +296,16 @@ This is the `#149` bug. A single `await db.insert(...)` is fine; the
 | Serverless-safe | ❌ exhausts connections | ⚠️ only with small `max` + `idle_timeout` | ✅ |
 | Multi-statement txns | ✅ sound | ✅ sound | ⚠️ can be mishandled |
 | Prepared statements | ✅ | ✅ | ⚠️ partial (Supavisor-emulated) |
-| In this app | unused | `dbTx` (`SESSION_DATABASE_URL`) | `db` (`DATABASE_URL`) |
+| In this app | unused | pattern 3 (design — not yet wired) | `db` (`DATABASE_URL`) |
 
 postgres-js options worth knowing: `max` (pool size), `idle_timeout` (close idle
 connections — the key to bounding session-mode backends), `prepare` (defaults
 true; harmless on the transaction pooler in practice — Supavisor emulates
-prepared-statement support). The default `db` client nonetheless sets
-`prepare: false` as a #149 variable-reduction measure, kept after the 2026-06
-audit found the redemption path clean under it — see the comment in `db.ts`.
+prepared-statement support). The default `db` client sets `prepare: false`,
+adopted mid-investigation as a #149 isolation experiment (#296). The A/B
+answered "not a factor": the failure signature continued unchanged until #358's
+concurrency fix. It stays because it costs nothing and reverting would
+re-introduce a variable — see the comment in `db.ts`.
 
 ## Recognizing this in the wild
 
@@ -297,11 +324,13 @@ Keep this current as transactions are added or changed.
 |---|---|
 | `resetE2EUsers` (`src/server/test-reset.ts`) | Fixed — `db.transaction` dropped; two autocommit statements (it never needed atomicity). |
 | `createInvite` (`src/server/invites.ts`) | Hardened — pattern 1 (writable CTE): invite + hint rows written in one statement, no transaction. |
-| invited sign-in (`src/app/auth/callback/route.ts`) | Exposed but monitored — multi-statement txn (profile insert + invite redemption + relations). A 2026-06 audit found **zero** occurrences across all 22 prod redemptions (DB integrity check), a normal auth/profile gap, and an empty Sentry `25P02` history; the redirect is now instrumented (`log.warn "invite redemption failed"`, queryable in Axiom). Left as-is under `prepare: false`; pattern 2 (a `redeem_invite` function) is the fix if it ever fires. |
+| invited sign-in (`src/app/auth/callback/route.ts`) | Accepted risk, alarmed (decision 2026-07-02) — multi-statement txn (profile insert + invite redemption + relations) kept as-is. Monitoring covers both failure shapes: loud aborts hit `Sentry_captureException` (tags `feature:auth-callback`) plus an Axiom `invite redemption failed` line with `pgCode`; silent discard is caught by a post-commit read-back of the invite's `redeemed_by`, which raises a Sentry error on mismatch. A 2026-06 audit found zero anomalies across all 22 prod redemptions. Pattern 2 (a `redeem_invite` function) is the harden path if the alarm ever fires. |
 
 ## References
 
-- Issue `#149` — the full investigation trail.
+- Issue `#149` — the full investigation trail (closing comment has the
+  two-bug retro-analysis).
+- Issue `#358` — the cross-run clobber mechanism and the e2e concurrency fix.
 - [supabase/supabase#43753](https://github.com/supabase/supabase/issues/43753)
   — transaction pooler silently discards writes.
 - [Supabase: disabling prepared statements](https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL).

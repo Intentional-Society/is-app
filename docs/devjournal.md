@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-02 | James | #149 closed — the residual flake was CI concurrency; `prepare: false` did nothing
+
+Retro-analysis of every #149-signature e2e failure: after #173 dropped the reset's `db.transaction`, every remaining failure on a trusted branch coincided with an overlapping e2e run — #358's clobber, fixed by the concurrency group on 2026-06-21, zero recurrences since. `prepare: false` (#296) showed no effect and stays only because it's harmless. The pooler-transaction hazard evidence is scoped to the mid-May probe captures (real, unreproduced since); `strategy-db-transactions.md` corrected, probe teardown filed as #486. The auth callback keeps its transaction by decision, now alarmed on both failure shapes: the existing Sentry capture for loud aborts plus a new post-commit read-back that raises a Sentry error if a redemption silently vanishes.
+
 ## 2026-07-02 | Blake | Required structural gate for the team Skills
 
 A new `functional-skills` Vitest project (`tests/functional/skills/skill-contract.test.ts`) holds `/commit`, `/pr`, and `/ship` to their SKILL.md structure — frontmatter, invocation policy, section order, ≥3 evals each — so a structural break now fails the required `Lint & Functional Tests` check (skill-creator, vendored upstream, is exempt). (#396)
