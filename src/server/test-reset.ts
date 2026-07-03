@@ -63,8 +63,8 @@ export const resetE2EUsers = async (): Promise<{
   // Two separate autocommit statements rather than db.transaction:
   // delete-then-wipe needn't be atomic for a test reset, and a
   // multi-statement BEGIN/COMMIT over the Supabase transaction pooler
-  // can have its writes silently dropped while still reporting success
-  // (cf. supabase/supabase#43753) — the leading suspect for #149.
+  // was observed here (May 2026, #149 bug 1; cf. supabase/supabase#43753)
+  // silently dropping its writes while still reporting success.
   await db.delete(invites).where(inArray(invites.createdBy, ids));
   const updated = await db
     .update(profiles)

@@ -1,4 +1,4 @@
-import { captureException as Sentry_captureException } from "@sentry/nextjs";
+import { captureException as Sentry_captureException, captureMessage as Sentry_captureMessage } from "@sentry/nextjs";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { log } from "next-axiom";
@@ -250,6 +250,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (!result) {
     return NextResponse.redirect(new URL("/signin?error=profile_error", request.url), 303);
+  }
+
+  // #149 read-back alarm — the pooler hazard's silent mode reports
+  // success while the writes vanish, so no catch block can see it. One
+  // post-commit SELECT (its own statement → fresh pooled connection)
+  // verifies the redemption persisted; a mismatch raises a Sentry
+  // error. Alarm only: the member's session is valid either way, and
+  // blocking the redirect wouldn't recover anything.
+  const [readBack] = await db.select({ redeemedBy: invites.redeemedBy }).from(invites).where(eq(invites.code, invite));
+  if (readBack?.redeemedBy !== userId) {
+    Sentry_captureMessage("invite redemption lost after commit (#149-class silent discard)", {
+      level: "error",
+      tags: { feature: "auth-callback", path: "invite-redemption-readback" },
+      extra: { inviteCode: invite, userId, redeemedBy: readBack?.redeemedBy ?? null },
+    });
+    log.error("invite redemption read-back mismatch", {
+      inviteCode: invite,
+      userId,
+      redeemedBy: readBack?.redeemedBy ?? null,
+    });
+    await log.flush();
   }
 
   // Auto-subscribe runs outside the redemption transaction: it is

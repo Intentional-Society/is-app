@@ -20,14 +20,12 @@ declare global {
   var __pgClient: ReturnType<typeof postgres> | undefined;
 }
 
-// `prepare: false` — kept deliberately. Supavisor's transaction-pooler
-// prepared-statement support is only "partial" (Supabase FAQ +
-// supavisor#239); dropping prepared statements removes a plausible #149
-// aggravator (postgres-js re-preparing against rotating backends) at no
-// measured cost — Supavisor emulates them anyway. A 2026-06 audit of the
-// auth-callback redemption path found zero #149 occurrences in prod under
-// this setting, so we keep it rather than re-introduce the variable.
-// See docs/strategy-db-transactions.md.
+// `prepare: false` — adopted as a #149 isolation experiment (#296). The A/B
+// answered "not a factor": the #149 failure signature continued unchanged
+// until the real fix (#358, e2e run serialization). Kept because it costs
+// nothing — Supavisor emulates prepared statements on the transaction pooler
+// anyway (Supabase FAQ + supavisor#239) — and reverting would re-introduce a
+// variable for no measured gain. See docs/strategy-db-transactions.md.
 const client = globalThis.__pgClient ?? postgres(connectionString, { prepare: false });
 if (process.env.NODE_ENV !== "production") {
   globalThis.__pgClient = client;
