@@ -1,0 +1,91 @@
+name: skill-creator drift check
+
+# Monthly freshness check for the vendored `.claude/skills/skill-creator/` copy.
+# Dependabot can't watch a vendored directory, so this runs the repo's own
+# `update-skill-creator.mjs --check` (pinned SHA in UPSTREAM.md vs upstream) and
+# opens ONE tracking issue when upstream has moved ahead — labeled
+# `dependencies` + `skill-creator-drift`, mirroring Dependabot's
+# dependencies+qualifier labeling; the qualifier label is also the dedup key.
+# Read-only toward the repo: it never edits files or opens a PR — refreshing
+# stays the deliberate, human-run `update-skill-creator.mjs` + reviewed /commit.
+# See docs/plan-skill-creator-vendoring.md (PR 3) and docs/doc-skill-creator.md.
+
+on:
+  schedule:
+    - cron: "7 5 1 * *" # 05:07 UTC on the 1st of each month (:07 dodges the :00 scheduling rush)
+  workflow_dispatch: {} # manual: gh workflow run skill-creator-drift.yml
+
+permissions:
+  contents: read
+  issues: write
+
+# One run at a time; never cancel a mid-flight check (they're seconds long).
+concurrency:
+  group: skill-creator-drift
+  cancel-in-progress: false
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check vendored skill-creator against upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          out="$(node scripts/update-skill-creator.mjs --check 2>&1)"
+          code=$?
+          set -e
+          printf '%s\n' "$out"
+
+          if [ "$code" -eq 0 ]; then
+            echo "Vendored skill-creator is current — nothing to do."
+            exit 0
+          fi
+          if [ "$code" -ne 2 ]; then
+            echo "::error::update-skill-creator.mjs --check failed (exit $code) — fix the check before trusting drift results"
+            exit 1
+          fi
+
+          # Behind upstream. Ensure the qualifier label exists (idempotent: if it
+          # already exists this fails and we move on; if creation genuinely failed,
+          # `gh issue create --label` below fails loudly).
+          gh label create skill-creator-drift \
+            --description "Vendored skill-creator copy is behind upstream" \
+            --color 0366d6 2>/dev/null || true
+
+          # Dedup by label, FAIL-CLOSED: if the query itself errors we abort red
+          # rather than risk opening a duplicate issue.
+          open_count="$(gh issue list --state open --label skill-creator-drift --json number --jq 'length')" || {
+            echo "::error::dedup query failed — aborting instead of risking a duplicate issue"
+            exit 1
+          }
+          if [ "$open_count" -gt 0 ]; then
+            echo "A skill-creator-drift issue is already open — not duplicating."
+            exit 0
+          fi
+
+          cat > issue-body.md <<'STATIC'
+          The vendored `.claude/skills/skill-creator/` copy has fallen behind upstream.
+
+          Refresh with `node scripts/update-skill-creator.mjs`, review the diff, run the
+          acceptance evals (`evals/skill-creator.evals.json`), and ship via /commit.
+          See docs/doc-skill-creator.md.
+
+          STATIC
+          {
+            echo '```'
+            printf '%s\n' "$out"
+            echo '```'
+            echo
+            echo "_Opened automatically by \`.github/workflows/skill-creator-drift.yml\` (monthly)._"
+          } >> issue-body.md
+
+          gh issue create \
+            --title "skill-creator vendored copy is behind upstream" \
+            --label dependencies --label skill-creator-drift \
+            --body-file issue-body.md

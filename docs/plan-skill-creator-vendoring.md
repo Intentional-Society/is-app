@@ -1,7 +1,8 @@
 # Plan: Vendor `skill-creator` + Drift Management + Skill Eval Gates
 
-**Status:** PR 1 shipped (#395, 2026-06-14). NL-invocation prereq shipped (#353/#433/#459/#460,
-2026-06-24). PRs 2–3 ready to implement; PRs 4–5 deferred. See #396.
+**Status:** PRs 1–3 shipped (PR 1 #395 2026-06-14; PR 2 #485 2026-07-02; PR 3
+`skill-creator-drift` 2026-07-03). NL-invocation prereq shipped (#353/#433/#459/#460,
+2026-06-24). #396 complete; PRs 4–5 deferred.
 **Relevant files:** `.claude/skills/`, `evals/`, `scripts/`, `.github/workflows/`,
 `docs/spec-portable-ai-procedures.md`
 
@@ -23,8 +24,8 @@ the normal repo CI plus human review.
 
 **Vendor the `skills/skill-creator/` subdirectory into `.claude/skills/skill-creator/`, pinned to
 an upstream commit SHA, refreshed by a small Node script.** Five PRs, sequenced below: vendor
-(1), deterministic structural gate (2), light drift detection + local eval surfacing (3), then two
-deferred upgrades (4, 5).
+(1), deterministic structural gate (2), scheduled drift detection (3), then two deferred
+upgrades (4, 5).
 
 Why vendoring wins: skill-creator is a *subdirectory of a monorepo*, and Claude Code auto-loads
 project skills only from `.claude/skills/<name>/`. Vendoring puts it exactly there — zero setup
@@ -48,7 +49,8 @@ without silent drift.
   needs Python in CI. Our gate asserts *our* spec instead; `quick_validate.py` remains a local
   authoring aid.
 - **Behavioral LLM evals as a blocking CI gate** — nondeterministic; a flaky required check is
-  how `main` stalls. Behavioral evals are local (PR 3) and later advisory-only (PR 5).
+  how `main` stalls. Behavioral evals stay local at authoring/refresh time and later
+  advisory-only (PR 5).
 - **Auto-PR drift automation first** — needs a PAT/App token so the bot PR triggers required
   checks. A tracking issue (PR 3) gets the same signal with the default `GITHUB_TOKEN`; the
   auto-PR upgrade (PR 4) is deferred until the cadence proves annoying.
@@ -84,10 +86,9 @@ the post-NL repo state, which is now live. **Verified post-NL state (don't re-de
   ≥3); it touches `/ship` SKILL.md too, but body-only (delegation narration) — the
   `disable-model-invocation: true` frontmatter is unchanged, so the expectation table holds. It
   also edits spec §2, so re-deriving the citations matters more.
-- **PR 3:** `/commit` has Step 0 at lines 28–43 and the approval block at Step 14 (line 105 on
-  `main`; ~109 after PR #484, a +4 shift entirely above Step 14). Place the skill-creator
-  surfacing inside **Step 14** (approval block), not near Step 0. Current line count is 198;
-  ample headroom to 500.
+- **PR 3:** *(Superseded 2026-07-02 — PR 3 was redesigned to the scheduled drift workflow and
+  the `/commit` Step 14 surfacing was dropped; see the PR 3 section and the decision log. The
+  original Step 14 placement notes are retired with it.)*
 - Both: `.claude/settings.json` is tracked (explicit `!.claude/settings.json` gitignore negation
   added by #353) — expected state, not a surprise to "fix".
 - **Resolved issue (know it):** Thread 15 (`.scratch/skill-nl-invocation-review-roundtable.md`;
@@ -160,20 +161,37 @@ skill contract. Assertions, each traceable to `docs/spec-portable-ai-procedures.
 Deliberately *not* asserted (judgment/LLM territory, per spec L115): description quality,
 `## Depends on` accuracy, "passes its eval set", self-hosting, eval realism.
 
-## PR 3 — Local eval surfacing in `/commit`
+## PR 3 — Scheduled drift check → tracking issue
 
-> Tracked in #396. Reference that issue in the PR body.
-> **Scope decision (2026-06-26):** The drift-detection workflow (`.github/workflows/skill-creator-drift.yml`)
-> is deferred — low ROI for a small team; `node scripts/update-skill-creator.mjs --check` runs
-> manually when needed. PR 3 is the `/commit` surfacing edit only.
+> Tracked in #396; this is the closing PR (`Closes #396` in the body).
+> **Scope decision (2026-07-02, reversing 2026-06-26):** PR 3 is the drift-detection workflow;
+> the previously planned `/commit` Step 14 surfacing edit is **dropped**. Rationale: the Step 14
+> hook fires only when `.claude/skills/skill-creator/**` is in a staged payload — i.e. on a
+> refresh the human has *already decided to do* — so it structurally cannot detect upstream
+> staleness (nothing in our tree changes when upstream moves), and its eval reminder duplicates
+> what `update-skill-creator.mjs` and `UPSTREAM.md` already print at refresh time. The 2026-06-26
+> "low ROI" deferral had bundled this cheap issue-based version with the expensive auto-PR (PAT)
+> and behavioral-eval (custom headless job) variants; unbundled, the issue version needs only the
+> default `GITHUB_TOKEN`.
 
-- `/commit` SKILL.md: when the staged payload touches `.claude/skills/skill-creator/**`, surface
-  in the approval block: "skill-creator changed — run the `evals/skill-creator.evals.json`
-  acceptance evals and capture results in the Test Plan." Same pattern as the existing
-  schema-touch detection (spec §4.1 step 9). **Surface-and-capture only** — `/commit` does not
-  auto-run Python or behavioral evals in its critical path. `/commit` is the right stage: it is
-  the earliest gate, already runs `npm test` (which fires PR 2's gate), and its commit-message
-  convention already requires a Test Plan. `/pr` and `/ship` move already-committed work.
+- `.github/workflows/skill-creator-drift.yml`: monthly cron (05:07 UTC on the 1st) +
+  `workflow_dispatch`; `permissions: contents: read, issues: write`; a `skill-creator-drift`
+  concurrency group. Runs `node scripts/update-skill-creator.mjs --check`:
+  - exit 0 (current) → silent success;
+  - exit 2 (behind) → ensure the `skill-creator-drift` label exists, then open **one** tracking
+    issue (compare URL + refresh instructions in the body) labeled `dependencies` +
+    `skill-creator-drift` — mirroring Dependabot's `dependencies`+qualifier labeling. Dedup is
+    by the qualifier label and **fail-closed**: if the dedup query errors, the run goes red
+    rather than risk a duplicate;
+  - any other exit → red (the check itself is broken; fix before trusting drift results).
+- **Read-only toward the repo:** the workflow never syncs files or opens a PR. Refreshing stays
+  the deliberate, human-run `update-skill-creator.mjs` + acceptance evals + reviewed `/commit`
+  (the script itself prints those instructions).
+- **Exit-2 path proven pre-merge (2026-07-02):** new workflows can't be dispatched before
+  they exist on the default branch, so PR 3 carried a temporary throwaway commit (a
+  `pull_request` trigger + the `UPSTREAM.md` pin rolled back to the prior upstream SHA) to force
+  one real exit-2 run in CI — issue creation and label dedup verified live, then the test issue
+  was closed and the throwaway commit dropped via force-with-lease before merge.
 
 ## Spike — prove the eval loop (tracked in #396; parallel to PRs 2–3)
 
@@ -232,8 +250,8 @@ Upgrade PR 3's workflow tail: drop `--check`, let the script sync files, open a 
 is dirty (compare URL in the body). Known requirements, mapped now so they aren't rediscovered:
 PAT or GitHub App token (a default-`GITHUB_TOKEN` PR does not trigger `Lint & Functional Tests`,
 so branch protection would block it); honest PR body (green = structural gate + repo build; the
-human reviews the diff and runs the PR 1 evals per PR 3's `/commit` surfacing). Build when the
-issue-based cadence proves annoying, not before.
+human reviews the diff and runs the PR 1 evals per the refresh script's printed instructions).
+Build when the issue-based cadence proves annoying, not before.
 
 ## PR 5 — Behavioral evals in CI, advisory/scheduled (deferred)
 
@@ -247,6 +265,15 @@ unverified — spike before committing to this PR.
 
 ## Decision log
 
+- 2026-07-02 — Blake: **PR 3 redesigned** from the `/commit` Step 14 eval-surfacing edit to a
+  monthly scheduled drift check (`.github/workflows/skill-creator-drift.yml`: cron 05:07 UTC on
+  the 1st + `workflow_dispatch`; `--check`; exit 2 → one tracking issue labeled `dependencies` +
+  `skill-creator-drift`, label-deduped fail-closed; default `GITHUB_TOKEN`, no PAT). Reverses the
+  2026-06-26 deferral: that call had bundled the cheap issue-based automation with the expensive
+  auto-PR/behavioral variants, and the Step 14 hook couldn't serve the actual freshness goal — it
+  fires only on refresh commits (never when upstream moves) and duplicates the refresh script's
+  own printed eval instructions. PR 3 remains the closing PR for #396. Exit-2 path proven live
+  pre-merge via a throwaway `pull_request`-trigger + pin-rollback commit, dropped before merge.
 - 2026-07-02 — Blake: PR 2 (deterministic structural gate) implemented **on top of #484**, reversing the 2026-07-01 "independent, branch off `main`" call: `skill-nl-announce-affirmation` (#484) was merged first (`92984dc`) and the gate is written against the post-#484 repo state — eval counts 8/9/6 (commit/pr/ship), skill-creator 3, all ≥3. Gate lives at `tests/functional/skills/skill-contract.test.ts` in a **new `functional-skills` Vitest project** (its own home rather than folded into `functional-server`, so a skills contract test doesn't masquerade as a server test — and the `tests/functional/skills/` path is otherwise collected by no project and would silently not run). Runs in the required `Lint & Functional Tests` check. Allowlist `{commit, pr, ship}` only (skill-creator not held to our contract). Asserts: SKILL.md present; frontmatter parses with `name` + `description`; `name` == dir; per-skill invocation policy (commit/pr: `disable-model-invocation` absent, ship: `true`); body sections Invocation → Steps → Failure modes → `## Depends on` as a **subsequence**; >500 lines warns only; both eval JSONs' every `skill_path` resolves with ≥3 evals per skill. Spec citations re-derived post-#484: §2 L52–61, §3 L79–117.
 - 2026-07-01 — Blake: Studied PR #484 (`skill-nl-announce-affirmation`, now open — announce at the routing decision + delegation narration + semantic over-trigger evals). Confirmed still independent of PRs 2/3 (verified assertion-by-assertion). Corrections folded into the Sequencing note and PR 2 assertions: post-#484 eval counts are 8/9/6 (not 5/8/4); #484 touches `/ship` SKILL.md body-only (frontmatter untouched); Step 14 shifts +4 (→~109). Also hardened two PR 2 assertions against the real file shapes: section-order is a subsequence check, and `evals.json` nests cases under one `skill_path` per skill (count within group).
 - 2026-06-26 — Blake: Prereq correction — `skill-nl-announce-affirmation` is not required before PR 2 or PR 3. PR 2's assertions (key absence, section order, eval count ≥3) are insensitive to Step 0 announce content; eval ≥3 threshold is already satisfied (5/8/4). PR #468 is a procedural prerequisite (implementer should start from current `main`) but not a technical one.

@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-02 | Blake | Monthly drift check for the vendored skill-creator
+
+A new `skill-creator drift check` workflow (`.github/workflows/skill-creator-drift.yml`, monthly + manual dispatch) compares the vendored `.claude/skills/skill-creator/` pin against upstream and opens a single tracking issue (labels `dependencies` + `skill-creator-drift`) when it falls behind; refreshing stays the human-run `update-skill-creator.mjs` + reviewed `/commit`. Replaces the previously planned `/commit` Step 14 reminder, which only fired on refresh commits and couldn't detect upstream movement. (#396)
+
 ## 2026-07-02 | James | #149 closed — the residual flake was CI concurrency; `prepare: false` did nothing
 
 Retro-analysis of every #149-signature e2e failure: after #173 dropped the reset's `db.transaction`, every remaining failure on a trusted branch coincided with an overlapping e2e run — #358's clobber, fixed by the concurrency group on 2026-06-21, zero recurrences since. `prepare: false` (#296) showed no effect and stays only because it's harmless. The pooler-transaction hazard evidence is scoped to the mid-May probe captures (real, unreproduced since); `strategy-db-transactions.md` corrected, probe teardown filed as #486. The auth callback keeps its transaction by decision, now alarmed on both failure shapes: the existing Sentry capture for loud aborts plus a new post-commit read-back that raises a Sentry error if a redemption silently vanishes.
