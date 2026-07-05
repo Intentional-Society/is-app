@@ -100,10 +100,19 @@ once, so signing must not become N round-trips:
   which signs the whole directory in **one** round-trip. Never loop
   the single-path `createSignedUrl`.
 - **Cache** the signed URLs, keyed by object path, for most of the
-  TTL (a module-level `Map` on the Fluid Compute instance, or Next's
-  `use cache`). Signing then fires roughly once per TTL per warm
-  instance — not once per page view. The directory's hot path does
-  zero Storage round-trips.
+  TTL via **Vercel Runtime Cache** (`getCache()` from
+  `@vercel/functions`), not a module-level `Map`. A Map is scoped to
+  one Fluid Compute instance and one deployment: instance recycling,
+  scale-out, and every push-to-main deploy discard it, and each loss
+  re-signs the same path with a fresh `?token=` — a new cache key for
+  the browser and the optimizer, forcing both to re-download bytes
+  they already had (a 2026-07-03 HAR showed one navigation
+  re-downloading all 12 of a program's avatars against tokens minted
+  8 minutes apart; #382). Runtime Cache is shared across a region's
+  instances and survives deploys, so signing fires roughly once per
+  path per TTL per region. Reads and writes are best-effort and
+  instrumented (hit/miss counts and timings to Axiom); `next dev` and
+  tests fall back to an in-process cache.
 - The signed URL's `?token=` is part of `next/image`'s optimizer cache
   key, so each rotation forces a full re-fetch of every avatar's source
   object from Storage. The original 24h rotation did this daily; combined
