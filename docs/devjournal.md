@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-05 | James | Avatar signed URLs cache in Vercel Runtime Cache
+
+Signed avatar URLs now cache in Vercel Runtime Cache instead of a per-instance module Map, so tokens stay stable across deploys and instances (#382).
+
 ## 2026-07-02 | Blake | Monthly drift check for the vendored skill-creator
 
 A new `skill-creator drift check` workflow (`.github/workflows/skill-creator-drift.yml`, monthly + manual dispatch) compares the vendored `.claude/skills/skill-creator/` pin against upstream and opens a single tracking issue (labels `dependencies` + `skill-creator-drift`) when it falls behind; refreshing stays the human-run `update-skill-creator.mjs` + reviewed `/commit`. Replaces the previously planned `/commit` Step 14 reminder, which only fired on refresh commits and couldn't detect upstream movement. (#396)

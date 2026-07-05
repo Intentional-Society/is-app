@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { getCache } from "@vercel/functions";
 import { eq } from "drizzle-orm";
 import { log } from "next-axiom";
 import sharp from "sharp";
@@ -23,15 +24,40 @@ export const AVATAR_BUCKET = "avatars";
 // week. The cache window sits an hour under the TTL so a URL is re-signed
 // before it can expire mid-use.
 const SIGN_TTL_SECONDS = 5 * 24 * 60 * 60;
-const CACHE_TTL_MS = SIGN_TTL_SECONDS * 1000 - 60 * 60 * 1000;
+const CACHE_TTL_SECONDS = SIGN_TTL_SECONDS - 60 * 60;
 
-type CacheEntry = { url: string; expiresAt: number };
+// Signed-URL cache. Vercel Runtime Cache rather than a module-level Map:
+// a Map is scoped to one Fluid Compute instance and one deployment, so
+// instance recycling, scale-out, and every push-to-main deploy discard
+// it — and each loss re-signs the same object path with a fresh
+// `?token=`, which is part of the browser's and the image optimizer's
+// cache key, forcing both to re-download bytes they already had. (A
+// 2026-07-03 HAR capture showed one navigation re-downloading all 12 of
+// a program's avatars against tokens minted 8 minutes apart; #382.)
+// Runtime Cache is shared across a region's instances and survives
+// deploys. getCache() resolves its backing store lazily per operation,
+// so binding it at module scope is safe; where the runtime store is
+// unavailable (`next dev`, vitest) it falls back to a per-process
+// in-memory cache — the old Map behavior.
+const cache = getCache({ namespace: "avatar-url" });
 
-// Module-level cache keyed by object path. On Fluid Compute the
-// instance is reused across requests, so signing fires roughly once
-// per path per TTL rather than once per page view — the directory's
-// hot path then does zero Storage round-trips.
-const signedUrlCache = new Map<string, CacheEntry>();
+// Cache reads and writes are best-effort, like signing itself: a cache
+// outage must cost us a re-sign, never a failed page.
+const cacheGet = async (path: string): Promise<string | null> => {
+  try {
+    return ((await cache.get(path)) as string | null) ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const cacheSet = async (path: string, url: string): Promise<void> => {
+  try {
+    await cache.set(path, url, { ttl: CACHE_TTL_SECONDS, tags: ["avatar-url"] });
+  } catch {
+    // A lost write just means a future re-sign.
+  }
+};
 
 // Signs a batch of avatar object paths, returning a path → signed-URL
 // map. Cache hits skip the network; misses are signed in a single
@@ -42,39 +68,60 @@ export const resolveAvatarUrls = async (
   paths: readonly (string | null | undefined)[],
 ): Promise<Map<string, string>> => {
   const result = new Map<string, string>();
-  const now = Date.now();
+  const uniquePaths = [...new Set(paths.filter((p): p is string => !!p))];
+  if (uniquePaths.length === 0) return result;
+
+  const getStart = performance.now();
+  const cached = await Promise.all(uniquePaths.map((path) => cacheGet(path)));
+  const cacheGetMs = Math.round(performance.now() - getStart);
+
   const misses: string[] = [];
+  uniquePaths.forEach((path, i) => {
+    const url = cached[i];
+    if (url) result.set(path, url);
+    else misses.push(path);
+  });
 
-  for (const path of paths) {
-    if (!path || result.has(path)) continue;
-    const cached = signedUrlCache.get(path);
-    if (cached && cached.expiresAt > now) {
-      result.set(path, cached.url);
-    } else if (!misses.includes(path)) {
-      misses.push(path);
-    }
-  }
-
+  let signMs = 0;
+  let signFailed = false;
   if (misses.length > 0) {
+    const signStart = performance.now();
     const { data, error } = await supabaseAdmin.storage.from(AVATAR_BUCKET).createSignedUrls(misses, SIGN_TTL_SECONDS);
+    signMs = Math.round(performance.now() - signStart);
     if (error) {
       // Signing is best-effort. A transient Storage error — most often a
       // 429 "too many connections" when a burst of renders all sign at
       // once — must not 500 a page over a decorative avatar. Report it,
       // then leave the misses unsigned so they fall back to initials.
+      signFailed = true;
       log.error("avatar sign failed", {
         count: misses.length,
         message: error.message,
         statusCode: (error as { statusCode?: string }).statusCode,
       });
-      return result;
-    }
-    for (const row of data ?? []) {
-      if (row.error || !row.path || !row.signedUrl) continue;
-      signedUrlCache.set(row.path, { url: row.signedUrl, expiresAt: now + CACHE_TTL_MS });
-      result.set(row.path, row.signedUrl);
+    } else {
+      const sets: Promise<void>[] = [];
+      for (const row of data ?? []) {
+        if (row.error || !row.path || !row.signedUrl) continue;
+        result.set(row.path, row.signedUrl);
+        sets.push(cacheSet(row.path, row.signedUrl));
+      }
+      await Promise.all(sets);
     }
   }
+
+  // One event per resolve. The hit rate is the ground truth on whether the
+  // shared cache is working (persistently low in prod means it isn't and
+  // we're back to per-instance signing churn); cacheGetMs/signMs bound what
+  // the lookup and the signing round-trip cost the request.
+  log.info("avatar url cache", {
+    batch: uniquePaths.length,
+    hits: uniquePaths.length - misses.length,
+    misses: misses.length,
+    cacheGetMs,
+    signMs,
+    signFailed,
+  });
 
   return result;
 };
