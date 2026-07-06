@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-06 | Blake | Throwaway-PR generator for agent evaluation
+
+`scripts/new-throwaway-pr.ps1` (PowerShell 5.1+, needs `gh`) opens small short-lived PRs with plausible filler content against a sandbox repo, for evaluating PR-reviewing agents. By design the generated content carries no overt synthetic markers ("test", "fixture", lorem ipsum) that would bias the agent under evaluation; instead each PR embeds an 8-hex ref token and is recorded in a local ledger (`~/.throwaway-prs.json`), and `-Cleanup` bulk-closes everything ledgered for the repo. Point it at a scratch repo, not this one.
+
 ## 2026-07-05 | James | Avatar signed URLs cache in Vercel Runtime Cache
 
 Signed avatar URLs now cache in Vercel Runtime Cache instead of a per-instance module Map, so tokens stay stable across deploys and instances (#382).
