@@ -72,6 +72,24 @@ export default async function AboutPage() {
           .
         </p>
       </section>
+
+      <section className="w-full max-w-2xl">
+        <h2 className="text-lg font-semibold">Browser support</h2>
+        <p className="mt-2 text-base text-muted-foreground">
+          This app is built to the{" "}
+          <a
+            href="https://web.dev/baseline"
+            rel="noopener noreferrer"
+            className="underline text-muted-foreground hover:text-foreground"
+          >
+            Web Platform Baseline
+          </a>{" "}
+          "Widely Available" standard: we rely on a web feature only when every major browser (Chrome, Edge, Firefox,
+          Safari) has supported it for at least 30 months. Older browsers are supported on a best-effort basis,
+          prioritizing functionality over visuals. Browsers too old to run the app at all (roughly pre-2020) see an
+          update notice instead.
+        </p>
+      </section>
     </main>
   );
 }

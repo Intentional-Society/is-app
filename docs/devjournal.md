@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-05 | James | Browser support policy: Baseline widely available
+
+Full support requires Baseline widely available — check the MDN badge before hand-writing any CSS property, JS API, or syntax feature; older browsers get best-effort down to the hard floor (Chrome/Edge 85 / Safari 13.1 / Firefox 77, the legacy-check blocker). Details in `docs/strategy-browser-support.md`; member-facing summary on `/about`.
+
 ## 2026-07-05 | James | Avatar signed URLs cache in Vercel Runtime Cache
 
 Signed avatar URLs now cache in Vercel Runtime Cache instead of a per-instance module Map, so tokens stay stable across deploys and instances (#382).
