@@ -56,7 +56,6 @@ export default async function AboutPage() {
           This app is built by the IS Dev Team: James, Benji, Ola, Alexis, and Blake. The code is open — read it at{" "}
           <a
             href="https://github.com/Intentional-Society/is-app"
-            target="_blank"
             rel="noopener noreferrer"
             className="underline text-muted-foreground hover:text-foreground"
           >
