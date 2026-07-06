@@ -119,22 +119,24 @@ function MemberNode({ id, data }: NodeProps<Node<MemberNodeData>>) {
       {/* Hidden by default, faded in when labeled (hover or lit path). Kept
           mounted at opacity 0 rather than unmounted so the node's height never
           shifts as names appear (no reflow against the fixed layout). The
-          viewer's own node reads "You" in place of their name (mini-map cue). */}
+          viewer's own node reads "You" in place of their name (mini-map cue).
+          Canvas-colored halo so the name reads over the dense edge lines behind
+          it — those strokes are canvas-foreground, the same color family as the
+          text, so without a moat the glyphs blend in. The halo is a stroked
+          duplicate layered *under* the fill text: -webkit-text-stroke alone
+          paints over the fill, and paint-order:stroke (the one-element fix)
+          only applies to HTML text since Chrome 123, which turned names
+          canvas-on-canvas invisible on older Chromes. */}
       <div
         aria-hidden={!labeled}
-        className="pointer-events-none max-w-[8rem] truncate text-sm font-medium transition-opacity duration-150"
-        style={{
-          opacity: labeled ? 1 : 0,
-          // Canvas-colored halo so the name reads over the dense edge lines
-          // behind it — those strokes are canvas-foreground, the same color
-          // family as the text, so without a moat the glyphs blend in.
-          // paint-order:stroke draws the stroke behind the fill, so it's a true
-          // outline (glyphs stay crisp) rather than a thinned weight.
-          paintOrder: "stroke",
-          WebkitTextStroke: "3px var(--color-canvas)",
-        }}
+        className="pointer-events-none relative max-w-[8rem] text-sm font-medium transition-opacity duration-150"
+        style={{ opacity: labeled ? 1 : 0 }}
       >
-        {isViewer ? "You" : (data.displayName ?? "—")}
+        <span aria-hidden className="absolute inset-0 truncate" style={{ WebkitTextStroke: "3px var(--color-canvas)" }}>
+          {isViewer ? "You" : (data.displayName ?? "—")}
+        </span>
+        {/* relative so the fill paints above the positioned halo (DOM order). */}
+        <span className="relative block truncate">{isViewer ? "You" : (data.displayName ?? "—")}</span>
       </div>
     </div>
   );
