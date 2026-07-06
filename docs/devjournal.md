@@ -6,7 +6,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-07-06 | Blake | Throwaway-PR generator for agent evaluation
 
-`scripts/new-throwaway-pr.ps1` (PowerShell 5.1+, needs `gh`) opens small short-lived PRs with plausible filler content against a sandbox repo, for evaluating PR-reviewing agents. By design the generated content carries no overt synthetic markers ("test", "fixture", lorem ipsum) that would bias the agent under evaluation; instead each PR embeds an 8-hex ref token and is recorded in a local ledger (`~/.throwaway-prs.json`), and `-Cleanup` bulk-closes everything ledgered for the repo. Point it at a scratch repo, not this one.
+Three interchangeable scripts — `scripts/new-throwaway-pr.ps1` (PowerShell 5.1+), `scripts/new_throwaway_pr.py` (Python 3), `scripts/new-throwaway-pr.sh` (Bash + `jq`), all needing `gh` — open small short-lived PRs with plausible filler content against a sandbox repo, for evaluating PR-reviewing agents. By design the generated content carries no overt synthetic markers ("test", "fixture", lorem ipsum) that would bias the agent under evaluation; instead each PR embeds an 8-hex ref token and is recorded in a shared local JSON ledger (`~/.throwaway-prs.json`), and `--cleanup`/`-Cleanup` bulk-closes everything ledgered for the repo. The ledger format is common to all three, so you can create with one and clean up with another. Point them at a scratch repo, not this one. Follow-up captured in CLAUDE.md: the check-in Skills (`/commit`, `/pr`, `/ship`) still assume `gh` + interactive approval and need a cloud/MCP path.
 
 ## 2026-07-05 | James | Avatar signed URLs cache in Vercel Runtime Cache
 

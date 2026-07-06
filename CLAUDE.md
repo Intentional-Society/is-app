@@ -73,6 +73,8 @@ Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-a
 
 A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the Skills above; model-invokable like `/commit` and `/pr` — only `/ship` is explicit-only), is vendored verbatim at `.claude/skills/skill-creator/`, pinned to an upstream commit. Check/refresh via `node scripts/update-skill-creator.mjs --check`. See [docs/doc-skill-creator.md](docs/doc-skill-creator.md).
 
+> **TODO (memory for Blake): make `/commit`, `/pr`, `/ship` work 100% in cloud Claude Code (web) sessions without `gh`.** These Skills currently assume the `gh` CLI *and* an interactive human-approval channel, neither of which exists in a cloud/web session — there `gh` is absent and GitHub work goes through the GitHub MCP server (`mcp__github__*`), with no synchronous "bundled approval" prompt available. Symptom that prompted this: in a web session the throwaway-PR scripts (`scripts/new-throwaway-pr.{ps1,py,sh}`, `docs/devjournal.md` 2026-07-06) had to be committed with ad-hoc `git` because routing through `/commit` would have failed on both counts. Fix direction: teach each Skill to detect the environment and, when `gh` is unavailable, use the MCP GitHub tools for PR create/merge/close; and define a non-interactive approval path for cloud (e.g. `AskUserQuestion`, or an explicit opt-out) so the approval checkpoints still mean something. Keep the local/`gh` path unchanged. Revisit the `scripts/*` git-vs-Skill note in the throwaway-PR replies once this lands.
+
 ## Key docs
 
 - `docs/strategy-branching.md` — branching strategy and rationale
