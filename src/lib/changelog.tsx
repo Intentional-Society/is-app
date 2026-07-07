@@ -39,7 +39,7 @@ export const changelog: ChangelogEntry[] = [
   {
     date: "2026-07-05",
     title: "Browser support",
-    description: "Browser support policy (30 months full support, 6 years functional) now on the About page.",
+    description: "Browser support policy (30 months full, 6 years functional) now listed on the About page.",
   },
   {
     date: "2026-06-24",
@@ -48,8 +48,8 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     date: "2026-06-20",
-    title: "Improved program descriptions",
-    description: "Program descriptions can now run as long as they need.",
+    title: "Improved program listings",
+    description: "Separate summaries, details link, longer descriptions, facepiles.",
   },
   {
     date: "2026-06-18",
