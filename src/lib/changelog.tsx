@@ -37,6 +37,21 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-07-05",
+    title: "Browser support",
+    description: "Browser support policy (30 months full, 6 years functional) now listed on the About page.",
+  },
+  {
+    date: "2026-06-24",
+    title: "Photos when relating",
+    description: "The dialog for setting a relationship now shows the member's photo.",
+  },
+  {
+    date: "2026-06-20",
+    title: "Improved program listings",
+    description: "Separate summaries, details link, longer descriptions, facepiles.",
+  },
+  {
     date: "2026-06-18",
     title: "Spacing slider",
     description: "My Web has a spacing slider to adjust map density, plus clarity and hover improvements.",

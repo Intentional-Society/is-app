@@ -14,6 +14,15 @@
  * Keep this ES5 (var, no arrow functions, no `?.`/`??`) so the warning can
  * display on the very browsers it is meant to warn. It is excluded from
  * Biome for the same reason — see biome.json.
+ *
+ * The generation this check gates on — Chrome/Edge 85, Safari 13.1,
+ * Firefox 77 — is the app's hard minimum spec: the "blocked" tier of
+ * docs/strategy-browser-support.md. This blocker fails legibly below the
+ * floor; the support commitments above it (Baseline-widely-available
+ * full fidelity, best-effort in between) live in that doc. Move the
+ * floor only in
+ * lockstep with the framework stack's emitted-syntax baseline, updating
+ * this check and the doc together.
  */
 (function () {
   // Each of these landed in Safari 13.1 / Chrome 85 / Firefox 77 — the same
