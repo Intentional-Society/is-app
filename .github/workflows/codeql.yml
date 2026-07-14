@@ -81,7 +81,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         # v2.0.2 — GitHub-owned but in the advanced-security org
         # rather than github/, so SHA-pin to lock the version.
-        uses: advanced-security/dismiss-alerts@046d6b48d2e43cf563f96f67332c47c432eff83e
+        uses: advanced-security/dismiss-alerts@a18f986bdb40edba0dd7a74382c15d4a3d50a1c8
         with:
           sarif-id: ${{ steps.analyze.outputs.sarif-id }}
           sarif-file: sarif-results/${{ matrix.sarif }}
