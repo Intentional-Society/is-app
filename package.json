@@ -83,7 +83,7 @@
     "lefthook": "^2.1.9",
     "supabase": "^2.109.0",
     "tailwindcss": "^4",
-    "typescript": "^6.0",
+    "typescript": "^7.0",
     "vitest": "^4.1.9"
   },
   "optionalDependencies": {
