@@ -1,0 +1,3 @@
+# Generated diagnostic reports — machine-local, never committed.
+# skill_diag.py writes here by default; override with --out.
+out/
