@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-19 | Blake (with Fable) | Skill-evals baseline program spec landed
+
+Landed the skill-evals baseline program spec (`docs/spec-skill-evals-baseline.md`, with its conversion manifest and strategy-doc outline): sandboxed, /skill-creator-centered eval infrastructure for the three team Skills, delivered in phases via GitHub-tracked delegation packets.
+
 ## 2026-07-05 | James | Browser support policy: Baseline widely available
 
 Full support requires Baseline widely available — check the MDN badge before hand-writing any CSS property, JS API, or syntax feature; older browsers get best-effort down to the hard floor (Chrome/Edge 85 / Safari 13.1 / Firefox 77, the legacy-check blocker). Details in `docs/strategy-browser-support.md`; member-facing summary on `/about`.
