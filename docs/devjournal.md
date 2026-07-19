@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-19 | Blake (with Fable) | Skill evals live per-skill now; strategy doc born
+
+The team skills' acceptance evals moved from `evals/evals.json` to `.claude/skills/<name>/evals/evals.json` with `kind`/`fixture`/`human_script`/`expectations` fields, pinned by the contract test. `docs/strategy-skill-evals.md` is the new runbook; eval prompts are never executed against the real repo (sandbox harness lands in Phase 2). (#507)
+
 ## 2026-07-19 | Blake (with Fable) | Skill-evals baseline program spec landed
 
 Landed the skill-evals baseline program spec (`docs/spec-skill-evals-baseline.md`, with its conversion manifest and strategy-doc outline): sandboxed, /skill-creator-centered eval infrastructure for the three team Skills, delivered in phases via GitHub-tracked delegation packets.

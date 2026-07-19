@@ -74,6 +74,8 @@ Design and rationale: [docs/spec-portable-ai-procedures.md](docs/spec-portable-a
 
 A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the Skills above; model-invokable like `/commit` and `/pr` — only `/ship` is explicit-only), is vendored verbatim at `.claude/skills/skill-creator/`, pinned to an upstream commit. Check/refresh via `node scripts/update-skill-creator.mjs --check`. See [docs/doc-skill-creator.md](docs/doc-skill-creator.md).
 
+**Skill evals.** Skill-eval prompts (`.claude/skills/{commit,pr,ship}/evals/evals.json`) are never executed against the real repo or real GitHub — any skill, any origin. Execution routes through the sandbox harness described in [docs/strategy-skill-evals.md](docs/strategy-skill-evals.md) — which doesn't exist yet, so no eval is executable at all as of this writing; that harness lands in Phase 2 of the skill-evals baseline program (`docs/spec-skill-evals-baseline.md`).
+
 ## Key docs
 
 - `docs/strategy-branching.md` — branching strategy and rationale

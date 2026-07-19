@@ -120,15 +120,21 @@ describe("skill contract — .claude/skills/{commit,pr,ship}", () => {
     });
   });
 
-  // Committed acceptance artifacts. `evals/evals.json` holds the team Skills'
-  // evals; `evals/skill-creator.evals.json` holds the vendored copy's. Each file
-  // nests eval cases under ONE `skill_path` per skill — so count cases *within* a
-  // skill's group, not `skill_path` occurrences. Plan PR 2, assertion 6.
+  // Committed acceptance artifacts. Two independent shapes coexist by design (spec
+  // II.2a, DP1 Option B; C14 rescope 2026-07-19):
+  //
+  //  - `evals/skill-creator.evals.json` — the vendored copy's OWN acceptance evals
+  //    (C1: the vendored dir stays verbatim upstream, so this file stays at repo root,
+  //    in the original multi-skill `{ skills: [...] }` wrapper shape).
+  //  - `.claude/skills/{commit,pr,ship}/evals/evals.json` — the team Skills' runnable
+  //    eval definitions, split per-skill at Phase 1 into upstream's own documented
+  //    per-skill location. Root `evals/evals.json` no longer exists (deleted at Phase 1
+  //    completion). Schema reference: docs/strategy-skill-evals.md §3.
   describe("eval acceptance artifacts", () => {
-    const EVAL_FILES = ["evals/evals.json", "evals/skill-creator.evals.json"];
     const MIN_EVALS = 3;
 
-    it.each(EVAL_FILES)("%s — every skill_path resolves and carries ≥3 evals", (file) => {
+    it("evals/skill-creator.evals.json — skill_path resolves and carries ≥3 evals", () => {
+      const file = "evals/skill-creator.evals.json";
       const parsed = JSON.parse(readFileSync(file, "utf8")) as {
         skills: { skill_name: string; skill_path: string; evals?: unknown[] }[];
       };
@@ -136,14 +142,120 @@ describe("skill contract — .claude/skills/{commit,pr,ship}", () => {
       const problems: string[] = [];
       for (const skill of parsed.skills) {
         if (!existsSync(skill.skill_path)) {
-          problems.push(`${skill.skill_name}: skill_path "${skill.skill_path}" does not resolve`);
+          problems.push(`${file} — ${skill.skill_name}: skill_path "${skill.skill_path}" does not resolve`);
         }
         const count = Array.isArray(skill.evals) ? skill.evals.length : 0;
         if (count < MIN_EVALS) {
-          problems.push(`${skill.skill_name}: ${count} evals (need ≥${MIN_EVALS})`);
+          problems.push(`${file} — ${skill.skill_name}: ${count} evals (need ≥${MIN_EVALS})`);
         }
       }
       expect(problems).toEqual([]);
+    });
+
+    it("root evals/evals.json no longer exists (evals moved per-skill in Phase 1)", () => {
+      expect(
+        existsSync("evals/evals.json"),
+        "evals/evals.json should have been deleted when the per-skill split landed " +
+          "(C14 rescope, spec II.2a). If this fired, either the delete regressed or a " +
+          "tool recreated the file — check git status.",
+      ).toBe(false);
+    });
+
+    // Allowed `kind` values (spec II.2a / II.2d) and the exact execution-eval ID set
+    // pinned from the approved conversion manifest (docs/spec-skill-evals-manifest.md).
+    // Pinning IDs (not just a minimum count) means a skill-creator regeneration that
+    // silently drops or renames an execution eval fails loudly here instead of shipping
+    // a quietly thinner suite (R1 hardening, spec II.5). If an eval-set change here is
+    // intentional and reviewed, update this table alongside the manifest — don't loosen
+    // the assertion to make it pass.
+    const ALLOWED_KINDS = new Set(["execution", "routing"]);
+    const EXPECTED_EXECUTION_IDS: Record<SkillName, string[]> = {
+      commit: ["commit-1", "commit-2", "commit-3a", "commit-3b"],
+      pr: ["pr-1", "pr-2", "pr-3", "pr-4", "pr-5", "pr-6", "pr-7"],
+      ship: ["ship-1", "ship-2a", "ship-2b", "ship-2c", "ship-3", "ship-6"],
+    };
+
+    type EvalEntry = {
+      id: string;
+      kind?: string;
+      fixture?: string;
+      expectations?: unknown[];
+    };
+
+    function readSkillEvals(name: SkillName) {
+      const path = `.claude/skills/${name}/evals/evals.json`;
+      const parsed = JSON.parse(readFileSync(path, "utf8")) as {
+        skill_path?: string;
+        evals?: EvalEntry[];
+      };
+      return { path, parsed };
+    }
+
+    describe.each(SKILLS)("%s/evals/evals.json", (name) => {
+      it(`exists, resolves skill_path to ${name}/SKILL.md, and carries ≥${MIN_EVALS} evals`, () => {
+        const path = `.claude/skills/${name}/evals/evals.json`;
+        expect(
+          existsSync(path),
+          `${path} is missing — Phase 1 moved each team Skill's evals into its own ` +
+            "skill folder (spec II.2a, DP1 Option B). See docs/strategy-skill-evals.md.",
+        ).toBe(true);
+
+        const { parsed } = readSkillEvals(name);
+        const expectedSkillPath = `.claude/skills/${name}/SKILL.md`;
+        expect(parsed.skill_path, `${path}: "skill_path" must be "${expectedSkillPath}"`).toBe(expectedSkillPath);
+        expect(existsSync(expectedSkillPath)).toBe(true);
+
+        const count = Array.isArray(parsed.evals) ? parsed.evals.length : 0;
+        expect(count, `${path}: ${count} evals (need ≥${MIN_EVALS})`).toBeGreaterThanOrEqual(MIN_EVALS);
+      });
+
+      it("every eval has a valid `kind`; `execution` evals carry `fixture` + ≥1 expectation", () => {
+        const { path, parsed } = readSkillEvals(name);
+        const problems: string[] = [];
+
+        for (const evalEntry of parsed.evals ?? []) {
+          if (!evalEntry.kind || !ALLOWED_KINDS.has(evalEntry.kind)) {
+            problems.push(
+              `${path} — eval "${evalEntry.id}": kind "${evalEntry.kind}" is not one of ` +
+                `${[...ALLOWED_KINDS].join("/")} (see docs/strategy-skill-evals.md §3)`,
+            );
+            continue;
+          }
+          if (evalEntry.kind !== "execution") continue;
+
+          if (!evalEntry.fixture) {
+            problems.push(
+              `${path} — eval "${evalEntry.id}": kind: execution requires a non-empty ` +
+                '"fixture" naming the sandbox starting-state profile (docs/strategy-skill-evals.md §3)',
+            );
+          }
+          if (!Array.isArray(evalEntry.expectations) || evalEntry.expectations.length < 1) {
+            problems.push(
+              `${path} — eval "${evalEntry.id}": kind: execution requires ≥1 ` +
+                '"expectations" entry (machine-gradeable assertion; docs/strategy-skill-evals.md §3)',
+            );
+          }
+        }
+        expect(problems).toEqual([]);
+      });
+
+      it("the execution-eval ID set matches the approved conversion manifest exactly", () => {
+        const { path, parsed } = readSkillEvals(name);
+        const actual = (parsed.evals ?? [])
+          .filter((e) => e.kind === "execution")
+          .map((e) => e.id)
+          .sort();
+        const expected = [...EXPECTED_EXECUTION_IDS[name]].sort();
+
+        expect(
+          actual,
+          `${path}: execution-eval IDs drifted from the approved conversion manifest ` +
+            "(docs/spec-skill-evals-manifest.md). Expected exactly " +
+            `[${expected.join(", ")}], got [${actual.join(", ")}]. If this is an ` +
+            "intentional, reviewed change, update EXPECTED_EXECUTION_IDS in this test " +
+            "alongside the manifest.",
+        ).toEqual(expected);
+      });
     });
   });
 });
