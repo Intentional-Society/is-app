@@ -112,7 +112,7 @@ Each Skill is built using Anthropic's `skill-creator` workflow:
 5. Review outputs via `eval-viewer/generate_review.py`; iterate the body based on feedback.
 6. Run the description-optimization loop via `scripts/run_loop.py`. For `/ship` (`disable-model-invocation: true`) this tunes the description for human readability and slash-invocation discoverability; for `/commit` and `/pr` (natural-language-invocable, v1.1 #353) it also tunes for correct natural-language firing.
 7. Forward-test each Skill on realistic prompts before shipping.
-8. Do not add README, changelog, quick-reference, or auxiliary docs inside Skill folders.
+8. Do not add README, changelog, quick-reference, or auxiliary docs inside Skill folders. (`evals/` — `evals.json`, fixtures, trigger sets — is upstream skill-creator anatomy, not an auxiliary doc, and belongs inside every skill folder; see [docs/strategy-skill-evals.md](strategy-skill-evals.md).)
 
 Per-skill acceptance: passes its eval set; body ≤500 lines; description is description-optimized; `## Depends on` footer is accurate and complete; the Skill self-hosts (it can be used to commit changes to itself).
 

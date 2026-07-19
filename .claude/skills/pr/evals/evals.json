@@ -1,0 +1,169 @@
+{
+  "$comment": "Runnable eval definitions for /pr (spec docs/spec-portable-ai-procedures.md §4.2). Converted from the original repo-root evals/evals.json per the approved conversion manifest (docs/spec-skill-evals-manifest.md — Phase 1 of docs/spec-skill-evals-baseline.md). EXECUTION NOTICE: skill-eval prompts are never executed against the real repo or real GitHub — any skill, any origin. `kind: execution` entries require a harness-built sandbox (`fixture` names the starting-state profile; `human_script` gives the scripted human replies, valid only inside a marker-bearing sandbox) — see docs/strategy-skill-evals.md. `kind: routing` entries test whether/how the skill fires in a live session; a subagent handed this file cannot execute them — they stay documented manual runbooks (docs/strategy-skill-evals.md) until the Phase-8 session runner. As of Phase 1 the sandbox harness does not exist yet (it ships in Phase 2), so no eval below is executable at all right now — CLAUDE.md's guardrail carries this staged caveat too.",
+  "skill_name": "pr",
+  "skill_path": ".claude/skills/pr/SKILL.md",
+  "spec_section": "docs/spec-portable-ai-procedures.md §4.2",
+  "evals": [
+    {
+      "id": "pr-1",
+      "kind": "execution",
+      "eval_name": "happy-path-existing-pr-comment-on-push",
+      "prompt": "/pr",
+      "fixture": "feature-open-pr-two-new-commits",
+      "preconditions": "On a feature branch that has an open PR; 2 new commits ahead of the last push; working tree clean; gh authenticated; `origin/main` has not advanced (rebase is a no-op).",
+      "human_script": "None — no human approval checkpoint is reached on this path: the run posts a PR-conversation comment automatically and skips the body update because there is no material scope change.",
+      "expected_output": "Skill runs `gh auth status` (pass), confirms tree clean, `git fetch origin main`, `merge-base --is-ancestor` succeeds (no rebase needed), skips the post-rebase `npm test` re-run (rebase was a no-op), `git push -u origin <branch>`, posts a PR-conversation comment summarizing each new commit (one bullet per commit), does NOT update the PR body (no material scope change), prints the PR URL, stops. Does NOT poll CI checks.",
+      "expectations": [
+        "`gh auth status` runs and succeeds before any git/gh mutation",
+        "`git fetch origin main` runs, and `git merge-base --is-ancestor origin/main HEAD` succeeds so no rebase occurs",
+        "`npm test` does not re-run (the rebase was a no-op)",
+        "`git push -u origin <branch>` appears in the command log",
+        "The gh call log shows exactly one PR-conversation comment posted, with one bullet per new commit",
+        "The gh call log shows no PR body-update call",
+        "The gh call log contains no CI-check polling call (e.g. no `gh pr checks`)",
+        "The final output prints the PR URL"
+      ]
+    },
+    {
+      "id": "pr-2",
+      "kind": "execution",
+      "eval_name": "refusal-pr-on-different-branch",
+      "prompt": "/pr 145",
+      "fixture": "feature-x-with-pr-on-feature-y",
+      "preconditions": "Current checkout is on branch `feature-x`. PR 145 is on branch `feature-y`. Tree clean; gh authenticated.",
+      "human_script": "None — the skill refuses before any interactive checkpoint is reached; no scripted reply is required.",
+      "expected_output": "Skill resolves the argument to PR 145 via `gh pr view 145`, detects the branch mismatch, refuses to switch (per `/pr` policy), names both branches in the refusal, and suggests `/ship 145` for switching. No fetch, no push, no PR-side mutation.",
+      "expectations": [
+        "`gh pr view 145` appears in the gh call log",
+        "The response names both branches (`feature-x` and `feature-y`) in the refusal",
+        "The response suggests `/ship 145` as the switching path",
+        "The command/gh call log contains no `git fetch`, no `git push`, and no PR-mutating call (no `gh pr create`, no PR comment, no body update)"
+      ]
+    },
+    {
+      "id": "pr-3",
+      "kind": "execution",
+      "eval_name": "edge-case-delegation-to-commit-then-create-pr",
+      "prompt": "/pr \"wire up dashboard\"",
+      "fixture": "feature-dirty-no-pr",
+      "preconditions": "On a feature branch with uncommitted changes related to a dashboard wiring task; no existing PR; gh authenticated.",
+      "human_script": "At /commit's step-14 approval checkpoint (reached via delegation), the human replies: y. At /pr's PR-draft approval checkpoint (title + body + reviewers), the human replies: y.",
+      "expected_output": "Skill detects dirty tree at the working-tree pre-flight, delegates to `/commit \"wire up dashboard\"` with the same argument. As it writes the delegation marker and invokes `/commit`, `/pr` prints `Using /commit — delegated from /pr` as the handoff line — and the delegated `/commit` does NOT separately self-announce (the marker suppresses its self-announcement), so the hop is announced exactly once, by the parent, even though `/pr` here was typed as a slash command. `/commit` runs its full flow (stage, test, approval, commit, push). On return, `/pr` continues: fetch, no-op rebase, no-op re-test, push (already pushed by `/commit`; idempotent), then drafts a CC-format PR title (e.g., `feat: wire up dashboard`) and structured body for human approval, runs `gh pr create` on approval, prints the URL, stops.",
+      "expectations": [
+        "`/pr` detects the dirty tree at the working-tree pre-flight and delegates to `/commit \"wire up dashboard\"` with the same argument",
+        "The transcript shows the delegation marker written and `/pr` printing `Using /commit — delegated from /pr` as the handoff line before the delegated call",
+        "The delegated `/commit` does not print its own `Using /commit` announcement (self-announcement suppressed by the marker)",
+        "`/commit` runs its full flow: stages the dashboard-related paths, runs `npm test`, presents the approval block, commits, and pushes — exactly one new commit exists in the sandbox git log",
+        "After `/commit` returns, `/pr` continues with fetch and a no-op rebase/re-test, and the subsequent push is idempotent (no error from re-pushing an already-current branch)",
+        "`/pr` drafts a Conventional-Commit-style PR title (e.g. `feat: wire up dashboard`) and a structured body, presents it for approval, and on approval runs exactly one `gh pr create` call",
+        "The final output prints the PR URL"
+      ]
+    },
+    {
+      "id": "pr-4",
+      "kind": "execution",
+      "eval_name": "new-pr-cc-title-and-breaking-change-flag",
+      "prompt": "/pr",
+      "fixture": "feature-breaking-change-no-pr",
+      "preconditions": "On a feature branch with no open PR; tree clean; the branch contains a single commit that removes a public API field (a breaking change); gh authenticated; `origin/main` has not advanced (rebase no-op).",
+      "human_script": "At the PR-draft approval checkpoint, the human replies: y",
+      "expected_output": "Skill runs `gh auth status`, confirms tree clean, fetch, no-op rebase, no-op re-test, push, then drafts a CC-format title with the breaking-change flag — e.g., `feat!: remove deprecated profile.legacyId field` (≤70 chars). Body includes the `Summary:` / `Why:` / `Behavior:` / `Test Plan:` sections and a `BREAKING CHANGE:` footer explaining the compatibility impact. Surfaces the breaking-change classification in the approval prompt so the human can confirm before `gh pr create`.",
+      "expectations": [
+        "`gh auth status` runs and succeeds; tree is confirmed clean",
+        "Fetch and a no-op rebase occur (origin/main not advanced); `npm test` does not re-run",
+        "`git push -u origin <branch>` appears in the command log",
+        "The drafted PR title uses `!` before the colon and is ≤70 chars (e.g. `feat!: remove deprecated profile.legacyId field`)",
+        "The drafted body includes `Summary:`, `Why:`, `Behavior:`, `Test Plan:` sections and a `BREAKING CHANGE:` footer explaining the compatibility impact",
+        "The approval prompt surfaces the breaking-change classification before `gh pr create` runs",
+        "On approval, exactly one `gh pr create` call appears in the gh call log"
+      ]
+    },
+    {
+      "id": "pr-5",
+      "kind": "execution",
+      "eval_name": "reviewer-cold-cache-numeric-pick-happy-path",
+      "prompt": "/pr",
+      "fixture": "feature-no-pr-cold-reviewer-cache",
+      "preconditions": "On a feature branch with a single commit and no open PR; tree clean; `origin/main` not advanced (rebase no-op); gh authenticated; `.claude/skills/pr/.team-cache.json` does not exist (cold cache); the repo has 5 human collaborators after bot-filtering.",
+      "human_script": "At the reviewer picker prompt, the human replies: 1 3. At the bundled approval block (title + body + reviewers), the human replies: y.",
+      "expected_output": "Skill runs Steps 1-8 normally. At Step 9, detects no cache and fires the three cold-cache fetches in parallel: `gh api repos/<owner>/<repo>/collaborators`, `gh api user`, and parallel `gh api users/<login>` for display names. Applies the bot filter to the collaborator list before writing `.claude/skills/pr/.team-cache.json` with `collaborators`, `displayNames`, `self`, `refreshedAt`. Renders the vertical picker sorted alphabetically by display name (case-insensitive), with `self` excluded and entries numbered in sort order. The rendered picker MUST NOT contain `[xN]` count markers, 'Frequent reviewers' or 'Other collaborators' tier headers, or any sort key derived from past review/author activity. Human types `1 3`; Skill resolves to the two corresponding logins, echoes `→ Requesting review from <login1>, <login3>. Proceeding.`, presents the bundled approval block (title + body + resolved reviewers), and on approval runs `gh pr create --reviewer <login1>,<login3>` (no `@`, no spaces inside the value).",
+      "expectations": [
+        "No `.claude/skills/pr/.team-cache.json` exists at sandbox start (cold-cache liveness: the file's absence is verified before the run, not assumed)",
+        "The gh call log shows the three cold-cache fetches fired for the fixture's 5 human collaborators (`gh api repos/.../collaborators`, `gh api user`, per-login `gh api users/<login>`)",
+        "The bot filter is applied before the cache is written — no bot/app login appears in the rendered picker",
+        "`.claude/skills/pr/.team-cache.json` is written with `collaborators`, `displayNames`, `self`, `refreshedAt`",
+        "The rendered picker is sorted alphabetically by display name (case-insensitive), excludes `self`, is numbered in sort order, and contains no `[xN]` count markers or 'Frequent reviewers'/'Other collaborators' tier headers",
+        "Given the human's reply `1 3`, the echoed resolution line names the two corresponding logins: `→ Requesting review from <login1>, <login3>. Proceeding.`",
+        "The bundled approval block presents title + body + resolved reviewers before `gh pr create` runs",
+        "On approval, `gh pr create --reviewer <login1>,<login3>` appears in the gh call log with no `@` prefix and no spaces inside the value"
+      ]
+    },
+    {
+      "id": "pr-6",
+      "kind": "execution",
+      "eval_name": "reviewer-warm-cache-natural-language-resolution",
+      "prompt": "/pr",
+      "fixture": "feature-no-pr-warm-reviewer-cache",
+      "preconditions": "On a feature branch with a single commit and no open PR; tree clean; `origin/main` not advanced (rebase no-op); gh authenticated; `.claude/skills/pr/.team-cache.json` exists, `refreshedAt` is 3 days old (well within 15-day TTL), `collaborators` includes both `james-baker` (displayName: `James Baker`) and `benjifriedman` (displayName: `Benji Friedman`), `self` is the running human's login.",
+      "human_script": "At the reviewer picker prompt, the human replies: james and benji. At the bundled approval block, the human replies: y.",
+      "expected_output": "Skill reads the cache without firing any `gh api` calls. Renders the vertical picker sorted alphabetically by display name with `self` excluded. The rendered picker MUST NOT contain `[xN]` count markers, 'Frequent reviewers' or 'Other collaborators' tier headers, or any sort key derived from past review/author activity. Human types `james and benji`; Skill matches against the cached `displayNames` dictionary, resolves unambiguously to `[james-baker, benjifriedman]`, asks no clarifying question, echoes `→ Requesting review from james-baker, benjifriedman. Proceeding.`, and on approval runs `gh pr create --reviewer james-baker,benjifriedman`. No cache write occurs during this run.",
+      "expectations": [
+        "`.claude/skills/pr/.team-cache.json` exists at sandbox start with `refreshedAt` 3 days old (within the 15-day TTL)",
+        "Liveness check before trusting the negative assertion below: the gh call log is non-empty overall (e.g. contains `gh auth status`), proving the stub was exercised and PATH is wired correctly",
+        "The gh call log shows zero `gh api` calls (collaborator/user/display-name lookups) during this run",
+        "The rendered picker is sorted alphabetically by display name, excludes `self`, is numbered in sort order, with no `[xN]` markers or tier headers",
+        "Given the human's reply `james and benji`, the skill resolves unambiguously to `[james-baker, benjifriedman]` and asks no clarifying question",
+        "The echoed resolution line reads `→ Requesting review from james-baker, benjifriedman. Proceeding.`",
+        "On approval, `gh pr create --reviewer james-baker,benjifriedman` appears in the gh call log",
+        "No cache-write occurs during this run — the cache file's `refreshedAt` is unchanged after the run"
+      ]
+    },
+    {
+      "id": "pr-7",
+      "kind": "execution",
+      "eval_name": "reviewer-gh-rejection-triggers-cache-refresh-and-reask",
+      "prompt": "/pr",
+      "fixture": "feature-no-pr-stale-reviewer-cache",
+      "preconditions": "On a feature branch with a single commit and no open PR; tree clean; `origin/main` not advanced (rebase no-op); gh authenticated; `.claude/skills/pr/.team-cache.json` exists with `refreshedAt` 5 days old (within TTL) and contains a login `formerteam` that has since been removed from the repo's collaborator list on GitHub.",
+      "human_script": "At the first reviewer picker prompt, the human picks the number corresponding to `formerteam`. After the refreshed picker re-renders, the human picks a valid login from the refreshed list. At the bundled approval block, the human replies: y.",
+      "expected_output": "Skill reads the cache, renders the picker including `formerteam`. Human picks the number corresponding to `formerteam`. Skill echoes `→ Requesting review from formerteam. Proceeding.` and calls `gh pr create --reviewer formerteam`. gh returns a reviewer-invalid error. Skill catches the error, surfaces the exact `gh` error text to the human, refreshes the team cache via the same three cold-cache fetches (after which `formerteam` no longer appears in `collaborators`), re-renders the picker with the refreshed list, and re-asks for a reviewer pick. Does NOT retry `gh pr create` with the same input. No PR is created until the re-asked picker resolves to a valid set; on the re-asked pick, `gh pr create --reviewer <valid-login>` runs and the PR opens.",
+      "expectations": [
+        "The cache exists with `refreshedAt` 5 days old and includes `formerteam`; the rendered picker includes `formerteam` as an option",
+        "Given the human's first pick, the echoed resolution line reads `→ Requesting review from formerteam. Proceeding.` and `gh pr create --reviewer formerteam` appears in the gh call log",
+        "The stub returns a reviewer-invalid error for that specific call (per-call sequenced response — named Phase-2 stub input) and the skill surfaces the exact error text to the human",
+        "The skill refreshes the team cache via the same three cold-cache fetches (evidenced in the gh call log), after which `formerteam` no longer appears in the re-rendered picker",
+        "The skill re-asks for a reviewer pick and does NOT retry `gh pr create --reviewer formerteam` again",
+        "On the re-asked valid pick, exactly one further `gh pr create --reviewer <valid-login>` call appears in the gh call log, and the PR opens"
+      ]
+    },
+    {
+      "id": "pr-8",
+      "kind": "routing",
+      "eval_name": "nl-pr-intent-routes-through-skill-with-step-0",
+      "prompt": "open a PR for this branch",
+      "preconditions": "On a feature branch with commits to push and no open PR; tree may be clean or dirty; gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local` opt-out file; not a delegated call (no `.claude/.nl-delegation-active` marker); invoked by natural language (Skill-tool invocation, not a typed `/pr`).",
+      "expected_output": "The /pr Skill is invoked (NL intent routed through the Skill). Its first visible line is the announcement `Using /pr`. Its first ACTION (after that line) is the Step 0 intent gate via AskUserQuestion (\"Open a PR with: <detected context>?\") — no `gh auth`, no `git fetch`/`push`, no `gh pr create` before it. Choosing Stop ends cleanly with zero side effects (no push, no PR created). Choosing Proceed continues into step 1 onward.",
+      "expectations": [
+        "The first visible line of the response is the announcement `Using /pr`",
+        "The Step 0 intent gate fires via AskUserQuestion before any `gh auth`, `git fetch`/`push`, or `gh pr create`",
+        "Choosing Stop leaves zero side effects: no push, no PR created",
+        "Choosing Proceed continues into step 1 onward"
+      ],
+      "notes": "Routing eval — not sandbox-executable by a subagent (routing is the thing under test). Stays a documented manual runbook at baseline; automated by the Phase-8 session runner."
+    },
+    {
+      "id": "pr-9",
+      "kind": "routing",
+      "eval_name": "assistant-offer-then-human-yes-routes-through-skill-and-announces",
+      "prompt": "(assistant turn) \"Want me to open a PR for this?\" then (human turn) \"yes\"",
+      "preconditions": "Mid-conversation: the assistant has just pushed commits and offered to open a PR; the human replies only with a bare affirmation (\"yes\" / \"go ahead\") and does NOT repeat \"PR\". On a feature branch with commits and no open PR; gh authenticated; no `.claude/skip-nl-confirm-commit-pr.local`; no `.claude/.nl-delegation-active` marker.",
+      "expected_output": "The bare affirmation is treated as the PR trigger: the model invokes the /pr Skill via the Skill tool and does NOT hand-roll the PR with an ad-hoc `git push` + `gh pr create`. The first visible line is the announcement `Using /pr`, followed by the Step 0 intent gate. Guards against the model reading a bare \"yes\" to its own offer as approval of an ad-hoc plan and opening the PR directly, with no visible sign the Skill ran.",
+      "expectations": [
+        "The bare affirmation routes through the Skill tool — no ad-hoc `git push` + `gh pr create` sequence appears anywhere in the transcript",
+        "The first visible line is the announcement `Using /pr`",
+        "The Step 0 intent gate fires immediately after the announcement"
+      ],
+      "notes": "Routing eval — two-turn; the Phase-8 multi-turn driver case (R4). Not sandbox-executable by a subagent at baseline."
+    }
+  ]
+}
