@@ -4,7 +4,6 @@
 // root proven to be outside the real repo.
 
 import { execFileSync } from "node:child_process";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -27,19 +26,30 @@ export function buildSandbox({ fixture, root, note }) {
   assertNodeEngine();
   const profile = getFixture(fixture);
 
+  // Create the base root private (0700) so a co-tenant on a shared POSIX tmpdir cannot read
+  // into it, then create the per-sandbox dir with fs.mkdtempSync — the CodeQL-sanctioned
+  // pattern for js/insecure-temporary-file: a unique, 0700, exclusively-created directory,
+  // so every subsequent write lands somewhere unpredictable and unshared rather than in a
+  // fixed, pre-creatable path. Windows ignores POSIX modes (no ACL handling, by design).
   const base = assertOutsideRepo(sandboxRoot(root));
-  fs.mkdirSync(base, { recursive: true });
+  fs.mkdirSync(base, { recursive: true, mode: 0o700 });
+  try {
+    fs.chmodSync(base, 0o700);
+  } catch {
+    // Not the owner (pre-existing dir) or a non-POSIX FS — the mkdtemp dir below is still 0700.
+  }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const rand = crypto.randomBytes(3).toString("hex");
-  const sandboxDir = path.join(base, `${SANDBOX_PREFIX + fixture}-${stamp}-${rand}`);
-  assertOutsideRepo(sandboxDir);
+  // mkdtempSync appends random chars to the prefix and creates the dir 0700, exclusively.
+  // The SANDBOX_PREFIX is preserved so teardownAll's prefix sweep still finds it.
+  const sandboxDir = assertOutsideRepo(fs.mkdtempSync(path.join(base, `${SANDBOX_PREFIX + fixture}-${stamp}-`)));
 
   const originDir = path.join(sandboxDir, "origin.git");
   const repoDir = path.join(sandboxDir, "repo");
   const binDir = path.join(sandboxDir, "bin");
   const ghConfigDir = path.join(sandboxDir, "gh-config");
-  for (const d of [sandboxDir, repoDir, binDir, ghConfigDir]) fs.mkdirSync(d, { recursive: true });
+  // sandboxDir already exists (mkdtemp created it); create the children private too.
+  for (const d of [repoDir, binDir, ghConfigDir]) fs.mkdirSync(d, { recursive: true, mode: 0o700 });
 
   // --- git: bare origin + working repo baseline on main ------------------------------
   git(["init", "--bare", "-b", "main", originDir]);
