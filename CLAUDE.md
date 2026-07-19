@@ -99,5 +99,6 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 - `docs/doc-axiom.md` — Axiom logging and Web Vitals
 - `docs/doc-biome.md` — Biome lint/format config rationale and the version-bump policy
 - `docs/doc-skill-creator.md` — the vendored upstream skill-creator skill (pin, refresh, evals)
+- `docs/spec-skill-evals-baseline.md` — skill-evals baseline program: spec of record (with `spec-skill-evals-manifest.md` — the eval conversion manifest — and `spec-skill-evals-outline.md` — the approved strategy-doc outline)
 - `docs/setup-dev-machine.md` — system prerequisites (Node.js, Docker, etc.)
 - `docs/devjournal.md` — development decision log (most recent first)

@@ -60,3 +60,6 @@ test-results/
 
 # operator-script source data — contains member PII, never commit
 scripts/*.csv
+
+# Skill-eval workspaces (generated run artifacts; see docs plan-skill-evals-baseline)
+.claude/skills/*-workspace/
