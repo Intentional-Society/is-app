@@ -1,0 +1,6 @@
+#!/bin/sh
+# skill-eval gh stub wrapper for Git Bash / macOS / Linux. Delegates to the Node stub in
+# the same directory. make-sandbox copies this into each sandbox's bin/ and sets +x, so the
+# committed mode does not need to be executable.
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec node "$DIR/gh-stub.mjs" "$@"

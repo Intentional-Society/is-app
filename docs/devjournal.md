@@ -4,6 +4,10 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-19 | Blake (with Fable) | Skill-eval sandbox harness landed
+
+`scripts/skill-evals/` now builds throwaway sandboxes (temp git repo + local bare origin + default-deny logging `gh` stub + fake `npm test`) for executing the per-skill evals — never against the real repo; `node scripts/skill-evals/selfcheck.mjs` runs the 20-check safety checklist. The batch + executor prompts under `scripts/skill-evals/prompts/` are the canonical way to run the suite. (#507)
+
 ## 2026-07-19 | Blake (with Fable) | Skill evals live per-skill now; strategy doc born
 
 The team skills' acceptance evals moved from `evals/evals.json` to `.claude/skills/<name>/evals/evals.json` with `kind`/`fixture`/`human_script`/`expectations` fields, pinned by the contract test. `docs/strategy-skill-evals.md` is the new runbook; eval prompts are never executed against the real repo (sandbox harness lands in Phase 2). (#507)

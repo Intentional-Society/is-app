@@ -1,0 +1,15 @@
+{
+  "name": "skill-evals-harness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Disposable sandbox harness for executing this repo's Claude Code skill evals. Node core + three thin gh-stub shell wrappers. Zero runtime dependencies. See ./README.md and docs/strategy-skill-evals.md.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "make-sandbox": "node ./make-sandbox.mjs",
+    "teardown": "node ./teardown-sandbox.mjs",
+    "selfcheck": "node ./selfcheck.mjs"
+  }
+}

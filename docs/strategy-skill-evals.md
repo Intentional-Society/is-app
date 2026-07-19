@@ -148,8 +148,9 @@ each one redundant with the next on purpose:
 2. **The eval files themselves** (just-in-time; covers subagents and odd contexts): an
    executing agent has to read `evals.json` to get the prompt, and the file's `$comment`
    plus each eval's `fixture` field carry the warning right where it's needed.
-3. **The turnkey safe path** *(lands in Phase 2)*: `make-sandbox --fixture <name>` returns
-   a ready sandbox path in one call — compliance is cheaper than improvising around it.
+3. **The turnkey safe path:** `make-sandbox --fixture <name>` (`scripts/skill-evals/`)
+   returns a ready sandbox path in one call — compliance is cheaper than improvising around
+   it. See [`scripts/skill-evals/README.md`](../scripts/skill-evals/README.md).
 
 **Invariant — "no marker, no run":** harness sandboxes contain a `.skill-eval-sandbox`
 marker file. Eval execution (and `human_script` use) requires that marker to be present.
@@ -205,12 +206,13 @@ the deterministic contract test (§3) is the only thing CI runs automatically. A
 deliberate skip is an unchecked PR-template box with a stated reason, visible to
 reviewers.
 
-**The batch prompt** *(lands in Phase 2, committed alongside the executor-prompt
-template)*: the single documented regression operation — "run the full skill eval
-suite" — runs every `kind: execution` eval across all three skills, one sandbox per eval,
-executor pairs in parallel batches, graded, aggregated per skill, and reported as one
-combined summary plus viewer link. This is the *only* documented way to regression-test a
-skill change; there is no lighter alternative.
+**The batch prompt** — [`scripts/skill-evals/prompts/batch-prompt.md`](../scripts/skill-evals/prompts/batch-prompt.md),
+committed alongside the [executor-prompt template](../scripts/skill-evals/prompts/executor-prompt.md):
+the single documented regression operation — "run the full skill eval suite" — runs every
+`kind: execution` eval across all three skills, one sandbox per eval, executor pairs in
+parallel batches, graded, aggregated per skill, and reported as one combined summary plus
+viewer link. This is the *only* documented way to regression-test a skill change; there is
+no lighter alternative.
 
 **Routing evals stay manual at baseline.** The nine `kind: routing` evals (listed below)
 are not part of the automated batch — a subagent handed the skill can't test whether it
@@ -251,9 +253,9 @@ its wait overlaps the rest of the batch rather than adding serially to the total
 ## 7. Reusable patterns for your own skill
 
 Written for a future skill author — human or agent — building *any* skill (not just
-`/commit`/`/pr`/`/ship`) whose evals need git/GitHub state to check against. This section
-is a skeleton at Phase 1; it grows an executable worked example once the harness exists
-(Phase 2).
+`/commit`/`/pr`/`/ship`) whose evals need git/GitHub state to check against. The harness
+that makes these patterns reusable lives at
+[`scripts/skill-evals/`](../scripts/skill-evals/README.md).
 
 **The core pattern:** if your skill's evals need "a mock repo with open PRs and commits to
 check against" — the `/handoff` pain point that motivated writing this down — you don't
@@ -272,11 +274,14 @@ need to invent your own test rig. Reuse this program's three pieces:
    the marker. Your eval's `human_script` and `expectations` are the only parts specific
    to your skill.
 
-**Worked example (skeleton):** your skill's evals need a repo with two open PRs, one with
-a stale review request. Copy an existing fixture profile close to that shape (Phase 2's
-README documents where profiles live), adjust the PR list and gh-stub response data, name
-it something like `two-open-prs-one-stale-review`, and reference it from your eval's
-`fixture` field. Three lines change; nothing about the harness itself does.
+**Worked example:** your skill's evals need a repo with two open PRs, one with a stale
+review request. Copy an existing fixture profile close to that shape — profiles are plain
+data in [`scripts/skill-evals/lib/fixtures.mjs`](../scripts/skill-evals/lib/fixtures.mjs)
+(the [README](../scripts/skill-evals/README.md) documents the profile fields) — adjust the
+PR list and gh-stub response data, name it something like `two-open-prs-one-stale-review`,
+and reference it from your eval's `fixture` field. A few lines of data change; nothing about
+the harness itself does. If your skill calls a `gh` subcommand the three team skills don't,
+add a handler to the stub's traced surface rather than loosening its default-deny.
 
 **Where the team boundary sits:** these requirements (schema, full-suite obligation,
 contract-test coverage) attach the moment a skill is committed to this repo's
@@ -293,13 +298,23 @@ machinery that can't run on native Windows — its runner crashes on a Unix-only
 the committed Layer-C runner copy-paste prompt once Phase 4 builds it. Design reference in
 the meantime: spec II.2f.
 
-## 9. Platform validation prompt *(lands in Phase 2)*
+## 9. Platform validation prompt
 
-A committed copy-paste prompt that runs one designated eval end-to-end on a given
-platform, emits a small pass/fail + environment artifact, and auto-posts it to a named
-GitHub issue. This section will carry the prompt, its issue-number placeholder, and its
-trigger conditions once Phase 2 builds the sandbox harness it depends on. Design reference
-in the meantime: spec II.2d.
+A committed copy-paste prompt that runs one designated eval end-to-end on a given platform,
+emits a small pass/fail + environment artifact, and **auto-posts it to a named GitHub
+issue** (`gh issue comment <ISSUE> --body-file …`; if `gh` isn't authenticated it prints the
+artifact for the runner to paste). It lives at
+[`scripts/skill-evals/prompts/platform-validation-prompt.md`](../scripts/skill-evals/prompts/platform-validation-prompt.md).
+
+- **Designated eval:** `commit-1` (fixture `feature-dirty-clean-payload`) — fast, no long
+  waits, no complex gh sequencing.
+- **Issue number:** filled per run via the `<ISSUE>` placeholder (the Phase-2 macOS smoke
+  posts to the phase issue).
+- **The one real-`gh` touch:** posting the artifact comment — a human-run action, not an
+  eval execution against the real repo.
+- **Retention:** kept past baseline for re-validation when the harness shell wrappers or
+  path handling change, and for onboarding a teammate on a new OS; revisit keep/slim/retire
+  after the first macOS run.
 
 ## 10. Real-repo exception lane *(lands in Phase 5)*
 
