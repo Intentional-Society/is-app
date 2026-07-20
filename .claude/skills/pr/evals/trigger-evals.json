@@ -1,0 +1,102 @@
+[
+  {
+    "query": "open a PR for this branch",
+    "should_trigger": true,
+    "note": "Canonical NL PR intent (routing eval pr-8 seed)."
+  },
+  {
+    "query": "let's put up a pull request for the reviewer-picker changes",
+    "should_trigger": true,
+    "note": "'put up a pull request' — PR intent, casual register; reviewer-picker feature context (pr-5/6/7)."
+  },
+  {
+    "query": "the commits are already pushed — open a PR and request review from james and benji",
+    "should_trigger": true,
+    "note": "PR intent with a reviewer request (james-baker / benjifriedman from the pr-6 warm-cache fixture). /pr owns the reviewer picker."
+  },
+  {
+    "query": "make a PR for issue #142 and link it so it closes the issue",
+    "should_trigger": true,
+    "note": "Issue-argument PR intent with Closes-linking — a documented /pr behavior (argument resolution order, Closes #N)."
+  },
+  {
+    "query": "can you open a pull request for the avatar upload work?",
+    "should_trigger": true,
+    "note": "Polite PR intent, avatar-upload feature context. Spelled-out 'pull request' phrasing."
+  },
+  {
+    "query": "raise a PR for this — it's a breaking change, we're dropping profile.legacyId",
+    "should_trigger": true,
+    "note": "'raise a PR' intent, breaking-change context (pr-4 fixture removes profile.legacyId). /pr surfaces the breaking-change flag."
+  },
+  {
+    "query": "open a PR, draft whatever title and body you think fits",
+    "should_trigger": true,
+    "note": "PR intent that defers title/body to the skill — should win against a naive 'answer a titling question' read."
+  },
+  {
+    "query": "there's already a PR for this branch — push the two new commits and update it",
+    "should_trigger": true,
+    "note": "Update-existing-PR intent (pr-1 fixture: open PR, 2 new commits). /pr handles both open-new and update-existing."
+  },
+  {
+    "query": "the dashboard wiring is committed, go ahead and open the PR",
+    "should_trigger": true,
+    "note": "PR intent after a commit landed (dashboard context from pr-3). Should fire /pr, not /commit (tree already clean)."
+  },
+  {
+    "query": "put this up for review as a pull request",
+    "should_trigger": true,
+    "note": "'put up for review as a pull request' — indirect PR intent phrasing for coverage."
+  },
+  {
+    "query": "what's the CI status on my PR — did the vercel preview e2e pass?",
+    "should_trigger": false,
+    "note": "Near-miss: CI-status inspection. /pr explicitly does NOT watch CI (that's /ship). Mentions PR + e2e but is not open/update intent."
+  },
+  {
+    "query": "explain how /pr picks which reviewers to suggest — is it based on who reviewed before?",
+    "should_trigger": false,
+    "note": "Near-miss (commit-7-style explain): names /pr and the reviewer picker but asks to EXPLAIN it (the answer: no activity-based sort, pr-5), not to open a PR."
+  },
+  {
+    "query": "why is my PR suddenly showing a merge conflict with main?",
+    "should_trigger": false,
+    "note": "Near-miss: debugging an existing PR's conflict state. Mentions PR + main but is not open/update intent."
+  },
+  {
+    "query": "what's the difference between /pr and /ship — does /pr merge on its own?",
+    "should_trigger": false,
+    "note": "Near-miss: compare/explain question. Answer is '/pr never merges' — the description says so. Not PR intent."
+  },
+  {
+    "query": "summarize the review feedback on PR #145 so i can address it myself",
+    "should_trigger": false,
+    "note": "Near-miss: inspection/summary of an existing PR's review comments (PR #145 from pr-2). User handles it themselves."
+  },
+  {
+    "query": "ship it",
+    "should_trigger": false,
+    "note": "Boundary near-miss (extends ship-4/ship-5 pattern): ship/merge intent. /pr must NOT fire (/pr never merges); /ship is explicit-only and won't auto-fire either. Correct behavior is neither routes."
+  },
+  {
+    "query": "merge this PR into main for me",
+    "should_trigger": false,
+    "note": "Boundary near-miss: merge intent. /pr explicitly never merges; merging is /ship (explicit-only). Strong /pr-vs-/ship stressor."
+  },
+  {
+    "query": "does the PR title `feat: add relations web` follow our conventional-commit convention?",
+    "should_trigger": false,
+    "note": "Near-miss (parallels commit-8): a review QUESTION about a PR title's CC format, not a request to open a PR."
+  },
+  {
+    "query": "who's currently requested as a reviewer on this branch's PR?",
+    "should_trigger": false,
+    "note": "Near-miss: a question about existing reviewers. Shares the reviewer-picker surface but is inspection, not open/update intent."
+  },
+  {
+    "query": "rename the getSignedAvatarUrl helper to signAvatarUrl everywhere it's used",
+    "should_trigger": false,
+    "note": "Over-trigger control: an ordinary dev task with no PR intent. Proves the skill doesn't fire on generic work requests."
+  }
+]

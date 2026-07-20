@@ -48,7 +48,7 @@ repo's overlay adds at each one.
 | Write eval prompts | `evals/evals.json` inside the skill folder, upstream's own convention | **Schema:** for a mutating skill, each execution eval also needs `kind: execution`, a `fixture` name, a `human_script`, and an `expectations` list — the fields that make an eval *runnable* instead of just descriptive. | §3 |
 | Run with-skill vs baseline | Executor subagents, in parallel, graded against expectations | **For a mutating skill:** executors run inside `make-sandbox`-built sandboxes, never against this repo. For a non-mutating skill: no change — stock parallel baseline runs. | §4, §6 |
 | Review in the eval viewer | `generate_review.py` serves a browser page; human leaves feedback | Nothing — stock. The sandbox's transcript, gh call log, and git state are just more evidence the grader reads before writing `grading.json`. | §4 |
-| Description-optimization loop | `run_loop.py` tunes the description for triggering accuracy | **Platform routing:** the loop's runner is Unix-only (a Windows `select()` crash). On Windows, hand off to a cloud/Cowork session with the committed Layer-C runner prompt instead of running it natively. | §8 *(lands in Phase 4)* |
+| Description-optimization loop | `run_loop.py` tunes the description for triggering accuracy | **Platform routing:** the loop's runner is Unix-only (a Windows `select()` crash). On Windows, hand off to a cloud/Cowork session with the committed Layer-C runner prompt instead of running it natively. | §8 |
 | Ship | `/commit` → `/pr` (self-hosting: the Skills commit changes to themselves) | Nothing new — the eval-file shape is checked by the same CI gate as any other PR. | §11 |
 
 ## 3. Eval schema reference
@@ -290,13 +290,65 @@ teammate, imported from GitHub). A skill installed only at the user level, or si
 uncommitted locally, can use the stock flow and this harness freely — it's just not
 *governed* by these obligations until it's committed.
 
-## 8. Platform routing (Layer C) *(lands in Phase 4)*
+## 8. Platform routing (Layer C)
 
-The description-optimization loop (`run_loop.py` and friends) is the one piece of vendored
-machinery that can't run on native Windows — its runner crashes on a Unix-only
-`select()` call (spec C2). This section will document the per-platform routing table and
-the committed Layer-C runner copy-paste prompt once Phase 4 builds it. Design reference in
-the meantime: spec II.2f.
+Layer C is the vendored `/skill-creator` **description-optimization loop** (`run_loop.py`,
+which imports `run_eval.py`): it tunes a skill's frontmatter `description` for triggering
+accuracy against a committed trigger-eval set. It is the one piece of vendored machinery
+that **can't run on native Windows** — `run_eval.py` calls `select.select()` on a
+subprocess pipe, which raises `OSError [WinError 10093]` on Windows (spec C2, re-verified
+2026-07-19). Layer C never touches `gh`, so the cloud-no-`gh` gap does not apply.
+
+**Scope:** only `/commit` and `/pr` — the two natural-language-invocable skills. `/ship` is
+explicit-only (`disable-model-invocation: true`), so description optimization does not apply
+to it; its should-NOT-trigger behavior is covered by routing evals ship-4 / ship-5.
+
+### Trigger-eval sets
+
+Location: `.claude/skills/{commit,pr}/evals/trigger-evals.json`. Shape is upstream's own —
+a **bare JSON array** consumed directly by `run_loop.py` (`SKILL.md` → "Description
+Optimization"):
+
+```json
+[
+  { "query": "open a PR for this branch", "should_trigger": true },
+  { "query": "ship it", "should_trigger": false }
+]
+```
+
+Each object needs `query` (string) and `should_trigger` (bool); ~20 per skill (10
+should-trigger phrasings + 10 tricky **near-miss** negatives — queries that share keywords
+with the skill but need something else). An additive **`note`** field per object is allowed
+for maintainer/author traceability — `run_loop.py` reads only `query`/`should_trigger` and
+ignores extra keys, and `note` never reaches the description-improver (it sees only the
+graded results). This is a different file and shape from a skill's `evals/evals.json`
+(§3); the CI contract test gates `evals.json`, not `trigger-evals.json`.
+
+### Where it runs
+
+| Platform | How Layer C runs |
+|---|---|
+| **macOS / Linux** | Run the documented commands **directly** (needs python3 + PyYAML + a logged-in `claude` CLI). |
+| **Cloud Claude Code session** | Linux, so the crash vanishes. The runner prompt's Step 0 is the **C5 smoke** — a 30-second nested `claude -p` check that the cloud sandbox supports it (spec C5). |
+| **Cowork** | Works per the vendored SKILL.md's Cowork section. |
+| **Windows** | **Never natively.** Hand the committed runner prompt to a cloud/Cowork session (or a Mac/Linux teammate) and take back the reported `best_description`. |
+
+The committed copy-paste driver is
+[`scripts/skill-evals/prompts/layer-c-runner-prompt.md`](../scripts/skill-evals/prompts/layer-c-runner-prompt.md).
+It runs the C5 smoke first, then `run_loop.py` per skill (holdout 0.4 → stratified
+train/test split; `runs-per-query 3` → probabilistic trigger *rates*), archives the raw
+results before any teardown, and **reports** `best_description` + before/after train/test
+scores. It does **not** commit anything.
+
+### Landing a description change
+
+The loop is **report-only**. A change to a real skill's `description` is a one-line SKILL.md
+frontmatter edit that lands back on the author's machine through the normal `/commit` → `/pr`
+flow **with maintainer sign-off** — the same guarded review as any skill change. **"Retain
+the current description" is an allowed, common outcome** (prefer the candidate only when it
+beats the current on the held-out **test** score, not just train — that's the overfitting
+guard). The current `/commit` and `/pr` descriptions were already hand-tuned during the
+NL-invocation work, so a no-change result is expected and fine.
 
 ## 9. Platform validation prompt
 
