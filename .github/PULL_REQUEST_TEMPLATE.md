@@ -25,3 +25,4 @@ outstanding work. Use plain bullets, not `- [ ]` checkboxes.
 ## Checklist
 
 - [ ] If this PR changes `.claude/skills/**/SKILL.md`, smoke-test the affected Skill on a realistic prompt.
+- [ ] If this PR changes an eval-governed skill under `.claude/skills/**` (a team skill's `SKILL.md`/evals, or a vendored `skill-creator` refresh), the full skill-eval batch ran (`docs/strategy-skill-evals.md` §6). A deliberate skip is this box left unchecked with a one-line reason.

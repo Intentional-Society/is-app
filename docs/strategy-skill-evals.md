@@ -1,8 +1,8 @@
 # Strategy — Skill Evals
 
 > Operational runbook for testing this repo's Claude Code Skills. Born in Phase 1 of the
-> skill-evals baseline program, grown through Phase 5. Sections marked *(lands in Phase N)*
-> are placeholders until that phase ships; everything else is authoritative today. Design
+> skill-evals baseline program and completed in Phase 5 — every section is authoritative
+> now; no *(lands in Phase N)* placeholders remain. Design
 > rationale, the full architecture, and the decision log live in
 > [`docs/spec-skill-evals-baseline.md`](spec-skill-evals-baseline.md) — this doc is the
 > "how do I actually run this" companion, not the "why did we build it this way" one.
@@ -214,6 +214,53 @@ parallel batches, graded, aggregated per skill, and reported as one combined sum
 viewer link. This is the *only* documented way to regression-test a skill change; there is
 no lighter alternative.
 
+### Running it — the exact commands (PowerShell and bash)
+
+The batch prompt above is what you hand an orchestrating session; under the hood it — and
+you, if you ever drive a single eval by hand — call the harness CLIs below. Every one is a
+`node` invocation, identical on all platforms. Only two things are OS-specific: how you
+*activate* a sandbox, and which `gh`-stub wrapper `PATH` resolves to (the harness sets that
+up for you; you never pick).
+
+PowerShell (Windows):
+
+```powershell
+# List fixture profiles; build a sandbox; or get the machine-readable manifest.
+node scripts/skill-evals/make-sandbox.mjs --list
+node scripts/skill-evals/make-sandbox.mjs --fixture feature-dirty-clean-payload
+node scripts/skill-evals/make-sandbox.mjs --fixture feature-dirty-clean-payload --json
+
+# Enter the sandbox (PATH -> stub gh, GH_TOKEN/GITHUB_TOKEN unset, cwd -> sandbox repo).
+. <sandbox>\activate.ps1
+
+# Full safety checklist; tear down one sandbox; or sweep all of them.
+node scripts/skill-evals/selfcheck.mjs
+node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
+node scripts/skill-evals/teardown-sandbox.mjs --all
+```
+
+bash (Git Bash on Windows, macOS, Linux):
+
+```bash
+node scripts/skill-evals/make-sandbox.mjs --list
+node scripts/skill-evals/make-sandbox.mjs --fixture feature-dirty-clean-payload
+node scripts/skill-evals/make-sandbox.mjs --fixture feature-dirty-clean-payload --json
+
+# Enter the sandbox.
+source <sandbox>/activate.sh
+
+node scripts/skill-evals/selfcheck.mjs
+node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
+node scripts/skill-evals/teardown-sandbox.mjs --all
+```
+
+Node ≥ 20 is the only prerequisite for the harness itself (enforced at runtime). Python 3 +
+PyYAML + a logged-in `claude` CLI are needed **only** for Layer C (§8) — never for the
+execution batch. Sandboxes are created under the OS temp dir (override with
+`SKILL_EVAL_SANDBOX_ROOT` or `--root`), and `make-sandbox` refuses any root inside the real
+repo, so you can never build one over your own checkout. Harness-internals reference:
+[`scripts/skill-evals/README.md`](../scripts/skill-evals/README.md).
+
 **Routing evals stay manual at baseline.** The nine `kind: routing` evals (listed below)
 are not part of the automated batch — a subagent handed the skill can't test whether it
 *fires*, only what it does once invoked. Until the Phase-8 session runner exists, run them
@@ -340,6 +387,16 @@ train/test split; `runs-per-query 3` → probabilistic trigger *rates*), archive
 results before any teardown, and **reports** `best_description` + before/after train/test
 scores. It does **not** commit anything.
 
+**Current posture (R6, as of 2026-07-20):** the true cloud C5 smoke and the Layer-C
+optimization run have **not yet been executed in a genuine cloud/Cowork Linux session** —
+attempts to date fell back to Windows hosts, which cannot run `run_eval.py` (the `select()`
+crash). What *is* confirmed, on native Windows, is only the diagnostics: nested `claude -p`
+returns cleanly (the `CLAUDECODE` nesting guard is not a blocker), and the `select()`-on-pipe
+probe reproduces `WinError 10093` (C2 re-verified). So the description-optimization leg stays
+**deferred** until someone runs the committed runner prompt above in a real cloud or Cowork
+session. Layer C is a *Should*, so this posture does not block baseline completion. Tracked on
+the Phase-4 issue (#512, R6 flag).
+
 ### Landing a description change
 
 The loop is **report-only**. A change to a real skill's `description` is a one-line SKILL.md
@@ -368,12 +425,63 @@ artifact for the runner to paste). It lives at
   path handling change, and for onboarding a teammate on a new OS; revisit keep/slim/retire
   after the first macOS run.
 
-## 10. Real-repo exception lane *(lands in Phase 5)*
+## 10. Real-repo exception lane (spec C12)
 
-The one sanctioned exception to "never against the real repo": a rare, human-run,
-AI-guided end-to-end smoke test, gated by a recorded justification and a runbook with
-cleanup owed (spec C12). This section will carry that runbook once Phase 5 authors it.
-Never a substitute for sandbox eval runs.
+Everything above keeps eval execution inside disposable sandboxes. This is the **single
+sanctioned exception** to "never against the real repo" — plus the discipline that keeps it
+from drifting into "whenever convenient."
+
+**What it is:** a rare, **human-run, human-attended, AI-guided end-to-end smoke test** of the
+actual plumbing — a real skill (`/commit` or `/pr`) doing its real job against real `gh`, on
+a throwaway change — for confidence the whole path works where a sandbox can't prove it.
+Reach for it only when the thing you need to check *is* the real boundary the sandbox fakes
+away: e.g. after changing how the harness or a skill shells out to `gh`, or validating the
+real `/commit` → `/pr` path once on a brand-new platform before you trust the sandbox
+surrogate there.
+
+**What it is NOT:** it is **not** running an eval *prompt* against the real repo — that stays
+forbidden, full stop, no exception. The line: a sandbox eval feeds a skill a scripted
+`prompt` + `human_script` to *grade* it; this smoke is *you*, a live human, driving the skill
+on genuinely disposable work and approving each checkpoint yourself. It is also **never a
+substitute** for a sandbox batch run — if the batch can cover it, the batch is the answer.
+
+**Two gates, both required before you run:**
+
+1. **Recorded justification.** Before running, write — on the PR or issue that motivates it —
+   one or two sentences naming *why a sandbox can't answer this* and *what you'll exercise*.
+   No recorded justification, no run. (This is spec C12's guard against "occasional" drifting
+   into "whenever convenient.")
+2. **Cleanup owed, declared up front.** You own reverting every trace before you walk away.
+   Paste the cleanup checklist (below) into the same PR/issue *before* you start, and tick it
+   when done.
+
+**The runbook:**
+
+1. Record the justification (gate 1) on the driving PR/issue.
+2. Create a throwaway scratch branch off `main` — **never run this on `main`** (PowerShell
+   and bash are identical here):
+   ```
+   git switch -c smoke/skill-eval-<short-desc>
+   ```
+3. Make a trivial, obviously-disposable change (e.g. a one-line edit to a scratch file you
+   will delete) — never real work you'd want to keep, so cleanup stays unambiguous.
+4. Drive the skill exactly as a normal human-approved run — invoke `/commit` or `/pr` and
+   answer every approval checkpoint **yourself** (no `human_script`: that string is valid only
+   inside a marker-bearing sandbox — §4). Watch that the real `gh` calls and the real
+   push/PR behave.
+5. Note the result on the driving PR/issue.
+6. **Clean up (owed) — the checklist you pasted up front:**
+   - [ ] Close and delete any PR the smoke opened (`gh pr close <N> --delete-branch`).
+   - [ ] Delete the scratch branch locally and on the remote (`git switch main`, then
+     `git branch -D smoke/…` and `git push origin --delete smoke/…`).
+   - [ ] Revert or drop any commit that reached `main` (this smoke should never target
+     `main`, but audit anyway).
+   - [ ] Delete any throwaway issue/PR comment the smoke posted.
+   - [ ] Confirm `git status` is clean and `git branch` shows no stray `smoke/…` branch.
+   - [ ] Tick this checklist on the driving PR/issue.
+
+If any cleanup step can't be completed, say so on the driving PR/issue and flag a maintainer —
+an un-cleaned smoke is a loose end someone must close, not something to leave silent.
 
 ## 11. Maintenance rules
 
