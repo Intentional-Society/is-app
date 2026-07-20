@@ -17,8 +17,8 @@
         "`gh pr checks <N> --watch` returns all-green per the fixture (Lint & Functional Tests, E2E, CodeQL)",
         "No rebase and no `npm test` re-run occur (origin/main not advanced)",
         "No schema-expand dispatch occurs — `npm run prod:db:expand` does not appear in the command log",
-        "The required pre-merge narration line (PR number, title, check posture) is printed before `gh pr merge` runs",
-        "Exactly one `gh pr merge <N> --merge --delete-branch` call appears in the gh call log, with no `--squash`, `--merge-title`, or `--body` flags",
+        "The required pre-merge narration line (PR number, title, check posture) is printed before the `gh pr merge` invocation appears in the transcript's tool-call record (ordering graded from the transcript, which is robust even when the checked-in `ask` rule intercepts the merge before the stub logs it)",
+        "Exactly one `gh pr merge <N> --merge --delete-branch` invocation appears in the transcript's tool-call record — with no `--squash`, `--merge-title`, or `--body` flags — and it is the only merge attempted. Grade this from the transcript (authoritative for whether the skill attempted the merge), corroborated where the environment let the call reach the stub by a matching `pr merge` entry in the gh call log and/or a merge record in `gh-stub-state.json`. PASS does not require a log/stub entry: the checked-in `ask` rule on `gh pr merge *` can intercept the command before the stub logs it (merge-discrimination rule, docs/strategy-skill-evals.md)",
         "Because the PR pre-existed, the merge is narrated in one line with no second conversational Y/n confirmation",
         "Post-merge tidy commands appear in the command log: `git switch main`, `git pull --ff-only`, `git branch -d <feature-branch>`",
         "`gh run list --branch main --commit <merge-sha>` appears in the gh call log and the post-merge watch runs to completion",
@@ -39,9 +39,9 @@
         "After 5 minutes, the skill presents EXACTLY three options: `wait+5`, `troubleshoot`, `abort` — no `proceed` option is offered",
         "On `wait+5`, the skill repeats the 5-minute wait and re-presents the same three-option menu",
         "On the second prompt's `abort`, the skill abandons the merge attempt",
-        "The gh call log contains no `gh pr merge` call at any point in this run"
+        "No merge is attempted after `abort`: the transcript's tool-call record shows NO `gh pr merge` invocation at any point (authoritative merge-negative signal — a wrongful merge appears in the transcript even when the checked-in `ask` rule intercepts it before the stub logs it), corroborated by a non-empty gh call log (liveness — the stub was reached for the calls that did run) that contains no `pr merge` entry and a `gh-stub-state.json` with no merge record. Graded against the transcript, not the empty log alone (merge-discrimination rule, docs/strategy-skill-evals.md)"
       ],
-      "notes": "≥5 real minutes by design (C11); this branch is the batch's long pole (~10 minutes total for wait+5-then-abort) — schedule it in the first parallel wave so its wait overlaps the rest of the batch (manifest cross-cutting requirement 3)."
+      "notes": "≥5 real minutes by design (C11); this branch is the batch's long pole (~10 minutes total for wait+5-then-abort) — schedule it in the first parallel wave so its wait overlaps the rest of the batch (manifest cross-cutting requirement 3). Merge-negative graded via transcript corroboration, not the log alone — the checked-in `ask` rule can intercept a wrongful `gh pr merge` before the stub logs it (item 1 / F-B re-instrumentation, #514; merge-discrimination rule, docs/strategy-skill-evals.md)."
     },
     {
       "id": "ship-2b",
@@ -55,7 +55,7 @@
       "expectations": [
         "The skill enters the wait at step 8, waits 5 minutes, then presents exactly three options (`wait+5`, `troubleshoot`, `abort`) — no `proceed`",
         "On `troubleshoot`, the skill exits the wait loop and surfaces the still-pending check's name and URL",
-        "The gh call log contains no `gh pr merge` call"
+        "No merge is attempted after `troubleshoot`: the transcript's tool-call record shows NO `gh pr merge` invocation (authoritative), corroborated by a non-empty gh call log (liveness) with no `pr merge` entry and no merge record in `gh-stub-state.json`. Graded against the transcript, not the empty log alone — the checked-in `ask` rule can intercept a wrongful merge before the stub logs it (merge-discrimination rule, docs/strategy-skill-evals.md)"
       ]
     },
     {
@@ -70,7 +70,7 @@
       "expectations": [
         "The skill enters the wait at step 8, waits 5 minutes, then presents exactly three options (`wait+5`, `troubleshoot`, `abort`) — no `proceed`",
         "On `abort`, the skill abandons the merge attempt",
-        "The gh call log contains no `gh pr merge` call"
+        "No merge is attempted after `abort`: the transcript's tool-call record shows NO `gh pr merge` invocation (authoritative), corroborated by a non-empty gh call log (liveness) with no `pr merge` entry and no merge record in `gh-stub-state.json`. Graded against the transcript, not the empty log alone — the checked-in `ask` rule can intercept a wrongful merge before the stub logs it (merge-discrimination rule, docs/strategy-skill-evals.md)"
       ]
     },
     {
@@ -86,10 +86,11 @@
         "The skill recognizes the docs-only condition (diff confined to `docs/**` and root `CLAUDE.md`)",
         "`Lint & Functional Tests` posts green within the fixture's simulated seconds via the `dorny/paths-filter` skip",
         "No 5-minute wait-loop entry appears in the transcript — the skill does not wait for advisories the docs-only path skipped by design",
-        "The skill proceeds to merge on required-green only: `gh pr merge --merge --delete-branch` appears in the gh call log",
+        "The skill proceeds to merge on required-green only: exactly one `gh pr merge --merge --delete-branch` invocation appears in the transcript's tool-call record (authoritative for whether the skill merged), corroborated where the environment let it reach the stub by a `pr merge` entry in the gh call log and/or a merge record in `gh-stub-state.json`. PASS does not require a log/stub entry — the checked-in `ask` rule can intercept the merge before the stub logs it (merge-discrimination rule, docs/strategy-skill-evals.md)",
         "Post-merge tidy and watch commands run as in ship-1 (`git switch main`, `git pull --ff-only`, `gh run list --branch main --commit <sha>`)",
         "The final report includes the merge SHA and post-merge status, including any production deploy/e2e run discovered in the post-merge run list"
-      ]
+      ],
+      "notes": "Positive-merge assertion graded from the transcript's tool-call record (authoritative), corroborated by the log / `gh-stub-state.json` merge record where the merge reached the stub — no longer stochastic on whether the checked-in `ask` rule auto-cleared (item 1 / F-B re-instrumentation, #514; the Phase-3 audit found this assertion environment-stochastic — passed with_skill on retry, failed the byte-identical old_skill arm)."
     },
     {
       "id": "ship-4",
@@ -134,7 +135,7 @@
         "/pr suppresses its own self-announcement and Step 0 (marker present)",
         "When /pr in turn delegates to /commit, it writes a fresh marker and prints `Using /commit — delegated from /pr`; /commit suppresses its own announcement and Step 0",
         "Each hop is announced exactly once, by its parent — `Using /pr — delegated from /ship` then `Using /commit — delegated from /pr` — with no doubled or missing announcements",
-        "The cascade completes end-to-end through the stubs: `/commit` commits and pushes, `/pr` creates the PR, and `/ship` proceeds through the merge per the fixture's check posture",
+        "The cascade completes end-to-end through the stubs: `/commit` commits and pushes (visible in the archived sandbox git state), `/pr` creates the PR (`pr create` in the gh call log), and `/ship` proceeds through the merge — the `gh pr merge` invocation is graded from the transcript's tool-call record (authoritative), corroborated by the gh call log / `gh-stub-state.json` merge record where the environment let it reach the stub (merge-discrimination rule, docs/strategy-skill-evals.md)",
         "No `Using /commit` or `Using /pr` announcement is printed by any Skill other than the parent that actually delegated"
       ],
       "notes": "Resolves the manifest's flagged classification: the cascade mechanics (markers written/cleared, handoff lines in transcript, Step-0 suppression, commit→PR→merge through stubs) are sandbox-executable by an executor following the three SKILL.md files. The live Skill-tool announcement nuance stays additionally covered by the routing runbook next to ship-4/ship-5 (cross-noted there — manifest cross-cutting requirement 4). Accepted compromise per R7: the scripted 'typed /ship' premise tests step-following, not live UX."

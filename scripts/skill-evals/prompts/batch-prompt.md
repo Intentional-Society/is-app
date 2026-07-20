@@ -34,11 +34,25 @@ docs/strategy-skill-evals.md §6, not part of this batch):
      launch a BASELINE executor against a second sandbox with the OLD skill snapshot on
      the path (native skill-creator baseline convention; for a NEW skill, baseline = no
      skill).
-  3. When both arms return, hand the evidence triad — transcript, gh call log (ghCallLog),
-     sandbox git state — plus the eval's `expectations` to the grader (vendored
-     agents/grader.md). Enforce the LIVENESS rule: before trusting any "log contains no X"
-     assertion, confirm the call log is non-empty.
-  4. Tear the sandboxes down:
+  3. ARCHIVE THE RAW EVIDENCE BEFORE TEARDOWN (harness behavior — ruling 3, #511):
+       node scripts/skill-evals/archive-evidence.mjs <sandboxDir> <eval-workspace>/outputs
+     This writes gh-calls.log + git-state.txt + gh-stub-state.json + archive-manifest.json
+     into the eval's outputs/ dir. Do this for BOTH arms, every eval — it is what makes the
+     grade independently auditable (the Phase-3 audit found the triad was never preserved,
+     so CLEAN verdicts rested on self-graded prose).
+  4. When both arms return, hand the evidence triad — the executor's transcript + the
+     ARCHIVED raw gh-calls.log + the ARCHIVED git-state.txt (+ gh-stub-state.json) — plus
+     the eval's `expectations` to the grader (vendored agents/grader.md). Grade from the
+     archived raw files, NOT from any prose summary (executor-independent grading). Enforce:
+       - LIVENESS: before trusting any "log contains no X" assertion, confirm the call log
+         is non-empty.
+       - MERGE-DISCRIMINATION: grade every `gh pr merge`-adjacent assertion from the
+         transcript's tool-call record (authoritative), corroborated by the log / stub merge
+         record where the merge reached the stub. The checked-in `ask` rule on
+         `gh pr merge *` can intercept a merge before the stub logs it, so NEVER PASS a
+         merge-negative on an empty log alone. (docs/strategy-skill-evals.md)
+  5. Tear the sandboxes down (or fold archive + teardown into one step with
+     `teardown-sandbox.mjs <sandboxDir> --archive <eval-workspace>/outputs`):
        node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
 
 SCHEDULING:
@@ -67,4 +81,8 @@ WHEN COMPLETE:
 **Red-control reminder (Phase 3, spec II.2e):** once per skill, demonstrate the suite going
 red against a deliberately mutated skill — proof the assertions can fail, not just pass.
 Force a failing gate cheaply by creating a `.skill-eval-fail-test` sentinel in the sandbox
-repo before the executor runs.
+repo before the executor runs. For `/ship`, the red control must go red on its **intended
+merge assertion**: a mutant that merges when it should abort attempts `gh pr merge`, which
+the transcript's tool-call record captures even when the `ask` rule intercepts it — so the
+merge-negative FAILS on the transcript leg (do NOT let an empty log spuriously PASS a broken
+skill; that vacuity was the Phase-3 F-B finding this re-instrumentation fixes, #514).

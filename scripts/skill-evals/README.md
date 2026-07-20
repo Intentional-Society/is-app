@@ -36,8 +36,12 @@ node scripts/skill-evals/make-sandbox.mjs --fixture feature-dirty-clean-payload 
 # Run the full safety checklist (see below).
 node scripts/skill-evals/selfcheck.mjs
 
-# Tear down one sandbox, or sweep all of them.
+# Archive the raw evidence triad into an eval's outputs/ dir BEFORE teardown.
+node scripts/skill-evals/archive-evidence.mjs <sandboxDir> <eval-workspace>/outputs
+
+# Tear down one sandbox (optionally archiving first), or sweep all of them.
 node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
+node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir> --archive <eval-workspace>/outputs
 node scripts/skill-evals/teardown-sandbox.mjs --all
 ```
 
@@ -64,6 +68,7 @@ repo.
   gh-config/                # isolated GH_CONFIG_DIR
   gh-fixture.json           # the data the stub answers from
   gh-calls.log              # every gh call, appended (primary grading evidence)
+  gh-stub-state.json        # stub durable state: pr-create sequencing + `gh pr merge` records
   env.json                  # the credential-scrub spec (unset / set / prependPath)
   activate.sh / activate.ps1  # source one to enter the sandbox
   manifest.json             # everything above, as paths
@@ -86,7 +91,7 @@ Stubbed surface (traced from `.claude/skills/{commit,pr,ship}/SKILL.md`):
 | `pr view [N]` / `pr list` | pr, ship | branch-PR detection (both are pure reads) |
 | `pr create` | pr | returns a PR URL; **per-call sequenced** for pr-7 (error→success) |
 | `pr checks <N> [--watch]` | ship | exit 0 pass / 8 pending / 1 fail, from fixture `checks` |
-| `pr merge <N> --merge --delete-branch` | ship | simulated; logged (never a real merge) |
+| `pr merge <N> --merge --delete-branch` | ship | simulated; logged + a durable record in `gh-stub-state.json` (never a real merge; never mutates the sandbox git tree) |
 | `pr comment <N> --body …` | pr | existing-PR comment |
 | `run list` / `run watch <id>` | ship | post-merge run discovery/watch |
 | `api user` / `api users/<login>` / `api repos/.../collaborators` | pr | reviewer team cache; emulates the `--jq` filters the skill uses |
@@ -131,9 +136,25 @@ non-zero if anything fails:
 - **call-log-liveness** — a stubbed call leaves positive evidence in `gh-calls.log`.
 - **stub-answers / pr7-sequencing** — representative calls return the right output; pr-7's
   `pr create` returns error-then-success across two calls.
-- **wrapper-on-path** — `gh` resolves to the stub via `PATH` on this OS.
+- **wrapper-on-path / gitbash-activation** — `gh` resolves to the stub via `PATH` on this
+  OS, including the literal `. activate.sh && gh` path a real executor takes.
+- **stub-merge-record** — `gh pr merge` leaves a durable, inspectable record in
+  `gh-stub-state.json` (item 1 corroboration leg, #514).
+- **evidence-archive** — the raw evidence triad (`gh-calls.log` + `git-state.txt` + stub
+  state) is archived into a workspace dir **before** teardown (item 2, #514).
 - **zero-mutation-audit** — the real repo's HEAD, branches, and `git status` are unchanged
   by the run, and no sandbox branches leak in.
+
+## Evidence archiving & the merge-discrimination rule
+
+`archive-evidence.mjs` (or `teardown-sandbox.mjs --archive`) copies the raw evidence triad
+legs the harness owns — `gh-calls.log`, a `git-state.txt` dump, `gh-stub-state.json`, and an
+`archive-manifest.json` — into an eval's `outputs/` dir **before** the sandbox is removed, so
+the grade is independently auditable and **executor-independent** (ruling 3, #511; the
+Phase-3 audit's F-A found these legs were never preserved). Grade merge-adjacent assertions
+from the **transcript's tool-call record**, not the log alone: the checked-in `ask` rule on
+`gh pr merge *` can intercept a merge before the stub logs it (the F-B merge-discrimination
+rule — full detail in [`docs/strategy-skill-evals.md`](../../docs/strategy-skill-evals.md) §6).
 
 ## Prompts (canonical operations)
 

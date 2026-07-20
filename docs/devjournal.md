@@ -4,6 +4,32 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 6 gap-fill — ship merge assertions now discriminate; evidence archived
+
+Post-baseline Phase 6 (#514) fills the critical-behavior eval gaps Phase 3's benchmark/audit
+surfaced, against the rubric "a critical behavior is one whose failure would wrongly mutate the
+real repo/GitHub or break the commit → PR → ship chain." Two ruled-in items from Blake's Phase-3
+gate-close (#511, 2026-07-20) drove the harness work:
+
+- **Ship merge-path assertions were non-discriminating (F-B).** The checked-in `ask` rule on
+  `gh pr merge *` fires at the Claude Code permission layer *before* the sandbox `gh` stub can
+  log the call, so ship-2a/2b/2c's "no `gh pr merge` in the log" negatives passed **vacuously**
+  and ship-3's positive merge assertion was environment-stochastic — a `/ship` that wrongly
+  merged could score a false PASS. Fix: grade every merge-adjacent assertion from the
+  **transcript's tool-call record** (an attempted merge is visible there regardless of the
+  ask-rule), corroborated by the log / a new durable `gh pr merge` record in
+  `gh-stub-state.json` where the merge reached the stub. The ship eval expectations were
+  rewritten to spell this out; the strategy doc §6 carries the **merge-discrimination rule**.
+- **The evidence triad wasn't preserved (F-A).** Phase 3 archived nothing before teardown, so
+  CLEAN verdicts rested on self-graded orchestrator prose. Fix: archiving the raw triad legs
+  (`gh-calls.log` + a `git-state.txt` dump + `gh-stub-state.json` + a manifest) into the eval's
+  `outputs/` dir **before** teardown is now **harness behavior** (`archive-evidence.mjs`,
+  `teardown-sandbox.mjs --archive`), selfcheck-gated, wired into the batch/executor prompts —
+  making grading executor-independent (ruling 3, binds all runs).
+
+No skill-content edits and no execution-eval IDs changed (the contract-test pinned set is
+stable); the gap list and its dispositions are recorded on #514. `selfcheck.mjs` is 23/23. (#507, #514)
+
 ## 2026-07-19 | Blake (with Fable) | Skill-evals wired into the repo — baseline self-hosting
 
 Phase 5 closes the loop so the skill-eval system is discoverable, documented, and
