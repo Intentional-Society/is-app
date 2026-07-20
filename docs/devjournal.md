@@ -4,6 +4,24 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-19 | Blake (with Fable) | Skill-evals wired into the repo — baseline self-hosting
+
+Phase 5 closes the loop so the skill-eval system is discoverable, documented, and
+self-hosting. `docs/strategy-skill-evals.md` is now complete: concrete run instructions with
+**both PowerShell and bash** command blocks (§6), and the **real-repo exception runbook**
+(§10, spec C12) — the one sanctioned human-run e2e smoke, gated by a recorded justification
+and a cleanup-owed checklist so "occasional" can't drift into "whenever convenient." The PR
+template gained an **eval-batch checklist line**: a PR touching an eval-governed skill (a team
+skill's `SKILL.md`/evals, or a `skill-creator` refresh) shows whether the full batch ran, and
+a deliberate skip is the box left unchecked with a reason. `docs/doc-skill-creator.md` now
+cross-references the strategy doc and notes that a vendored refresh trips the one testing rule.
+The wiring ships through the team's own `/commit` → `/pr` (self-hosting is the acceptance
+check), and the **golden-path walkthrough** — a non-author operator exercising the
+`/skill-creator` front door end-to-end against a sandbox, never touching the real repo — is
+recorded on the Phase-5 issue as proof the front door works. Baseline completion still owes the
+macOS platform-validation artifact (tracked on #510) and the cloud Layer-C run (R6, #512);
+neither blocks this wiring. (#507, #513)
+
 ## 2026-07-19 | Blake (with Fable) | Skill-eval sandbox harness landed
 
 `scripts/skill-evals/` now builds throwaway sandboxes (temp git repo + local bare origin + default-deny logging `gh` stub + fake `npm test`) for executing the per-skill evals — never against the real repo; `node scripts/skill-evals/selfcheck.mjs` runs the 20-check safety checklist. The batch + executor prompts under `scripts/skill-evals/prompts/` are the canonical way to run the suite. (#507)

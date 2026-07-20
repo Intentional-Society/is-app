@@ -27,7 +27,9 @@ node scripts/update-skill-creator.mjs --sha=<sha>  # sync to a specific upstream
 Requires `gh` (authenticated) and `tar` (ships with Windows 10+/macOS/Linux). The script never
 commits. After a refresh: review the diff, run the acceptance evals in
 `evals/skill-creator.evals.json` and capture results in the commit's Test Plan, then ship via
-`/commit`.
+`/commit`. A refresh also trips the team's **one testing rule** — refreshing the vendored copy
+counts as a skill change, so run the full skill-eval batch (`docs/strategy-skill-evals.md` §6)
+and record whether you did via the PR-template eval-batch checkbox.
 
 You don't have to remember to run `--check`: a monthly workflow
 (`.github/workflows/skill-creator-drift.yml`, 05:07 UTC on the 1st; manual via
@@ -41,6 +43,17 @@ human-run procedure above.
 The bundled `scripts/*.py` and `eval-viewer/` need **Python 3 with PyYAML**
 (`python -m pip install --user pyyaml`). Nothing in CI or the app runs them — Python is a
 human-at-the-keyboard authoring prerequisite only.
+
+## Testing skills built with it
+
+skill-creator is the **front door** for every skill task in this repo — creating, editing,
+eval-running, and description-tuning a skill all start by invoking it (slash or natural
+language). How the team actually *tests* those skills — the per-skill eval schema, the
+disposable sandbox harness that executes mutating-skill evals safely, the one testing rule,
+platform routing, and the golden-path walkthrough — lives in
+[`docs/strategy-skill-evals.md`](strategy-skill-evals.md) (with design rationale in
+[`docs/spec-skill-evals-baseline.md`](spec-skill-evals-baseline.md)). Read that before running
+or changing any skill's evals.
 
 Known divergence, expected: upstream's `scripts/quick_validate.py` enforces a strict frontmatter
 key allowlist and rejects the Claude Code key `disable-model-invocation` used by team skills.
