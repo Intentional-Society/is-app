@@ -4,6 +4,31 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 7 right-sizing — removed `ship-2c` (strict subset of `ship-2a`)
+
+Post-baseline Phase 7 (#515) is the prioritization pass against the I.4 right-sized-coverage
+Should ("every skill's critical behaviors have evals and the suite stays lean"). A systematic
+per-eval pass over the whole set (17 execution + 9 routing + two 20-query Layer-C trigger sets)
+found the suite already tight, with **one clear redundancy: `ship-2c`**.
+
+`ship-2c` (immediate-abort under pending advisories) shares `ship-2a`'s fixture and setup and
+asserts only a strict subset of `ship-2a`'s behaviors: enter the step-8 wait, present exactly
+three options (no `proceed`), `abort` → abandon the merge with no `gh pr merge`. `ship-2a`
+(`wait+5` then `abort`) makes every one of those assertions **plus** the `wait+5` re-loop, and
+`ship-2b` retains the distinct `troubleshoot` arm. `abort` is the same handler regardless of
+wait-loop iteration, so `ship-2c` caught nothing `ship-2a` doesn't — it only added a ~5-minute
+sandboxed LLM run. Phase 6 had already run a ship-2c-shaped abort scenario with a real executor
+and graded it PASS under the merge-discrimination rule, so removal loses no validated coverage.
+
+Trimming only bites on execution evals (each = one sandboxed run); routing evals are manual
+runbooks (≈zero batch cost) and the trigger sets are sized to the ~20 triggering-rate target —
+both reviewed and left intact, as was the reviewer-picker trio (`pr-5`/`pr-6`/`pr-7`, three
+mutually-exclusive cache/error paths). Updated in lockstep: the ship eval file, the contract
+test's pinned `EXPECTED_EXECUTION_IDS.ship`, the conversion manifest (Phase-7 amendment), and a
+cosmetic fixtures comment. No skill content (`SKILL.md`) changed.
+
+---
+
 ## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 6 gap-fill — ship merge assertions now discriminate; evidence archived
 
 Post-baseline Phase 6 (#514) fills the critical-behavior eval gaps Phase 3's benchmark/audit
