@@ -233,9 +233,11 @@ node scripts/skill-evals/make-sandbox.mjs --fixture feature-dirty-clean-payload 
 # Enter the sandbox (PATH -> stub gh, GH_TOKEN/GITHUB_TOKEN unset, cwd -> sandbox repo).
 . <sandbox>\activate.ps1
 
-# Full safety checklist; tear down one sandbox; or sweep all of them.
+# Full safety checklist; archive the raw evidence triad before teardown; tear down.
 node scripts/skill-evals/selfcheck.mjs
+node scripts/skill-evals/archive-evidence.mjs <sandboxDir> <eval-workspace>\outputs
 node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
+node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir> --archive <eval-workspace>\outputs
 node scripts/skill-evals/teardown-sandbox.mjs --all
 ```
 
@@ -250,7 +252,9 @@ node scripts/skill-evals/make-sandbox.mjs --fixture feature-dirty-clean-payload 
 source <sandbox>/activate.sh
 
 node scripts/skill-evals/selfcheck.mjs
+node scripts/skill-evals/archive-evidence.mjs <sandboxDir> <eval-workspace>/outputs
 node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
+node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir> --archive <eval-workspace>/outputs
 node scripts/skill-evals/teardown-sandbox.mjs --all
 ```
 
@@ -260,6 +264,51 @@ execution batch. Sandboxes are created under the OS temp dir (override with
 `SKILL_EVAL_SANDBOX_ROOT` or `--root`), and `make-sandbox` refuses any root inside the real
 repo, so you can never build one over your own checkout. Harness-internals reference:
 [`scripts/skill-evals/README.md`](../scripts/skill-evals/README.md).
+
+### Evidence archiving and executor-independent grading
+
+Every eval run archives the **raw evidence triad** into the eval's workspace `outputs/` dir
+**before the sandbox is torn down** — this is harness behavior (`archive-evidence.mjs` /
+`teardown-sandbox.mjs --archive`), not a request an agent may skip. It writes:
+
+- `gh-calls.log` — the primary grading evidence (what the skill asked GitHub to do).
+- `git-state.txt` — a raw dump of the sandbox repo + bare origin (status, log, branches,
+  reflog, staged/unstaged diffs).
+- `gh-stub-state.json` — the stub's durable state, including any `gh pr merge` records.
+- `archive-manifest.json` — provenance and which legs were captured.
+
+The grader reads those **raw files** (plus the executor's transcript), never a prose
+*summary* of them. This makes the grade **executor-independent** — reproducible by a third
+party who never watched the run. (This is a hard rule as of the Phase-3 gate-close, #511:
+that iteration archived nothing, so its CLEAN verdicts rested on self-graded orchestrator
+prose and could not be independently corroborated — the audit's F-A finding.)
+
+### The merge-discrimination rule (`gh pr merge`-adjacent assertions)
+
+`.claude/settings.json` ships an `ask` permission rule on `gh pr merge *` (and the
+PowerShell equivalent). It fires at the Claude Code permission layer — **before** the
+sandbox `gh` stub ever runs — so in an eval session a `gh pr merge` command is frequently
+intercepted and never reaches the stub to be logged. Consequently:
+
+- An **empty `gh-calls.log` is not proof that no merge was attempted.** A `/ship` that
+  wrongly merges would have its merge intercepted too, leaving the log just as empty as a
+  correct abort — a false PASS (the Phase-3 audit's F-B finding: the ship red control's
+  designated "no `gh pr merge` in the log" assertion passed *vacuously* against a mutant
+  that did attempt the merge).
+- A **missing log entry is not proof a correct merge failed.** Whether the `ask` rule
+  auto-clears is environment-stochastic, not skill behavior (F-B: ship-3's positive merge
+  assertion passed on one arm and failed the byte-identical other arm).
+
+**The rule:** grade every merge-adjacent assertion from the **transcript's tool-call
+record** — an attempted `gh pr merge` appears there whether or not the `ask` rule lets it
+through, so it is the authoritative signal for whether the skill *attempted* the merge.
+Corroborate it, where the environment let the call reach the stub, with a `pr merge` entry
+in `gh-calls.log` and/or a merge record in `gh-stub-state.json`. **Never PASS a
+merge-negative on an empty log alone.** This is the same discipline the liveness rule
+applies to negative assertions, extended to cover interception *upstream of the stub*, not
+just a PATH misroute. (The permanent close would be sandbox-scoped merge instrumentation the
+`ask` rule can't preempt; until then, the transcript is the load-bearing leg — the ship
+merge expectations spell this out inline.)
 
 **Routing evals stay manual at baseline.** The nine `kind: routing` evals (listed below)
 are not part of the automated batch — a subagent handed the skill can't test whether it

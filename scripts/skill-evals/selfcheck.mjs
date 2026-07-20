@@ -16,17 +16,23 @@
 //  10. gitbash-activation    — a genuine POSIX shell (`. activate.sh && gh auth status`) reaches
 //                              the stub, exercising bash's own $PATH command search (the literal
 //                              path a real executor takes, which check 9's Node spawn does not).
-//  11. zero-mutation-audit   — the real repo's HEAD/branches/status are unchanged by the run.
+//  11. stub-merge-record     — `gh pr merge` leaves a durable, inspectable record in
+//                              gh-stub-state.json (item 1 corroboration leg, #514).
+//  12. evidence-archive      — the raw evidence triad (gh-calls.log + git-state dump + stub
+//                              state) is archived into a workspace dir BEFORE teardown (item 2,
+//                              ruling 3, #511 gate-close, #514).
+//  13. zero-mutation-audit   — the real repo's HEAD/branches/status are unchanged by the run.
 //
 // Exit 0 iff every check passes.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { listFixtures } from "./lib/fixtures.mjs";
 import { REPO_ROOT } from "./lib/paths.mjs";
-import { buildSandbox, teardownSandbox } from "./lib/sandbox.mjs";
+import { archiveEvidence, buildSandbox, teardownSandbox } from "./lib/sandbox.mjs";
 
 const results = [];
 const built = [];
@@ -39,6 +45,7 @@ try {
   checkTeardown();
   checkWrapperOnPath();
   checkGitBashActivation();
+  checkEvidenceArchive();
 } finally {
   for (const dir of built) {
     try {
@@ -312,6 +319,65 @@ function findPosixShell() {
     if (fs.existsSync(c)) return c;
   }
   return null;
+}
+
+function checkEvidenceArchive() {
+  // Item 1 + item 2 (#514): prove the stub leaves a durable merge record AND that the raw
+  // evidence triad is archived into a workspace dir BEFORE teardown (ruling 3, #511
+  // gate-close). Exercise the stub DIRECTLY (node gh-stub.mjs), which bypasses the Claude
+  // Code `ask` rule that would gate `gh pr merge` in a real session — so this deterministic
+  // check can verify the merge-capture + archive plumbing without depending on the ask-rule.
+  const m = buildSandbox({ fixture: "feature-open-pr-all-green", note: "selfcheck-archive" });
+  built.push(m.sandboxDir);
+  runStub(m.binDir, m.repoDir, ["auth", "status"]);
+  runStub(m.binDir, m.repoDir, ["pr", "merge", "210", "--merge", "--delete-branch"]);
+
+  // durable merge record (item 1 corroboration leg) landed in gh-stub-state.json
+  let mergeRecorded = false;
+  try {
+    const state = JSON.parse(fs.readFileSync(path.join(m.sandboxDir, "gh-stub-state.json"), "utf8"));
+    mergeRecorded =
+      Array.isArray(state.merges) &&
+      state.merges.some((x) => String(x.prNumber) === "210" && x.merge === true && x.deleteBranch === true);
+  } catch {
+    // mergeRecorded stays false
+  }
+  add(
+    "stub-merge-record",
+    mergeRecorded,
+    mergeRecorded
+      ? "`gh pr merge` left a durable record in gh-stub-state.json"
+      : "no merge record in gh-stub-state.json",
+  );
+
+  // archive the raw triad BEFORE teardown, into a throwaway dest
+  const dest = fs.mkdtempSync(path.join(os.tmpdir(), "skill-eval-archive-"));
+  try {
+    const result = archiveEvidence(m.sandboxDir, dest);
+    const ghLog = path.join(dest, "gh-calls.log");
+    const gitState = path.join(dest, "git-state.txt");
+    const stubState = path.join(dest, "gh-stub-state.json");
+    const ghLogOk = fs.existsSync(ghLog) && fs.readFileSync(ghLog, "utf8").trim().length > 0;
+    const gitStateOk = fs.existsSync(gitState) && fs.readFileSync(gitState, "utf8").includes("rev-parse HEAD");
+    const stubStateOk = fs.existsSync(stubState);
+    let manifestOk = false;
+    try {
+      const am = JSON.parse(fs.readFileSync(path.join(dest, "archive-manifest.json"), "utf8"));
+      manifestOk = am.legs?.ghCallLog === true && am.legs?.gitState === true;
+    } catch {
+      // manifestOk stays false
+    }
+    const ok = result.ghCallLog && result.gitState && ghLogOk && gitStateOk && stubStateOk && manifestOk;
+    add(
+      "evidence-archive",
+      ok,
+      ok
+        ? "raw triad archived before teardown: gh-calls.log (non-empty) + git-state.txt + gh-stub-state.json + manifest"
+        : `archive incomplete (ghLog=${ghLogOk} gitState=${gitStateOk} stubState=${stubStateOk} manifest=${manifestOk})`,
+    );
+  } finally {
+    fs.rmSync(dest, { recursive: true, force: true });
+  }
 }
 
 function checkZeroMutation(beforeState) {

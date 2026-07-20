@@ -186,6 +186,24 @@ function handlePrChecks(fx) {
 function handlePrMerge(_fx) {
   const number = firstPositional(2);
   stdout(`✓ Merged pull request #${number ?? "?"} (SANDBOX STUB — no real merge)`);
+  // Durable merge record — an inspectable side effect (in gh-stub-state.json) that survives
+  // into the archived sandbox state, independent of the transcript, corroborating a real
+  // merge wherever this handler was actually reached. It never mutates the sandbox git tree,
+  // so the skill's own post-merge tidy (`git branch -d <feature>`) is unaffected.
+  //
+  // CAVEAT (item 1 / F-B, #511): the checked-in `ask` rule on `gh pr merge *` usually
+  // intercepts the command at the Claude Code permission layer BEFORE the stub runs, so in a
+  // Claude Code eval session this handler — and therefore this record and the log entry
+  // below — is often never reached even for a genuine merge. An empty log/state is therefore
+  // NOT proof no merge was attempted. The authoritative merge signal for grading is the
+  // TRANSCRIPT's tool-call record (a `gh pr merge` attempt appears there whether or not the
+  // ask-rule lets it through). See the merge-discrimination rule in docs/strategy-skill-evals.md.
+  recordMerge({
+    prNumber: number,
+    merge: hasFlag("--merge"),
+    deleteBranch: hasFlag("--delete-branch"),
+    squash: hasFlag("--squash"),
+  });
   logCall({
     decision: "answered",
     exitCode: 0,
@@ -195,6 +213,14 @@ function handlePrMerge(_fx) {
     prNumber: number,
   });
   return 0;
+}
+
+function recordMerge(entry) {
+  const state = readJson(STATE_PATH) || {};
+  const merges = state.merges || [];
+  merges.push({ ts: new Date().toISOString(), argv: rawArgv, ...entry });
+  state.merges = merges;
+  writeJson(STATE_PATH, state);
 }
 
 function handlePrComment(fx) {

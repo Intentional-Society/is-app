@@ -147,6 +147,107 @@ export function teardownSandbox(sandboxDir) {
   return resolved;
 }
 
+/**
+ * Archive the raw evidence triad from a sandbox into destDir — call this BEFORE teardown.
+ *
+ * Captures the two OBJECTIVE triad legs (spec II.2e) as inspectable raw artifacts so a
+ * grade is independently auditable and executor-independent (ruling 3, #511 gate-close
+ * 2026-07-20 — binds all runs; the Phase-3 audit's F-A found these legs were never
+ * preserved, leaving CLEAN verdicts resting on self-graded orchestrator prose):
+ *   - `gh-calls.log`   — the primary grading evidence (what the skill asked GitHub to do).
+ *   - `git-state.txt`  — a full raw dump of the sandbox repo + bare origin state.
+ *   - `gh-stub-state.json` — the stub's durable state (incl. any merge records — item 1).
+ * The transcript (the third leg) is the executor's own output, written to the eval
+ * workspace separately; this function captures only the legs the harness itself owns.
+ *
+ * @param {string} sandboxDir  the sandbox to archive (must be outside the real repo).
+ * @param {string} destDir     where to write the artifacts (an eval's `outputs/` dir).
+ * @returns {{destDir:string, files:string[], gitState:boolean, ghCallLog:boolean}}
+ */
+export function archiveEvidence(sandboxDir, destDir) {
+  const resolved = assertOutsideRepo(sandboxDir);
+  if (!destDir) throw new Error("archiveEvidence: a destination dir is required.");
+  fs.mkdirSync(destDir, { recursive: true });
+
+  const repoDir = path.join(resolved, "repo");
+  const originDir = path.join(resolved, "origin.git");
+  const captured = [];
+
+  // --- objective leg 1: the gh call log (copied verbatim) -----------------------------
+  const ghLogSrc = path.join(resolved, "gh-calls.log");
+  const ghCallLog = fs.existsSync(ghLogSrc);
+  if (ghCallLog) {
+    fs.copyFileSync(ghLogSrc, path.join(destDir, "gh-calls.log"));
+    captured.push("gh-calls.log");
+  }
+
+  // --- stub durable state + provenance ------------------------------------------------
+  for (const name of ["gh-stub-state.json", "gh-fixture.json", "manifest.json"]) {
+    const src = path.join(resolved, name);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, path.join(destDir, name));
+      captured.push(name);
+    }
+  }
+  const markerSrc = path.join(resolved, MARKER_FILENAME);
+  if (fs.existsSync(markerSrc)) {
+    fs.copyFileSync(markerSrc, path.join(destDir, "sandbox-marker.json"));
+    captured.push("sandbox-marker.json");
+  }
+
+  // --- objective leg 2: a raw, inspectable git-state dump -----------------------------
+  const gitState = fs.existsSync(path.join(repoDir, ".git"));
+  if (gitState) {
+    const sections = [];
+    const dump = (label, args) => sections.push(`### ${label}\n$ git ${args.join(" ")}\n${gitSafe(args)}`);
+    dump("rev-parse HEAD", ["-C", repoDir, "rev-parse", "HEAD"]);
+    dump("status --porcelain=v1 -b", ["-C", repoDir, "status", "--porcelain=v1", "-b"]);
+    dump("log --oneline --all -n 50", ["-C", repoDir, "log", "--oneline", "--all", "-n", "50"]);
+    dump("branch -avv", ["-C", repoDir, "branch", "-avv"]);
+    dump("reflog -n 50", ["-C", repoDir, "reflog", "-n", "50"]);
+    dump("diff (unstaged)", ["-C", repoDir, "diff"]);
+    dump("diff --cached (staged)", ["-C", repoDir, "diff", "--cached"]);
+    if (fs.existsSync(originDir)) {
+      dump("origin(bare): log --oneline --all -n 50", [
+        "--git-dir",
+        originDir,
+        "log",
+        "--oneline",
+        "--all",
+        "-n",
+        "50",
+      ]);
+      dump("origin(bare): branch --list", ["--git-dir", originDir, "branch", "--list"]);
+    }
+    fs.writeFileSync(path.join(destDir, "git-state.txt"), `${sections.join("\n\n")}\n`);
+    captured.push("git-state.txt");
+  }
+
+  // --- archive manifest: provenance + what was captured -------------------------------
+  const archiveManifest = {
+    archivedAt: new Date().toISOString(),
+    sandboxDir: resolved,
+    destDir,
+    captured,
+    legs: {
+      ghCallLog,
+      gitState,
+      transcript: "authored by the executor to the eval workspace — not a harness artifact",
+    },
+    note:
+      "Raw evidence triad archived BEFORE teardown (spec II.2e; ruling 3, #511 gate-close). " +
+      "gh-calls.log + git-state.txt are the two OBJECTIVE legs — inspectable independently of " +
+      "any orchestrator narration, so the grade is executor-independent. Merge assertions are " +
+      "corroborated against the transcript's tool-call record: the checked-in `ask` rule on " +
+      "`gh pr merge *` can intercept a merge before the stub logs it, so an empty log is NOT " +
+      "proof no merge was attempted (merge-discrimination rule, docs/strategy-skill-evals.md).",
+  };
+  fs.writeFileSync(path.join(destDir, "archive-manifest.json"), `${JSON.stringify(archiveManifest, null, 2)}\n`);
+  captured.push("archive-manifest.json");
+
+  return { destDir, files: captured, gitState, ghCallLog };
+}
+
 /** Remove every sandbox under the root. Returns the removed dirs. */
 export function teardownAll(root) {
   const base = assertOutsideRepo(sandboxRoot(root));
@@ -173,6 +274,15 @@ export function teardownAll(root) {
 
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+/** Like git(), but never throws — returns a bracketed error note instead (for the archive dump). */
+function gitSafe(args) {
+  try {
+    return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trimEnd();
+  } catch (err) {
+    return `<git ${args.join(" ")} failed: ${err?.message ? err.message : err}>`;
+  }
 }
 
 /** Remove a dir tree, tolerating Windows read-only git objects + transient locks. */

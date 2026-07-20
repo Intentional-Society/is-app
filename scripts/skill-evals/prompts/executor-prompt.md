@@ -67,7 +67,13 @@ DO NOT:
     not an obstacle to route around. Report it.
 
 WHEN DONE, REPORT:
-  1. A transcript of what you did (the assistant turns).
+  1. A transcript of what you did (the assistant turns) INCLUDING a verbatim tool-call
+     record — every git/gh command you attempted, in order. Record an attempted
+     `gh pr merge ...` even if a permission prompt intercepted or denied it before it ran:
+     that attempt is the authoritative signal for whether the skill tried to merge, and the
+     grader relies on it (the checked-in `ask` rule on `gh pr merge *` can intercept the
+     command before the sandbox stub logs it, so the log alone cannot prove a merge did or
+     did not happen — the merge-discrimination rule, docs/strategy-skill-evals.md).
   2. The final sandbox git state: `git log --oneline -5`, `git status --short`,
      `git branch -vv`.
   3. Confirm the gh call log path for the grader: {{GH_CALL_LOG}}
@@ -103,3 +109,24 @@ evidence sources — the transcript, the gh call log (`ghCallLog`), and the sand
 state — against the eval's `expectations`, and applies the **liveness rule**: before
 trusting any "log contains no X" assertion, confirm the call log is non-empty (positive
 proof the stub was exercised and PATH was wired correctly).
+
+**Grade from archived raw evidence, not orchestrator narration (executor-independent grading
+— ruling 3, #511 gate-close).** Before teardown, the orchestrator archives the raw triad legs
+the harness owns into the eval's `outputs/` dir:
+
+```
+node scripts/skill-evals/archive-evidence.mjs <sandboxDir> <eval-workspace>/outputs
+```
+
+This writes `gh-calls.log`, `git-state.txt`, `gh-stub-state.json`, and `archive-manifest.json`.
+The grader reads those raw files (plus the executor's transcript), never a prose summary of
+them — so the grade is reproducible by a third party who never saw the run.
+
+**The merge-discrimination rule (`gh pr merge`-adjacent assertions).** The checked-in `ask`
+rule on `gh pr merge *` can intercept the merge at the Claude Code permission layer BEFORE the
+sandbox stub logs it. So an empty gh call log is **not** proof no merge was attempted, and a
+missing log entry is **not** proof a correct merge failed. Grade every merge assertion from the
+**transcript's tool-call record** (authoritative for whether the skill attempted the merge),
+corroborated where the environment let the call reach the stub by a `pr merge` entry in
+`gh-calls.log` and/or a merge record in `gh-stub-state.json`. Never PASS a merge-negative on an
+empty log alone.
