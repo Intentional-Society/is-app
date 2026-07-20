@@ -310,11 +310,32 @@ just a PATH misroute. (The permanent close would be sandbox-scoped merge instrum
 `ask` rule can't preempt; until then, the transcript is the load-bearing leg — the ship
 merge expectations spell this out inline.)
 
-**Routing evals stay manual at baseline.** The nine `kind: routing` evals (listed below)
-are not part of the automated batch — a subagent handed the skill can't test whether it
-*fires*, only what it does once invoked. Until the Phase-8 session runner exists, run them
-by hand: open a fresh session with no prior context, issue the query exactly as written,
-and check the response against the eval's `expectations` list.
+**Routing evals: automated by the Phase-8 session runner.** The nine `kind: routing` evals
+(listed below) aren't part of the *execution* batch — a subagent handed the skill can't
+test whether it *fires*, only what it does once invoked. They are instead run by the
+**routing session-runner**, [`scripts/skill-evals/routing/`](../scripts/skill-evals/routing/README.md):
+it builds a sandbox, copies the three team skills + the real CLAUDE.md "AI Skills" section +
+`settings.json` in so a fresh `claude -p` **discovers** them naturally, drives the scenario
+(single-turn, or the multi-turn "assistant offers → bare yes" cases via a seeded prior
+assistant turn), and grades the last turn per `agents/grader.md`. Reports **trigger rates**
+over N repetitions (N=3 default); routing is probabilistic (never a single binary verdict).
+
+```sh
+node scripts/skill-evals/routing/run-routing-evals.mjs --reps 3          # all nine
+node scripts/skill-evals/routing/run-routing-evals.mjs --only commit-6,ship-4 --reps 1
+```
+
+Two **headless-observability adaptations** the runner's grader applies (a headless
+`claude -p` session has no interactive layer): (1) `AskUserQuestion` does not exist headless
+— "Step 0 fires via AskUserQuestion" is graded by its **observable proxy** (announcement +
+gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `ask` rule
+can't prompt headless (spec R8) — `ship-4` asserts the **observable** (no `pr merge` in
+`gh-calls.log`, trusted only when the log is non-empty — liveness).
+
+**The manual runbook below is retained** as the human-readable reference and fallback — run
+it by hand (fresh session, issue the query verbatim, check against `expectations`) when you
+want to eyeball the live UX the headless runner can't fully reproduce (the AskUserQuestion
+prompt, the live announce cadence), or when the runner is unavailable.
 
 | Eval | Query | What to watch for |
 |---|---|---|

@@ -4,6 +4,39 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 8 — routing session-runner (the nine routing evals now run automated)
+
+Post-baseline Phase 8 (#516) automates the nine `kind: routing` evals (commit-4/5/6/7/8,
+pr-8/9, ship-4/5) — the ones a sandboxed subagent can't test, because routing is *whether/how
+a skill fires in a live session*, not what it does once invoked. New code under
+`scripts/skill-evals/routing/`: a Windows-native Node runner that builds a harness sandbox,
+copies the three team `SKILL.md` files + the real CLAUDE.md "AI Skills" section + `settings.json`
+INTO it (so a fresh `claude -p` **discovers** the skills naturally), drives the scenario, and
+grades the last turn per `agents/grader.md` into the standard `eval-<id>/<config>/run-<k>/grading.json`
+→ `aggregate_benchmark.py` → benchmark/viewer flow. Reports **trigger rates** over N=3 reps.
+
+The phase opened with the R4 **kickoff spike** (the named main technical risk): can we drive
+the "assistant offers, human says yes" cases (commit-6/7, pr-9)? **It passed.** The driver seeds
+a synthetic prior assistant offer via `claude -p --input-format stream-json`, then sends the bare
+affirmation; the model routes on the "yes" correctly (commit-6 → `Skill(commit)`; pr-9 → `Using
+/pr` then the full delegation cascade incl. `Using /commit — delegated from /pr`; commit-7 the
+negative control correctly did *not* fire). No SDK install and no `select()` needed — Node reads
+child stdout via async stream events, the Windows-native equivalent of the "threaded pipe reader"
+(the vendored `run_eval.py`'s `select()` crashes on native Windows; the no-patching rule applies
+only to the vendored dir).
+
+Two **headless-observability adaptations** the grader applies (a headless `claude -p` session has
+no interactive layer): (1) **`AskUserQuestion` does not exist headless** (spike finding) — the
+"Step 0 fires via AskUserQuestion" assertions are graded by their observable proxy (announcement +
+gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `ask` rule can't
+prompt headless (spec **R8**) — `ship-4` asserts the observable (no `pr merge` in `gh-calls.log`,
+trusted only when the log is non-empty — liveness). Both are documented limits, not driver faults.
+The manual runbook in strategy-skill-evals §6 is retained as the human-readable reference/fallback
+for eyeballing the live UX (the AskUserQuestion prompt, live announce cadence) the runner can't
+fully reproduce.
+
+---
+
 ## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 7 right-sizing — removed `ship-2c` (strict subset of `ship-2a`)
 
 Post-baseline Phase 7 (#515) is the prioritization pass against the I.4 right-sized-coverage
