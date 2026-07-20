@@ -214,6 +214,24 @@ parallel batches, graded, aggregated per skill, and reported as one combined sum
 viewer link. This is the *only* documented way to regression-test a skill change; there is
 no lighter alternative.
 
+**Expected range (advisory, not a gate — decided 2026-07-20, Phase 3 exit task):** a typical
+full batch runs **~60–90 minutes wall-clock and ~2M tokens**. These are not enforced by
+anything — batch runs are human-triggered, never CI (per the rule above), so there is no
+mechanism that could reject a run for exceeding them. They exist purely as a documented
+reference point: if a run significantly overshoots either number, it's worth asking why
+(a stuck eval, an infrastructure regression, an unrelated tooling hiccup) — not
+automatically wrong, just worth a look. Baseline data point: Phase 3's iteration-1 run
+measured 1,369,407 tokens / ~1h46m, of which roughly 30–40 minutes was one-time noise
+(a harness bug investigation, since fixed) rather than steady-state cost; a clean rerun
+today would likely land lower, and every run since Phase 6 additionally archives raw
+evidence and grades independently, which adds a small, expected amount of overhead beyond
+that baseline.
+
+**Pass rate has no numeric threshold, by design.** The gate stays exactly what it has always
+been: every Must-level assertion passes, or a human explicitly dispositions the failure — no
+softer "95% is fine" bar sits alongside it. A numeric pass-rate floor would let a fixed slice
+of real regressions through unexamined, which defeats the point of a regression suite.
+
 ### Running it — the exact commands (PowerShell and bash)
 
 The batch prompt above is what you hand an orchestrating session; under the hood it — and
