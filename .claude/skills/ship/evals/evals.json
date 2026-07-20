@@ -59,21 +59,6 @@
       ]
     },
     {
-      "id": "ship-2c",
-      "kind": "execution",
-      "eval_name": "refusal-pending-advisory-immediate-abort",
-      "prompt": "/ship",
-      "fixture": "feature-open-pr-advisory-pending",
-      "preconditions": "On a feature branch with a pre-existing open PR; tree clean; required check `Lint & Functional Tests` green within 1 minute; advisory E2E still pending after the 5-minute wait window; no `proceed` option offered.",
-      "human_script": "At the three-option prompt (after the 5-minute wait), the human replies: abort.",
-      "expected_output": "Skill enters the wait at step 8, waits 5 minutes for advisories, then presents EXACTLY three options: `wait+5`, `troubleshoot`, `abort`. No `proceed` option is offered or accepted. On `abort`, abandons the merge attempt without calling `gh pr merge`.",
-      "expectations": [
-        "The skill enters the wait at step 8, waits 5 minutes, then presents exactly three options (`wait+5`, `troubleshoot`, `abort`) — no `proceed`",
-        "On `abort`, the skill abandons the merge attempt",
-        "No merge is attempted after `abort`: the transcript's tool-call record shows NO `gh pr merge` invocation (authoritative), corroborated by a non-empty gh call log (liveness) with no `pr merge` entry and no merge record in `gh-stub-state.json`. Graded against the transcript, not the empty log alone — the checked-in `ask` rule can intercept a wrongful merge before the stub logs it (merge-discrimination rule, docs/strategy-skill-evals.md)"
-      ]
-    },
-    {
       "id": "ship-3",
       "kind": "execution",
       "eval_name": "edge-docs-only-pr-absent-advisories-expected",

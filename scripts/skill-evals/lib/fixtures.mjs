@@ -448,7 +448,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
     },
   },
 
-  // ship-2a/2b/2c — pre-existing PR, advisory E2E pending past the 5-minute wait
+  // ship-2a/2b — pre-existing PR, advisory E2E pending past the 5-minute wait
   "feature-open-pr-advisory-pending": {
     summary:
       "Pre-existing open PR; required check green; advisory E2E still pending after the 5-minute wait; no merge.",
