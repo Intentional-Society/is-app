@@ -1,0 +1,102 @@
+[
+  {
+    "query": "ok the profile redirect fix looks good, go ahead and commit it",
+    "should_trigger": true,
+    "note": "Canonical NL commit intent, casual register (extends routing eval commit-4). References the commit-1 fixture's profile-redirect change."
+  },
+  {
+    "query": "commit this — just the two files in src/server/ i touched for the user endpoint",
+    "should_trigger": true,
+    "note": "Explicit 'commit this' + scoped payload (src/server, the commit-2 user-endpoint change). Should route to /commit."
+  },
+  {
+    "query": "let's commit this and push it up",
+    "should_trigger": true,
+    "note": "commit-4 seed phrasing; commit + push is exactly /commit's job (leaf skill, only place changes leave the tree)."
+  },
+  {
+    "query": "can you commit these in two commits? the schema.ts expand first, then the api.ts endpoint",
+    "should_trigger": true,
+    "note": "Commit-splitting intent — the description calls this out verbatim ('commit in two steps: X then Y'). References the expand/contract schema flow (commit-3)."
+  },
+  {
+    "query": "commit what we've got for issue #142, the drizzle migration's in there too",
+    "should_trigger": true,
+    "note": "Issue-argument NL intent (#142 = the commit-3 issue), migration context. /commit resolves #N via gh issue view."
+  },
+  {
+    "query": "save this and push, it's the buttondown sync tweak from earlier",
+    "should_trigger": true,
+    "note": "'save this and push' = commit intent without the literal word 'commit' — coverage for implicit phrasing (upstream: cases where the user doesn't name the skill but clearly needs it)."
+  },
+  {
+    "query": "wrap up the avatar upload changes in a commit please",
+    "should_trigger": true,
+    "note": "'wrap up ... in a commit' — polite/indirect commit intent, avatar-upload feature context (design-profile-pictures)."
+  },
+  {
+    "query": "go ahead and commit, use whatever conventional-commit subject makes sense",
+    "should_trigger": true,
+    "note": "Clear commit intent that defers the CC subject to the skill — should win against a naive 'answer a question about Conventional Commits' read."
+  },
+  {
+    "query": "i think the welcome flow step is done — commit it for now, we'll PR later",
+    "should_trigger": true,
+    "note": "Commit intent that explicitly defers the PR — should fire /commit, NOT /pr. Welcome-flow feature context (design-welcome)."
+  },
+  {
+    "query": "commit the relations web edits and push them up",
+    "should_trigger": true,
+    "note": "Commit + push intent, relations-web feature context (design-relations)."
+  },
+  {
+    "query": "does the commit message you drafted actually follow Conventional Commits? the subject feels too long",
+    "should_trigger": false,
+    "note": "Near-miss (extends routing eval commit-8): a review QUESTION about a commit message, not a request to perform a commit. Naive keyword match on 'commit' + 'Conventional Commits' must NOT fire the skill."
+  },
+  {
+    "query": "walk me through what /commit's Step 0 intent gate checks before it fires",
+    "should_trigger": false,
+    "note": "Near-miss (extends routing eval commit-7 pattern): the token '/commit' appears but the ask is to EXPLAIN the skill, not run it. Keys on intent (explain) not keyword."
+  },
+  {
+    "query": "why did the last commit's npm test gate fail — was it the playwright e2e or vitest?",
+    "should_trigger": false,
+    "note": "Near-miss: debugging a PAST commit's test failure. Mentions 'commit' + the npm test gate but is not commit intent."
+  },
+  {
+    "query": "what's the difference between just committing with /commit versus running /ship end to end?",
+    "should_trigger": false,
+    "note": "Near-miss: a compare/explain question naming /commit and /ship. Answering it is not performing a commit."
+  },
+  {
+    "query": "show me the diff from the last commit on this branch before i decide what to do next",
+    "should_trigger": false,
+    "note": "Near-miss: inspection of an existing commit's diff. 'commit' as a noun/topic, no intent to create one."
+  },
+  {
+    "query": "does /commit ever run `git add -A`, or does it always stage explicit paths?",
+    "should_trigger": false,
+    "note": "Near-miss: a question ABOUT the skill's staging discipline (the commit-1/2 assertion). Explain, not perform."
+  },
+  {
+    "query": "the pre-commit lefthook keeps reformatting my files with biome — how do i turn that off?",
+    "should_trigger": false,
+    "note": "Near-miss: 'pre-commit' hook tooling question. Shares the 'commit' substring but is about lefthook/biome config, not making a commit."
+  },
+  {
+    "query": "summarize the commits on this branch so i can write the PR description myself",
+    "should_trigger": false,
+    "note": "Near-miss: summarize existing commits; user explicitly wants to write the PR themselves — neither /commit nor /pr intent."
+  },
+  {
+    "query": "rename the getSignedAvatarUrl helper to signAvatarUrl everywhere it's used",
+    "should_trigger": false,
+    "note": "Over-trigger control: an ordinary dev task with no commit intent at all. Proves the skill doesn't fire on generic 'do some work' requests (upstream: keep at least one clean control)."
+  },
+  {
+    "query": "should this schema change be split into expand and contract commits, or is it safe as one?",
+    "should_trigger": false,
+    "note": "Tricky near-miss: shares the 'split into commits' concept the description advertises, but is a design QUESTION seeking advice, not a request to perform the split."
+  }
+]
