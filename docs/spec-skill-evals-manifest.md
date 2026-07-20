@@ -50,7 +50,7 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 
 ## Cross-cutting requirements this manifest creates
 
-1. **Phase 2 fixture set** = the 13 distinct proposed fixture names above (routing evals
+1. **Phase 2 fixture set** = the 14 distinct proposed fixture names above (routing evals
    need none at baseline). Phase-2 acceptance already requires a profile per referenced
    name.
 2. **Stub sequencing:** pr-7 requires per-call response sequencing — explicitly in

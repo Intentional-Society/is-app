@@ -276,13 +276,32 @@ function installGhStub(binDir) {
 
 function writeActivateScripts(sandboxDir, { binDir, ghConfigDir, repoDir }) {
   const posix = (p) => p.replace(/\\/g, "/");
+  // PATH entries specifically need MSYS/Git-Bash mount-point form (`/c/Users/...`),
+  // not merely forward-slashed Windows form (`C:/Users/...`): bash's own command-search
+  // over $PATH does not understand a drive-letter-colon segment the way `cd`/utilities
+  // that take an explicit path argument do (those pass through to the Windows filesystem
+  // APIs directly). A forward-slashed-but-still-drive-lettered PATH entry is silently
+  // unresolvable, so `gh` falls through to the next PATH entry — which, on a dev machine
+  // with the real GitHub CLI installed, is the real `gh` (found and confirmed empirically
+  // during Phase 3 execution, 2026-07-20 — see docs/spec-skill-evals-baseline.md / #511).
+  // Credential scrubbing (unset tokens + isolated GH_CONFIG_DIR) independently prevented
+  // any authenticated reach to real GitHub even while this bug was live, but the stub's
+  // call-log — and hence its liveness/evidence guarantees — could silently go dark for
+  // any call this affected. Only the PATH line needs mount-point form; `cd` and
+  // `GH_CONFIG_DIR` (read by Node, not resolved via bash's command search) both tolerate
+  // the forward-slashed Windows form fine, verified empirically.
+  const msysPath = (p) => {
+    const forward = posix(p);
+    const m = forward.match(/^([A-Za-z]):\/(.*)$/);
+    return m ? `/${m[1].toLowerCase()}/${m[2]}` : forward;
+  };
   const sh =
     "# Source this to enter the skill-eval sandbox (Git Bash / macOS / Linux):\n" +
     "#   source " +
     posix(path.join(sandboxDir, "activate.sh")) +
     "\n" +
     'export PATH="' +
-    posix(binDir) +
+    msysPath(binDir) +
     ':$PATH"\n' +
     "unset " +
     SCRUB_UNSET.join(" ") +
