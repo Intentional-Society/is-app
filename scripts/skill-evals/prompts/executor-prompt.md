@@ -8,9 +8,11 @@ the `make-sandbox` manifest.
 
 > **Safety contract (non-negotiable).** This prompt is only ever run against a
 > harness-built sandbox. The executor's very first action is to confirm the
-> `.skill-eval-sandbox` marker exists in its working directory — **no marker, no run.**
-> The scripted human replies below are valid **only** because the marker is present; in the
-> real repo every approval always comes from a live human.
+> `.skill-eval-sandbox` marker exists in its working directory — **no marker, no run.** It
+> then confirms the sandbox `gh` stub — not the real GitHub CLI — is the one on PATH, by
+> checking that `gh auth status` prints the `(SANDBOX gh stub)` marker — **stub not on
+> PATH, no run.** The scripted human replies below are valid **only** because the marker is
+> present; in the real repo every approval always comes from a live human.
 
 ---
 
@@ -28,6 +30,17 @@ STEP 0 — MARKER GATE (do this first, before anything else):
     Git Bash/macOS/Linux:  source {{ACTIVATE_SH}}
   Activation puts the stub `gh` on PATH, unsets GH_TOKEN/GITHUB_TOKEN, isolates
   GH_CONFIG_DIR, and cd's you into the sandbox repo.)
+
+  STUB-LIVENESS GATE (still STEP 0 — do this right after the marker check and activation,
+  before any git/gh command or eval action): run `gh auth status` and confirm its output
+  contains the exact string "(SANDBOX gh stub)". If that string is ABSENT, the real GitHub
+  CLI — not the sandbox stub — won the PATH race: STOP immediately, report "stub not on
+  PATH — refusing to run", and run no further git or gh command. (The stub prints this
+  marker in its `gh auth status` output; the real gh never does. The stub writes it to
+  stderr, so inspect stderr, not just stdout. This turns an activation/PATH misroute into a
+  hard stop before any eval action: credential scrubbing still blocks a real-GitHub reach,
+  but a misrouted real `gh` produces no stub call-log entry, so the grader's evidence would
+  silently go dark — this gate refuses to run rather than grade against a dark log.)
 
 CONTEXT YOU MAY RELY ON:
   - The sandbox starting state is the fixture `{{FIXTURE}}`. Its preconditions:

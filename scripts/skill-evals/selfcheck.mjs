@@ -13,7 +13,10 @@
 //   7. stub-answers          — representative stubbed calls return the expected output.
 //   8. pr7-sequencing        — pr create returns error-then-success across two calls.
 //   9. wrapper-on-path       — the shell wrapper resolves as `gh` on PATH and reaches the stub.
-//  10. zero-mutation-audit   — the real repo's HEAD/branches/status are unchanged by the run.
+//  10. gitbash-activation    — a genuine POSIX shell (`. activate.sh && gh auth status`) reaches
+//                              the stub, exercising bash's own $PATH command search (the literal
+//                              path a real executor takes, which check 9's Node spawn does not).
+//  11. zero-mutation-audit   — the real repo's HEAD/branches/status are unchanged by the run.
 //
 // Exit 0 iff every check passes.
 
@@ -35,6 +38,7 @@ try {
   checkEnvScrub();
   checkTeardown();
   checkWrapperOnPath();
+  checkGitBashActivation();
 } finally {
   for (const dir of built) {
     try {
@@ -234,6 +238,80 @@ function checkWrapperOnPath() {
       ? `\`gh\` resolved to the stub via PATH (${process.platform})`
       : `wrapper did not reach the stub (status ${res.status})`,
   );
+}
+
+function checkGitBashActivation() {
+  // Exercise the LITERAL path a real executor takes: a genuine POSIX shell sources
+  // activate.sh (which prepends the stub bin dir to PATH in MSYS mount-point form) and
+  // then runs a BARE `gh`, so bash's own $PATH command search decides which `gh` wins.
+  // check 9 (wrapper-on-path) uses Node's spawn with shell:true, which resolves the
+  // wrapper differently — it did NOT catch the 2026-07-20 activate.sh drive-letter-PATH
+  // near-miss (#511) where a bare `gh` fell through to the real installed GitHub CLI.
+  // This closes that coverage gap.
+  const m = buildSandbox({ fixture: "feature-dirty-clean-payload", note: "selfcheck-gitbash" });
+  built.push(m.sandboxDir);
+
+  const shell = findPosixShell();
+  if (!shell) {
+    // A POSIX shell is expected on every platform this repo supports — Git Bash is a hard
+    // requirement on Windows, and /bin/sh always exists on macOS/Linux. Its absence is a
+    // real FAILURE (not a skip): it means the literal `source activate.sh` path a real
+    // executor uses is untested here.
+    add(
+      "gitbash-activation",
+      false,
+      `no POSIX shell found (looked for Git Bash bash.exe / bash / sh) on ${process.platform} — cannot exercise the literal \`. activate.sh && gh\` path`,
+    );
+    return;
+  }
+
+  // Forward-slash the activate path (bash treats backslashes as escapes); use `.` rather
+  // than `source` so the command is portable to POSIX sh (dash) as well as bash. gh writes
+  // auth status to stderr, so capture both streams.
+  const activate = m.activate.sh.replace(/\\/g, "/");
+  const res = spawnSync(shell, ["-c", `. '${activate}' && gh auth status`], { encoding: "utf8" });
+  const output = `${res.stdout || ""}${res.stderr || ""}`;
+  const reachedStub = output.includes("(SANDBOX gh stub)");
+  add(
+    "gitbash-activation",
+    reachedStub,
+    reachedStub
+      ? `bare \`gh\` after \`. activate.sh\` reached the stub via ${path.basename(shell)} (${process.platform})`
+      : `bare \`gh\` did NOT reach the stub via ${shell} — output lacked the "(SANDBOX gh stub)" marker (real gh winning the PATH race?)`,
+  );
+}
+
+// Locate a genuine POSIX shell to source activate.sh. On Windows this MUST be Git Bash's
+// bash.exe — found via git's own install root, never a bare `bash` on PATH (that can be the
+// WSL launcher in System32, which is not the Git Bash POSIX shell the harness targets).
+function findPosixShell() {
+  if (process.platform === "win32") {
+    const candidates = [];
+    try {
+      // e.g. `C:/Program Files/Git/mingw64/libexec/git-core` → install root is `.../Git`.
+      const execPath = execFileSync("git", ["--exec-path"], { encoding: "utf8" }).trim().replace(/\\/g, "/");
+      const idx = execPath.toLowerCase().lastIndexOf("/mingw");
+      const root = idx > 0 ? execPath.slice(0, idx) : path.dirname(path.dirname(path.dirname(execPath)));
+      candidates.push(path.join(root, "bin", "bash.exe"), path.join(root, "usr", "bin", "bash.exe"));
+    } catch {
+      // git not resolvable — fall through to Program Files probing.
+    }
+    for (const base of [
+      process.env.ProgramFiles,
+      process.env["ProgramFiles(x86)"],
+      "C:\\Program Files",
+      "C:\\Program Files (x86)",
+    ]) {
+      if (base)
+        candidates.push(path.join(base, "Git", "bin", "bash.exe"), path.join(base, "Git", "usr", "bin", "bash.exe"));
+    }
+    for (const c of candidates) if (fs.existsSync(c)) return c;
+    return null;
+  }
+  for (const c of ["/bin/bash", "/usr/bin/bash", "/usr/local/bin/bash", "/bin/sh", "/usr/bin/sh"]) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
 }
 
 function checkZeroMutation(beforeState) {
