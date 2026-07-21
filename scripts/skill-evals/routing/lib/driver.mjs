@@ -201,14 +201,40 @@ export function runGrader({
   });
 }
 
-// JSON's only legal string escapes. A backslash followed by anything else — most commonly a
-// Windows path the grader quoted verbatim from evidence (`Remove-Item .claude\.nl-delegation-active`)
-// — makes JSON.parse throw, which used to drop the whole run silently (#527 SDET review).
-const VALID_ESCAPE = /\\(?!["\\/bfnrtu])/g;
+// JSON's only legal two-character string escapes. A backslash followed by anything else — most
+// commonly a Windows path the grader quoted verbatim from evidence (`Remove-Item
+// .claude\.nl-delegation-active`) — makes JSON.parse throw, which used to drop the whole run
+// silently (#527 SDET review).
+const SIMPLE_ESCAPES = '"\\/bfnrt';
+const HEX4 = /^[0-9a-fA-F]{4}$/;
 
-/** Best-effort repair of invalid backslash escapes in LLM-emitted JSON. */
+/**
+ * Best-effort repair of invalid backslash escapes in LLM-emitted JSON.
+ *
+ * Walks the slice consuming each valid escape ATOMICALLY. A regex cannot do this: a lookahead
+ * like /\\(?!["\\/bfnrtu])/ matches the SECOND backslash of an already-valid `\\` pair, turning
+ * it into `\\\` and leaving the payload broken — so a string mixing a real Windows path with an
+ * invalid escape (`{"v":"C:\\Users","w":"a\.b"}`) failed exactly the case the repair exists for.
+ */
 function repairEscapes(slice) {
-  return slice.replace(VALID_ESCAPE, "\\\\");
+  let out = "";
+  for (let i = 0; i < slice.length; i++) {
+    if (slice[i] !== "\\") {
+      out += slice[i];
+      continue;
+    }
+    const next = slice[i + 1];
+    if (next !== undefined && SIMPLE_ESCAPES.includes(next)) {
+      out += slice[i] + next; // valid pair — consume both so `\\` is never re-examined
+      i++;
+    } else if (next === "u" && HEX4.test(slice.slice(i + 2, i + 6))) {
+      out += slice.slice(i, i + 6); // valid \uXXXX — consume all six
+      i += 5;
+    } else {
+      out += "\\\\"; // invalid escape — escape the backslash itself
+    }
+  }
+  return out;
 }
 
 /** Parse a JSON slice, retrying once with escapes repaired. */

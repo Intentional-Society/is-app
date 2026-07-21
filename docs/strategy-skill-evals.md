@@ -364,13 +364,15 @@ while resolving #527; both are environment facts, not skill defects):
   silently. **Consequence:** `commit-5b`'s marker-deletion assertion was removed from the
   automated eval and is covered by the manual runbook below. Never read a failed deletion in a
   headless run as a skill defect.
-- **The 30s delegation-marker lease can expire mid-run.** Setup files are written before the
-  executor starts, so on a multi-turn eval the model generates through every seeded turn before
-  Step 0 ever reads the marker — measured at 47s and 67s old. Step 0 then correctly treats it
-  as stale, fires, and self-announces. **Consequence:** `commit-5b`'s expected steady-state is
-  roughly two passes in three, not a clean sweep. That is correct product behavior meeting a
-  harness timing limit; closing it would mean restructuring when setup files are applied
-  relative to turn processing.
+- **The 30s delegation-marker lease is a latent timing risk, not an observed failure.** Setup
+  files are written before the executor starts, so on a multi-turn eval the model could in
+  principle generate through every seeded turn before Step 0 reads the marker, pushing it past
+  the lease — at which point Step 0 correctly treats it as stale and fires. Stale reads *do*
+  appear in archived artifacts, but only from **superseded** seed shapes; on `commit-5b`'s
+  current seed the marker has been read fresh in every observed run. **Consequence:** treat a
+  stale read on the current seed as a real finding worth a ticket, not an expected outcome —
+  and do not add a grader branch that excuses a failure as staleness. Closing the underlying
+  risk would mean restructuring when setup files are applied relative to turn processing.
 
 **The manual runbook below is retained** as the human-readable reference and fallback — run
 it by hand (fresh session, issue the query verbatim, check against `expectations`) when you

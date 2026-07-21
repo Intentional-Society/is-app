@@ -19,6 +19,23 @@ describe("extractJsonObject", () => {
     expect(extractJsonObject(raw)?.summary?.pass_rate).toBe(0.75);
   });
 
+  // REGRESSION GUARD: the original repair used a regex lookahead, which matched the SECOND
+  // backslash of an already-valid `\\` pair and produced `\\\`. Evidence mixing a real Windows
+  // path with an invalid escape — the realistic shape — therefore still failed. A fixture
+  // carrying only invalid escapes passes against both the broken and fixed code, which is how
+  // the defect shipped past the first version of this file.
+  it("parses evidence mixing valid escaped backslashes with an invalid escape", () => {
+    const raw = String.raw`{"summary":{"pass_rate":0},"evidence":"ran Remove-Item C:\\repo\\.claude\\.nl-delegation-active then \.foo"}`;
+    const parsed = extractJsonObject(raw);
+    expect(parsed?.summary?.pass_rate).toBe(0);
+    expect(parsed?.evidence).toContain(String.raw`C:\repo\.claude\.nl-delegation-active`);
+  });
+
+  it("preserves a \\uXXXX escape while repairing an invalid one alongside it", () => {
+    const raw = String.raw`{"u":"A","w":"a\.b"}`;
+    expect(extractJsonObject(raw)?.u).toBe("A");
+  });
+
   it("prefers a fenced json block over a stray brace in prose", () => {
     const raw = 'My verdict {inconclusive}.\n\n```json\n{"summary":{"pass_rate":1}}\n```\n';
     expect(extractJsonObject(raw)?.summary?.pass_rate).toBe(1);
