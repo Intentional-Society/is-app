@@ -32,10 +32,13 @@ export const ROUTING_QUERIES = [
     fixture: "feature-dirty-clean-payload",
     turns: [{ role: "user", text: "/commit fix the profile redirect", slash: true }],
     expectationsOverride: [
-      "(a) slash entry: the Step 0 intent confirmation does NOT fire and the Skill begins at step 1; no announcement is required on the typed-slash path",
+      "(a) Typed-slash is CLI-native — NO `Skill(commit)` tool call is expected. A literal `/commit …` typed by a human is expanded by the Claude Code CLI's own slash-command parser, which injects the skill body directly into context; it does NOT route through the `Skill` tool (docs/plan-skill-nl-invocation.md 'Shared mechanism facts' #1; SKILL.md Step 0, whose intent gate fires ONLY when the skill was invoked via the `Skill` tool). The absence of any `Skill()` invocation (`invokedThisSkill:false`) is therefore CORRECT and EXPECTED on this path — it must NOT be graded as a failure, and it does NOT make any assertion below 'vacuous' or 'ungradeable'. Grade every assertion below on the transcript's text and its non-Skill tool calls.",
+      "Step-0 handling is correct for the entry path the model actually observed. If the model treats the turn as verified slash entry, NO Step-0 intent confirmation fires ('Run /commit with: <detected context>?' — no `AskUserQuestion`, no textual equivalent) before it touches git. If instead the model reports it could not see a `<command-name>` slash tag, then Step 0 firing IS correct — SKILL.md Step 0 instructs it to bias toward firing the gate when that signal is not reliably visible, and the harness cannot inject a kernel-level tag. PASS on either, but the transcript must show which case applies; an unexplained Step-0 firing, with no indication the model found the entry path ambiguous, is a FAIL. Neither case covers the step-14 CONTENT-approval checkpoint ('Proceed with this commit? (Y/n)', shown at the END alongside the drafted message + staged payload) — that gate always runs and IS expected here; do not mistake it for a Step-0 firing.",
+      "The model proceeds directly into the /commit workflow's documented steps from step 1 — inspecting `git status`/`git diff`, staging the deliberate payload, running `npm test`, drafting the commit message — i.e. it executes the skill's STEPS inline. ('Begins at step 1' means the skill's steps run inline; it does NOT mean a `Skill()` tool call is observed.)",
+      "No `Using /commit` announcement is required on the typed-slash path: its absence is NOT a failure (and its presence, if any, is also acceptable and not scored).",
     ],
     graderHint:
-      "Sub-scenario (a): the query was a TYPED slash `/commit ...`. Step 0 confirmation should be SKIPPED (verified slash entry) and no `Using /commit` announcement is required. NOTE headless caveat: if the harness could not reproduce a genuine `<command-name>` slash tag, the skill may bias toward firing Step 0 (its own documented fallback) — say so in evidence and grade what the transcript actually shows.",
+      "Sub-scenario (a): a TYPED slash `/commit fix the profile redirect`. SETTLED ARCHITECTURE (load-bearing — docs/plan-skill-nl-invocation.md 'Shared mechanism facts' #1 and PR1/PR2 acceptance checklist item 6; plus SKILL.md Step 0, whose intent gate fires ONLY when the skill was invoked via the `Skill` tool): an explicit typed slash is expanded by the Claude Code CLI's parser and injected DIRECTLY, so it NEVER routes through the `Skill` tool. No `Skill(commit)` call is expected and `invokedThisSkill:false` is the CORRECT result. Contrast commit-4 — the genuine NL case — which DOES require a `Skill()` call + `Using /commit` + Step 0. Therefore: do NOT fail this run, and do NOT declare any assertion 'vacuous'/'impossible to grade', merely because the Skill tool was never invoked — that non-invocation IS the expected slash-native behavior. PASS = the transcript shows NO pre-work Step-0 intent confirmation (again: the final 'Proceed with this commit? (Y/n)' content-approval at step 14 is a DIFFERENT, expected gate) AND the model runs the commit workflow's steps inline (git status/diff, npm test, message draft). The announcement is not required either way. HARNESS LIMITATION — THIS IS A REAL GRADING BRANCH, NOT JUST CONTEXT: the runner feeds this query as literal text on stdin and cannot inject a kernel-level `<command-name>` slash tag. SKILL.md Step 0 explicitly instructs that when that signal 'isn't reliably visible, bias toward FIRING the gate' — so a Step-0 confirmation appearing here is the skill following its own documented fallback under a condition the harness manufactured, and it must NOT be scored as a failure. If Step 0 fires, say so in evidence, attribute it to the missing slash tag, and still PASS the run provided the model otherwise executes the commit workflow inline. Only fail this assertion if the model does something Step 0's fallback does not explain. (Removing this branch is what moved #528's flakiness from the model onto the grader — do not remove it again without re-reading SKILL.md Step 0.)",
   },
   {
     queryId: "commit-5b-delegation",
@@ -43,12 +46,42 @@ export const ROUTING_QUERIES = [
     skill: "commit",
     fixture: "feature-dirty-clean-payload",
     setupFiles: { ".claude/.nl-delegation-active": FRESH_DELEGATION },
-    turns: [{ role: "user", text: "commit this" }],
+    // R4-shaped seed, mirroring commit-6/pr-9 — but unlike those, the assistant's seeded
+    // turn is not a QUESTION being answered; it's the parent's already-printed delegation
+    // announcement being CONTINUED. Turn 1 deliberately reuses commit-6's own opener
+    // (regression-verified 3/3, zero trigger risk for either skill) instead of a
+    // self-standing commit-trigger phrase like "commit this" — a real /pr->/commit
+    // delegation never begins with the human typing that, and seeding it created a second,
+    // competing routing signal (see #527 SDET review). The human's only turns here are a
+    // neutral statement and a bare continuation; the ENTIRE delegation signal comes from
+    // the seeded assistant turn + the fresh marker on disk, so the eval isolates
+    // announcement-suppression from the routing decision itself.
+    turns: [
+      { role: "user", text: "I just finished editing the profile-redirect handler in src/ to fix the bug." },
+      { role: "assistant", text: "Using /commit — delegated from /pr" },
+      { role: "user", text: "go ahead" },
+    ],
+    // CLEAR-ON-READ IS UNGRADEABLE HEADLESS, so it is deliberately NOT asserted below. Deleting
+    // anything inside `.claude/` is refused by built-in Claude Code protection — reproduced in a
+    // bare scratch dir with no fixture and no settings; the same filename in another directory
+    // deletes fine. Headless has no prompter, so the refusal is absolute. It works in the real
+    // repo only because an interactive session can approve the prompt. Sandbox
+    // `permissions.allow` cannot lift it either (untrusted workspaces ignore those entries).
+    // Marker deletion is covered by the manual runbook instead — docs/strategy-skill-evals.md §6.
+    //
+    // A note on marker STALENESS, so it is not re-litigated: the 30s lease can in principle
+    // expire before Step 0 reads the marker, since setupFiles are written before the executor
+    // starts. With THIS seed that does not happen — across the batches run on it the marker was
+    // read fresh every time, and the failures observed were all on clear-on-read (now removed).
+    // Stale reads appear only in artifacts from SUPERSEDED seed shapes. So the eval is expected
+    // to pass cleanly; do NOT add a grader branch excusing a failure as staleness. If a stale
+    // read ever is observed on this seed, that is a real finding worth a ticket, not an excuse.
     expectationsOverride: [
-      "(b) delegation: Step 0 does not fire; the Skill does NOT self-announce (a fresh `.claude/.nl-delegation-active` marker is present, so the parent is presumed to have printed the handoff); the marker is deleted on read (clear-on-read)",
+      "(b) delegation: Step 0's intent confirmation does NOT fire — a fresh `.claude/.nl-delegation-active` marker is present, so the parent is presumed to have printed the handoff already.",
+      "(b) delegation: the Skill does NOT self-announce — the model's NEW response to 'go ahead' must not re-print `Using /commit`, because the seeded assistant turn already shows the parent printing it.",
     ],
     graderHint:
-      "Sub-scenario (b): a FRESH `.claude/.nl-delegation-active` marker (pr\\t<now>) was planted immediately before the run to simulate a parent /pr delegating in. Expect: NO self-announcement, Step 0 skipped, and the marker deleted on read. This is an approximation of an in-flight delegation (no real parent /pr ran) — grade the marker-driven suppression + clear-on-read; note the approximation.",
+      "Sub-scenario (b): a FRESH `.claude/.nl-delegation-active` marker (pr\\t<now>) was planted immediately before the run, AND the seeded conversation already shows the parent's handoff line `Using /commit — delegated from /pr` as the assistant's PRIOR turn. The human's own turns (a neutral statement, then a bare 'go ahead') deliberately do NOT repeat 'commit' or otherwise self-trigger — the routing/announcement signal comes entirely from the seeded assistant turn + the marker, not from the human's wording (mirrors commit-6's precondition that the affirmation 'does NOT repeat the word commit'). Expect: the model's NEW generated response (to 'go ahead') does NOT re-print the `Using /commit` announcement, and Step 0's intent confirmation is skipped. DO NOT grade marker deletion (clear-on-read): deleting inside `.claude/` is blocked by built-in Claude Code protection and cannot succeed headless, so it is not asserted — a failed or refused deletion is NOT a failure of this eval, and its absence must not be cited against any assertion. Grade ONLY the two assertions above, strictly, on what the transcript shows. If the model re-prints the announcement or surfaces a Step-0 intent confirmation, that is a FAIL — do not excuse it. In particular, if the transcript shows the model judged the marker STALE (>30s), record that verbatim in evidence and still FAIL the affected assertion: on this seed the marker has been read fresh in every observed run, so a stale read is an unexpected finding worth surfacing, not a known-good outcome to wave through. This remains an approximation of an in-flight delegation (no real parent /pr ran, and seeded assistant turns carry no backing tool_use) — note the approximation.",
   },
   {
     queryId: "commit-5c-optout",

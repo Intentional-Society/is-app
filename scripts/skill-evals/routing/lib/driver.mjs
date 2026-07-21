@@ -9,6 +9,8 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { renderInputTurns } from "./transcript.mjs";
+
 /**
  * Build the child env that reproduces a sandbox activation (env.json in the manifest):
  * prepend the stub bin/ to PATH, unset GH tokens, isolate GH_CONFIG_DIR, and remove
@@ -106,6 +108,7 @@ export function runGrader({
   timeoutMs = 180000,
 }) {
   const graderMd = fs.readFileSync(path.join(repoRoot, GRADER_MD_REL), "utf8");
+  const seed = renderInputTurns(path.join(runDir, "input.jsonl"));
   const prompt = [
     "You are the Grader agent. Follow the role and grading criteria below EXACTLY.",
     "",
@@ -114,9 +117,29 @@ export function runGrader({
     "=== end agents/grader.md ===",
     "",
     "## This run",
-    "- transcript_path: ./transcript.md (the model's response to the final user message — the graded turn)",
+    "- transcript_path: ./transcript.md (the model's response to the final user message — the graded turn ONLY; it does NOT contain any seeded prior turns)",
+    "- input_path: ./input.jsonl (the VERBATIM turns FED to the executor on stdin — the seeded prior turns plus the final trigger. Rendered for you below under 'CONVERSATION FED TO THE EXECUTOR'.)",
     "- outputs_dir: ./outputs (raw evidence: gh-calls.log, git-state.txt, gh-stub-state.json, observables.json)",
-    "- The full raw event stream is ./raw.jsonl if you need it.",
+    "- The full raw event stream is ./raw.jsonl if you need it (this is the executor's OUTPUT — it never contains the fed input turns as conversation history).",
+    "",
+    "## CONVERSATION FED TO THE EXECUTOR (rendered from ./input.jsonl — ground truth)",
+    seed.markdown,
+    "## SEED-PRESENCE RULE (read carefully — this closes a known grader-hallucination gap)",
+    "Any expectation about whether a PRIOR TURN was present in what the model saw — a seeded",
+    "'offer' turn, a delegation announcement/handoff line, a prior assistant message, or the",
+    "ABSENCE of any such turn — MUST be answered from the 'CONVERSATION FED TO THE EXECUTOR'",
+    "section above (rendered verbatim from ./input.jsonl, the only faithful record of the fed",
+    "input). When you cite it, quote the actual turn from that section.",
+    "- Do NOT infer seed presence/absence from ./transcript.md — it holds ONLY the final graded",
+    "  turn and never contains the seeded history.",
+    "- Do NOT infer seed presence/absence from ./raw.jsonl — it is the executor's OUTPUT stream",
+    "  and STRUCTURALLY never carries the fed input turns as conversation history. A seeded",
+    "  phrase can still appear there as the model's OWN echo/thinking, or inside a file the model",
+    "  read (SKILL.md/CLAUDE.md tool_results) — none of which is proof the turn was fed. Never",
+    "  write that you 'verified via raw.jsonl' that a seed was present or absent: raw.jsonl cannot",
+    "  answer that question.",
+    "- If ./input.jsonl was missing (the section above says so), state that seed presence is",
+    "  unverifiable rather than guessing.",
     "",
     "## Expectations to grade",
     ...expectations.map((e, i) => `${i + 1}. ${e}`),
@@ -178,8 +201,68 @@ export function runGrader({
   });
 }
 
-/** Pull the first balanced top-level JSON object out of a text blob. */
+// JSON's only legal two-character string escapes. A backslash followed by anything else — most
+// commonly a Windows path the grader quoted verbatim from evidence (`Remove-Item
+// .claude\.nl-delegation-active`) — makes JSON.parse throw, which used to drop the whole run
+// silently (#527 SDET review).
+const SIMPLE_ESCAPES = '"\\/bfnrt';
+const HEX4 = /^[0-9a-fA-F]{4}$/;
+
+/**
+ * Best-effort repair of invalid backslash escapes in LLM-emitted JSON.
+ *
+ * Walks the slice consuming each valid escape ATOMICALLY. A regex cannot do this: a lookahead
+ * like /\\(?!["\\/bfnrtu])/ matches the SECOND backslash of an already-valid `\\` pair, turning
+ * it into `\\\` and leaving the payload broken — so a string mixing a real Windows path with an
+ * invalid escape (`{"v":"C:\\Users","w":"a\.b"}`) failed exactly the case the repair exists for.
+ */
+function repairEscapes(slice) {
+  let out = "";
+  for (let i = 0; i < slice.length; i++) {
+    if (slice[i] !== "\\") {
+      out += slice[i];
+      continue;
+    }
+    const next = slice[i + 1];
+    if (next !== undefined && SIMPLE_ESCAPES.includes(next)) {
+      out += slice[i] + next; // valid pair — consume both so `\\` is never re-examined
+      i++;
+    } else if (next === "u" && HEX4.test(slice.slice(i + 2, i + 6))) {
+      out += slice.slice(i, i + 6); // valid \uXXXX — consume all six
+      i += 5;
+    } else {
+      out += "\\\\"; // invalid escape — escape the backslash itself
+    }
+  }
+  return out;
+}
+
+/** Parse a JSON slice, retrying once with escapes repaired. */
+function parseOrRepair(slice) {
+  try {
+    return JSON.parse(slice);
+  } catch {
+    try {
+      return JSON.parse(repairEscapes(slice));
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
+ * Pull the grader's JSON verdict out of a text blob. Prefers a fenced ```json block (prose
+ * before the verdict can otherwise contain a `{` that derails the brace scan), then falls back
+ * to the first balanced top-level object. Returns null only when both routes fail even after
+ * escape repair — callers must treat that as a hard failure, never as "no result".
+ */
 export function extractJsonObject(text) {
+  const fenced = /```(?:json)?\s*\n([\s\S]*?)```/i.exec(text);
+  if (fenced) {
+    const parsed = parseOrRepair(fenced[1].trim());
+    if (parsed && typeof parsed === "object") return parsed;
+  }
+
   const start = text.indexOf("{");
   if (start < 0) return null;
   let depth = 0;
@@ -195,13 +278,7 @@ export function extractJsonObject(text) {
     else if (ch === "{") depth++;
     else if (ch === "}") {
       depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(text.slice(start, i + 1));
-        } catch {
-          return null;
-        }
-      }
+      if (depth === 0) return parseOrRepair(text.slice(start, i + 1));
     }
   }
   return null;
