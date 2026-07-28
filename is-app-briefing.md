@@ -378,7 +378,7 @@ Two robots deserve special mention because they're *not* GitHub Actions: **Verce
 | Prod schema expander | `.github/workflows/forward-migrate-prod-schema-expansion.yml` | a human clicks "Run workflow" | The only human-gated pipeline — see A.5. |
 | Dependency bumps | Dependabot (`docs/doc-github.md`; devjournal 2026-06-30) | weekly | Opens PRs that bump library versions; `sharp` is quarantined into its own PR. These ride the same CI gauntlet as human PRs. |
 
-**Why does merge require CI but not e2e?** CI is hermetic — it builds its own database, so it's reliable enough to hard-block on. E2e depends on a live deployment and shared accounts, so it's kept as a *policy* gate humans enforce, not a GitHub-enforced one (`CLAUDE.md` "CI/CD" section). Ask the engineers how often that policy is actually waited on.
+**Why does merge require CI but not e2e?** Partly because CI is hermetic (it builds its own database) while e2e depends on a live deployment — but the binding reason is mechanical: e2e triggers on the `deployment_status` event, and docs-only PRs never deploy (Vercel's `ignoreCommand` skips them), so a *required* e2e check would simply never report on a docs PR and that PR could never merge. The same logic keeps GitHub auto-merge switched off. The documented precondition for changing this: teach `e2e.yml` to short-circuit docs-only PRs the way `ci.yml`'s paths-filter does (`docs/doc-github.md`). See A.8.
 
 ### A.4 The one queue in the system
 
@@ -415,4 +415,67 @@ The **forward-migrate workflow** (`forward-migrate-prod-schema-expansion.yml`) e
 - **Cycle time is structurally short**: commit → production is one merge plus one build; the docs-only skip keeps documentation changes free.
 - **The safety net is layered but has one soft spot**: format/type/unit tests are hard gates; e2e — the only layer that tests the *real deployed thing* — is a policy gate on a shared-prod-DB queue. Incidents that "passed CI" will usually trace to that gap or to migration ordering.
 - **The most dangerous button is well-guarded**: direct prod DB changes require a human-approved, SQL-visible, destructive-pattern-checked workflow. That's better discipline than most teams this size.
-- **Bus-factor lives in Vercel/Supabase dashboards**: chunks of the pipeline (build command, env vars, cron, seeded accounts) are dashboard state, documented in `docs/doc-vercel.md` / `docs/doc-supabase.md` but not enforced by code review.
+- **Supply-chain posture is deliberate**: third-party GitHub Actions are pinned to commit SHAs, CodeQL scans the workflow YAMLs themselves, and workflow changes are codeowner-gated (A.8).
+
+### A.7 Containers — where Docker fits (and where it deliberately doesn't)
+
+A **container** is a lightweight, isolated box that runs a program together with everything it needs (its own filesystem, network ports, dependencies) — like a very cheap virtual computer. **Docker** is the tool that runs them. Teams often also use an **orchestrator** (Kubernetes is the famous one) to run many containers across many servers.
+
+This repo's answer is unusual and easy to state: **containers exist only on laptops and CI runners, and there is no orchestration tech at all — nothing we build ever ships as a container.**
+
+```mermaid
+flowchart LR
+    subgraph devside["Your laptop + CI runners — Docker lives HERE"]
+        CLI["Supabase CLI is the de facto orchestrator<br/>npx supabase start<br/>config: supabase/config.toml"]
+        subgraph stack["one local Supabase stack — about 10 containers, about 2 GB RAM"]
+            PG2[("Postgres<br/>port 54322")]
+            AUTH2["Auth server"]
+            STUDIO["Studio admin UI<br/>port 54323"]
+            MISC["storage · email catcher · more"]
+        end
+        CLI --> stack
+    end
+    subgraph prodside["Production — ZERO containers of ours"]
+        V2["Vercel serverless functions<br/>run the app code"]
+        S2["Supabase managed cloud<br/>runs the real database"]
+    end
+    devside -.->|"same Postgres engine,<br/>completely separate data"| prodside
+```
+
+**Why containers locally?** The app needs a real Postgres database (plus Supabase's auth server) to do anything. Rather than every developer installing and configuring those by hand, `npm run dev` conjures the whole stack in Docker — identical on every machine, deletable without trace (`npm run dev:db:reset` wipes it; `npm run dev:db:stop` shuts it down).
+
+**Who plays "orchestrator"?** The **Supabase CLI**. There's no Kubernetes and no hand-written docker-compose file in the repo — `npx supabase start` reads `supabase/config.toml` (project id `is-app`; Postgres on port 54322, Studio web UI on 54323, API on 54321) and starts/wires the ~10 containers itself. Two helper scripts babysit it, and they encode real operational scar tissue worth knowing about: `scripts/ensure-docker.mjs` auto-launches Docker Desktop and polls until the daemon answers, and `scripts/ensure-supabase.mjs` handles the cold-start race where Docker is still auto-booting old containers, plus auto-recovery from dangling-container name conflicts.
+
+**The same trick powers two other things:**
+- **CI** (`ci.yml`) runs `npx supabase start` on the throwaway GitHub runner — so the "autograder" tests against a real Postgres in containers, not a mock. This is why CI is trustworthy enough to be the required merge gate.
+- **Worktree lanes** (`docs/strategy-worktree-lanes.md`): the CLI keys the container stack off the current directory name (`PROJECT_ID = basename of cwd` in `ensure-supabase.mjs`), so each git worktree can run its *own* complete Supabase stack on its own ports — parallel feature work with fully isolated databases, ~2 GB RAM each.
+
+**Why no containers in production?** Deployment is Vercel serverless functions (the app) plus Supabase's managed cloud (the database) — both are someone else's infrastructure. The team never builds a Docker image, pushes to a registry, or patches an orchestrator; that entire operational category is outsourced by design ("low operational complexity", `docs/architecture-appstack.md`). The trade-off is the vendor lock-in and dashboard bus-factor noted in A.6.
+
+*(Honest edge: Vercel and Supabase certainly use containers internally — but that's invisible to this team and not something a maintainer here operates.)*
+
+### A.8 Maintainer's addendum — what the owner of this pipeline must know
+
+Everything above explains the pipeline to a reader. This section is for the person who has to *own* it.
+
+**1. GitHub settings are code — don't touch the UI.** Branch protection for `main` is a ruleset applied idempotently by `scripts/update-main-branch-protection.mjs` (`npm run update_main_branch_protection`; `--dry-run` to preview). Edits made in the GitHub settings UI will be reverted the next time anyone re-runs the script. The ruleset encodes: no deletion/force-push on `main`; PR required for every change; required status check **"Lint & Functional Tests"** (`ci.yml`); branches must be **up to date with `main`** before merge (this is what forces the team's rebase-when-main-moves convention); zero required approvals globally, **but** code-owner review required on `.github/CODEOWNERS` paths — currently `.github/workflows/` and CODEOWNERS itself. Consequences: *the CI/CD maintainer cannot land workflow changes solo*, and bumping a SHA-pinned action is a codeowner-gated change. Emergency escape hatch: repository admins can bypass per-PR via the merge-box checkbox (`bypass_mode: "pull_request"` — deliberately not a blanket bypass). Merges land only as `gh pr merge --merge --delete-branch` (the `/ship` Skill's form); GitHub auto-merge is off (see A.3 for why).
+
+**2. Secrets and out-of-repo state — the dependency inventory.**
+
+| Where | Item | Used by | Notes |
+|---|---|---|---|
+| GitHub Actions secrets | `E2E_REGULAR_PASSWORD`, `E2E_ADMIN_PASSWORD` | `e2e.yml` | Passwords of the two seeded prod accounts (provisioning: `docs/doc-supabase.md`) |
+| GitHub Actions secrets | `CI_RESET_TOKEN` | `e2e.yml` | **Rotation coupling:** must match the Vercel env var of the same name, or every e2e run fails at reset |
+| GitHub Actions secrets | `PRODUCTION_DATABASE_URL` | forward-migrate workflow | The only workflow credential that can write prod data |
+| GitHub Actions secrets | `CLAUDE_CODE_OAUTH_TOKEN` | both Claude workflows | |
+| GitHub environment `prod-db` | required-reviewer list | forward-migrate workflow | The human gate on prod schema changes lives here, not in code |
+| Vercel dashboard | build command, cron schedule, Skew Protection, env vars (`DATABASE_URL`, `CRON_SECRET`, `CI_RESET_TOKEN`, `BUTTONDOWN_*`, …) | production runtime | `docs/doc-vercel.md` |
+| Supabase dashboard | auth URLs, SMTP (Resend), API keys, seeded e2e users | auth + e2e | `docs/doc-supabase.md` |
+
+**3. When it breaks — the built-in diagnostics.**
+- **Migration failures/silent no-ops:** `scripts/migrate.mjs` is not a thin wrapper. In CI/verbose mode it logs which host/port it reached (flagging 6543 = the hazardous transaction pooler vs 5432 = session), counts `drizzle.__drizzle_migrations` before and after, and prints an explicit `WARNING` if `migrate()` reported success but nothing persisted — the #149 silent-discard tripwire extended into deploys. First place to look: the Vercel build log (prod) or Actions log (CI/forward-migrate).
+- **E2e failures:** the config already retries twice in CI, runs everything serially (`workers: 1` — *within* a run, on top of the cross-run queue from A.4), and re-seeds via the `reset.setup.ts` project before specs run. Every test request carries `x-debug-timing: 1`, so per-step server timing for a failed run is queryable in Vercel function logs. The full Playwright HTML report is uploaded as a run artifact (14-day retention).
+- **A wedged e2e queue:** one global concurrency group means a stuck run blocks all verdicts; cancel it from the Actions UI — superseded queued runs auto-cancel, so only the newest deploy re-tests.
+
+**4. Open questions the maintainer should settle** (also surfaced in Pass 5): `ci.yml`/`e2e.yml` use `npm install` where `forward-migrate` uses `npm ci` — the lockfile-drift risk of `install` in CI is undocumented; either justify or align. And the standing improvement everyone will ask for: make e2e a required check, which first requires the docs-only short-circuit described in A.3.
+- **Bus-factor lives in Vercel/Supabase dashboards**: chunks of the pipeline (build command, env vars, cron, seeded accounts) are dashboard state, documented in `docs/doc-vercel.md` / `docs/doc-supabase.md` but not enforced by code review. (GitHub-side settings are better off — branch protection is applied from a script; see A.8.)
