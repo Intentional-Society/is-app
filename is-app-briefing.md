@@ -303,4 +303,116 @@ flowchart LR
     Prod -.-> OBS
 ```
 
-*Companion file: `is-app-visuals.html` renders these three diagrams standalone (self-contained, no CDN).*
+*Companion file: `is-app-visuals.html` renders all diagrams in this document standalone (self-contained, no CDN).*
+
+---
+
+## Appendix — CI/CD in this repo, explained from zero
+
+*This section assumes no prior knowledge: it defines every term and walks the actual pipeline this repo uses, file by file. If you already know what CI/CD is, skim the headers and jump to the tables.*
+
+### A.1 What "CI/CD" means
+
+When several people edit the same codebase, two questions come up constantly:
+
+1. **"Did my change break anything?"** — you want to find out *now*, not next week when someone else hits the bug.
+2. **"How does my change get to real users?"** — someone has to take the code from GitHub and put it on the actual website.
+
+**CI — Continuous Integration** — answers question 1. Every time anyone pushes code, robots automatically run all the checks (formatting, type errors, tests) and put a green ✅ or red ❌ on the change. Think of it as an autograder that runs on every submission, except the "assignment" is the whole app.
+
+**CD — Continuous Deployment** — answers question 2. When a change is approved and merged, robots automatically build the website and publish it. No release day, no person copying files to a server. In this repo, *merging a pull request IS releasing to production* — that's the headline fact.
+
+Some vocabulary used below, defined once:
+
+- **Branch** — a parallel line of work in git; you make changes on your own branch so `main` (the official version) stays untouched until you're ready.
+- **Pull request (PR)** — a GitHub page that says "here are my changes, please review and merge them into `main`". All the robot checks attach their ✅/❌ here.
+- **Merge** — accepting the PR: your commits become part of `main`.
+- **Deploy** — building the app and putting it on servers so real users get the new version.
+- **Workflow / job / step** — GitHub Actions terms. A *workflow* is a YAML file in `.github/workflows/` that says "when X happens, run these commands on a rented Linux machine (a *runner*)". Workflows contain *jobs*, jobs contain *steps*.
+- **Migration** — a small SQL script that changes the database's shape (add a table, add a column). The app's code and the database's shape must always agree, which is why migrations get special treatment (A.5).
+
+### A.2 The life of a code change (the picture to remember)
+
+```mermaid
+flowchart TB
+    A["1 · Edit code on your laptop<br/>(dev server + local database in Docker)"]
+    B["2 · git commit<br/>lefthook auto-formats your staged files<br/>with Biome before the commit lands"]
+    C["3 · git push your branch<br/>and open a Pull Request"]
+    D1["4a · ci.yml — the autograder<br/>format check · type check · unit tests<br/>REQUIRED: PR cannot merge if red"]
+    D2["4b · codeql.yml<br/>security scan of code + workflows"]
+    D3["4c · claude-code-review.yml<br/>an AI reads the diff and comments"]
+    E["5 · Vercel builds a PREVIEW site<br/>a real, private copy of the app<br/>at its own throwaway URL"]
+    F["6 · e2e.yml — the robot user<br/>Playwright opens the preview in Chrome,<br/>signs in, clicks through real flows"]
+    G["7 · Human review, then merge to main"]
+    H["8 · Vercel PRODUCTION build<br/>step 1: apply DB migrations<br/>step 2: next build + publish"]
+    I["9 · Live at app.intentionalsociety.org"]
+    J["10 · e2e.yml runs once more,<br/>this time against production"]
+    K["11 · Sentry + Axiom watch<br/>errors and logs continuously"]
+
+    A --> B --> C
+    C --> D1
+    C --> D2
+    C --> D3
+    C --> E --> F
+    D1 --> G
+    F -.->|"team policy: must be green"| G
+    G --> H --> I
+    I --> J
+    I -.-> K
+```
+
+Two robots deserve special mention because they're *not* GitHub Actions: **Vercel** (the hosting company) watches the GitHub repo itself and does steps 5, 8, 9 on its own servers; **lefthook** (step 2) runs on your laptop, installed into git's "pre-commit hook" slot by `npm run setup` (`lefthook.yml`).
+
+### A.3 Each robot, what it does, and where it's configured
+
+| Robot | File | Trigger | What it actually does |
+|---|---|---|---|
+| Pre-commit formatter | `lefthook.yml` → `scripts/biome-precommit.mjs` | `git commit` on your laptop | Auto-formats only the files you staged, re-stages the fixes. Bypass: `git commit --no-verify`. |
+| **CI (the required check)** | `.github/workflows/ci.yml` | every PR into `main` | Spins up a throwaway Linux machine, starts a real local Supabase (Postgres in Docker), then: `biome ci` (lint/format), `npm run typecheck`, apply migrations, run the Vitest functional suite. A docs-only PR skips all of it but still reports green — that's the `paths-filter` step. |
+| Preview deploy | Vercel (config in `vercel.json`, dashboard settings in `docs/doc-vercel.md`) | every push to any branch | Builds the app and hosts it at a unique URL so humans and robots can try the change before merge. The `ignoreCommand` in `vercel.json` skips the build for docs-only pushes. |
+| **E2e — the robot user** | `.github/workflows/e2e.yml` | a Vercel deploy (preview *or* production) finishing successfully (`deployment_status` event) | Installs Chrome, points Playwright at the *deployed URL* (with a guard that refuses non-Vercel URLs), signs in as two pre-seeded test accounts, and clicks through sign-up, profile, invites, the web, admin, etc. Uploads a report you can download from the run page. Not a GitHub-required check, but team policy says green-before-merge. |
+| Security scan | `.github/workflows/codeql.yml` | PRs, pushes to `main`, and weekly | GitHub's CodeQL static analysis over the TypeScript *and* over the workflow YAMLs themselves (catches CI misconfigurations). The weekly run re-scans unchanged code with newly published rules. |
+| AI reviewer | `.github/workflows/claude-code-review.yml` | every PR (skips bot-authored PRs) | Claude reads the diff and posts a review comment. Advisory, not blocking. |
+| AI on-demand | `.github/workflows/claude.yml` | someone writes `@claude` in an issue/PR comment | Wakes Claude to answer or make changes. |
+| Vendored-code drift check | `.github/workflows/skill-creator-drift.yml` | monthly | Checks whether the vendored copy of the upstream `skill-creator` skill fell behind, and opens one tracking issue if so. Never edits code itself. |
+| Prod schema expander | `.github/workflows/forward-migrate-prod-schema-expansion.yml` | a human clicks "Run workflow" | The only human-gated pipeline — see A.5. |
+| Dependency bumps | Dependabot (`docs/doc-github.md`; devjournal 2026-06-30) | weekly | Opens PRs that bump library versions; `sharp` is quarantined into its own PR. These ride the same CI gauntlet as human PRs. |
+
+**Why does merge require CI but not e2e?** CI is hermetic — it builds its own database, so it's reliable enough to hard-block on. E2e depends on a live deployment and shared accounts, so it's kept as a *policy* gate humans enforce, not a GitHub-enforced one (`CLAUDE.md` "CI/CD" section). Ask the engineers how often that policy is actually waited on.
+
+### A.4 The one queue in the system
+
+E2e runs are **globally serialized** — one at a time across all branches (`concurrency.group: e2e-shared-prod-db` in `e2e.yml`). The reason is unusual and worth understanding: the test suite doesn't get its own database. It drives two fixed seeded accounts **in the production database** and resets their state mid-run via `POST /api/_test/reset` (token-gated; `src/server/test-reset.ts`). Two suites running at once would trample each other's accounts — that was bug #358, and serialization was the fix (devjournal 2026-06-21). Consequence for planning: when several deploys land close together, their e2e verdicts queue up behind each other, and GitHub cancels superseded queued runs so only the newest deploy gets tested.
+
+### A.5 Database changes — the special path
+
+The scary part of CD is changing the database while the app is running, because for a few minutes old code and new code coexist against one database. Two mechanisms handle this:
+
+**Ordinary (additive) changes ride the normal pipeline.** Change the schema in TypeScript (`src/server/schema.ts`) → `npx drizzle-kit generate` writes a SQL file into `drizzle/` → it merges with your PR → the production Vercel build runs `node scripts/migrate.mjs` *before* `next build`, production-only (`vercel.json` `buildCommand` gated on `VERCEL_ENV`). So the database is upgraded moments before the new code goes live.
+
+**The expand-contract pattern for anything risky** (`docs/strategy-committing.md`): never change-and-remove in one step. First **expand** (add the new column/table — harmless to old code), then switch the code over, then later **contract** (remove the old column) in a separate deploy once nothing references it. Drizzle migrations are forward-only — there is no "undo" button — which is exactly why the pattern is mandatory.
+
+```mermaid
+flowchart LR
+    subgraph s1["Step 1 — EXPAND"]
+        E1["Additive migration only<br/>e.g. ADD COLUMN"]
+        E2["forward-migrate workflow:<br/>human reads the SQL diff,<br/>a destructive-pattern guard<br/>blocks DROP and RENAME,<br/>then a required reviewer<br/>approves the prod-db gate"]
+        E1 --> E2
+    end
+    subgraph s2["Step 2 — SWITCH"]
+        C1["Merge the PR —<br/>new code reads and writes<br/>the new column"]
+    end
+    subgraph s3["Step 3 — CONTRACT"]
+        X1["Later, separate PR:<br/>remove the old column.<br/>Rides the normal<br/>merge-to-main pipeline"]
+    end
+    s1 --> s2 --> s3
+```
+
+The **forward-migrate workflow** (`forward-migrate-prod-schema-expansion.yml`) exists because previews share the production database: if your branch's code needs a new column, the preview will crash until that column exists in prod. So an engineer can apply *expand* migrations to prod ahead of merging. It's deliberately the least automated thing in the repo — a two-job design where the first job prints the exact SQL and refuses destructive patterns *before* a human approves the `prod-db` environment gate, and only then does the second job touch the production database.
+
+### A.6 What a TPM should take from this
+
+- **Cycle time is structurally short**: commit → production is one merge plus one build; the docs-only skip keeps documentation changes free.
+- **The safety net is layered but has one soft spot**: format/type/unit tests are hard gates; e2e — the only layer that tests the *real deployed thing* — is a policy gate on a shared-prod-DB queue. Incidents that "passed CI" will usually trace to that gap or to migration ordering.
+- **The most dangerous button is well-guarded**: direct prod DB changes require a human-approved, SQL-visible, destructive-pattern-checked workflow. That's better discipline than most teams this size.
+- **Bus-factor lives in Vercel/Supabase dashboards**: chunks of the pipeline (build command, env vars, cron, seeded accounts) are dashboard state, documented in `docs/doc-vercel.md` / `docs/doc-supabase.md` but not enforced by code review.
