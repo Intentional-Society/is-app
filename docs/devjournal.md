@@ -4,6 +4,16 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-07-30 | Benji (with Kiro) | Members page grid/list view toggle
+
+Added a view-mode toggle to the Member directory page. Two icon buttons (grid and list) sit at
+the right end of the toolbar, opposite the search input. Grid view (the default) is unchanged.
+List view renders each member as a compact row: small circular avatar, bold name, location
+(hidden on mobile), and up to 3 keyword chips (hidden below lg). Uses the existing Button
+component with ghost/primary variants and the lucide-react LayoutGrid + List icons.
+
+---
+
 ## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 8 — routing session-runner (the nine routing evals now run automated)
 
 Post-baseline Phase 8 (#516) automates the nine `kind: routing` evals (commit-4/5/6/7/8,
