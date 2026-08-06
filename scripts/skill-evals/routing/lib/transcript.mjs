@@ -8,6 +8,111 @@
 
 import fs from "node:fs";
 
+/**
+ * Render the conversation turns FED to the executor (input.jsonl) as markdown, so a grader
+ * can answer seed-presence questions from GROUND TRUTH — the verbatim bytes sent on stdin —
+ * instead of inferring from transcript.md (only the final graded turn) or raw.jsonl (the
+ * executor's OUTPUT stream, which never carries the fed input turns as conversation history).
+ *
+ * input.jsonl lines are the runner's own serialization (buildInputJsonl):
+ *   { type:<role>, message:{ role:<role>, content:[{type:'text',text}] } }
+ * The LAST turn is the trigger (the user message being graded); every preceding turn is
+ * seeded prior context (the multi-turn / R4 "offer" cases and any delegation seeding).
+ *
+ * @param {string} inputJsonlPath  absolute path to the run's input.jsonl
+ * @returns {{found:boolean, seeded:Array<{role:string,text:string}>, trigger:({role:string,text:string}|null), markdown:string}}
+ */
+export function renderInputTurns(inputJsonlPath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(inputJsonlPath, "utf8");
+  } catch {
+    return {
+      found: false,
+      seeded: [],
+      trigger: null,
+      markdown:
+        "## Conversation fed to the executor (input.jsonl)\n\n" +
+        `_input.jsonl was not found at \`${inputJsonlPath}\`. Seed presence/absence CANNOT be ` +
+        "verified from ground truth for this run — do not assert it either way._\n",
+    };
+  }
+
+  const turns = [];
+  for (const line of raw.split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    try {
+      const o = JSON.parse(s);
+      const role = o.message?.role ?? o.type ?? "user";
+      const text = (o.message?.content ?? [])
+        .filter((c) => c.type === "text")
+        .map((c) => c.text ?? "")
+        .join("\n");
+      turns.push({ role, text });
+    } catch {
+      /* partial / non-JSON line — ignore */
+    }
+  }
+
+  // An empty or wholly unparseable file is NOT the same as a single-turn eval, even though both
+  // leave `seeded` empty. Guard on `turns`, not `seeded`: falling through to the "NONE" branch
+  // below would assert "no seeded turn was present" as ground truth on evidence we do not have —
+  // the exact fabricated-negative this module exists to prevent (#527 SDET review).
+  if (turns.length === 0) {
+    return {
+      found: false,
+      seeded: [],
+      trigger: null,
+      markdown:
+        "## Conversation fed to the executor (input.jsonl)\n\n" +
+        `_input.jsonl at \`${inputJsonlPath}\` was empty or contained no parseable turns. Seed ` +
+        "presence/absence CANNOT be verified from ground truth for this run — do not assert it " +
+        "either way._\n",
+    };
+  }
+
+  const trigger = turns[turns.length - 1];
+  const seeded = turns.slice(0, -1);
+
+  const quote = (t) => (t?.text ? t.text.replace(/\n/g, "\n> ") : "(empty)");
+  const lines = [
+    "## Conversation fed to the executor (input.jsonl — GROUND TRUTH of what the model saw)",
+    "",
+    "This is the verbatim turn sequence sent to the model on stdin, rendered from ./input.jsonl.",
+    "It is the ONLY faithful record of the seeded prior turns. transcript.md holds only the",
+    "final graded turn; raw.jsonl is the executor's OUTPUT stream and never contains these fed",
+    "turns as conversation history.",
+    "",
+  ];
+
+  if (seeded.length === 0) {
+    lines.push(
+      "### Seeded prior turns: NONE",
+      "",
+      "_This is a SINGLE-TURN eval — no prior conversation was seeded. The only input turn is the",
+      "trigger below. Any expectation about a seeded prior turn being present is FALSE for this run._",
+      "",
+    );
+  } else {
+    lines.push(`### Seeded prior turns: ${seeded.length} (present in what the model saw)`, "");
+    seeded.forEach((t, i) => {
+      lines.push(`**Seeded prior turn ${i + 1} — role: ${t.role}:**`, "", `> ${quote(t)}`, "");
+    });
+  }
+
+  lines.push(
+    "### Final trigger turn (the graded user message)",
+    "",
+    trigger ? `**role: ${trigger.role}:**` : "_no trigger turn found_",
+    "",
+    trigger ? `> ${quote(trigger)}` : "",
+    "",
+  );
+
+  return { found: true, seeded, trigger, markdown: lines.join("\n") };
+}
+
 /** Parse a stream-json .out file into an array of events (skips unparseable lines). */
 export function parseEvents(outFile) {
   const events = [];

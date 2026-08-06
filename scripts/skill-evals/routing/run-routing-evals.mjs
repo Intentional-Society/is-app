@@ -29,10 +29,16 @@ import path from "node:path";
 import { archiveEvidence, buildSandbox, teardownSandbox } from "../lib/sandbox.mjs";
 import { populateRoutingContext, REPO_ROOT } from "./lib/context.mjs";
 import { runExecutor, runGrader } from "./lib/driver.mjs";
-import { parseEvents, renderTurnMarkdown, routingObservables, splitTurns } from "./lib/transcript.mjs";
+import { formatSummaryLine, NEGATIVE_CONTROLS, summarizeEval } from "./lib/summary.mjs";
+import {
+  parseEvents,
+  renderInputTurns,
+  renderTurnMarkdown,
+  routingObservables,
+  splitTurns,
+} from "./lib/transcript.mjs";
 import { FRESH_DELEGATION, ROUTING_QUERIES } from "./routing-plan.mjs";
 
-const NEGATIVE_CONTROLS = new Set(["commit-7", "commit-8", "ship-4", "ship-5"]);
 const args = process.argv.slice(2);
 const opt = (name, def) => {
   const i = args.indexOf(name);
@@ -131,6 +137,13 @@ for (const q of queries) {
 
       const inputJsonl = buildInputJsonl(q.turns);
       fs.writeFileSync(path.join(runDir, "input.jsonl"), inputJsonl);
+      // Render the fed turns to a human/SDET-auditable sibling artifact. The grader reads the
+      // SAME rendering inlined into its prompt (driver.mjs runGrader) so seed-presence claims
+      // come from ground truth, not inference — this file is the on-disk audit copy.
+      fs.writeFileSync(
+        path.join(runDir, "seeded-turns.md"),
+        renderInputTurns(path.join(runDir, "input.jsonl")).markdown,
+      );
       const rawOut = path.join(runDir, "raw.jsonl");
       const exec = await runExecutor({
         manifest,
@@ -227,19 +240,21 @@ for (const q of queries) {
     }
   }
 
-  const invokedCount = perRep.filter((r) => r.invoked).length;
-  const graded = perRep.filter((r) => typeof r.passRate === "number");
-  const meanPass = graded.length ? graded.reduce((a, r) => a + r.passRate, 0) / graded.length : null;
-  const evalSummary = {
-    eval_id: q.queryId,
-    source_eval: q.evalId,
+  const evalSummary = summarizeEval({
+    queryId: q.queryId,
+    evalId: q.evalId,
     skill: q.skill,
-    polarity: expectTrigger ? "should-fire" : "should-NOT-fire",
     reps,
-    invocation_trigger_rate: reps ? invokedCount / reps : 0,
-    mean_expectation_pass_rate: meanPass,
-    runs: perRep,
-  };
+    perRep,
+  });
+  // An ungraded run means a grade existed but could not be parsed — never let that pass quietly,
+  // it would leave the mean computed over a flattering subset.
+  if (evalSummary.ungraded_runs > 0) {
+    process.stdout.write(
+      `  ⚠ ${q.queryId}: ${evalSummary.ungraded_runs}/${reps} run(s) UNGRADED — excluded from the mean:\n` +
+        evalSummary.ungraded.map((u) => `      run-${u.run}: ${u.reason}\n`).join(""),
+    );
+  }
   summary.push(evalSummary);
 }
 
@@ -268,8 +283,6 @@ if (!aggregated) {
 
 console.log("\n=== Trigger-rate summary ===");
 for (const e of summary) {
-  console.log(
-    `${e.eval_id.padEnd(22)} ${e.polarity.padEnd(14)} invoked ${(e.invocation_trigger_rate * 100).toFixed(0)}% · mean pass ${e.mean_expectation_pass_rate == null ? "n/a" : `${(e.mean_expectation_pass_rate * 100).toFixed(0)}%`}`,
-  );
+  console.log(formatSummaryLine(e));
 }
 console.log(`\nArtifacts: ${outRoot}`);
