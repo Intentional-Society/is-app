@@ -20,6 +20,13 @@ updates:
       # against APIs that don't exist in production.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7.0 is the Go rewrite, which ships without the compiler API
+      # that `next build` type-checks through — Next.js accepts it only behind
+      # `experimental.useTypeScriptCli`. Ignoring the 7.0 line alone keeps 6.x
+      # bumps flowing and turns 7.1, the release that restores the API, into a
+      # fresh PR to re-evaluate on.
+      - dependency-name: "typescript"
+        versions: ["7.0.x"]
     groups:
       # Batch patch/minor bumps together so Dependabot doesn't open one
       # PR per transitively-related package. Majors still land as their

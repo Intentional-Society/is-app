@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-08-11 | James | Dependabot holds `typescript` at 6.x until the 7.1 API lands
+
+Dependabot ignores the `7.0.x` line of `typescript` (superseding #504, which fails the Vercel build) because 7.0 is the Go rewrite and ships without the compiler API `next build` type-checks through — Next.js accepts it only behind `experimental.useTypeScriptCli`; scoping the ignore to 7.0.x keeps 6.x bumps flowing and turns 7.1, the release that restores the API, into a fresh PR to re-evaluate on.
+
+---
+
 ## 2026-07-30 | Benji (with Kiro) | Members page grid/list view toggle
 
 Added a view-mode toggle to the Member directory page. Two icon buttons (grid and list) sit at
