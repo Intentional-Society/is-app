@@ -78,6 +78,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 
 ## Key docs
 
+- `docs/architecture-programs.md` — programs platform (draft): shared bids/program-items models, program roles, program UI surfaces
 - `docs/strategy-branching.md` — branching strategy and rationale
 - `docs/strategy-worktree-lanes.md` — running parallel worktrees as isolated "lanes" (own Supabase stack + ports) for concurrent dev/test
 - `docs/strategy-committing.md` — commit conventions and expand-contract pattern
@@ -87,6 +88,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 - `docs/strategy-security.md` — security headers and rationale for each directive
 - `docs/strategy-browser-support.md` — three browser-support tiers: Baseline-widely-available full fidelity, best-effort down to the hard floor, legacy-check blocker below
 - `docs/strategy-ui.md` — theme tokens, the `/colors` dev page, Button variants, buttons vs anchors
+- `docs/design-events.md` — events (draft): singular/recurring model, GCal invitation mirror
 - `docs/design-welcome.md` — multi-step onboarding/welcome flow design
 - `docs/design-emails.md` — auth email template authoring and prod sync
 - `docs/design-profile-pictures.md` — avatar uploads, storage bucket, signed URLs
