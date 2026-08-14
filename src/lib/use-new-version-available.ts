@@ -88,6 +88,12 @@ export function useNewVersionAvailable(): NewVersionState {
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      // `cancelled` is per-run but `inFlight` is shared across runs, so a
+      // torn-down run holding it would block the next run's own check while
+      // its own result is discarded — leaving `live` unset until the next
+      // focus. Release it so the remount can poll (React's dev-only
+      // double-invoke of effects makes this the common path locally).
+      inFlight.current = false;
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
     };
