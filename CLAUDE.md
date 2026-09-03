@@ -84,7 +84,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 - `docs/strategy-deployment.md` — continuous deployment during active sessions: Skew Protection, the tiered update banner, and the home safe-refresh
 - `docs/strategy-db-transactions.md` — writing transactions that survive the Supabase connection pooler
 - `docs/strategy-project-management.md` — GitHub Projects board conventions
-- `docs/strategy-security.md` — security headers and rationale for each directive
+- `docs/strategy-security.md` — HTTP headers, supply-chain quarantine, dependency scanning policy, secret rotation
 - `docs/strategy-browser-support.md` — three browser-support tiers: Baseline-widely-available full fidelity, best-effort down to the hard floor, legacy-check blocker below
 - `docs/strategy-ui.md` — theme tokens, the `/colors` dev page, Button variants, buttons vs anchors
 - `docs/design-welcome.md` — multi-step onboarding/welcome flow design
