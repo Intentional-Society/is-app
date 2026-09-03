@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-09-02 | James (with Claude) | `sharp` un-held at 0.35.4 — the corruption was a duplicate-install fallback
+
+0.35.x mangled uploaded avatars on Vercel (#469) because Next 16.2 wanted `sharp: ^0.34.5` while we forced 0.35.x: npm installed two sharp trees, the loader missed the newer libvips, and sharp fell back **silently** to its WebAssembly build — whose `SharedArrayBuffer`-backed output undici stringifies into a UTF-8-mangled webp (upstream `lovell/sharp#4567` + `#4576`). Next 16.3 moved its optional range to `^0.35.3`, so 0.35.4 dedupes to one copy and the fallback never fires. The trap stays armed though — 0.35.x dropped the `cpu: ["wasm32"]` constraint, so the fallback target now ships — hence `encodeAvatar` copies its output regardless, `ensure-deps` fails on a duplicate install, and the Dependabot quarantine is gone.
+
+---
+
 ## 2026-08-11 | James | Dependabot holds `typescript` at 6.x until the 7.1 API lands
 
 Dependabot ignores the `7.0.x` line of `typescript` (superseding #504, which fails the Vercel build) because 7.0 is the Go rewrite and ships without the compiler API `next build` type-checks through — Next.js accepts it only behind `experimental.useTypeScriptCli`; scoping the ignore to 7.0.x keeps 6.x bumps flowing and turns 7.1, the release that restores the API, into a fresh PR to re-evaluate on.

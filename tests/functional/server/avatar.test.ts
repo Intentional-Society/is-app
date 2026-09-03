@@ -12,7 +12,13 @@ import { createServerClient } from "@supabase/ssr";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import app from "@/server/api";
-import { AVATAR_BUCKET, attachAvatarUrls, MAX_AVATAR_UPLOAD_BYTES, resolveAvatarUrls } from "@/server/avatars";
+import {
+  AVATAR_BUCKET,
+  attachAvatarUrls,
+  encodeAvatar,
+  MAX_AVATAR_UPLOAD_BYTES,
+  resolveAvatarUrls,
+} from "@/server/avatars";
 import { db } from "@/server/db";
 import { profiles } from "@/server/schema";
 
@@ -200,5 +206,27 @@ describe("resolveAvatarUrls — a Storage failure degrades to initials", () => {
     } finally {
       fromSpy.mockRestore();
     }
+  });
+});
+
+describe("encodeAvatar — the wasm-fallback corruption guard (#469)", () => {
+  it("produces the canonical 1024² webp artifact", async () => {
+    const meta = await sharp(await encodeAvatar(await makeImage())).metadata();
+
+    expect(meta.format).toBe("webp");
+    expect(meta.width).toBe(1024);
+    expect(meta.height).toBe(1024);
+  });
+
+  it("returns a Buffer safe to hand to fetch as a binary body", async () => {
+    const encoded = await encodeAvatar(await makeImage());
+
+    // The invariant that keeps replaceAvatar's Storage upload intact.
+    // sharp's WebAssembly build returns a SharedArrayBuffer-backed view,
+    // which undici stringifies rather than sending as bytes; encodeAvatar
+    // copies so this holds whichever runtime loaded. It passes trivially on
+    // a native runtime — the e2e avatar spec is what exercises the real
+    // upload path — but it pins the contract the copy exists to provide.
+    expect(encoded.buffer instanceof SharedArrayBuffer).toBe(false);
   });
 });
