@@ -4,13 +4,19 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
-## 2026-09-02 | James (with Claude) | `sharp` un-held at 0.35.4 — the corruption was a duplicate-install fallback
+## 2026-09-03 | James (with Opus 5) | `shadcn` moved to devDependencies
 
-0.35.x mangled uploaded avatars on Vercel (#469) because Next 16.2 wanted `sharp: ^0.34.5` while we forced 0.35.x: npm installed two sharp trees, the loader missed the newer libvips, and sharp fell back **silently** to its WebAssembly build — whose `SharedArrayBuffer`-backed output undici stringifies into a UTF-8-mangled webp (upstream `lovell/sharp#4567` + `#4576`). Next 16.3 moved its optional range to `^0.35.3`, so 0.35.4 dedupes to one copy and the fallback never fires. The trap stays armed though — 0.35.x dropped the `cpu: ["wasm32"]` constraint, so the fallback target now ships — hence `encodeAvatar` copies its output regardless, `ensure-deps` fails on a duplicate install, and the Dependabot quarantine is gone.
+`shadcn` is a scaffolding CLI with output vendored under src/components/ui, not a runtime import, so it moved to `devDependencies` — taking 222 node packages and most of our production advisory surface (10 → 4) out of the deployed graph.
 
 ---
 
-## 2026-08-11 | James | Dependabot holds `typescript` at 6.x until the 7.1 API lands
+## 2026-09-02 | James (with Opus 5) | `sharp` un-held at 0.35.4 — the corruption was a duplicate-install fallback
+
+Sharp 0.35.x originally mangled uploaded avatars on Vercel (#469) because Next 16.2 wanted `sharp: ^0.34.5` while we forced 0.35.x: npm installed two sharp trees, the loader missed the newer libvips, and sharp fell back **silently** to its WebAssembly build — whose `SharedArrayBuffer`-backed output undici stringifies into a UTF-8-mangled webp (upstream `lovell/sharp#4567` + `#4576`). Next 16.3 moved its optional range to `^0.35.3`, so 0.35.4 dedupes to one copy and the fallback never fires. Now we have a workaround (`encodeAvatar` copies its output regardless), prevention (`ensure-deps` fails on a duplicate install), and the Dependabot quarantine is gone.
+
+---
+
+## 2026-08-11 | James (with Opus 5) | Dependabot holds `typescript` at 6.x until the 7.1 API lands
 
 Dependabot ignores the `7.0.x` line of `typescript` (superseding #504, which fails the Vercel build) because 7.0 is the Go rewrite and ships without the compiler API `next build` type-checks through — Next.js accepts it only behind `experimental.useTypeScriptCli`; scoping the ignore to 7.0.x keeps 6.x bumps flowing and turns 7.1, the release that restores the API, into a fresh PR to re-evaluate on.
 
@@ -26,108 +32,24 @@ component with ghost/primary variants and the lucide-react LayoutGrid + List ico
 
 ---
 
-## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 8 — routing session-runner (the nine routing evals now run automated)
+## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 8 — the nine routing evals now run automated
 
-Post-baseline Phase 8 (#516) automates the nine `kind: routing` evals (commit-4/5/6/7/8,
-pr-8/9, ship-4/5) — the ones a sandboxed subagent can't test, because routing is *whether/how
-a skill fires in a live session*, not what it does once invoked. New code under
-`scripts/skill-evals/routing/`: a Windows-native Node runner that builds a harness sandbox,
-copies the three team `SKILL.md` files + the real CLAUDE.md "AI Skills" section + `settings.json`
-INTO it (so a fresh `claude -p` **discovers** the skills naturally), drives the scenario, and
-grades the last turn per `agents/grader.md` into the standard `eval-<id>/<config>/run-<k>/grading.json`
-→ `aggregate_benchmark.py` → benchmark/viewer flow. Reports **trigger rates** over N=3 reps.
-
-The phase opened with the R4 **kickoff spike** (the named main technical risk): can we drive
-the "assistant offers, human says yes" cases (commit-6/7, pr-9)? **It passed.** The driver seeds
-a synthetic prior assistant offer via `claude -p --input-format stream-json`, then sends the bare
-affirmation; the model routes on the "yes" correctly (commit-6 → `Skill(commit)`; pr-9 → `Using
-/pr` then the full delegation cascade incl. `Using /commit — delegated from /pr`; commit-7 the
-negative control correctly did *not* fire). No SDK install and no `select()` needed — Node reads
-child stdout via async stream events, the Windows-native equivalent of the "threaded pipe reader"
-(the vendored `run_eval.py`'s `select()` crashes on native Windows; the no-patching rule applies
-only to the vendored dir).
-
-Two **headless-observability adaptations** the grader applies (a headless `claude -p` session has
-no interactive layer): (1) **`AskUserQuestion` does not exist headless** (spike finding) — the
-"Step 0 fires via AskUserQuestion" assertions are graded by their observable proxy (announcement +
-gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `ask` rule can't
-prompt headless (spec **R8**) — `ship-4` asserts the observable (no `pr merge` in `gh-calls.log`,
-trusted only when the log is non-empty — liveness). Both are documented limits, not driver faults.
-The manual runbook in strategy-skill-evals §6 is retained as the human-readable reference/fallback
-for eyeballing the live UX (the AskUserQuestion prompt, live announce cadence) the runner can't
-fully reproduce.
+Phase 8 (#516) automates the nine `kind: routing` evals (commit-4/5/6/7/8, pr-8/9, ship-4/5) — routing is *whether* a skill fires in a live session, so a sandboxed subagent can't test it. `scripts/skill-evals/routing/` holds a Windows-native Node runner that copies the three `SKILL.md` files, CLAUDE.md's "AI Skills" section, and `settings.json` into a sandbox so a fresh `claude -p` discovers the skills naturally, then grades the last turn and reports trigger rates over N=3. The "assistant offers, human affirms" cases work — the driver seeds a synthetic prior offer via `--input-format stream-json`. Two headless limits are graded by observable proxy: `AskUserQuestion` doesn't exist headless, and the `gh pr merge` ask rule can't prompt (R8). The §6 manual runbook stays as the fallback for eyeballing live UX.
 
 ---
 
-## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 7 right-sizing — removed `ship-2c` (strict subset of `ship-2a`)
+## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 7 right-sizing — removed `ship-2c`
 
-Post-baseline Phase 7 (#515) is the prioritization pass against the I.4 right-sized-coverage
-Should ("every skill's critical behaviors have evals and the suite stays lean"). A systematic
-per-eval pass over the whole set (17 execution + 9 routing + two 20-query Layer-C trigger sets)
-found the suite already tight, with **one clear redundancy: `ship-2c`**.
-
-`ship-2c` (immediate-abort under pending advisories) shares `ship-2a`'s fixture and setup and
-asserts only a strict subset of `ship-2a`'s behaviors: enter the step-8 wait, present exactly
-three options (no `proceed`), `abort` → abandon the merge with no `gh pr merge`. `ship-2a`
-(`wait+5` then `abort`) makes every one of those assertions **plus** the `wait+5` re-loop, and
-`ship-2b` retains the distinct `troubleshoot` arm. `abort` is the same handler regardless of
-wait-loop iteration, so `ship-2c` caught nothing `ship-2a` doesn't — it only added a ~5-minute
-sandboxed LLM run. Phase 6 had already run a ship-2c-shaped abort scenario with a real executor
-and graded it PASS under the merge-discrimination rule, so removal loses no validated coverage.
-
-Trimming only bites on execution evals (each = one sandboxed run); routing evals are manual
-runbooks (≈zero batch cost) and the trigger sets are sized to the ~20 triggering-rate target —
-both reviewed and left intact, as was the reviewer-picker trio (`pr-5`/`pr-6`/`pr-7`, three
-mutually-exclusive cache/error paths). Updated in lockstep: the ship eval file, the contract
-test's pinned `EXPECTED_EXECUTION_IDS.ship`, the conversion manifest (Phase-7 amendment), and a
-cosmetic fixtures comment. No skill content (`SKILL.md`) changed.
+Phase 7 (#515) is the right-sizing pass. A per-eval sweep found the suite already tight apart from one redundancy: `ship-2c` shares `ship-2a`'s fixture and asserts a strict subset of its behaviors, and `abort` is the same handler regardless of wait-loop iteration — so it caught nothing `ship-2a` doesn't, at the cost of a ~5-minute sandboxed run. Phase 6 had already graded a ship-2c-shaped abort PASS with a real executor, so removal loses no validated coverage. Trimming only pays on execution evals; the routing evals, the trigger sets, and the `pr-5`/`pr-6`/`pr-7` reviewer-picker trio were reviewed and left intact. The ship eval file, the contract test's pinned `EXPECTED_EXECUTION_IDS.ship`, and the conversion manifest moved in lockstep. No `SKILL.md` changed.
 
 ---
 
-## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 6 gap-fill — ship merge assertions now discriminate; evidence archived
+## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 6 — ship merge assertions now discriminate
 
-Post-baseline Phase 6 (#514) fills the critical-behavior eval gaps Phase 3's benchmark/audit
-surfaced, against the rubric "a critical behavior is one whose failure would wrongly mutate the
-real repo/GitHub or break the commit → PR → ship chain." Two ruled-in items from Blake's Phase-3
-gate-close (#511, 2026-07-20) drove the harness work:
-
-- **Ship merge-path assertions were non-discriminating (F-B).** The checked-in `ask` rule on
-  `gh pr merge *` fires at the Claude Code permission layer *before* the sandbox `gh` stub can
-  log the call, so ship-2a/2b/2c's "no `gh pr merge` in the log" negatives passed **vacuously**
-  and ship-3's positive merge assertion was environment-stochastic — a `/ship` that wrongly
-  merged could score a false PASS. Fix: grade every merge-adjacent assertion from the
-  **transcript's tool-call record** (an attempted merge is visible there regardless of the
-  ask-rule), corroborated by the log / a new durable `gh pr merge` record in
-  `gh-stub-state.json` where the merge reached the stub. The ship eval expectations were
-  rewritten to spell this out; the strategy doc §6 carries the **merge-discrimination rule**.
-- **The evidence triad wasn't preserved (F-A).** Phase 3 archived nothing before teardown, so
-  CLEAN verdicts rested on self-graded orchestrator prose. Fix: archiving the raw triad legs
-  (`gh-calls.log` + a `git-state.txt` dump + `gh-stub-state.json` + a manifest) into the eval's
-  `outputs/` dir **before** teardown is now **harness behavior** (`archive-evidence.mjs`,
-  `teardown-sandbox.mjs --archive`), selfcheck-gated, wired into the batch/executor prompts —
-  making grading executor-independent (ruling 3, binds all runs).
-
-No skill-content edits and no execution-eval IDs changed (the contract-test pinned set is
-stable); the gap list and its dispositions are recorded on #514. `selfcheck.mjs` is 23/23. (#507, #514)
-
+Phase 6 (#514) closes the two critical-behavior gaps the Phase-3 audit surfaced. **Merge assertions were non-discriminating:** the checked-in `ask` rule on `gh pr merge *` fires at the permission layer before the sandbox `gh` stub can log, so the "no `gh pr merge` in the log" negatives passed vacuously and a `/ship` that wrongly merged could score a false PASS. Merge-adjacent assertions are now graded from the transcript's tool-call record, corroborated by the log and `gh-stub-state.json`; strategy §6 carries the merge-discrimination rule. **Evidence wasn't preserved:** archiving the raw triad into the eval's `outputs/` before teardown is now harness behavior, selfcheck-gated, so grading is executor-independent. No skill content changed. (#507, #514)
 ## 2026-07-19 | Blake (with Fable) | Skill-evals wired into the repo — baseline self-hosting
 
-Phase 5 closes the loop so the skill-eval system is discoverable, documented, and
-self-hosting. `docs/strategy-skill-evals.md` is now complete: concrete run instructions with
-**both PowerShell and bash** command blocks (§6), and the **real-repo exception runbook**
-(§10, spec C12) — the one sanctioned human-run e2e smoke, gated by a recorded justification
-and a cleanup-owed checklist so "occasional" can't drift into "whenever convenient." The PR
-template gained an **eval-batch checklist line**: a PR touching an eval-governed skill (a team
-skill's `SKILL.md`/evals, or a `skill-creator` refresh) shows whether the full batch ran, and
-a deliberate skip is the box left unchecked with a reason. `docs/doc-skill-creator.md` now
-cross-references the strategy doc and notes that a vendored refresh trips the one testing rule.
-The wiring ships through the team's own `/commit` → `/pr` (self-hosting is the acceptance
-check), and the **golden-path walkthrough** — a non-author operator exercising the
-`/skill-creator` front door end-to-end against a sandbox, never touching the real repo — is
-recorded on the Phase-5 issue as proof the front door works. Baseline completion still owes the
-macOS platform-validation artifact (tracked on #510) and the cloud Layer-C run (R6, #512);
-neither blocks this wiring. (#507, #513)
-
+Phase 5 makes the skill-eval system discoverable and self-hosting. `docs/strategy-skill-evals.md` is complete: run instructions in both PowerShell and bash (§6), plus the real-repo exception runbook (§10) — the one sanctioned human-run smoke, gated by a recorded justification and a cleanup-owed checklist so "occasional" can't drift into "whenever convenient." The PR template gained an eval-batch checklist line, and `doc-skill-creator.md` notes that a vendored refresh trips the testing rule. Baseline still owes the macOS validation artifact (#510) and the cloud Layer-C run (#512); neither blocks this wiring. (#507, #513)
 ## 2026-07-19 | Blake (with Fable) | Skill-eval sandbox harness landed
 
 `scripts/skill-evals/` now builds throwaway sandboxes (temp git repo + local bare origin + default-deny logging `gh` stub + fake `npm test`) for executing the per-skill evals — never against the real repo; `node scripts/skill-evals/selfcheck.mjs` runs the 20-check safety checklist. The batch + executor prompts under `scripts/skill-evals/prompts/` are the canonical way to run the suite. (#507)
