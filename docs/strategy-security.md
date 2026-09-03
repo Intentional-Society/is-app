@@ -147,6 +147,38 @@ Requires npm ≥11 — older npm warns and ignores the setting, so this is silen
 
 Dependabot has no visibility into `.npmrc`, so `.github/dependabot.yml` carries a matching `cooldown.default-days: 3` for the npm ecosystem. Keep the two values in sync — otherwise Dependabot opens PRs bumping to versions the `.npmrc` quarantine would still reject.
 
+# Dependency scanning
+
+Three GitHub features act on dependency advisories, configured independently. Confusing them is the main hazard.
+
+**Dependabot alerts** are on, and are the source of truth for what's outstanding.
+
+**Dependabot version updates** are configured in `.github/dependabot.yml`: weekly, with patch and minor bumps batched into one `minor-and-patch` group PR. This is what actually clears most advisories, because nearly every npm fix ships as an in-range patch.
+
+**Dependabot security updates** — the repo-level toggle at `PUT /repos/{owner}/{repo}/automated-security-fixes` — are deliberately **off**. With the toggle on, Dependabot opens a pull request for every alert with an available patch, and `open-pull-requests-limit` does not apply to security updates; there is no cap, so a backlog of 27 alerts becomes 27 pull requests. Since the weekly group sweeps every in-range fix within a week anyway, the toggle buys speed on a few advisories at the cost of unbounded PR volume on all of them.
+
+## The critical-alert fast lane
+
+A repository auto-triage rule named **Critical alert fast lane** gives us a bypass for genuinely urgent advisories without the flood. As built on 2026-09-03:
+
+| Setting | Value |
+|---|---|
+| Target alerts | `severity:critical` `scope:runtime` |
+| Action | Open a pull request to resolve this alert |
+| State | Enabled |
+
+The mechanism is the rule, not the toggle. **The "open pull requests" action is available only while Dependabot security updates are off**, and dismissal rules do *not* suppress pull requests while they are on — the two are alternative PR sources, not layers. GitHub's docs put it plainly: "for an 'open a pull request' rule to take effect, you must ensure that Dependabot security updates are **disabled**." Turning the toggle back on silently supersedes this rule. Related ordering nuance: dismissal rules always act before rules that open pull requests.
+
+Rules live at Settings → Advanced Security → Dependabot rules → New rule (limit 10 per repository during the public preview). They are **UI-only** — no YAML, and no documented REST or GraphQL API for repository-level rules; the public GraphQL schema exposes no auto-triage types at all. So unlike `dependabot.yml`, this configuration is not in the repo, not reviewable in a pull request, and not reproducible from a clone. The table above is the only record — keep it current if the rule changes.
+
+This repo is public, so GitHub's preset "Dismiss low impact issues for development-scoped dependencies" is on by default. It is narrowly curated and does little for us.
+
+## Reading `npm audit`
+
+`npm audit` reports the entire subtree of anything in `dependencies` as production, which overstates exposure. `@sentry/nextjs` must sit in `dependencies` for its runtime SDK, so its build-time half — `@sentry/webpack-plugin`, `@sentry/bundler-plugin-core`, `webpack` and their transitive deps — is labelled production too. That code is reached only through `build/*/config/**`, the `withSentryConfig` path that runs on the Vercel build machine, and `config/webpack.js` loads the bundler plugin lazily, so none of it enters the deployed function bundle. Confirm the path with `npm ls <package> --omit=dev` before treating a "production" advisory as request-reachable.
+
+**Never run `npm audit fix --force` here.** As of 2026-09-03 npm's offered fix for the remaining `esbuild` advisories is `drizzle-kit@0.18.1` — a downgrade from 0.31.10 that would gut the migration toolchain. Those advisories are dev-scope and stay until drizzle-kit drops its deprecated `@esbuild-kit/*` dependencies upstream. Plain `npm audit fix` is safe and lockfile-only.
+
 # Secret rotation
 
 If a secret is suspected compromised, rotate it immediately using the steps below.
