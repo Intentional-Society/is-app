@@ -153,12 +153,31 @@ const AVATAR_DIMENSION = 1024;
 // applied, all metadata stripped. Rejects (throws) bytes that do not
 // decode as an image — the caller maps that to a 400. limitInputPixels
 // caps the decoded surface as a decompression-bomb guard.
-export const encodeAvatar = (input: Buffer): Promise<Buffer> =>
-  sharp(input, { limitInputPixels: 100_000_000 })
+export const encodeAvatar = async (input: Buffer): Promise<Buffer> => {
+  const encoded = await sharp(input, { limitInputPixels: 100_000_000 })
     .rotate()
     .resize(AVATAR_DIMENSION, AVATAR_DIMENSION, { fit: "cover" })
     .webp({ quality: 88 })
     .toBuffer();
+
+  // sharp's loader falls back to its WebAssembly build when the native
+  // binary won't load, and does so silently — it tries four paths and
+  // keeps the first that works, without exporting which one won. That
+  // build returns a Buffer viewing a SharedArrayBuffer, which undici
+  // refuses to send as a binary body: it stringifies it instead, so every
+  // byte >= 0x80 becomes U+FFFD and Storage receives a UTF-8-mangled webp
+  // (#469 — the bug that held sharp at 0.34.5).
+  //
+  // Copying into a normally-allocated Buffer makes the upload correct on
+  // either runtime, so a future fallback costs speed rather than data.
+  // The check has to read `encoded` before the copy, and is the only
+  // signal available that we are on the fallback at all.
+  if (encoded.buffer instanceof SharedArrayBuffer) {
+    log.error("sharp is running on its WebAssembly fallback runtime", { bytes: encoded.byteLength });
+  }
+
+  return Buffer.from(encoded);
+};
 
 // Stores an encoded avatar for a user: uploads the object, points the
 // profile row at it, then removes the previous object. The ordering is
