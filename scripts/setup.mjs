@@ -23,8 +23,35 @@ function ensureLefthookInstalled() {
   });
   if (result.status !== 0) {
     console.error("  lefthook install failed — pre-commit formatting will not run");
+    printLefthookRecovery();
     process.exit(1);
   }
+}
+
+// lefthook declines to install whenever core.hooksPath is set — including when
+// the value is the default path git already resolves to — and its own output
+// presents --reset-hooks-path and --force as equals. Only the first fits a repo
+// whose setup runs a plain `lefthook install`, and lefthook cannot know that, so
+// make the call here (#410).
+function printLefthookRecovery() {
+  const res = spawnSync("git", ["config", "--show-origin", "--get", "core.hooksPath"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  const raw = res.status === 0 && typeof res.stdout === "string" ? res.stdout.trim() : "";
+  if (!raw) {
+    console.error("  Fix: run `npx lefthook install --verbose` for the detail, then retry `npm run setup`.");
+    return;
+  }
+
+  // --show-origin prefixes the value with "file:<path>" and a tab.
+  const [origin, value] = raw.split("\t");
+  console.error(
+    `  Cause: core.hooksPath is set to ${value} (in ${origin.replace(/^file:/, "")}).\n` +
+      "  Fix: run `npx lefthook install --reset-hooks-path`, then retry `npm run setup`.\n" +
+      "  That unsets the key and installs into git's default hooks dir — the one the base worktree and every lane share.\n" +
+      "  `--force` also installs, but leaves the key set, so the next `npm run setup` fails here the same way.",
+  );
 }
 
 function ensurePlaywrightBrowsersInstalled() {
