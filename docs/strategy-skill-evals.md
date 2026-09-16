@@ -350,10 +350,34 @@ gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `a
 can't prompt headless (spec R8) — `ship-4` asserts the **observable** (no `pr merge` in
 `gh-calls.log`, trusted only when the log is non-empty — liveness).
 
+**Two further headless limits, specific to the delegation-marker evals** (found 2026-07-20
+while resolving #527; both are environment facts, not skill defects):
+
+- **`.claude/` is write-protected, so clear-on-read can't be graded headless.** Deleting any
+  file inside `.claude/` — including `.claude/.nl-delegation-active`, which `/commit` and `/pr`
+  delete on read at their Step 0 — is refused by built-in Claude Code protection. This
+  reproduces in a bare scratch directory with no fixture and no settings; the *same filename in
+  a different directory* deletes fine, so the trigger is the directory, not the file. An
+  interactive session can approve the prompt, which is why the real `/ship` → `/pr` → `/commit`
+  chain works; headless has no prompter, so the refusal is absolute. Sandbox
+  `permissions.allow` entries can't lift it either — an untrusted workspace ignores them
+  silently. **Consequence:** `commit-5b`'s marker-deletion assertion was removed from the
+  automated eval and is covered by the manual runbook below. Never read a failed deletion in a
+  headless run as a skill defect.
+- **The 30s delegation-marker lease is a latent timing risk, not an observed failure.** Setup
+  files are written before the executor starts, so on a multi-turn eval the model could in
+  principle generate through every seeded turn before Step 0 reads the marker, pushing it past
+  the lease — at which point Step 0 correctly treats it as stale and fires. Stale reads *do*
+  appear in archived artifacts, but only from **superseded** seed shapes; on `commit-5b`'s
+  current seed the marker has been read fresh in every observed run. **Consequence:** treat a
+  stale read on the current seed as a real finding worth a ticket, not an expected outcome —
+  and do not add a grader branch that excuses a failure as staleness. Closing the underlying
+  risk would mean restructuring when setup files are applied relative to turn processing.
+
 **The manual runbook below is retained** as the human-readable reference and fallback — run
 it by hand (fresh session, issue the query verbatim, check against `expectations`) when you
 want to eyeball the live UX the headless runner can't fully reproduce (the AskUserQuestion
-prompt, the live announce cadence), or when the runner is unavailable.
+prompt, the live announce cadence, **marker clear-on-read**), or when the runner is unavailable.
 
 | Eval | Query | What to watch for |
 |---|---|---|
