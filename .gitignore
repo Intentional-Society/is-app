@@ -48,6 +48,10 @@ test-results/
 # repo, so re-include it explicitly past the `.claude/*` exclusion. Per-machine overrides live in
 # .claude/settings.local.json, which stays ignored by the `.claude/*` rule above.
 !.claude/settings.json
+# agent definitions (.claude/agents/*.md) are team procedure in the same sense skills are —
+# they set model + reasoning effort + standing rules for delegated work. Re-include them past
+# the `.claude/*` exclusion so a fresh clone keeps the escalation path (decided 2026-09-16).
+!.claude/agents/
 # per-machine Skill state (team-cache, etc.) — never commit
 .claude/skills/**/.team-cache.json
 # skill-creator generated run artifacts (Python bytecode, packaged .skill files) — never commit
