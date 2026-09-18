@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-09-18 | Blake (with Fable 5.1) | `/handoff` is now a team skill
+
+`/handoff` lives at `.claude/skills/handoff/`. It writes a session hand-off doc plus a paste-ready bootstrap prompt at compact/full/minimal depth, verifying state via git/gh rather than chat memory. Every hand-off now carries a "How this work is done" section (pattern, roles, gap no role owned). `.claude/agents/` also ships now — the three agent definitions the skill-evals program delegates to; `.gitignore` re-includes it.
+
+---
+
 ## 2026-09-03 | James (with Opus 5) | `shadcn` moved to devDependencies
 
 `shadcn` is a scaffolding CLI with output vendored under src/components/ui, not a runtime import, so it moved to `devDependencies` — taking 222 node packages and most of our production advisory surface (10 → 4) out of the deployed graph.

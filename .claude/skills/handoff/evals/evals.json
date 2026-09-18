@@ -1,0 +1,163 @@
+{
+  "skill_name": "handoff",
+  "runner_notes": "Run every eval inside a disposable isolated git worktree/repo built to the eval's 'fixture' description — subagents must never touch the real repo. The fixture is part of the eval: prompts assume the described git/gh state exists. Where a fixture mentions a conversation claim, put that claim in the subagent's task framing so the contradiction with verified git/gh state is testable.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "verify-over-memory",
+      "prompt": "Hopping on a call in 5 min — can you throw together a hand-off for the notifier retry-count fix? Pretty sure I already committed it earlier, just need something I can hand to a fresh session after lunch.",
+      "expected_output": "A .scratch/*-bootstrap.md hand-off doc plus a printed bootstrap prompt, at default (compact) depth. The doc must correctly report that the notifier retry-count change is NOT committed (git status shows the file modified/uncommitted) even though the user believed it was — the skill should verify via git rather than repeat the user's claim at face value.",
+      "fixture": "Branch 486-notifier-retry-fix, no commits ahead of main. src/server/notifier.ts modified but uncommitted (the retry-count change). No PR. Conversation claim: user believes the change was already committed.",
+      "files": [],
+      "assertions": [
+        "States the notifier retry-count change is NOT committed / still shows as uncommitted in git status",
+        "Does not assert or imply the change was already committed",
+        "Created a hand-off doc file (e.g. under .scratch/) rather than only responding in chat",
+        "Doc or response lists the uncommitted file(s) explicitly",
+        "Doc stays at default depth: no decision-log table, risk register, alternatives-considered, or detailed-chronology sections",
+        "Doc includes a concrete resume/next-step section ending in one bounded next action with real commands where they matter",
+        "Final chat response includes a printed, paste-ready bootstrap prompt for a fresh session",
+        "Doc includes a 'How this work is done' section that names the orchestration pattern and the roles or personas involved (a one-line 'solo, no personas' answer is acceptable)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "preserve-historical",
+      "prompt": "/handoff — we finished the drift-check workflow stub since this morning's hand-off doc, update it for whoever picks this up next.",
+      "expected_output": "Updates the existing .scratch/drift-workflow-bootstrap.md: preserves the prior morning-state content under a 'Historical' heading rather than deleting it, adds new current state reflecting the new commit (the drift-check workflow stub), and prints an updated bootstrap prompt.",
+      "fixture": "Branch 396-pr3-drift with an existing .scratch/drift-workflow-bootstrap.md written this morning (old template: 'State as of' says PR 3 design finished, drift-check workflow drafted but not implemented). Since then: one new commit adding .github/workflows/skill-creator-drift.yml (the stub). Working tree clean.",
+      "files": [],
+      "assertions": [
+        "The prior state description (PR 3 design finished / drift-check workflow drafted but not implemented) survives somewhere in the updated doc",
+        "The updated doc has a distinct heading separating prior/historical state from current state",
+        "The updated doc's current state reflects the new commit (the drift-check workflow stub now exists)",
+        "The existing doc was updated in place, not replaced by a differently-named or duplicate doc",
+        "Final chat response includes a printed, paste-ready bootstrap prompt reflecting the updated state"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "nothing-in-flight",
+      "prompt": "/handoff",
+      "expected_output": "Recognizes there is nothing in-flight to hand off (clean working tree, on main, no distinguishing branch work) and asks what this hand-off is for, rather than fabricating a doc about nonexistent work.",
+      "fixture": "On main, clean working tree, no commits ahead of origin/main, no PR, no meaningful prior conversation about any workstream.",
+      "files": [],
+      "assertions": [
+        "Response asks a clarifying question about what topic/work the hand-off is for, rather than proceeding blind",
+        "No hand-off doc is created that describes fabricated or invented in-flight work",
+        "Response reflects awareness that the working tree is clean / on main with nothing distinguishing in flight"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "slash-minimal-parse",
+      "prompt": "/handoff notifier-retry --mode minimal",
+      "expected_output": "A genuinely minimal .scratch/notifier-retry-bootstrap.md (slug from the argument): goal+done-when compressed to a line or two, short bullets, essential anchors kept, no ceremony — plus a printed bootstrap prompt. Corrects the user's stale belief that a PR is already open.",
+      "fixture": "Branch 486-notifier-retry-fix, one commit ahead of main ('fix(notifier): stop double-counting retries'), working tree clean, npm run test:functional passed earlier this session. No PR exists. Conversation claim: user said earlier 'the PR is already up'.",
+      "files": [],
+      "assertions": [
+        "Doc created at .scratch/notifier-retry-bootstrap.md — slug taken from the argument, mode flag not mistaken for a slug",
+        "Doc is materially low-ceremony: no decision tables, risk registers, alternatives-considered, chronology, or multi-step future plans",
+        "Essential anchors survive the contraction: branch and commit, working-tree state, and at least one key file path",
+        "Corrects the stale claim: reports that no PR exists rather than repeating that one is up",
+        "Contains a verification step and exactly one concrete next action",
+        "Final chat response includes a printed, paste-ready bootstrap prompt",
+        "The 'How this work is done' section is present but contracted to a single line — not omitted, not expanded"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "slash-full-decision-log",
+      "prompt": "/handoff pr3-drift --mode full",
+      "expected_output": "A full-depth .scratch/pr3-drift-bootstrap.md: decision log with rationale/evidence identifying the roundtable doc, validation split into completed vs still-required, exact stopping point, ordered resume plan with approval gate — plus a printed bootstrap prompt. Reports the PR's real (pending) check status, not the remembered 'green' claim.",
+      "fixture": "Branch 396-pr3-drift-workflow, three commits ahead of main. A decision-review doc .scratch/pr3-drift-roundtable.md records this session's decision: monthly scheduled drift-check workflow chosen over per-PR checking, with alternatives and reasons. Workstream A (workflow YAML + script) implemented; exit-code-2 path live-tested; functional tests pass; e2e not run. Workstream B (docs update) not started. Open PR #489 with one check still pending. Conversation claim: user said earlier 'CI is green on the PR'.",
+      "files": [],
+      "assertions": [
+        "Decisions are recorded with rationale and evidence, not bare conclusions",
+        "The roundtable/design-review doc is identified as the decision log",
+        "Validation separates completed checks (with their results) from still-required checks",
+        "Status identifies the exact stopping point, separating in-progress from not-started work (docs workstream)",
+        "Reports the PR check status as verified (pending), not the remembered 'green' claim",
+        "Resume plan is ordered, starts with verification/preflight, and includes an approval gate before merge",
+        "Final chat response includes a printed, paste-ready bootstrap prompt",
+        "The 'How this work is done' section carries the roles in play, roles to add or swap next, and answers 'what gap did no role own?'"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "nl-minimal-explicit",
+      "prompt": "That's the whole fix — just leave a quick minimal handoff so tomorrow-me can close this out, nothing fancy.",
+      "expected_output": "Recognizes natural-language minimal-mode intent and proceeds (no clarifying question needed): a short handoff doc with the uncommitted file and branch anchors, the not-yet-run test as the next required check, one exact next action, and a printed bootstrap prompt.",
+      "fixture": "Branch chore/biome-rule-tweak with one uncommitted modified file (biome.jsonc — a lint rule severity change made this session). No commits ahead of main, no PR. Tests not yet run this session.",
+      "files": [],
+      "assertions": [
+        "Proceeds without asking a clarifying question — the intent and scope are clear",
+        "Minimal-depth structure: goal and completion condition compressed into one or two lines, short bullets, no Full-only ceremony sections",
+        "The uncommitted file and branch anchor are still present despite the contraction",
+        "Identifies that tests haven't been run as the next required check, and gives one exact next action",
+        "Final chat response includes a printed, paste-ready bootstrap prompt"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "nl-compact-explicit-overrides",
+      "prompt": "Write the compact version for the buttondown-sync work — I know it's sprawling, but I just need the essentials.",
+      "expected_output": "Honors the explicit compact request even though the work's complexity would otherwise justify full: a compact doc that still names both workstreams and the open question, with no Full-only ceremony — plus a printed bootstrap prompt.",
+      "fixture": "Branch 512-buttondown-tag-mirror, two commits ahead of main, one modified file uncommitted. Two workstreams: tag-mirror cron fix (in progress), write-policy doc update (not started). Open question from this session: whether Buttondown rate limits require batching. Open issue #512, no PR.",
+      "files": [],
+      "assertions": [
+        "Document stays compact overall despite the complexity: no decision-log table, risk register, alternatives-considered, or detailed chronology",
+        "Both workstreams appear in the status (essentials are not dropped to achieve brevity)",
+        "The open rate-limit question is recorded",
+        "Compact spine intact: leads with goal and status, has verified-state anchors, ends in one concrete next action",
+        "Final chat response includes a printed, paste-ready bootstrap prompt"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "auto-escalate-full",
+      "prompt": "Let's stop here for tonight — write a handoff so whoever picks this up tomorrow has what they need.",
+      "expected_output": "No depth was specified; the recovery risk (expand-contract migration mid-flight, half-implemented API change, teammate's WIP file, unverified preview) justifies automatic full-depth treatment: decision log with rationale/evidence, separated validation states, ordered resume plan with the contract-step stop condition as a gate, ownership uncertainty recorded — plus a printed bootstrap prompt.",
+      "fixture": "Branch 518-member-status-migration, two commits ahead of main (expand migration + new column write path). API change half-implemented: read path still on old column. Consequential decision this session: expand-contract ordering — the contract migration must NOT ship until all readers are migrated. A teammate's WIP file (src/app/members/page.tsx) is modified in the working tree — this session never touched it. Migration applied locally; preview e2e not run. Open PR #520 linked to issue #518.",
+      "files": [],
+      "assertions": [
+        "Escalates to full-depth treatment unprompted: decisions carry rationale and evidence, validation states are separated, resume plan is ordered",
+        "The expand-contract constraint (contract step must wait for reader migration) is recorded as a stop condition or approval gate",
+        "The teammate's modified file is listed with its uncertain/other ownership noted, without claiming it or requiring it be committed",
+        "Verified facts are distinguished from assumptions or unknowns",
+        "Final chat response includes a printed, paste-ready bootstrap prompt"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "compact-selective-expansion",
+      "prompt": "/handoff avatar-signed-urls",
+      "expected_output": "Ordinary work with one recovery-risk wrinkle: the doc stays compact overall but expands the verified-state/working-tree area to flag the unexplained modified file and its uncertain ownership. No cascade into other Full-only sections. Printed bootstrap prompt included.",
+      "fixture": "Branch 507-avatar-url-ttl, one commit ahead of main (signed-URL TTL fix) plus one modified file from this session's work (src/server/avatars.ts, uncommitted follow-up). Additionally src/lib/supabase/client.ts is modified but this session never touched it — origin unknown (possibly the user's manual edit). npm run test:functional passed after the fix.",
+      "files": [],
+      "assertions": [
+        "Document stays compact overall: no decision-log table, risk register, alternatives-considered, or detailed chronology appears",
+        "The verified-state/working-tree area explicitly flags the unexplained modified file and that its origin/ownership is uncertain",
+        "The unexplained file is not silently folded into the session's own work, and no commit is demanded",
+        "The expansion does not cascade: decisions and validation stay at compact depth",
+        "One concrete next action and a printed, paste-ready bootstrap prompt are present"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "nl-full-explicit",
+      "prompt": "I need a full handoff for the drift work — the decisions, risks, and what validation is still left. This has several moving pieces, so give the next agent everything.",
+      "expected_output": "Recognizes natural-language full-mode intent. Produces a full-depth handoff equivalent in structure to the slash-full run on the identical fixture: decision log with rationale/evidence identifying the roundtable doc, split validation, stopping point, ordered resume plan with approval gate, corrected PR check status — plus a printed bootstrap prompt.",
+      "fixture": "Identical to eval 5 (slash-full-decision-log) — reuse it verbatim. The slash/NL pair on identical state doubles as a consistency check between the two invocation interfaces; compare the two docs in the analyst pass.",
+      "files": [],
+      "assertions": [
+        "Full-depth treatment from the natural-language modifier alone: decisions carry rationale and evidence, validation states are separated, resume plan is ordered",
+        "The roundtable/design-review doc is identified as the decision log",
+        "Reports the PR check status as verified (pending), not the remembered 'green' claim",
+        "Status identifies the exact stopping point, separating in-progress from not-started work (docs workstream)",
+        "Doc slug derived sensibly from the drift-work context (e.g. pr3-drift), not from mode words",
+        "Final chat response includes a printed, paste-ready bootstrap prompt"
+      ]
+    }
+  ]
+}
