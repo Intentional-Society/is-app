@@ -6,9 +6,9 @@ throwaway git repo per named fixture, shadows `gh` with a logging **default-deny
 fakes `npm test`, and scrubs credentials — so a skill eval can stage, commit, push, open a
 PR, and "merge" against a world that is physically separate from your checkout.
 
-- **Design & rationale:** [`docs/spec-skill-evals-baseline.md`](../../docs/spec-skill-evals-baseline.md) (§II.2b, §II.2c).
-- **How to run evals / the safety model / the schema:** [`docs/strategy-skill-evals.md`](../../docs/strategy-skill-evals.md).
-- This README is the harness-internals reference: what each piece is and how to drive it.
+- **Design & rationale, module map, known gaps:** [`docs/design-skill-evals-harness.md`](../../docs/design-skill-evals-harness.md) (§4 module map, §5 safety model, §10 what's still open).
+- **How to run evals / the safety rules / the schema:** [`docs/strategy-skill-evals.md`](../../docs/strategy-skill-evals.md).
+- This README is the harness-internals reference: what each piece **is** and how to **drive** it. Why it is shaped this way, and which module owns which behavior, is the design doc above.
 
 Node core, zero runtime dependencies; only the three thin `gh`-stub wrappers are shell. The
 Node engine floor is pinned in [`package.json`](./package.json) (`engines.node >= 20`) and
@@ -96,14 +96,15 @@ Stubbed surface (traced from `.claude/skills/{commit,pr,ship}/SKILL.md`):
 | `run list` / `run watch <id>` | ship | post-merge run discovery/watch |
 | `api user` / `api users/<login>` / `api repos/.../collaborators` | pr | reviewer team cache; emulates the `--jq` filters the skill uses |
 
-This is a **superset** of spec II.2b's illustrative list — it adds `pr comment`, `run list`,
+This is a **superset** of the original design's illustrative list
+([`design-skill-evals-harness.md`](../../docs/design-skill-evals-harness.md) §4.3) — it adds `pr comment`, `run list`,
 and `run watch` because pr-1 and ship-1/-3 genuinely call them. Everything genuinely
 unexpected still hard-fails. To extend the surface for a new skill, add a handler in
 `gh-stub.mjs` and the data it reads to the fixture — do not loosen the default-deny.
 
 ## Fixtures
 
-Profiles live in [`lib/fixtures.mjs`](./lib/fixtures.mjs) as **plain data** (spec C13) — one
+Profiles live in [`lib/fixtures.mjs`](./lib/fixtures.mjs) as **plain data** (constraint C13) — one
 per `fixture` name referenced by a `kind: execution` eval. Each names the feature branch,
 any commits/dirty working-tree changes, an optional preseeded reviewer cache, and the `gh`
 data the stub answers from. Adding an eval is usually just adding a profile here; the harness
@@ -113,16 +114,21 @@ does not change. A build-time check rejects any profile with case-colliding file
 The set of profiles must cover **every** fixture name in the eval files. `selfcheck.mjs`
 enforces this and fails loudly if a referenced name has no profile.
 
+Field-by-field reference for a profile — including what `openPr` and `pushedBranchCommits`
+actually do — is [`design-skill-evals-harness.md`](../../docs/design-skill-evals-harness.md) §4.2;
+the method for adding one (copy the closest neighbour) is `docs/strategy-skill-evals.md` §7.
+
 ## Fake `npm test`
 
 The sandbox `package.json`'s `test` script runs `.skill-eval-fake-test.mjs`, which passes
-instantly. Red-path (spec II.2e): create a `.skill-eval-fail-test` sentinel in the repo to
-force a failing gate — used by Phase 3's red-control demonstration.
+instantly. Red-path: create a `.skill-eval-fail-test` sentinel in the repo to force a failing
+gate — the cheapest generic way to make a red control go red
+([`design-skill-evals-harness.md`](../../docs/design-skill-evals-harness.md) §11).
 
 ## Safety checklist — `selfcheck.mjs`
 
-`node scripts/skill-evals/selfcheck.mjs` runs the full Phase-2 safety checklist and exits
-non-zero if anything fails:
+`node scripts/skill-evals/selfcheck.mjs` runs the full safety checklist — thirteen named checks,
+twenty-three result rows — and exits non-zero if anything fails:
 
 - **fixture-completeness** — a profile exists for every referenced fixture name, and every
   profile builds.

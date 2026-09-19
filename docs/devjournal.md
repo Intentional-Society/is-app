@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-09-18 | Blake (with Fable 5.1) | Skill-evals: one as-built design doc, and the old spec archived
+
+`docs/design-skill-evals-harness.md` replaces `docs/spec-skill-evals-baseline.md`, which was written before the program it planned had run and never revised — three of its claims were actively wrong, the worst being R8's advice to grade `gh pr merge` assertions off the call log (the Claude Code permission layer intercepts above the sandbox stub — the checked-in `ask` rule in default mode, the session's auto-mode classifier in auto mode — so an empty log is not proof either way). The old spec is archived under `docs/old-archive/` behind a banner naming all three, with a ten-line stub left at its path. The new doc owns what nothing owned: the module map and data flow for every file under `scripts/skill-evals/`, the safety model named to file and function, the scenarios as built, the decision ledger, the assertion-design rules learned in #527/#528, the evidence digest, and a glossary so a legacy id in a code comment still resolves. `docs/strategy-skill-evals.md` stays the runbook and gains a "which doc do I want" table at its top. Baseline is done except the macOS validation artifact — which has no tracking issue of its own, only #507's Parked list — and the cloud Layer-C run (#512). (#507)
+
+---
+
 ## 2026-09-18 | Blake (with Fable 5.1) | `/handoff` is now a team skill
 
 `/handoff` lives at `.claude/skills/handoff/`. It writes a session hand-off doc plus a paste-ready bootstrap prompt at compact/full/minimal depth, verifying state via git/gh rather than chat memory. Every hand-off now carries a "How this work is done" section (pattern, roles, gap no role owned). `.claude/agents/` also ships now — the three agent definitions the skill-evals program delegates to; `.gitignore` re-includes it.
@@ -66,7 +72,7 @@ The team skills' acceptance evals moved from `evals/evals.json` to `.claude/skil
 
 ## 2026-07-19 | Blake (with Fable) | Skill-evals baseline program spec landed
 
-Landed the skill-evals baseline program spec (`docs/spec-skill-evals-baseline.md`, with its conversion manifest and strategy-doc outline): sandboxed, /skill-creator-centered eval infrastructure for the three team Skills, delivered in phases via GitHub-tracked delegation packets.
+Landed the skill-evals baseline program spec (`docs/spec-skill-evals-baseline.md`, with its conversion manifest and strategy-doc outline): sandboxed, /skill-creator-centered eval infrastructure for the three team Skills, delivered in phases via GitHub-tracked delegation packets. *(Superseded 2026-09-18: that spec is archived at `docs/old-archive/spec-skill-evals-baseline.md` and replaced by `docs/design-skill-evals-harness.md`.)*
 
 ## 2026-07-05 | James | Browser support policy: Baseline widely available
 

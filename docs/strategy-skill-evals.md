@@ -1,15 +1,22 @@
 # Strategy — Skill Evals
 
-> Operational runbook for testing this repo's Claude Code Skills. Born in Phase 1 of the
-> skill-evals baseline program and completed in Phase 5 — every section is authoritative
-> now; no *(lands in Phase N)* placeholders remain. Design
-> rationale, the full architecture, and the decision log live in
-> [`docs/spec-skill-evals-baseline.md`](spec-skill-evals-baseline.md) — this doc is the
-> "how do I actually run this" companion, not the "why did we build it this way" one.
->
-> Built from the approved outline, `docs/spec-skill-evals-outline.md` (retired now that
-> this doc exists — the outline's job was to get Blake's sign-off on structure before
-> Phase 1 wrote content).
+> Operational runbook for testing this repo's Claude Code Skills: the schema, the safety
+> rules, the exact commands, the runbooks. Every section is authoritative. Design rationale,
+> the module map, and the decision ledger live in
+> [`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) — this doc is the
+> "how do I actually run this" companion, not the "why is it shaped this way" one.
+
+## Which doc do I want?
+
+| I want to… | Read |
+|---|---|
+| run, extend or maintain skill evals | **this doc** |
+| know why the harness is shaped this way; find a module, a function, or a known gap | [`design-skill-evals-harness.md`](design-skill-evals-harness.md) |
+| change what `/commit`, `/pr` or `/ship` *does* | [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) §4 |
+| understand natural-language invocation — Step 0, the delegation marker, the announcement | [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md) |
+| operate the vendored `/skill-creator` copy — the pin, the refresh, its Python prerequisite | [`doc-skill-creator.md`](doc-skill-creator.md) |
+| look up which eval id came from which original acceptance eval | [`spec-skill-evals-manifest.md`](spec-skill-evals-manifest.md) |
+| drive the harness CLIs directly, or debug one | [`scripts/skill-evals/README.md`](../scripts/skill-evals/README.md) |
 
 ## 1. What this doc is
 
@@ -28,11 +35,10 @@ else about a skill — reading it, editing its `SKILL.md`, writing or updating i
 reviewing an assertion list — is a plain file edit, safe anywhere, no different from any
 other repo change.
 
-**Not this doc's job:** how a fresh-session agent picks up a phase of the skill-evals
-*build-out* program. That's the delegation protocol in spec Part III.1 plus the parent
-GitHub issue's kickoff template. This doc is what those implementing agents (and everyone
-else) consult *while working on a skill* — it has nothing to say about how the
-infrastructure itself gets built.
+**Not this doc's job:** why the harness is built the way it is. That is
+[`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) — the module map, the
+trust-boundary model, the decision ledger, and the list of what is still open. This doc is
+what you consult *while working on a skill*.
 
 ## 2. Lifecycle map
 
@@ -87,7 +93,7 @@ orphaned.
 | `preconditions` | ours, retained from the original acceptance evals | every eval | Human-readable prose describing the starting world. **Kept verbatim on purpose:** this is the human-readable contract; the fixture profile is its executable implementation. If a fixture and its `preconditions` prose ever disagree, the profile is the bug, not the prose. |
 | `human_script` | **ours (additive)** | `kind: execution` only, where an interactive checkpoint is reached | The scripted human reply (or replies) an executor gives at each approval/prompt point. Valid **only inside a marker-bearing sandbox** — see §4's scoping rule. |
 | `expected_output` | upstream | every eval | Retained prose summary of correct behavior — the original acceptance-eval description. |
-| `expectations` | upstream (`expectations[]`) | `kind: execution` (≥1 required); present but not required on `kind: routing` | Machine-gradeable assertion strings — what the native grader agent (`agents/grader.md`) checks against the transcript, gh call log, and sandbox git state. On routing evals these double as the manual-runbook checklist (§6) until Phase 8 automates them. |
+| `expectations` | upstream (`expectations[]`) | `kind: execution` (≥1 required); present but not required on `kind: routing` | Machine-gradeable assertion strings — what the native grader agent (`.claude/skills/skill-creator/agents/grader.md`) checks against the transcript, gh call log, and sandbox git state. On routing evals these are graded by the routing session-runner (§6), and double as the checklist for the manual runbook that §6 retains as the fallback. |
 | `notes` | ours (additive, optional) | occasional | Freeform cross-references — e.g. a wall-clock warning, a stub-sequencing requirement, a pointer to a related routing eval. Not read by any grader; purely for a human or agent skimming the file. |
 
 ### Execution vs. routing
@@ -97,8 +103,8 @@ orphaned.
 - **`kind: routing`** — the eval tests *whether or how the skill fires* in a live session
   (a Step 0 gate, an announcement, a bare-"yes" affirmation, an over-trigger control). A
   subagent handed the skill directly can't test this — the thing under test is discovery,
-  not execution — so these stay documented manual runbooks (§6) until the Phase-8 session
-  runner automates them.
+  not execution — so these are run by the routing session-runner rather than by a subagent,
+  with the manual runbook in §6 retained as the fallback.
 
 ### The `$comment` execution notice
 
@@ -121,7 +127,8 @@ eval-artifact block it asserts, per skill:
 - The set of `kind: execution` eval `id`s exactly matches a **pinned list** taken from the
   approved conversion manifest (`docs/spec-skill-evals-manifest.md`) — so a
   skill-creator regeneration that silently drops or downgrades an eval fails loudly
-  instead of shipping a quietly thinner suite (R1 hardening, spec II.5).
+  instead of shipping a quietly thinner suite (risk R1 — see
+  [`design-skill-evals-harness.md`](design-skill-evals-harness.md) §9).
 - Root `evals/evals.json` does not exist (it was deleted in Phase 1 — C14 rescope).
 
 Failure messages are **prescriptive**: they name the offending file, the offending eval
@@ -131,8 +138,34 @@ alongside the manifest — don't loosen the assertion to make it pass.
 
 **What this gate does NOT check:** eval *content* quality, whether an `expectations`
 entry is well-written, or whether a fixture profile actually exists for a referenced
-name (that's Phase 2's fixture-completeness check). Human review of the assertion lists
-is the graded truth — the checkpoint every phase of this program names explicitly.
+name (that's the harness selfcheck's fixture-completeness item). Human review of the
+assertion lists is the graded truth — the checkpoint every phase of this program named
+explicitly.
+
+### Adding a new eval
+
+Four files move in lockstep. The contract test catches two of the four — the eval object's shape
+and the pinned id set. It does **not** catch a missing manifest amendment, and it does not catch a
+missing fixture profile (it only checks that `fixture` is non-empty); fixture completeness is the
+harness selfcheck's job, so run it.
+
+1. **The eval object** — `.claude/skills/<skill>/evals/evals.json`, per the schema above.
+2. **The fixture profile** (execution evals only) — `scripts/skill-evals/lib/fixtures.mjs`, plus
+   the `// The N profiles.` comment above the `FIXTURES` literal. See §7 for the method.
+3. **The pinned id set** (execution evals only) — `EXPECTED_EXECUTION_IDS` in
+   `tests/functional/skills/skill-contract.test.ts`. Routing evals are not pinned, so a
+   routing-only addition skips this and step 4.
+4. **A dated amendment in the manifest** — [`spec-skill-evals-manifest.md`](spec-skill-evals-manifest.md).
+   That file is the Phase-1 *conversion* record, and its tables have an `Original` column a
+   net-new eval cannot fill, so a net-new eval is recorded as a new dated amendment section at
+   the end, listing the files updated in lockstep and the new totals. The worked precedent in
+   that file is the Phase-7 right-sizing amendment that removed `ship-2c`.
+
+**Ids** are short, stable strings, scoped per skill (`commit-2`, `ship-2a`). Suffixed ids came from
+splitting one original eval. No rule fixes what a new id must be: read the ids already in use in
+that skill's `evals.json` and the pinned set in the contract test, and pick an unused one.
+**Sign-off:** the assertion list needs a maintainer's review before the PR merges — that
+review is the graded truth, not the green contract test.
 
 ## 4. The safety model
 
@@ -160,13 +193,13 @@ This turns "am I in the right place?" into a file-existence check, not a judgmen
 marker-bearing sandbox. In the real repo, every approval checkpoint always comes from an
 actual human — a `human_script` string is never a substitute for one outside a sandbox.
 
-**Honest limit (spec C8):** these layers are prompt-level guidance, not hard enforcement.
+**Honest limit (constraint C8):** these layers are prompt-level guidance, not hard enforcement.
 The gates that fire regardless of what any agent does are the checked-in `ask` permission
 rule on `gh pr merge` and the skills' own human-approval checkpoints (which stall rather
 than push forward when no real human answers). The backstop stack — the marker rule,
 the structural sandbox isolation, those hard gates, the CI shape gate, and plain git
 recoverability — means a missed layer degrades to "recoverable and loud," never "silent
-damage." Full backstop-stack detail: spec II.2c and II.5 (risk R3).
+damage." Full backstop-stack detail: [`design-skill-evals-harness.md`](design-skill-evals-harness.md) §5 (risk R3 in §9).
 
 ## 5. Layer A reality check
 
@@ -182,7 +215,7 @@ Unexpected key(s) in SKILL.md frontmatter: disable-model-invocation
 ```
 
 **The `/ship` failure is expected, not a defect.** `disable-model-invocation` is a real
-Claude Code frontmatter key that makes `/ship` explicit-only (spec C7) — upstream's
+Claude Code frontmatter key that makes `/ship` explicit-only (constraint C7) — upstream's
 validator predates it and carries a strict key allowlist that doesn't know about it. This
 divergence is accepted and permanent until upstream's validator catches up.
 
@@ -198,13 +231,38 @@ check `skill-contract.test.ts` instead.
 
 ## 6. Running evals — the one testing rule
 
-**The rule:** when you change a skill (or refresh the vendored copy), you run the whole
-test suite. There is only one way to run the tests — the full batch — and the PR
+**The rule:** when you change a skill **or its evals** (or refresh the vendored copy), you run the
+whole test suite. There is only one way to run the tests — the full batch — and the PR
 checklist shows whether you did it. No lighter per-skill variant exists in any doc or
-template. Runs are human-triggered (a person, or their session's agent) — **never CI**;
-the deterministic contract test (§3) is the only thing CI runs automatically. A
-deliberate skip is an unchecked PR-template box with a stated reason, visible to
-reviewers.
+template. Runs are human-triggered (a person, or their session's agent) — **never CI**. What CI runs
+automatically is the deterministic pair: the contract test (§3) and
+`tests/functional/skills/routing-harness.test.ts`, which unit-tests the routing harness's pure
+functions. Neither executes an eval. A deliberate skip of the batch is an unchecked PR-template
+box with a stated reason, visible to reviewers.
+
+**What "change a skill" covers** is set by the PR-template box, which is the thing reviewers
+actually read. It says, verbatim:
+
+> If this PR changes an eval-governed skill under `.claude/skills/**` (a team skill's
+> `SKILL.md`/evals, or a vendored `skill-creator` refresh), the full skill-eval batch ran
+> (`docs/strategy-skill-evals.md` §6). A deliberate skip is this box left unchecked with a
+> one-line reason.
+
+So **editing an eval counts**, not just editing a `SKILL.md`.
+
+**Not settled: what a routing-only change owes.** The batch runs `kind: execution` evals; it
+cannot exercise a routing eval at all. Nothing decides whether `run-routing-evals.mjs` discharges
+the box for a routing-only change, and nothing states a repetition count for diagnosing a flaky
+routing eval (`--reps 3` is a reporting default, not a diagnostic one). Both are open, tracked on
+**#507**. Until they land, **the maintainer decides case by case**: say in the PR which run you
+did and why, rather than inventing a rule. Background:
+[`design-skill-evals-harness.md`](design-skill-evals-harness.md) §10, "No procedure for changing a
+routing assertion".
+
+**Single-eval runs are legitimate for authoring, not for regression evidence.** Driving one eval by
+hand with [`prompts/executor-prompt.md`](../scripts/skill-evals/prompts/executor-prompt.md) while
+you iterate is expected and is what that template is for. It is never what discharges the rule
+above — only the full batch is.
 
 **The batch prompt** — [`scripts/skill-evals/prompts/batch-prompt.md`](../scripts/skill-evals/prompts/batch-prompt.md),
 committed alongside the [executor-prompt template](../scripts/skill-evals/prompts/executor-prompt.md):
@@ -276,6 +334,13 @@ node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir> --archive <eval-works
 node scripts/skill-evals/teardown-sandbox.mjs --all
 ```
 
+Short aliases exist for the three commands you run most, declared in
+[`scripts/skill-evals/package.json`](../scripts/skill-evals/package.json). They are scoped to
+that directory, so run them from there (`npm run make-sandbox -- --fixture <name>`,
+`npm run teardown -- <sandboxDir>`, `npm run selfcheck`) — or use the full `node …` form above
+from the repo root, which always works. `archive-evidence.mjs` and the routing runner have no
+alias; call them with `node`.
+
 Node ≥ 20 is the only prerequisite for the harness itself (enforced at runtime). Python 3 +
 PyYAML + a logged-in `claude` CLI are needed **only** for Layer C (§8) — never for the
 execution batch. Sandboxes are created under the OS temp dir (override with
@@ -300,6 +365,28 @@ The grader reads those **raw files** (plus the executor's transcript), never a p
 party who never watched the run. (This is a hard rule as of the Phase-3 gate-close, #511:
 that iteration archived nothing, so its CLEAN verdicts rested on self-graded orchestrator
 prose and could not be independently corroborated — the audit's F-A finding.)
+
+### Red controls — proving an assertion can actually fail
+
+A suite that has only ever passed proves nothing. Once per skill the batch demonstrates an eval
+going **red** against a deliberately mutated copy of that skill — kept in the gitignored
+workspace at `.claude/skills/<skill>-workspace/red-control-mutant/SKILL.md`, never in
+`.claude/skills/<skill>/`. `prompts/batch-prompt.md` carries the reminder; the cheapest
+generic red path is a `.skill-eval-fail-test` sentinel in the sandbox repo, which makes the
+fake `npm test` exit non-zero.
+
+The three on record:
+
+| Skill | Mutation | Eval re-run | Assertion expected to go red | Outcome |
+|---|---|---|---|---|
+| `/commit` | suspicious-file blocker narrowed to `.suspicioustestmarker` only, disabling the real `.env*` rule | `commit-2` (`feature-dirty-with-env-local`) | names `.env.local` before any staging; no `git add` stages `.env.local` | **RED.** Both failed; `git diff --cached --name-status` confirmed `.env.local` staged |
+| `/pr` | step 10 (comment-on-push when an open PR exists) replaced with an unconditional no-op | `pr-1` (`feature-open-pr-two-new-commits`) | the call log shows exactly one PR-conversation comment | **RED.** Log held three entries — `auth status`, `pr list`, `pr view` — and no `pr comment` |
+| `/ship` | step 8 merges immediately on required-green, skipping the 5-minute advisory wait and the wait/troubleshoot/abort menu | advisory-pending scenario (`feature-open-pr-advisory-pending`) | enters the wait at step 8 and waits 5 minutes | **RED on the transcript/timing leg** — the merge was attempted with zero delay. The *log-only* "no `gh pr merge`" assertion still **passed**: the Claude Code permission layer intercepted the merge above the stub, so nothing was logged — a false PASS on a knowingly broken skill. In that run the intervening layer was the session's own auto-mode permission classifier (in auto mode the `ask` rule is auto-approved); in default mode the `ask` rule prompts instead. Either way the log goes blind, which is the first-hand evidence for the merge-discrimination rule below |
+
+When you write a red control, mutate the *workspace copy* and pick an assertion that the
+mutation must break. If an assertion still passes against a mutant that genuinely broke the
+behavior, that assertion is vacuous — fix the assertion, not the drill. Full write-ups and the
+grading context: [`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) §11.
 
 ### The merge-discrimination rule (`gh pr merge`-adjacent assertions)
 
@@ -328,6 +415,12 @@ just a PATH misroute. (The permanent close would be sandbox-scoped merge instrum
 `ask` rule can't preempt; until then, the transcript is the load-bearing leg — the ship
 merge expectations spell this out inline.)
 
+**`ship-4` is the one acknowledged exception, and it is weaker on purpose.** As a routing eval it
+runs headless, where there is no transcript-side merge to read because the point is that `/ship`
+must never fire at all — so it asserts the observable instead (no `pr merge` in `gh-calls.log`,
+trusted only when the log is non-empty). That is a liveness-guarded negative, not a repeal of the
+rule above; #531 tracks whether its assumptions still hold.
+
 **Routing evals: automated by the Phase-8 session runner.** The nine `kind: routing` evals
 (listed below) aren't part of the *execution* batch — a subagent handed the skill can't
 test whether it *fires*, only what it does once invoked. They are instead run by the
@@ -335,11 +428,11 @@ test whether it *fires*, only what it does once invoked. They are instead run by
 it builds a sandbox, copies the three team skills + the real CLAUDE.md "AI Skills" section +
 `settings.json` in so a fresh `claude -p` **discovers** them naturally, drives the scenario
 (single-turn, or the multi-turn "assistant offers → bare yes" cases via a seeded prior
-assistant turn), and grades the last turn per `agents/grader.md`. Reports **trigger rates**
+assistant turn), and grades the last turn per `.claude/skills/skill-creator/agents/grader.md`. Reports **trigger rates**
 over N repetitions (N=3 default); routing is probabilistic (never a single binary verdict).
 
 ```sh
-node scripts/skill-evals/routing/run-routing-evals.mjs --reps 3          # all nine
+node scripts/skill-evals/routing/run-routing-evals.mjs --reps 3          # all eleven queries (nine evals)
 node scripts/skill-evals/routing/run-routing-evals.mjs --only commit-6,ship-4 --reps 1
 ```
 
@@ -347,7 +440,7 @@ Two **headless-observability adaptations** the runner's grader applies (a headle
 `claude -p` session has no interactive layer): (1) `AskUserQuestion` does not exist headless
 — "Step 0 fires via AskUserQuestion" is graded by its **observable proxy** (announcement +
 gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `ask` rule
-can't prompt headless (spec R8) — `ship-4` asserts the **observable** (no `pr merge` in
+can't prompt headless (risk R8) — `ship-4` asserts the **observable** (no `pr merge` in
 `gh-calls.log`, trusted only when the log is non-empty — liveness).
 
 **Two further headless limits, specific to the delegation-marker evals** (found 2026-07-20
@@ -422,7 +515,7 @@ need to invent your own test rig. Reuse this program's three pieces:
 
 1. **A fixture profile** — a named starting-state (a temp git repo pre-populated with
    whatever commits/branches/PRs your skill's evals need). Fixtures are plain data, not
-   code (spec C13) — adding a new one is usually just naming a new starting state, not
+   code (constraint C13) — adding a new one is usually just naming a new starting state, not
    touching the harness.
 2. **The logging `gh` stub** — a `PATH`-shadowing shim that answers `gh` subcommands from
    fixture JSON and logs every call. If your skill only calls `gh` subcommands the three
@@ -436,7 +529,9 @@ need to invent your own test rig. Reuse this program's three pieces:
 **Worked example:** your skill's evals need a repo with two open PRs, one with a stale
 review request. Copy an existing fixture profile close to that shape — profiles are plain
 data in [`scripts/skill-evals/lib/fixtures.mjs`](../scripts/skill-evals/lib/fixtures.mjs)
-(the [README](../scripts/skill-evals/README.md) documents the profile fields) — adjust the
+(the field-by-field table is [`design-skill-evals-harness.md`](design-skill-evals-harness.md) §4.2;
+the [README](../scripts/skill-evals/README.md) covers the case-collision rule and the
+selfcheck enforcement) — adjust the
 PR list and gh-stub response data, name it something like `two-open-prs-one-stale-review`,
 and reference it from your eval's `fixture` field. A few lines of data change; nothing about
 the harness itself does. If your skill calls a `gh` subcommand the three team skills don't,
@@ -449,13 +544,23 @@ teammate, imported from GitHub). A skill installed only at the user level, or si
 uncommitted locally, can use the stock flow and this harness freely — it's just not
 *governed* by these obligations until it's committed.
 
+**The one known exception — `/handoff`.** `.claude/skills/handoff/` is a committed team skill
+that is deliberately **not yet** under either gate: `skill-contract.test.ts` pins its skill list
+to `commit`/`pr`/`ship`, and `handoff`'s `evals/evals.json` is pre-harness (bare integer ids, no
+`kind`/`fixture`/`expectations`, its own `build_fixtures.mjs`). This is a migration pending, not
+a licence: **its evals are still never executed outside a harness sandbox** — the one rule is
+origin-agnostic and applies to it exactly as to the other three. The migration is: build the
+fixture profiles its evals describe, convert the file to the schema in §3, then decide whether
+`handoff` joins the contract test's list. Parked on #507; the skill's own `SKILL.md` carries the
+maintainer TODO.
+
 ## 8. Platform routing (Layer C)
 
 Layer C is the vendored `/skill-creator` **description-optimization loop** (`run_loop.py`,
 which imports `run_eval.py`): it tunes a skill's frontmatter `description` for triggering
 accuracy against a committed trigger-eval set. It is the one piece of vendored machinery
 that **can't run on native Windows** — `run_eval.py` calls `select.select()` on a
-subprocess pipe, which raises `OSError [WinError 10093]` on Windows (spec C2, re-verified
+subprocess pipe, which raises `OSError [WinError 10093]` on Windows (constraint C2, re-verified
 2026-07-19). Layer C never touches `gh`, so the cloud-no-`gh` gap does not apply.
 
 **Scope:** only `/commit` and `/pr` — the two natural-language-invocable skills. `/ship` is
@@ -488,7 +593,7 @@ graded results). This is a different file and shape from a skill's `evals/evals.
 | Platform | How Layer C runs |
 |---|---|
 | **macOS / Linux** | Run the documented commands **directly** (needs python3 + PyYAML + a logged-in `claude` CLI). |
-| **Cloud Claude Code session** | Linux, so the crash vanishes. The runner prompt's Step 0 is the **C5 smoke** — a 30-second nested `claude -p` check that the cloud sandbox supports it (spec C5). |
+| **Cloud Claude Code session** | Linux, so the crash vanishes. The runner prompt's Step 0 is the **C5 smoke** — a 30-second nested `claude -p` check that the cloud sandbox supports it (constraint C5). |
 | **Cowork** | Works per the vendored SKILL.md's Cowork section. |
 | **Windows** | **Never natively.** Hand the committed runner prompt to a cloud/Cowork session (or a Mac/Linux teammate) and take back the reported `best_description`. |
 
@@ -537,7 +642,7 @@ artifact for the runner to paste). It lives at
   path handling change, and for onboarding a teammate on a new OS; revisit keep/slim/retire
   after the first macOS run.
 
-## 10. Real-repo exception lane (spec C12)
+## 10. Real-repo exception lane (constraint C12)
 
 Everything above keeps eval execution inside disposable sandboxes. This is the **single
 sanctioned exception** to "never against the real repo" — plus the discipline that keeps it
@@ -561,7 +666,7 @@ substitute** for a sandbox batch run — if the batch can cover it, the batch is
 
 1. **Recorded justification.** Before running, write — on the PR or issue that motivates it —
    one or two sentences naming *why a sandbox can't answer this* and *what you'll exercise*.
-   No recorded justification, no run. (This is spec C12's guard against "occasional" drifting
+   No recorded justification, no run. (This is constraint C12's guard against "occasional" drifting
    into "whenever convenient.")
 2. **Cleanup owed, declared up front.** You own reverting every trace before you walk away.
    Paste the cleanup checklist (below) into the same PR/issue *before* you start, and tick it
@@ -598,7 +703,7 @@ an un-cleaned smoke is a loose end someone must close, not something to leave si
 ## 11. Maintenance rules
 
 - **Edit skills in place; never delete-and-recreate.** Under the per-skill eval layout, a
-  folder delete-and-recreate loses that skill's evals (spec II.5, risk R2). Git recovers
+  folder delete-and-recreate loses that skill's evals (risk R2). Git recovers
   either way, but editing in place avoids the churn.
 - **The vendored `.claude/skills/skill-creator/` directory is 100% stock.** Never
   hand-edit it. Refresh via the monthly drift workflow (`node
@@ -607,7 +712,14 @@ an un-cleaned smoke is a loose end someone must close, not something to leave si
   `.claude/skills/<name>-workspace/` (upstream's own default location) and are covered by
   the repo's `.gitignore`. Nothing about a normal eval run should ever show up in `git
   status`.
-- **Where decisions live vs. where state lives:** design decisions and their rationale are
-  the spec's Part IV ledger (`docs/spec-skill-evals-baseline.md`); the *current state* of
-  the build-out program (which phase is active, what's blocked) lives on the parent
-  GitHub tracking issue, not in any committed file.
+- **An eval looks flaky?** Follow
+  [`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) §6, "Assertion-design
+  rules": presume the test before the skill, sort the variance by locus (grader / headless
+  environment / harness / tested agent), and stop after the third round or the first fix that
+  does not move the rate. The measured per-query counts you are comparing against are in that
+  doc's §11, which is where a new measurement gets recorded. What a routing-only change owes, and
+  how many repetitions settle it, are not decided — see §6 above.
+- **Where decisions live vs. where state lives:** design decisions and their rationale are the
+  ledger in [`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) §9 — add
+  there, not as a dated aside in this doc. Live state (what is open, what is blocked) lives on
+  the tracking issue **#507**, not in any committed file.
