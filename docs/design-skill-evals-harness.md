@@ -1,16 +1,78 @@
 # Design — Skill-evals harness
 
-Status: as-built 2026-09-18, against `scripts/skill-evals/` at commit `7b8f157` (PR #530). Baseline done except two items (§10). Author: Blake, with Claude; the 2026-09-18 scope decisions behind this doc are recorded as comments on #507. Tracks #507. Supersedes `docs/old-archive/spec-skill-evals-baseline.md`.
+Status: as-built 2026-09-18, against `scripts/skill-evals/` at commit `7b8f157`. Tracks issue #507.
+Supersedes `docs/old-archive/spec-skill-evals-baseline.md`.
 
-This is a design doc — the concrete decisions, module map, and rationale for one thing: the
-machinery that lets this repo test its Claude Code skills without touching the real repo or real
-GitHub. It sits below `strategy-skill-evals.md` (which tells you how to *run* it) and above the
-code.
+**Read this if you need to understand, fix or extend the machinery that tests this repo's Claude
+Code skills (`/commit`, `/pr`, `/ship`): how it is built, why it is built that way, and what is
+known to be missing.** This is **not** the front door to the skills work as a whole. If you are
+new, start at the "Which doc do I want?" table at the top of
+[`strategy-skill-evals.md`](strategy-skill-evals.md). If you only need to *run* evals, read that
+runbook instead.
+
+After reading this you should be able to find the module that owns any harness behavior, explain
+why an eval run cannot reach real GitHub, and tell whether a given piece of work is settled, open,
+or deliberately not built.
+
+*As-built* means this doc describes the harness that exists, not the harness that was planned; the
+plan is the archived predecessor named above. It sits below `strategy-skill-evals.md` (which tells
+you how to *run* the harness) and above the code. The program that built it is finished except for
+two items, both listed in §10. The 2026-09-18 scope decisions behind this rewrite are recorded as
+comments on issue #507. Blake is the repo's maintainer and the author of the three skills; until
+this program he was the only person who could verify a skill change.
 
 ## 0. How to read this
 
-Primary reader: an AI agent picking up harness work cold. A human can skim §1, §2, §4's two flow
-diagrams, §10 and §11 and stop.
+Primary reader: an AI agent picking up harness work cold. A human who just needs the shape can read
+§1, §2, §5 and §6 and stop — §5 is what lets you trust running an eval at all, and §6 is the
+judgment you need to review someone's eval change. §4's two flow diagrams show the machinery; §10
+and §11 are for auditing state and evidence. (The runbook carries no rationale, so §5 and §6 are the
+only account of *why* anywhere.)
+
+### What is in each section
+
+| § | Answers |
+|---|---|
+| 1 | Why this exists, and what "done" was supposed to mean |
+| 2 | How it got here — four stages of work, and the one inherited fact that shaped everything |
+| 3 | The organizing rule, and the fourteen constraints the design had to work around |
+| 4 | What the code is: every file, what calls it, and the two end-to-end flows |
+| 5 | What keeps an eval run away from the real repo — and what does not |
+| 6 | Why it is shaped this way, including the rules for writing an assertion worth keeping |
+| 7 | Three worked scenarios: new skill, changed skill, a teammate arriving cold |
+| 8 | The one thing designed but deliberately not built |
+| 9 | The decision ledger and the live risk register |
+| 10 | What is broken, thin or unfinished — and what to update here when each lands |
+| 11 | The measured evidence, re-derived from the raw run artifacts |
+| 12 | How to decode an id you found in an old comment |
+
+### Notation
+
+**`§`** means "section". **`§4`** is section 4 of *this* document. **`strategy §6`** or
+**`strategy-skill-evals.md` §6** is section 6 of that document; where a cross-document reference
+matters, the section's title is given too, because these links land at the top of the file and you
+would otherwise hunt.
+
+The doc uses several id schemes. This is the key; §12 resolves each one in full.
+
+| Scheme | What it numbers | Defined in |
+|---|---|---|
+| `C1`–`C14` | **Constraints** — facts the design had to work around | §3 |
+| `R1`–`R8` | **Risks**, each with its status today | §9 |
+| `DP1`–`DP4` | **Design points** — the program's numbered architecture decisions | §9 |
+| `E1`–`E4` | **Escalations** — the four questions the 2026-07-19 peer review put to the maintainer | §9 |
+| `F-A`, `F-B` | **Findings** from the audit at the end of Phase 3 | §12 |
+| `II.2c`, `IV.1`, … | Section numbers of the **archived predecessor spec**, still cited in code comments | §12 |
+| "ruling N" | A numbered **maintainer decision** from a review session, cited in code comments | §12 |
+| Phase 0–8 | The nine **stages of the program** that built this, tracked as issues #508–#516 | §12 |
+| `G1` / `G2` | Two generations of the **routing grader** (§11's counts table) | §11, §12 |
+| `A1`–`A4` | This doc's shorthand for an eval's **expectations in file order today** — a display convention, not ids | §10, §12 |
+| `commit-5a`, `pr-7`, `ship-2a` | **Eval ids**: skill name + number; a letter suffix marks a sub-scenario of one original eval | the roster in §4 |
+| `#nnn` | A **GitHub issue or PR** in this repo | §12 |
+| `7b8f157` | A **git commit** in this repo, cited to pin a claim to a point in history | — |
+
+**Bold ids in tables** mark the ones cited by bare number somewhere outside this doc — in code
+comments, tests, or a sibling doc. Unbolded ids are referenced only from inside this document.
 
 ### Task → where to go
 
@@ -25,20 +87,21 @@ diagrams, §10 and §11 and stop.
 | A routing eval is flaky | §6's assertion-design rules here — "sort variance by locus" and the #527/#528 worked example — then §11 for the measured counts, and §10's "No procedure for changing a routing assertion" for what is *not* decided yet |
 | The `gh` stub rejected a command | §4.3's subcommand table here (default-deny is deliberate), then [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md)'s gh-stub surface table |
 | Is this eval able to fail at all? | §11's red controls, then §6's assertion-design rules |
+| Find out what the evals actually test | the **eval roster** at the head of §4 — all 25, one line each |
 | Find out what is known-broken or unfinished | §10 here |
 | Find a number (pass rates, run counts) | §11 here |
-| Decode an id you found in a comment (`C8`, `R4`, `DP1`, `E1`, `II.2e`, `F-B`, `ruling 3`) | §12 here |
+| Decode an id you found in a comment | the **Notation** key above, then §12 for the full resolution |
 | Change a skill's *behavior* | [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) §4 |
 
 ### The siblings, one line each
 
 | Doc | Owns |
 |---|---|
-| [`strategy-skill-evals.md`](strategy-skill-evals.md) | The operational runbook: the one rule, the eval schema, the exact run commands, the merge-discrimination rule, the manual routing runbook, maintenance rules. Highest fan-in of the family. |
+| [`strategy-skill-evals.md`](strategy-skill-evals.md) | The operational runbook: what it calls "the one rule" (the safety rule), the eval schema, the exact run commands, the merge-discrimination rule, the manual routing runbook, maintenance rules. Highest fan-in of the family. |
 | [`spec-skill-evals-manifest.md`](spec-skill-evals-manifest.md) | The pinned, id-by-id mapping from the 23 original acceptance evals to today's 25 entries. Enforced by the contract test. |
 | [`doc-skill-creator.md`](doc-skill-creator.md) | Operating the vendored `/skill-creator` copy: the pin, the refresh command, the Python prerequisite, the `quick_validate.py` divergence. |
 | [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) | What `/commit`, `/pr`, `/ship` each *do*, step by step. The behavior the evals test. |
-| [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md) | The natural-language invocation mechanism: Step 0, the delegation marker and its 30s lease, the announcement contract. |
+| [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md) | The natural-language invocation mechanism: Step 0, the delegation hand-off file and its 30s lease, the announcement contract. |
 | [`plan-skill-creator-vendoring.md`](plan-skill-creator-vendoring.md) | Why the skill-creator copy is vendored rather than submoduled, and the PR sequence that delivered it. |
 | [`strategy-security.md`](strategy-security.md) | The checked-in `ask` rule on `gh pr merge` — its precedence and its stated limits. |
 | [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md) | Harness CLI surface, sandbox directory layout, the gh-stub surface table, the selfcheck item list. |
@@ -47,38 +110,148 @@ diagrams, §10 and §11 and stop.
 
 ### Terminology — one term per concept, held throughout
 
+**Skip this on a first read; come back when a word bites.** It is an index, not a chapter.
+
+Three groups: the words Claude Code brings with it, the words this harness invented, and four words
+that used to mean more than one thing.
+
+#### Claude Code vocabulary — inherited, and what the harness tests
+
+You need these to follow §2, §5 and §6. Each is sourced from a file in this repo; follow the named
+file for the full rules.
+
+- **Skill / `SKILL.md`** — a folder under `.claude/skills/` holding a procedure Claude Code can
+  follow. `SKILL.md` is its instructions, opening with a frontmatter block that declares its `name`
+  and `description`. The three under test here are `/commit`, `/pr` and `/ship`
+  ([`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) §3).
+- **Slash vs natural-language (NL) invocation** — a skill fires either because a human typed
+  `/commit`, or because the model recognised the intent in ordinary words ("commit this"). A typed
+  slash is expanded by the CLI's own parser and injected directly; an NL invocation goes through the
+  `Skill` tool. That difference is the whole of `commit-5a` (§6).
+- **`disable-model-invocation`** — the frontmatter key that makes a skill **explicit-only**: it can
+  be typed but never fired by the model. `/ship` carries it; `/commit` and `/pr` do not. The
+  contract test pins exactly that (§4.8).
+- **Step 0** — the intent-confirmation step `/commit` and `/pr` run when they were invoked by
+  natural language rather than by a typed slash. It asks, in `/commit`'s own words, "Run `/commit`
+  with: *[detected context]*?" before touching git. Three things skip it: a typed slash, a fresh
+  delegation hand-off file, and the opt-out file `.claude/skip-nl-confirm-commit-pr.local`
+  (`.claude/skills/commit/SKILL.md` Step 0).
+- **The announcement** — the line a skill prints as it routes, `Using /commit` or `Using /pr`, so
+  the human can see which skill fired. The opt-out file suppresses the Step-0 *confirmation* but
+  never the announcement; only delegation does (CLAUDE.md, "AI Skills").
+- **Affirmation** — the human saying "yes" or "go ahead" to the assistant's *own* offer to commit or
+  open a PR. That counts as invoking the skill. A "yes" to an unrelated offer does not — which is
+  what the over-trigger controls check (CLAUDE.md, "AI Skills").
+- **Delegation, and the delegation hand-off file** — `/ship` calls `/pr`, which calls `/commit`.
+  Before each hop the parent writes `.claude/.nl-delegation-active` containing the parent's name and
+  a timestamp, so the child knows it was delegated to rather than invoked directly and does not
+  re-prompt. The child honours it only if it is **less than 30 seconds old** — that is the "30s
+  lease" — and deletes it on read. The parent prints the hop, `Using /commit — delegated from /pr`,
+  and the child suppresses its own announcement (`.claude/skills/ship/SKILL.md` step 3).
+- **Permission rule (`allow` / `ask` / `deny`)** — an entry in `.claude/settings.json` classifying a
+  command pattern. Precedence is **deny → ask → allow, first match**, evaluated by Claude Code
+  *before* the command runs — so above anything a sandbox controls. This repo checks in one `ask`
+  rule, on `Bash(gh pr merge *)` and the PowerShell equivalent
+  ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
+- **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
+  how an `ask` behaves. A checked-in `ask` cannot be weakened by a local `allow` or by
+  `bypassPermissions`, but **`auto` mode auto-approves it**, and a prior "Yes, don't ask again"
+  silences it for the rest of the session (`.claude/skills/ship/SKILL.md` step 11). §5 depends on
+  this.
+- **Untrusted workspace** — a directory in which Claude Code silently ignores local
+  `permissions.allow` entries. Every sandbox is one; that is issue #531 (§5, §10).
+- **Hook / `PreToolUse`** — a program Claude Code runs before a matching tool call, whose exit code
+  can veto it: exit 0 allows, exit 2 blocks and feeds stderr back to the model. The harness has
+  none; §8 is the design for one that was deliberately not built.
+- **`claude -p` / headless** — running Claude Code non-interactively: a prompt in, a transcript out,
+  nobody at the keyboard. This doc calls that *headless*. The consequence is that such a session can
+  never be asked a question, which is why evals use scripted answers and why the routing grader
+  needs the adaptations in §4.6.
+- **`AskUserQuestion`** — the tool a skill uses to put a question to the human. It does not exist
+  for subagents or headless sessions (constraint C6), so a Step-0 gate is graded by an observable
+  proxy instead of a literal tool call.
+- **Subagent** — a separate Claude session an orchestrating session launches for a scoped task. Here
+  it is what runs one execution eval, and what grades it.
+- **Cowork** — Anthropic's Claude Cowork, a separate Claude environment from Claude Code. It matters
+  in this doc for one reason only: it is one of the two places a teammate on Windows can run Layer C,
+  which crashes on native Windows (constraint C4, decision DP3). Upstream's `/skill-creator`
+  `SKILL.md` carries a "Cowork-Specific Instructions" section and states the Layer-C scripts work
+  there because they drive `claude -p` as a subprocess rather than a browser.
+- **Advisory check** — a CI check that runs and is reported but is not required to pass. `/ship`
+  waits on visible advisory checks as well as the required one; `ship-2a` exists to test what it
+  does while one is still pending (`.claude/skills/ship/SKILL.md` step 8).
+- **Must / Should / Could** — priority labels (the "MoSCoW" scheme) the program put on requirements
+  and that this doc uses for assertions. A failing **Must** blocks; a **Should** is tracked but does
+  not. Layer C is a *Should*, which is why §10's second open item does not block on its own.
+
+#### This harness's own vocabulary
+
 - **Harness** — everything under `scripts/skill-evals/`. Our code. Never the vendored skill-creator.
-- **Vendored machinery** — `.claude/skills/skill-creator/`, pinned verbatim upstream.
+- **Vendored machinery** — `.claude/skills/skill-creator/`, pinned verbatim upstream. Script paths
+  written bare — `scripts/quick_validate.py`, `agents/grader.md`, `eval-viewer/generate_review.py` —
+  are relative to that directory. Every other path in this doc is relative to the repo root.
 - **Sandbox** — one disposable directory tree built by `buildSandbox()`, containing a throwaway git
-  repo, a local bare origin, the stub `gh`, and the marker. Torn down after every run.
+  repo, a local bare origin, the stub `gh`, and the sandbox marker. Torn down after every run.
 - **Workspace** — `.claude/skills/<skill>-workspace/`, the *vendored* machinery's own output tree
   (`iteration-N/eval-X/` holding `eval_metadata.json`, `grading.json` and the rest — see §2's
   enabling insight). Gitignored, and it persists across runs. Not a sandbox: a sandbox is
   disposable git and `gh` state, a workspace is the durable-on-disk evidence a run leaves behind.
-- **Marker** — the file `.skill-eval-sandbox`. Written at both the sandbox root and `repo/`.
+- **Sandbox marker** — the file `.skill-eval-sandbox`. Written at both the sandbox root and `repo/`.
+  Nothing in the harness will act on a directory that lacks it. Not the delegation hand-off file
+  above — different file, different job.
 - **Fixture / fixture profile** — a named starting-state entry in `lib/fixtures.mjs`. Plain data.
 - **Execution eval** — `kind: execution`. The prompt makes the skill do its work. Runs in a sandbox.
 - **Routing eval** — `kind: routing`. Tests *whether or how* the skill fires. Runs through the
   routing runner.
-- **Query** — one entry in `ROUTING_QUERIES`. Eleven queries cover nine routing evals, because
-  `commit-5` fans out to three.
+- **Trigger eval** — a *different* thing, in a different file. `trigger-evals.json` holds short
+  query/`should_trigger` pairs in the vendored machinery's own format; they are the training and
+  test data for the Layer-C description-optimization loop. They are never run by the routing runner
+  and never run together with routing evals (`strategy-skill-evals.md` §8).
+- **Query** — one entry in `ROUTING_QUERIES`. Eleven queries cover nine routing evals: eight
+  one-to-one, plus `commit-5`'s three.
+- **Seed / seeded turns / turn** — a short fabricated conversation, written to `input.jsonl` and fed
+  to a fresh headless session as if it had really happened. A **turn** is one message in it; some
+  turns are attributed to the assistant. The session's *next* turn is the one graded. §11's "Seed"
+  column counts turns.
+- **Polarity** — what a correct run looks like for a routing query: **should-fire**,
+  **should-NOT-fire** (an over-trigger control the skill must stay out of), or
+  **should-fire-inline** (the skill runs, but because the human typed the slash the CLI expands it
+  directly, so a correct run makes *no* `Skill` tool call).
 - **Expectation / assertion** — one entry in an eval's `expectations` array. The schema field is
-  `expectations`; this doc and its siblings call one entry an "assertion" (or a "Must-level
-  assertion") in prose. Same thing.
-- **Batch** — one full run of every execution eval across all three skills, driven by
-  `prompts/batch-prompt.md`; this is the unit the one testing rule operates on. The routing runner's
-  own unit — all eleven queries × N repetitions — is also called a batch where the context is
-  routing (§11).
-- **Red control** — a deliberately mutated copy of a skill's `SKILL.md`, kept in a gitignored
-  workspace and run through an eval to prove that eval's assertions can actually go red. Never
-  applied to the real skill files. The three on record are in §11.
+  `expectations`; this doc and its siblings call one entry an "assertion" in prose. Same thing.
+- **`human_script`** — the pre-written replies an eval gives at the skill's human-approval
+  checkpoints, since no human is present. Valid **only** inside a marker-bearing sandbox.
+- **Arm** — one side of a comparison run. `with_skill` is the eval run against the current skill;
+  `old_skill` is the same eval against the previous version, for comparison.
+- **Layer A / B / C** — the three ways a skill is tested: **A** structural (is it well-formed?),
+  **B** behavior (does it do the right things?), **C** triggering (does the right wording fire it?).
+  Defined with their machinery in §2.
+- **Red control** — a deliberately broken copy of a skill, used to prove an eval can actually FAIL.
+  The mutated `SKILL.md` lives in a gitignored workspace and is never applied to the real skill
+  files; the eval is re-run against it and the designated assertion must go red. The three on record
+  are in §11.
 - **Evidence triad** — transcript, `gh` call log, sandbox git state. `observables.json` is not a
   fourth leg: it corroborates the grader, it is not evidence in its own right (§6).
 - **Observables** — the script-computed facts in `observables.json`. They corroborate the grader;
   they never replace it.
 - **Trigger rate** — the fraction of repetitions in which a routing eval's skill fired.
-- **The one rule** — skill-eval prompts are never executed against the real repo or real GitHub,
-  any skill, any origin.
+
+#### Four words that used to mean more than one thing
+
+- **"Baseline"** had four senses. This doc keeps them apart: **the baseline program** (always both
+  words — the nine-phase program, #507, that built the harness); **the seed commit** (a sandbox's
+  first commit on `main`); **the control arm** or **old-skill arm** (the comparison run against the
+  previous version of a skill — upstream calls this the baseline arm); and **baseline completion**
+  (the bar the program had to clear, §10).
+- **"Marker"** was two files. The **sandbox marker** gates every harness operation; the **delegation
+  hand-off file** tells one skill it was called by another. Both are defined above.
+- **"The one rule"** was two rules. **The safety rule**: eval prompts are never executed against the
+  real repo or real GitHub, any skill, any origin. **The full-batch rule**: when you change a skill
+  or its evals, you run the whole execution batch, not just the part you touched
+  (`strategy-skill-evals.md` §6).
+- **"Batch"** was two units. The **execution batch** is one full run of every execution eval across
+  all three skills, driven by `prompts/batch-prompt.md`. A **routing batch** is one full run of the
+  eleven routing queries × N repetitions, driven by the routing runner. §11 counts routing batches.
 
 ### The tense rule
 
@@ -110,17 +283,20 @@ learns a second system and never performs an opt-in step to get safety.
 
 ### Success criteria
 
-Carried forward from the baseline program and still the bar:
+Carried forward from the baseline program that built this (§2, stage 4) and still the bar:
 
 - A non-Blake operator can test a skill change in a small fraction of a session's time and tokens.
 - A dev or agent can build, or fully re-eval, a skill end to end through `/skill-creator`'s stock
-  flow with no help — the golden-path walkthrough. **Passed 9/9** in Phase 5, run by a non-author
-  operator; recorded on #507's body checklist, evidence on #513.
-- Structural validation (Layer A) recorded for the four skills in the contract and vendored sets —
-  `/commit`, `/pr`, `/ship`, `/skill-creator`. (Unrelated to `/handoff`, which §10 calls a fourth
-  *team* skill.)
-- Every execution eval runnable end to end in a sandbox, graded by the native grader, aggregated
-  by `aggregate_benchmark.py`, reviewed through `eval-viewer/generate_review.py`.
+  flow with no help — the golden-path walkthrough. It passed all nine of its steps, run by someone
+  other than the author, in Phase 5 (the fifth of the program's nine stages — §12); recorded on
+  issue #507's body checklist, evidence on issue #513.
+- Structural validation (Layer A — the three test layers are defined in §2) recorded for the four
+  skills in the contract and vendored sets — `/commit`, `/pr`, `/ship`, `/skill-creator`.
+  (Unrelated to `/handoff`, which §10 calls a fourth *team* skill.)
+- Every execution eval runnable end to end in a sandbox, graded by the native grader, aggregated by
+  `aggregate_benchmark.py` (which rolls per-run grades into one `benchmark.json`), reviewed through
+  `eval-viewer/generate_review.py` (which serves a browser page over that). Both are vendored, so
+  both paths are relative to `.claude/skills/skill-creator/`.
 - The contract test green in CI and in `/commit`'s local `npm test` gate.
 - Trigger-eval sets exist for `/commit` and `/pr`, and the description-optimization loop has run
   at least once per skill with before/after train/test scores reviewed.
@@ -138,47 +314,66 @@ model named to code, the reasoning behind the shape, the scenarios, the decision
 known gaps, the evidence on disk.
 
 **Is not:** a runbook. It contains no operational run commands and no schema table — those live in
-`strategy-skill-evals.md`, which is current and has the highest fan-in in the family; duplicating
-it is precisely what made the predecessor spec unreadable and, in three places, wrong. The one
-exception is §11, which carries a read-only script that reproduces its own evidence table.
+`strategy-skill-evals.md`, the doc most other docs point at; duplicating a runbook inside a design
+doc is how the archived predecessor drifted out of date. The one exception is §11, which carries a
+read-only script that reproduces its own evidence table.
 
 ## 2. Context
 
-Four arcs stack, each solving a problem the previous one created. Full chronology and issue
-numbers are in [`devjournal.md`](devjournal.md).
+### How we got here — four stages of work
 
-**Arc 1 — the three skills (#133 / #62, May 2026).** The team's check-in conventions lived in
-people's prompting habits. `spec-portable-ai-procedures.md` encoded them as three skills and fixed
-their step lists. This arc created the dependency everything later inherits: **the skills mutate
-real git and real GitHub.**
+This section is historical context, and it is worth the four paragraphs: each stage solved a problem
+the previous one created, and the harness only makes sense in that light. Full chronology and issue
+numbers are in [`devjournal.md`](devjournal.md). Where two numbers appear below, the first is the
+issue and the second the pull request most associated with it.
 
-**Arc 2 — natural-language invocation (#353 / #484, June–July).** All three skills started
-explicit-only, so humans had to remember to type the slash command. `plan-skill-nl-invocation.md`
-designed the two-tier answer: `/commit` and `/pr` became NL-invocable behind a Step-0 intent gate;
-`/ship` stayed explicit-only, backstopped by a checked-in `ask` permission rule on `gh pr merge`
-in `.claude/settings.json`. PR #484 added the announcement and affirmation routing.
+**Stage 1 — the three skills (issue #62; the spec landed as PR #133; May 2026).** The team's
+check-in conventions lived in people's prompting habits. PR #133 landed
+`spec-portable-ai-procedures.md`, which encoded them as three skills and fixed their step lists;
+PR #283 landed the implementation plan; and the skills themselves arrived in commit `e61ddbe` on
+2026-05-27. This stage created the dependency everything later inherits: **the skills mutate real
+git and real GitHub.**
+
+**Stage 2 — natural-language invocation (issue #353, with follow-on PR #484; June–July).** All
+three skills started explicit-only, so humans had to remember to type the slash command.
+`plan-skill-nl-invocation.md` designed the two-tier answer: `/commit` and `/pr` became
+NL-invocable behind a Step-0 intent gate; `/ship` stayed explicit-only, backstopped by a checked-in
+`ask` permission rule on `gh pr merge` in `.claude/settings.json`. PR #484 added the announcement
+and affirmation routing.
+
+> **What the routing evals are testing, in plain words.** A human can invoke `/commit` and `/pr` by
+> typing the slash command *or* by just asking ("commit this"). On the natural-language path the
+> skill first confirms intent — that confirmation is **Step 0** — and prints a line **announcing**
+> which skill fired (`Using /commit`), so the human can see it. A human saying "yes" to the
+> assistant's own offer to commit is an **affirmation**, and counts as invoking it too. Three
+> situations skip the Step-0 confirmation: a typed slash, a fresh delegation hand-off file, and an
+> opt-out file. `/ship` is excluded from all of this deliberately — it fires only on an explicit
+> `/ship`. Nine of the twenty-five evals test exactly these behaviors. Full design:
+> [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md).
 
 **That `ask` rule matters to everything after it.** It fires at the Claude Code permission layer —
 *above* the sandbox, *before* the stub `gh` ever runs. So in an eval session a `gh pr merge` is
 frequently intercepted and never logged. A `/ship` that wrongly merges leaves the same empty call
 log as a correct abort. Every merge-adjacent grading decision in this system is shaped by that one
 fact; it is why §5's trust boundary has a layer above the stub, why §6 says observables corroborate
-rather than decide, and why risk R8's original mitigation is wrong (§9's risk register). Its security rationale and
+rather than decide, and why the original plan for risk **R8** — the one about grading merges from
+the call log — turned out to be wrong (§9's risk register). Its security rationale and
 its own stated limits live in [`strategy-security.md`](strategy-security.md).
 
-**Arc 3 — vendored skill-creator (#396, June–July).** Skills were built with `/skill-creator`,
-which nobody had on clone. `plan-skill-creator-vendoring.md` vendored it, added the contract test
-and a monthly drift workflow — and noticed that the committed evals were inert.
+**Stage 3 — vendored skill-creator (issue #396; June–July).** Skills were built with
+`/skill-creator`, which nobody had on clone. `plan-skill-creator-vendoring.md` vendored it, added
+the contract test and a monthly drift workflow — and noticed that the committed evals were inert.
 
-**Arc 4 — the skill-evals baseline program (#507, July onward).** That inertness became this
-program. It ran in nine phases; `strategy-skill-evals.md` grew alongside the build. PR #530
-(`7b8f157`, 2026-09-16) closed #527 and #528, hardened the routing runner and corrected its
-5a/5b grading.
+**Stage 4 — the skill-evals baseline program (issue #507, July onward).** That inertness became
+this program. It ran in nine phases (§12); `strategy-skill-evals.md` grew alongside the build.
+PR #530 (`7b8f157`, 2026-09-16) closed issues #527 and #528, hardened the routing runner and
+corrected the grading of the `commit-5a` and `commit-5b` routing queries.
 
 ### The three test layers
 
 The vendored machinery tests a skill in three layers. In every one, the pattern is the same: **the
-vendored machinery does the work; our additions supply what it needs.**
+vendored machinery does the work; our additions supply what it needs.** Paths in the *Vendored
+machinery* column are relative to `.claude/skills/skill-creator/`.
 
 | Layer | Question | Vendored machinery | What the harness adds |
 |---|---|---|---|
@@ -207,7 +402,13 @@ without any compromise.
 
 ## 3. The organizing rule and the constraints
 
+**This section answers: which things you can do to a skill are dangerous, and what facts the design
+had to work around?**
+
 ### Separate the verbs
+
+**What the diagram shows:** of all the things you can do to a skill, only one — running its evals —
+is dangerous. Everything else is ordinary file editing.
 
 ```mermaid
 flowchart LR
@@ -231,23 +432,95 @@ row says whether it **holds** as written or has **changed**.
 | **C1** | The vendored `.claude/skills/skill-creator/` directory stays verbatim upstream; only `UPSTREAM.md` is local. The refresh script clobbers anything else placed there — which is why `evals/skill-creator.evals.json` stays at the repo root. | **Holds.** `skill-contract.test.ts` asserts the root file's `skill_path` resolves and that each entry carries ≥3 evals. |
 | **C2** | `run_eval.py` calls `select.select()` on a subprocess pipe — Unix-only; it raises `OSError [WinError 10093]` on native Windows, and `run_loop.py` imports it, so all of Layer C is Unix-only. | **Holds.** The routing runner sidesteps it entirely: `runExecutor()` and `runGrader()` in `routing/lib/driver.mjs` consume child stdout through Node stream events, never a `select()` equivalent. |
 | C3 | Layer C scripts are needed only for description optimization; Layers A and B are plain file processing and run fine on native Windows. | Holds. |
-| C4 | Cowork can run the Layer C scripts. | Holds, still per upstream's own Cowork section — not independently verified. |
-| C5 | Cloud Claude Code sessions are Linux; nested `claude -p` inside a cloud sandbox needs a one-time smoke test. | **Unverified in a genuine cloud session.** Nested `claude -p` is confirmed working on the native Windows host, which is not the case C5 is about. Tracked on #512. |
+| C4 | Cowork — the other environment upstream's skill-creator supports (§0) — can run the Layer C scripts. | Holds, still per upstream's own Cowork section — not independently verified. |
+| C5 | Cloud Claude Code sessions are Linux; a nested `claude -p` (Claude Code driven non-interactively from inside another session — §0) in a cloud sandbox needs a one-time smoke test. | **Unverified in a genuine cloud session.** Nested `claude -p` is confirmed working on the native Windows host, which is not the case C5 is about. Tracked on #512. |
 | C6 | The skills are interactive; subagents cannot use `AskUserQuestion`, so eval runs use scripted human replies, valid only inside a marker-bearing sandbox. | **Holds, and extended.** Headless `claude -p` has no `AskUserQuestion` either, so the routing grader grades an observable proxy — `runGrader()` in `routing/lib/driver.mjs` injects that adaptation into every grader prompt. |
 | **C7** | Upstream `quick_validate.py` rejects `/ship`'s `disable-model-invocation` key. Accepted divergence; the repo's gate is the Vitest contract test. | **Holds.** |
-| **C8** | The agent-guidance layers (CLAUDE.md, eval-file notices, the marker rule) are prompt-level, not hard enforcement. The skills' human-approval checkpoints are also prompt-level in the eval context, since an agent holding a `human_script` can satisfy a checkpoint from the script instead of stalling. The only gate that fires regardless is the checked-in `ask` rule on `gh pr merge` — and it guards merges, not pushes or PR creation. | **Holds.** See §5 for what is structural and what is not. |
+| **C8** | The agent-guidance layers (CLAUDE.md, eval-file notices, the sandbox-marker rule) are prompt-level, not hard enforcement. The skills' human-approval checkpoints are also prompt-level in the eval context, since an agent holding a `human_script` can satisfy a checkpoint from the script instead of stalling. The only gate that fires regardless is the checked-in `ask` rule on `gh pr merge` — and it guards merges, not pushes or PR creation. | **Holds.** See §5 for what is structural and what is not. |
 | C9 | `spec-portable-ai-procedures.md` §3 needs a clarification that `evals/` is upstream skill anatomy, not an auxiliary doc. | **Delivered.** That §3 now says so explicitly and links the strategy doc. |
 | C10 | Python 3 + PyYAML is an authoring-time prerequisite; nothing in CI or the app runs the Python. | Holds. |
-| **C11** | The advisory-pending ship eval takes ≥5 real minutes by design; it stays in the single batch, scheduled in the first parallel wave so its wait overlaps the others. | **Changed in naming only.** The eval is `ship-2a` (~10 minutes: wait, `wait+5`, wait, abort); `ship-2c` was removed in the Phase-7 right-sizing. The scheduling rule is unchanged and is stated in `prompts/batch-prompt.md`. |
+| **C11** | The `/ship` eval that exercises a *pending advisory check* — a CI check that is reported but not required to pass — takes ≥5 real minutes by design; it stays in the single execution batch, scheduled in the first parallel wave so its wait overlaps the others. | **Changed in naming only.** The eval is `ship-2a`; the scripted human answers it runs through are *wait*, *wait 5 more minutes* (`wait+5` is the literal menu choice `/ship` offers), *wait*, *abort* — about 10 minutes in all. `ship-2c` was removed in the Phase-7 right-sizing pass (§9). The scheduling rule is unchanged and is stated in `prompts/batch-prompt.md`. |
 | **C12** | Real-repo testing is exception-only and gated: automated runs never touch the real repo, full stop; the sole allowed touch is an occasional human-run, AI-guided end-to-end smoke, gated by a recorded justification and a cleanup-owed runbook. | **Holds.** The runbook is `strategy-skill-evals.md` §10. |
 | **C13** | Dead simple beats clever — usable and maintainable by 4–5 volunteer engineers at varying experience levels. The recorded tie-breaker: fixtures as data not a DSL; the stub as a lookup not a simulator; the tracker as an issue not a board; harness scripts in Node, not shell. | **Holds, and visible in the code.** `scripts/skill-evals/package.json` declares zero runtime dependencies; `lib/fixtures.mjs` is a plain object literal; only the three `gh` wrappers are shell. |
 | **C14** | One cohesive testing story: the existing Vitest contract gate keeps working; the harness may enhance it but never interfere. The SKILL.md-structural assertions pass unchanged; the eval-artifact assertions were rewritten for the per-skill layout, and root `evals/evals.json` was deleted. | **Holds, and grew.** CI now runs two skill test files: `skill-contract.test.ts` and `routing-harness.test.ts`. Both sit in the same `functional-skills` Vitest project inside the required `Lint & Functional Tests` check — no new workflow, no new config. |
 
 ## 4. Module map and data flow
 
+**This section answers: what are the evals, what code runs them, and what happens end to end?**
+
 Everything the harness owns lives under `scripts/skill-evals/`. Node core only; zero runtime
 dependencies; `package.json` pins `engines.node >= 20`, and `assertNodeEngine()` in `lib/engine.mjs`
 re-checks it at runtime so a too-old Node fails with a sentence instead of an obscure API error.
+
+### The eval roster
+
+Twenty-five evals: sixteen `kind: execution` and nine `kind: routing`. The rest of this doc argues
+about them by id, so here they are.
+
+**Id scheme:** `<skill>-<n>` — the skill's name, then a number, scoped per skill. A letter suffix
+(`commit-3a`, `ship-2a`) marks one sub-scenario of a single original eval that was split. Routing
+*queries* may add a word (`commit-5a-slash`); those are §4.4's, not eval ids.
+
+The first four columns are generated; the last is written by hand from each eval's own
+`eval_name`.
+
+| Id | Kind | Skill | Fixture | What it proves |
+|---|---|---|---|---|
+| `commit-1` | execution | commit | `feature-dirty-clean-payload` | Happy path: a dirty feature branch commits with a Conventional Commit subject |
+| `commit-2` | execution | commit | `feature-dirty-with-env-local` | It refuses to stage a suspicious file (`.env.local`) that is sitting in the payload |
+| `commit-3a` | execution | commit | `feature-schema-expand-only` | An expand-only schema change surfaces the post-PR deploy-dispatch note |
+| `commit-3b` | execution | commit | `feature-schema-expand-plus-contract` | A combined expand-and-contract schema change is refused outright |
+| `commit-4` | routing | commit | — | Natural-language commit intent routes through the Skill tool, with Step 0 |
+| `commit-5` | routing | commit | — | Step 0 is skipped on exactly three paths: typed slash, delegation, opt-out file |
+| `commit-6` | routing | commit | — | The assistant offers, the human says "yes": that affirmation routes through the skill and announces |
+| `commit-7` | routing | commit | — | Over-trigger control: a bare "yes" to an offer to *explain* `/commit` must not run it |
+| `commit-8` | routing | commit | — | Over-trigger control: "commit" as the topic of a question must not run it |
+| `pr-1` | execution | pr | `feature-open-pr-two-new-commits` | Happy path: a PR already exists, so it comments on the newly pushed commits |
+| `pr-2` | execution | pr | `feature-x-with-pr-on-feature-y` | It refuses when the named PR belongs to a different branch |
+| `pr-3` | execution | pr | `feature-dirty-no-pr` | Dirty tree with no PR: it delegates to `/commit`, then creates the PR |
+| `pr-4` | execution | pr | `feature-breaking-change-no-pr` | A new PR gets a Conventional Commit title and the breaking-change flag |
+| `pr-5` | execution | pr | `feature-no-pr-cold-reviewer-cache` | Cold reviewer cache: the picker lists collaborators and takes a numeric pick |
+| `pr-6` | execution | pr | `feature-no-pr-warm-reviewer-cache` | Warm cache: a reviewer named in plain language resolves without any `gh api` call |
+| `pr-7` | execution | pr | `feature-no-pr-stale-reviewer-cache` | A stale cache makes `gh` reject a reviewer; it refreshes the cache and re-asks |
+| `pr-8` | routing | pr | — | Natural-language PR intent routes through the Skill tool, with Step 0 |
+| `pr-9` | routing | pr | — | The assistant offers, the human says "yes": that routes through `/pr` and announces |
+| `ship-1` | execution | ship | `feature-open-pr-all-green` | Happy path: a pre-existing PR, all checks green, merges and watches |
+| `ship-2a` | execution | ship | `feature-open-pr-advisory-pending` | A pending advisory check: it waits, offers `wait+5`, waits again, then aborts |
+| `ship-2b` | execution | ship | `feature-open-pr-advisory-pending` | Same world, the human picks `troubleshoot` instead of waiting |
+| `ship-3` | execution | ship | `docs-only-open-pr` | A docs-only PR: absent advisory checks are expected, so it merges on required-green |
+| `ship-4` | routing | ship | — | Session control: "ship it" must *not* fire `/ship`, and must not simulate the merge |
+| `ship-5` | routing | ship | — | Over-trigger control: "remind me what /ship does" explains, it does not ship |
+| `ship-6` | execution | ship | `feature-dirty-no-pr` | The `/ship` → `/pr` → `/commit` cascade announces each hop exactly once |
+
+The first four columns regenerate with this read-only command, from the three eval files:
+
+```bash
+node -e 'const fs=require("fs");for(const s of ["commit","pr","ship"]){for(const e of JSON.parse(fs.readFileSync(`.claude/skills/${s}/evals/evals.json`,"utf8")).evals){console.log([e.id,e.kind,s,e.fixture??"-",e.eval_name].join(" | "));}}'
+```
+
+```powershell
+node -e 'const fs=require("fs");for(const s of ["commit","pr","ship"]){for(const e of JSON.parse(fs.readFileSync(".claude/skills/"+s+"/evals/evals.json","utf8")).evals){console.log([e.id,e.kind,s,e.fixture??"-",e.eval_name].join(" | "));}}'
+```
+
+**One eval, shown.** Illustrative only — the schema of record is `strategy-skill-evals.md` §3.
+This is `commit-2`, trimmed:
+
+```json
+{
+  "id": "commit-2",
+  "kind": "execution",
+  "eval_name": "refusal-env-local-in-payload",
+  "prompt": "/commit \"add user endpoint\"",
+  "fixture": "feature-dirty-with-env-local",
+  "preconditions": "On a feature branch with a few edits to src/server/api.ts AND a modified `.env.local` in t…",
+  "human_script": "When the skill names `.env.local` as a suspicious-file match and asks for direction, the human replies: remove it from the payload.",
+  "expectations": [
+    "The response names `.env.local` as a suspicious-file blocker match before any staging occurs",
+    "No `git add` command in the command log stages `.env.local`",
+    "…"
+  ]
+}
+```
 
 ### 4.1 Entry points
 
@@ -296,15 +569,23 @@ module-local helpers `existingPr()`, `featureModule()` and the constants `AUTH_O
 `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` — copy the nearest existing profile rather than
 writing one from scratch.
 
-`buildSandbox()`, in order: assert the Node floor → look up and validate the profile → resolve and
-prove the sandbox root is outside the repo → create the root `0700` and the per-sandbox directory
-with `fs.mkdtempSync` → `git init --bare` the origin and `git init` the repo → `setLocalConfig()`
-→ write `BASE_FILES` plus the profile's `baseFilesExtra`, commit, add the local origin remote,
-push `main` → create the feature branch and replay `branchCommits`, pushing at
-`pushedBranchCommits` if set → apply the profile's uncommitted `working` changes → write the
-preseeded reviewer team cache if the profile asks for one → write the marker, copy `fake-test.mjs`
-in, install the `gh` stub into `bin/` → write `gh-fixture.json`, an empty `gh-calls.log`,
-`env.json`, the two activation scripts, `manifest.json`, and the root marker → return the manifest.
+`buildSandbox()` runs these steps, in order:
+
+1. Assert the Node floor.
+2. Look up and validate the fixture profile.
+3. Resolve the sandbox root and prove it is outside the repo.
+4. Create that root `0700`, and the per-sandbox directory with `fs.mkdtempSync`.
+5. `git init --bare` the origin, and `git init` the working repo.
+6. Apply `setLocalConfig()` to the working repo.
+7. Write `BASE_FILES` plus the profile's `baseFilesExtra`, commit them as the **seed commit**, add
+   the local origin as a remote, and push `main`.
+8. Create the feature branch and replay `branchCommits`, pushing at `pushedBranchCommits` if set.
+9. Apply the profile's uncommitted `working` changes — this is what makes a fixture "dirty".
+10. Write the preseeded reviewer team cache, if the profile asks for one.
+11. Write the sandbox marker, copy `fake-test.mjs` in, and install the `gh` stub into `bin/`.
+12. Write `gh-fixture.json` and an empty `gh-calls.log`.
+13. Write `env.json`, the two activation scripts, and `manifest.json`.
+14. Write the root-level marker, and return the manifest.
 
 ### 4.3 The `gh` stub
 
@@ -312,7 +593,7 @@ in, install the `gh` stub into `bin/` → write `gh-fixture.json`, an empty `gh-
 (POSIX shell), `gh.ps1`, `gh.cmd` — that each exec `node gh-stub.mjs "$@"`. Because `bin/` is
 prepended to `PATH`, this is the `gh` an executor runs.
 
-`main()` refuses immediately if the marker is absent, then `dispatch()` routes on the first two
+`main()` refuses immediately if the sandbox marker is absent, then `dispatch()` routes on the first two
 argv tokens. Every answered and every refused call is appended to `gh-calls.log` by `logCall()`,
 which records `ts`, `argv`, `cwd`, `sub`, `credsPresent` (whether `GH_TOKEN`/`GITHUB_TOKEN` were
 set), `ghConfigDir`, a `decision` of `answered` / `denied` / `no-marker` / `error`, the `exitCode`,
@@ -346,6 +627,13 @@ original design's illustrative list because `pr-1` and the ship evals genuinely 
 
 ### 4.4 The routing runner
 
+**How a routing eval works.** We want to know whether a skill fires in a given conversational
+situation, so we fabricate that situation: a short scripted exchange — some turns from the human,
+sometimes a turn attributed to the assistant — is written to `input.jsonl` and fed into a fresh
+headless session as if it had really happened. The session's *next* turn is the one we grade.
+Because the model is not deterministic, each query runs N times and the result is reported as a
+rate, not a verdict.
+
 | File | Job | Key exports |
 |---|---|---|
 | `routing/routing-plan.mjs` | The driver plan: one entry per **query**, carrying the seeded turns, the fixture, setup files, an optional `expectationsOverride` (replaces the eval's committed `expectations` for one sub-scenario — §6), and a `graderHint` (freeform scenario context appended to the grader's prompt — §6). | `ROUTING_QUERIES`, `FRESH_DELEGATION` |
@@ -358,7 +646,7 @@ original design's illustrative list because `pr-1` and the ship evals genuinely 
 `populateRoutingContext()` copies the three team `SKILL.md` files, `.claude/settings.json` (so the
 `ask` rule is present exactly as in real life), and a sandbox `CLAUDE.md` whose body is the real
 repo's `## AI Skills` section extracted verbatim by `extractAiSkillsSection()`. It refuses any
-target that resolves inside the real repo, and refuses any directory without the marker.
+target that resolves inside the real repo, and refuses any directory without the sandbox marker.
 
 `runExecutor()` spawns `claude -p` with `--input-format stream-json --output-format stream-json
 --verbose --model <m> --allowedTools "Bash Read Grep Glob Edit Write Skill TodoWrite"
@@ -384,6 +672,11 @@ tools, cwd set to the run directory, with a 180-second timeout.
 | `pr-9` | `pr-9` | pr | should-fire |
 | `ship-4` | `ship-4` | ship | should-NOT-fire |
 | `ship-5` | `ship-5` | ship | should-NOT-fire |
+
+***Polarity* = what a correct run looks like.** **should-fire**: the skill runs. **should-NOT-fire**:
+the skill must stay out of it — an over-trigger control. **should-fire-inline**: the skill runs, but
+because the human typed the slash command the CLI expands it directly, so a correct run makes *no*
+`Skill` tool call (§6 explains why that is not a failure).
 
 Polarity comes from `polarityFor()`: `NEGATIVE_CONTROLS` holds the four over-trigger controls,
 `INLINE_FIRE` holds `commit-5a-slash` alone.
@@ -415,7 +708,7 @@ sequenceDiagram
   X-->>O: transcript incl. verbatim tool-call record
   O->>AE: archiveEvidence(sandboxDir, <eval>/outputs)
   AE-->>O: gh-calls.log · git-state.txt · gh-stub-state.json ·<br/>gh-fixture.json · manifest.json · sandbox-marker.json ·<br/>archive-manifest.json
-  O->>G: transcript + archived raw files (the evidence triad) + eval.expectations
+  O->>G: transcript + archived raw files (the evidence triad —<br/>transcript, gh call log, sandbox git state) + eval.expectations
   G-->>O: grading.json
   O->>SB: teardown-sandbox.mjs (sweep with --all at the end)
 ```
@@ -451,7 +744,7 @@ sequenceDiagram
   R->>SB: buildSandbox({fixture})
   R->>C: populateRoutingContext(repoDir)
   C->>SB: 3× SKILL.md · settings.json (ask rule) ·<br/>CLAUDE.md carrying the real "AI Skills" section
-  R->>SB: applySetupFiles — opt-out file /<br/>fresh delegation marker (pr\t<now>)
+  R->>SB: applySetupFiles — opt-out file /<br/>fresh delegation hand-off file (pr\t<now>)
   R->>R: buildInputJsonl(q.turns) → input.jsonl
   R->>E: spawn with --input-format stream-json,<br/>cwd = sandbox repo, env = sandboxEnv(manifest)
   E-->>R: raw.jsonl (stream-json events)
@@ -486,7 +779,7 @@ Three details in that flow matter and are easy to get wrong:
 
 ### 4.7 Artifacts
 
-**Inside a sandbox** — `repo/` (the executor's cwd, holding the marker, `.git`, the baseline files
+**Inside a sandbox** — `repo/` (the executor's cwd, holding the sandbox marker, `.git`, the seed-commit files
 and `.skill-eval-fake-test.mjs`), `origin.git/` (the local bare push target), `bin/` (the stub and
 its three wrappers), `gh-config/` (the isolated `GH_CONFIG_DIR`), `gh-fixture.json`,
 `gh-calls.log`, `gh-stub-state.json`, `env.json`, `activate.sh`, `activate.ps1`, `manifest.json`,
@@ -506,9 +799,11 @@ level: `eval_metadata.json` per query, `routing_summary.json`, and `benchmark.js
 from `aggregate_benchmark.py`. The tree shape is documented in
 [`../scripts/skill-evals/routing/README.md`](../scripts/skill-evals/routing/README.md).
 
-`observables.json` carries `firstText`, `announcementPresent`, `announcementIsFirstLine`,
-`skillInvocations`, `invokedThisSkill`, `mutatingBashCmds`, `askUserQuestionUsed`, `ghLog`
-(`present`, `lines`, `hasPrMerge`, `live`), `result` and `numGradedTools`.
+`observables.json` carries `firstText` (the opening of the model's first text block, where an
+announcement would be), `announcementPresent`, `announcementIsFirstLine`, `skillInvocations`,
+`invokedThisSkill`, `mutatingBashCmds`, `askUserQuestionUsed`, `ghLog` (`present`, `lines`,
+`hasPrMerge`, `live`), `result` (the session's own completion record — subtype, internal step count,
+duration) and `numGradedTools` (how many tool calls the graded turn made).
 
 ### 4.8 What CI runs — and what it does not
 
@@ -581,11 +876,11 @@ its home.
   sandbox by settings alone will fail quietly. Tracked as **#531**.
 - **Nothing inside `.claude/` can be deleted headless.** Built-in Claude Code protection refuses
   it; the same filename in another directory deletes fine, so the trigger is the directory. This is
-  why `/commit`'s clear-on-read of the delegation marker cannot be graded by the routing runner —
+  why `/commit`'s clear-on-read of the delegation hand-off file cannot be graded by the routing runner —
   `routing-plan.mjs` documents the exclusion on `commit-5b-delegation`, and the manual runbook in
   `strategy-skill-evals.md` §6 covers it instead.
 - **The guidance layers are prompt-level (C8).** An agent that ignores CLAUDE.md, the eval files'
-  `$comment` notices and the marker rule, while holding a `human_script`, can satisfy an approval
+  `$comment` notices and the sandbox-marker rule, while holding a `human_script`, can satisfy an approval
   checkpoint from the script rather than stalling. The backstop stack — structural isolation, the
   default-deny stub, the `ask` rule, the CI shape gate, and plain git recoverability — means a
   missed layer degrades to *recoverable and loud*, never *silent damage*. That is the honest scope
@@ -593,6 +888,10 @@ its home.
   deviation.
 
 ## 6. Why it is shaped this way
+
+**This section answers: for each choice a reader might ask "why not the obvious thing?" about, what
+was the reason?** Eight of those, then — at the end — the rules for writing an assertion worth
+keeping.
 
 ### Per-skill eval layout (DP1)
 
@@ -603,8 +902,9 @@ Evals live at `.claude/skills/<skill>/evals/evals.json` — upstream's own docum
 rather than in one repo-root file. The decision was reversed from "convert the root file in place"
 on a single named criterion: **upstream instructions must work verbatim**. Under the root-file
 option the bridging pointer would have lived in CLAUDE.md, itself a local translation layer, and
-every future upstream refresh would have had to be re-reconciled against it. Cascade evals live
-with the skill whose invocation is the eval's prompt. `evals/skill-creator.evals.json` stays at the
+every future upstream refresh would have had to be re-reconciled against it. A **cascade eval** —
+one that tests a skill delegating onward, as `ship-6` tests `/ship` → `/pr` → `/commit` — is filed
+under whichever skill the eval's *prompt* invokes, so `ship-6` lives with `/ship`. `evals/skill-creator.evals.json` stays at the
 repo root because of C1 — the refresh script clobbers anything else placed in the vendored
 directory. The cost of the layout is risk R2: deleting and recreating a skill folder takes its
 evals with it.
@@ -639,7 +939,7 @@ came back.
 
 ### One batch, never CI
 
-The one testing rule is: when you change a skill, or refresh the vendored copy, you run the whole
+The full-batch rule is: when you change a skill, or refresh the vendored copy, you run the whole
 batch. There is deliberately no lighter per-skill variant documented anywhere, because a lighter
 variant is what people reach for and then the regression suite stops being a regression suite. Runs
 stay human-triggered — never CI — because an LLM-driven run costs real money and real minutes and
@@ -649,7 +949,8 @@ reason, visible to reviewers.
 
 ### The `commit-5` fan-out and `expectationsOverride`
 
-`commit-5` is **one** routing eval in the committed eval file, because the manifest's splitting rule
+`commit-5` is **one** routing eval in the committed eval file, because the conversion manifest only
+splits *execution* evals into separate entries — that splitting rule
 applies to execution evals only. But it has three sub-scenarios — typed slash, delegation, opt-out
 — that cannot be driven by one query. `routing-plan.mjs` is the de-multiplexer: three entries
 (`commit-5a-slash`, `commit-5b-delegation`, `commit-5c-optout`) all carry `evalId: "commit-5"` and
@@ -684,8 +985,9 @@ auditing the run has numbers to check.
 
 A typical full batch runs roughly 60–90 minutes and about 2M tokens. Those are documented reference
 points, not gates — nothing could enforce them, because batch runs are human-triggered. **Pass rate
-has no numeric floor, by design.** The gate stays what it always was: every Must-level assertion
-passes, or a human explicitly dispositions the failure. A "95% is fine" bar would let a fixed slice
+has no numeric floor, by design.** The gate stays what it always was: every Must-level assertion —
+a *Must* is one whose failure blocks, a *Should* is tracked but does not (§0) — passes, or a human
+explicitly decides in writing to accept the failure. A "95% is fine" bar would let a fixed slice
 of real regressions through unexamined, which defeats the point of a regression suite. Routing is
 separately probabilistic (R5) and is reported as rates over repetitions, never as a binary verdict.
 
@@ -723,24 +1025,33 @@ eval.
 **Stop after the third round, or after the first fix that does not move the rate.** Churn on a
 probabilistic eval is how you end up over-fitting the test to one batch.
 
-**#527/#528, worked.** `commit-5b`'s delegation eval was reported at roughly a 0.35 pass rate. Sorting
-by locus found three distinct causes and not one of them was the skill. *Harness*: the original seed
-made the human's first turn `commit this`, which is a second, competing routing signal — a real
-`/pr` → `/commit` delegation never begins that way. The seed was rewritten so the entire delegation
-signal comes from the seeded assistant turn plus the on-disk marker, and the human's turns are a
-neutral statement and a bare "go ahead". *Headless environment*: the eval bundled a clear-on-read
-clause asserting the marker was deleted — impossible headless, because `.claude/` deletion is
-refused with no prompter to approve it. That clause was removed from the automated eval and moved
-to the manual runbook. *Grader*: `commit-5a` was being failed for not making a `Skill` tool call on
-a typed slash, which is the correct behavior; `summary.mjs` gained `INLINE_FIRE` and a three-way
-`polarityFor()` so the summary stops reading "0%, broken" for correct behavior, and the runner
-gained `expectationsOverride` text saying so. Two further grader-locus defects surfaced in the same
-review and are now regression-guarded in `routing-harness.test.ts`: `extractJsonObject()` threw on a
-Windows path the grader had quoted verbatim, silently dropping whole runs from the mean; and
-`renderInputTurns()` would have reported "Seeded prior turns: NONE" for an unreadable input file,
-fabricating a negative. The measured outcome is in §11. **No skill changed.**
+**Worked example: the #527/#528 investigation.** `commit-5b`'s delegation eval was reported at
+roughly a 0.35 pass rate. (§11 discusses a *different* ≈0.35, belonging to `commit-5a` — two
+coincidentally similar numbers for two different queries, which is itself part of why §11 exists.)
+Sorting by locus found three distinct causes, and not one of them was the skill.
+
+- *Harness.* The original seed made the human's first turn `commit this`, which is a second,
+  competing routing signal — a real `/pr` → `/commit` delegation never begins that way. The seed was
+  rewritten so the entire delegation signal comes from the seeded assistant turn plus the on-disk
+  hand-off file, and the human's turns are a neutral statement and a bare "go ahead".
+- *Headless environment.* The eval bundled a clear-on-read clause asserting the hand-off file was
+  deleted — impossible headless, because `.claude/` deletion is refused with no prompter to approve
+  it. That clause was removed from the automated eval and moved to the manual runbook.
+- *Grader.* `commit-5a` was being failed for not making a `Skill` tool call on a typed slash, which
+  is the correct behavior; `summary.mjs` gained `INLINE_FIRE` and a three-way `polarityFor()` so the
+  summary stops reading "0%, broken" for correct behavior, and the runner gained
+  `expectationsOverride` text saying so. Two further grader-locus defects surfaced in the same
+  review and are now regression-guarded in `routing-harness.test.ts`: `extractJsonObject()` threw on
+  a Windows path the grader had quoted verbatim, silently dropping whole runs from the mean; and
+  `renderInputTurns()` would have reported "Seeded prior turns: NONE" for an unreadable input file,
+  fabricating a negative.
+
+The measured outcome is in §11. **No skill changed.**
 
 ## 7. Scenarios as built
+
+**This section answers: what does the whole thing actually look like in use?** Three walkthroughs —
+building a new skill, changing an existing one, and a teammate arriving with no context.
 
 ### Scenario A — create a brand-new skill
 
@@ -769,34 +1080,34 @@ obligations until it is committed.
 
 ### Scenario B — update an existing skill and re-run its evals
 
-The harness's home game. Say you are changing `/pr`'s reviewer picker.
+This is what the harness was built for. Say you are changing `/pr`'s reviewer picker.
 
 CRUD first, all plain file edits: snapshot the current `/pr` into the workspace as the baseline,
 edit `SKILL.md`, update the eval definitions and assertions. A maintainer reviews the assertion
 changes: the program's acceptance criteria named that review as the graded truth at every phase,
 and decision E4 in §9 makes the role any maintainer with repo write access rather than one person.
 
-Then the batch, run per the one rule in [`strategy-skill-evals.md`](strategy-skill-evals.md) §6 —
+Then the batch, run per the full-batch rule in [`strategy-skill-evals.md`](strategy-skill-evals.md) §6 —
 which owns the command sequence. Per that rule this is the **full batch across all three skills**,
 not just the edited one, because the three delegate into each other. The parts specific to an
-*update* are: a second, baseline arm per eval, run against a sandbox carrying the old snapshot of
+*update* are: a second, old-skill control arm per eval, run against a sandbox carrying the old snapshot of
 the skill; and archiving the raw evidence for **both** arms before teardown. (Baseline semantics
 are upstream's: for a skill *update* the baseline is the snapshot of the old skill; for a *new*
 skill the baseline is no skill at all.) `ship-2a` goes in the first parallel wave so its
 ~10-minute wait overlaps the rest. Then `aggregate_benchmark.py` and the viewer, human feedback,
 iterate.
 
-Two corrections to how this used to be described. The routing evals are **not** in this loop — they
-have their own runner (Scenario C's tail, and §4.6). And grading reads the **archived raw files**,
-never a prose summary of them: that is what makes a grade reproducible by someone who never watched
-the run.
+Two things about this loop are easy to get wrong. The routing evals are **not** in it — they have
+their own runner (Scenario C's tail, and §4.6). And grading reads the **archived raw files**, never
+a prose summary of them: that is what makes a grade reproducible by someone who never watched the
+run. (Both were described the other way round in the archived predecessor spec.)
 
 ### Scenario C — a teammate verifies a skill by natural language
 
 A teammate says: *"I tweaked /commit's devjournal triggers — make sure it still passes its evals."*
 No slash command, no prior context. Three guidance layers catch it, each redundant with the next:
 
-1. **CLAUDE.md**, always in context including natural-language entries, states the one rule and
+1. **CLAUDE.md**, always in context including natural-language entries, states the safety rule and
    points at `strategy-skill-evals.md`.
 2. **The eval files themselves.** The agent must open `evals.json` to get the prompt, and every one
    of the three carries a top-level `$comment` execution notice plus per-eval `fixture` fields whose
@@ -812,7 +1123,7 @@ For the routing half of the same request, the answer today is a command rather t
 `node scripts/skill-evals/routing/run-routing-evals.mjs --reps 3` runs all eleven queries and
 reports trigger rates. The manual runbook in `strategy-skill-evals.md` §6 is retained as the
 fallback and as the only way to eyeball what the headless runner cannot reproduce — the live
-`AskUserQuestion` prompt, the announcement cadence, and the marker's clear-on-read.
+`AskUserQuestion` prompt, the announcement cadence, and the delegation hand-off file's clear-on-read.
 
 ## 8. Designed, not built
 
@@ -829,6 +1140,9 @@ fails open. It would only become possible if transcripts ever revealed a keyable
 none has appeared.
 
 **A sandbox-boundary guard** is deterministic, and this is its design:
+
+A **hook** is a program Claude Code runs before every matching tool call, and whose exit code can
+veto that call. The design:
 
 - A `.claude/settings.json` `PreToolUse` matcher on `Bash|PowerShell` invoking
   `node <harness-dir>/guard-hook.mjs`.
@@ -875,6 +1189,9 @@ not scatter.
 
 ### Decisions
 
+Grouped by topic, not sorted by date — read down for related choices, not for chronology. `(inherited)`
+in the Date column means the decision predates this program.
+
 | Date | Decision | Chosen | Rejected — and why |
 |---|---|---|---|
 | (inherited) | CI gate; hook posture; vendored sync | The Vitest contract test is the only CI gate; NL-invocation guardrails are prompt-level; the vendored directory is never hand-edited and the drift workflow owns sync | Inherited context this design builds on |
@@ -888,7 +1205,7 @@ not scatter.
 | 2026-07-19 | Harness directory | `scripts/skill-evals/` | `evals/harness/` — muddles eval data with executable code; `scripts/` is the repo convention |
 | 2026-07-18 | The PreToolUse hook | Structural-in-harness is the baseline; the hook is designed and shovel-ready, not installed (§8) | Installing it from the start — a per-shell-call tax on every session to guard rare events; and the real-repo half is not deterministically guardable at all |
 | 2026-07-18 | Tracker lives in GitHub | The parent issue body is the state snapshot; comments are the append-only log | A committed tracker file (churns state as commits); a `.scratch` file (gitignored, so it does not travel) |
-| 2026-07-18 | The one testing rule | One batch, human-triggered, never CI; no lighter documented variant; a PR-template box records whether it ran | Per-skill quick modes — people reach for the lighter one and the suite stops catching regressions |
+| 2026-07-18 | The full-batch rule | One batch, human-triggered, never CI; no lighter documented variant; a PR-template box records whether it ran | Per-skill quick modes — people reach for the lighter one and the suite stops catching regressions |
 | 2026-07-18 | macOS gate | The macOS smoke blocks *baseline completion*, never a harness PR | Hard-blocking the harness PR on Mac hardware availability |
 | 2026-07-19 | **E1** — scope of the safety Must | Honest scoping: structural against accidental mutation, prompt-level against deliberate deviation (C8) | Keeping the unscoped "structurally, not just by instruction" claim — overpromised for the adversarial case |
 | 2026-07-19 | **E2** — the hook stays deferred, conditioned | Deferral conditioned on the safety checklist delivering the in-harness hardenings; a checklist failure or any near-miss promotes it (§8) | Installing at harness time — the buildable half mostly duplicates prevention that is already structural |
@@ -902,8 +1219,8 @@ not scatter.
 | 2026-07-20 | `ship-2c` removed (right-sizing) | It shared `ship-2a`'s fixture and asserted a strict subset, at the cost of a ~5-minute run | Keeping it for symmetry — no validated coverage was lost |
 | 2026-07-18 | Post-baseline order | Eval gap-fill → right-sizing → routing runner — improve the suite you have before building new runner machinery | Building the runner first; the only hard dependency is gap-fill → right-sizing, so nothing else forced an order |
 | 2026-07-17 (check) → 2026-07-18 (DP3) | WSL demoted to optional for Layer C | Cloud or Cowork is the Windows route (DP3) | WSL-Ubuntu — checked 2026-07-17 and rejected on evidence: the host carries only a `docker-desktop` distro, so adopting WSL would mean a new distro install per developer |
-| 2026-07-18 | The CRUD/discovery safety model | Layered guidance (CLAUDE.md → the eval files' `$comment` → the turnkey `make-sandbox` path) plus the marker invariant and the `human_script` scoping rule | — |
-| 2026-07-19 | `ship-2` stays in the one batch | Scheduled into the first parallel wave so its ~10-minute wait overlaps the rest (C11) | A `slow` tag plus an on-demand mode — that is a second documented way to run the tests, which the one testing rule exists to prevent |
+| 2026-07-18 | The CRUD/discovery safety model | Layered guidance (CLAUDE.md → the eval files' `$comment` → the turnkey `make-sandbox` path) plus the sandbox-marker invariant and the `human_script` scoping rule | — |
+| 2026-07-19 | `ship-2` stays in the one batch | Scheduled into the first parallel wave so its ~10-minute wait overlaps the rest (C11) | A `slow` tag plus an on-demand mode — that is a second documented way to run the tests, which the full-batch rule exists to prevent |
 | 2026-09-16 | Routing-harness pure functions get unit tests (#530) | `routing-harness.test.ts` in the existing `functional-skills` project — no config, no workflow change | A separate ticket for a clean agent later — the deferral overhead exceeded the work, and the `turns.length` versus `seeded.length` trap would have stayed unguarded |
 | 2026-09-16 | `commit-5b`'s clear-on-read assertion removed from the automated eval (#527) | Covered by the manual runbook instead; a failed deletion headless is never a skill defect | Keeping it and excusing failures in the grader — an assertion that can never pass is not an assertion |
 | 2026-09-16 | `commit-5a` is inline-fire, not a should-fire failure (#528) | `INLINE_FIRE` plus a three-way `polarityFor()`; `invocation_trigger_rate` reports `null` rather than a meaningless 0 | Leaving it labelled should-fire — the summary read "0%, broken" for correct behavior |
@@ -935,11 +1252,19 @@ Stated plainly. Nothing here is hidden behind a hedge.
   **It has no open tracking issue.** `prompts/platform-validation-prompt.md` names the Phase-2
   issue #510 as its posting target, and #510 is closed, so posting there would track nothing; the
   item lives on #507's Parked list instead.
+  **When this lands, update:** this bullet (delete it), the Status paragraph's "except for two
+  items", and §1's closing sentence, which names this item alongside the tally — the count itself
+  does not move, because this is a completion gate rather than one of the eight criteria. If the run
+  posts to a new issue, update this doc's and the prompt's pointer to #510 too. Nothing else in the
+  runbook changes.
 - **The cloud Layer-C run** has not happened in a genuine cloud or Cowork Linux session. Attempts
   to date fell back to Windows hosts, which cannot run `run_eval.py` (C2). What is confirmed, on
   native Windows only, is the diagnostics: nested `claude -p` returns cleanly, and the
   `select()`-on-pipe probe reproduces `WinError 10093`. Layer C is a *Should*, so this does not
   block baseline completion on its own. Tracked on **#512** as risk R6.
+  **When this lands, update:** this bullet, the Status paragraph, §1's tally, constraint **C5** in
+  §3 (it stops being "unverified in a genuine cloud session"), risk **R6** in §9, and
+  `strategy-skill-evals.md` §8's "Current posture" paragraph, which says the same thing.
 
 Baseline closes when those two land; the upstream item below is post-baseline and does not gate it.
 
@@ -948,6 +1273,9 @@ anthropics/skills, replacing `select()` with a thread-based reader. It has not b
 were filed, merged, and picked up by the monthly drift refresh, Windows Layer-C routing would
 become optional — that is not the case today, and unlike every other item in this section it has no
 tracking issue. It appears in no other committed doc.
+**When this lands, update:** this paragraph, constraint **C2** in §3, decision **DP3** in §9, and
+`strategy-skill-evals.md` §8's platform table — Windows would move from "never natively" to
+"optional routing". Tracked only on #507's Parked list.
 
 ### `/handoff` is knowingly outside the contract test and the harness
 
@@ -960,22 +1288,32 @@ saying exactly this, and the work is parked on #507.
 **This is a known exception pending migration, not a violation of the scope boundary.** The
 migration is: build the fixture profiles its evals describe in `lib/fixtures.mjs`, convert the eval
 file to the per-skill schema, then decide whether `handoff` joins the `SKILLS` list. Until then, its
-evals must still never be executed outside a harness sandbox — the one rule is about origin-agnostic
+evals must still never be executed outside a harness sandbox — the safety rule is about origin-agnostic
 execution, and it applies to `/handoff` exactly as it applies to the other three. The migration
 carries no owner and no date; it sits on #507's Parked list.
+**When this lands, update:** delete this whole subsection; delete the `/handoff` exception paragraph
+in `strategy-skill-evals.md` §7; add `handoff` to **all three** of `SKILLS`, `EXPLICIT_ONLY` and
+`EXPECTED_EXECUTION_IDS` in `tests/functional/skills/skill-contract.test.ts` — the latter two are
+typed `Record<SkillName, …>`, so adding it to `SKILLS` alone will not compile; add it to the
+hardcoded skill list in `referencedFixtureNames()` in `scripts/skill-evals/selfcheck.mjs`, or its
+fixtures escape the fixture-completeness check silently; and add its evals to the roster in §4.
 
 ### Thin evidence on execution evals
 
-Every execution eval has exactly **one** graded run per arm. Three evals (`commit-2`, `pr-2`,
-`ship-3`) additionally have a baseline `old_skill` arm; the rest have only `with_skill`. There has
-been one graded iteration per skill and no *graded* rerun since — `ship-workspace/iteration-2/`
-holds three ungraded `ship-2c` run directories from the red-control work, with no `grading.json`
-among them. Any claim about an execution eval's reliability rests on n=1.
+Every execution eval has exactly **one** graded run per arm (an *arm* is one side of a comparison
+run — §0). Three evals (`commit-2`, `pr-2`, `ship-3`) additionally have an `old_skill` control arm;
+the rest have only `with_skill`. There has been one graded iteration per skill and no *graded* rerun
+since — `ship-workspace/iteration-2/` holds three ungraded `ship-2c` run directories from the
+red-control work, with no `grading.json` among them. Any claim about an execution eval's reliability
+rests on n=1.
+**When this lands** — that is, when a second graded iteration exists — **update:** this subsection
+and §11's "Execution evals" inventory, which is the durable record of what the workspaces held.
 
 ### No routing eval has a red control
 
-The three red-control demonstrations that exist are all execution evals (§11). No mutated skill has
-been run against a routing eval, so nothing proves a routing assertion can go red.
+A *red control* is a deliberately broken copy of a skill, run through an eval to prove that eval can
+actually FAIL (§0; the three on record are in §11). All three are execution evals. No mutated skill
+has ever been run against a *routing* eval, so nothing proves a routing assertion can go red.
 
 Of `commit-5a`'s four override assertions, two cannot fail: **A1** is a grading instruction (it
 tells the grader that a typed slash is CLI-native and that no `Skill()` call is expected), and
@@ -984,8 +1322,15 @@ and **A3** (the model runs the commit workflow's steps inline) can both fail; A2
 because it passes on either Step-0 branch and only an unexplained Step-0 firing is a FAIL, but it
 is falsifiable. So two of four discriminate.
 
+*(**A1**–**A4** are this doc's shorthand for an eval's expectations in the order they appear in the
+file **today**. They are not ids — the schema has none, see "Assertions have no stable ids" below —
+so an A-number is only meaningful against the current text of that eval.)*
+
 Both facts are recorded rather than acted on: there is no measured failure to chase, and churning a
 probabilistic eval that has no red signal is how a test gets over-fitted to one batch.
+**When this lands** — a routing red control is built — **update:** this subsection, §11's
+red-control table, and the "Red controls" section of `strategy-skill-evals.md` §6. Not tracked on an
+issue of its own; it sits on #507's Parked list.
 
 ### No procedure for changing a routing assertion
 
@@ -1001,6 +1346,9 @@ recorded rather than guessed at:
 
 Both are planned work, tracked on **#507**. Until they land, **the maintainer decides case by case**
 — say in the PR which run you did, and why. Do not invent a rule and apply it silently.
+**When this lands, update:** this subsection, the "Not settled: what a routing-only change owes"
+paragraph in `strategy-skill-evals.md` §6, and — if the answer changes the checklist — the
+eval-batch box in `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ### Assertions have no stable ids
 
@@ -1009,6 +1357,10 @@ comparison has to match by verbatim text. During the #527/#528 audit this surfac
 historical assertion texts for `commit-5a` and four for `commit-5b`; pooling by index would have
 produced nonsense. Adding ids would change the eval schema and the contract test together, so it is
 not a local fix.
+**When this lands, update:** this subsection, the `A1`–`A4` note above and in §0's Notation key,
+§11's per-assertion column (which could then cite real ids), the schema table in
+`strategy-skill-evals.md` §3, and the eval-shape assertions in
+`tests/functional/skills/skill-contract.test.ts`. On #507's Parked list.
 
 ### `grading.json` records no grader model
 
@@ -1017,18 +1369,24 @@ records the model at batch level, which covers the executor and the grader toget
 `run-routing-evals.mjs` passes the same `--model` to both — but a `grading.json` read on its own
 cannot say what graded it. For execution evals, where the grader is a subagent rather than a
 scripted `claude -p`, nothing records the model at all.
+**When this lands, update:** this subsection, and §11's opening — its counts could then be split by
+grader model as well as by grader version. On #507's Parked list.
 
 ### Sandbox `permissions.allow` is silently ignored — #531
 
 Covered in §5. The practical consequence: `ship-4`'s observable assertion rests on the permission
 layer above the stub behaving a particular way, and the sandbox cannot locally change that
 behavior even deliberately.
+**When this lands, update:** this subsection, §5's "What is not protected", and the `.claude/`
+write-protection bullet in `scripts/skill-evals/routing/README.md`. Tracked on **#531**.
 
 ### `routing/lib/transcript.mjs` drops `tool_result` blocks — #576
 
 `turnItems()` walks `assistant` events and keeps `text` and `tool_use` content only. Tool *results*
 never reach `transcript.md`, so the grader sees what the model asked for but not what came back,
 unless it opens `raw.jsonl` itself.
+**When this lands, update:** this subsection, §4.4's `transcript.mjs` row, and §4.7's routing-run
+artifact list. Tracked on **#576**.
 
 ### Raw evidence lives in gitignored per-machine workspaces
 
@@ -1036,6 +1394,9 @@ unless it opens `raw.jsonl` itself.
 on the machine that ran it. There is no shared copy, and nothing in CI regenerates it. §11 is
 therefore the durable record of what those workspaces contained at the Status date, and it is
 maintained: append measured rates there when a routing eval is re-run.
+**If this changes** — if the evidence is ever published somewhere shared — **update:** this
+subsection and §11's opening caveat that most readers cannot re-run its commands. Not currently
+planned.
 
 ### Documentation debt outside this doc
 
@@ -1049,29 +1410,46 @@ are follow-up edits, not design questions.
 `architecture-devstack.md` mentions neither skills nor evals, so the harness — a substantial piece
 of this repo's dev tooling — is absent from the dev-stack architecture doc. Closing that would be
 one block in its What-it-does / Connects-to / Why rubric.
+**When these land, update:** this subsection only — nothing else in this doc depends on them. On
+#507's Parked list.
 
 ## 11. Evidence digest
+
+**This section answers: what has actually been measured, and how much should you trust it?**
 
 Every number here was re-derived from the raw `grading.json` files in the gitignored workspaces on
 the machine that produced them, with the commands given below. No eval, grader or sandbox was run
 to write this section.
+
+**You probably cannot re-run these commands.** The workspaces they read
+(`.claude/skills/*-workspace/`) are gitignored and exist on one machine, so for almost every reader
+the commands below will find nothing. They are here so that whoever *does* have the artifacts can
+audit every number, and so the numbers survive the machine.
 
 ### Execution evals
 
 One graded iteration per skill, in `.claude/skills/{commit,pr,ship}-workspace/iteration-1/`.
 Seventeen eval directories carry a `grading.json`: today's sixteen execution evals plus the
 since-retired `ship-2c`. Each has exactly one `with_skill/run-1`; `commit-2`, `pr-2` and `ship-3`
-also have an `old_skill/run-1` baseline arm — twenty grading files in all. That is the entire
+also have an `old_skill/run-1` control arm — twenty grading files in all. That is the entire
 execution-eval evidence base.
 
-```sh
+```bash
 find .claude/skills/{commit,pr,ship}-workspace -name grading.json | sort
+```
+
+```powershell
+Get-ChildItem .claude/skills/commit-workspace,.claude/skills/pr-workspace,.claude/skills/ship-workspace -Recurse -Filter grading.json | Sort-Object FullName | ForEach-Object FullName
 ```
 
 ### The three red controls
 
-Each is a deliberately mutated copy of a `SKILL.md` in a gitignored workspace
-(`.claude/skills/<skill>-workspace/red-control-mutant/`). The real skills were never touched.
+A **red control** is a deliberately broken copy of a skill, run through an eval to prove that eval
+can actually FAIL — a suite that has only ever passed proves nothing. Each mutated `SKILL.md` lives
+in a gitignored workspace (`.claude/skills/<skill>-workspace/red-control-mutant/`); the real skills
+were never touched. Each run left a `RESULT.md` beside it, in
+`red-control-mutant/evidence/RESULT.md`, and those three files are the only first-hand record of
+what happened — the sandboxes were torn down after grading.
 
 | Skill | Mutation | Target eval | Assertion expected to go red | Outcome |
 |---|---|---|---|---|
@@ -1092,7 +1470,7 @@ empty log proves nothing and merges must be graded from the transcript's tool-ca
 
 That is why the `/ship` red control is the most consequential run in the archive: it is the
 first-hand demonstration behind the merge-discrimination rule (§5, §9), and behind the principle
-that no single evidence source carries Must-level weight alone.
+that no single evidence source carries Must-level weight (§0) alone.
 
 ### Routing evals
 
@@ -1101,7 +1479,10 @@ that no single evidence source carries Must-level weight alone.
 commits — the fixes were developed in the working tree, verified by these batches, then committed.
 So pre- and post-fix must be read off the artifacts, not off commit dates.
 
-**Two axes that must never be pooled, and this table obeys its own rule.**
+**Three axes vary across the archive, and pooling across any of them produces a meaningless number.**
+The table handles them two ways: it **filters** on assertion version, keeping only runs that match
+today's text, and it **reports** grader version and seed shape per row so you can see what each
+number is made of.
 
 *Assertion version.* An eval's `expectations` text has been edited repeatedly, and assertions have
 no ids (§10), so runs can only be compared by verbatim assertion text. Every row below is filtered
@@ -1124,7 +1505,20 @@ first turn is a neutral statement about having edited the handler. Only the last
 `routing-plan.mjs`. Every other query used one stable seed throughout, and the **Seed** column
 gives its turn count.
 
-**Counts, current assertion text only:**
+**Counts, current assertion text only.** Legend for the columns:
+
+- **Grader** — which grader version produced the grades. `G1 ×3 + G2 ×1` means three of the runs
+  were graded by G1 and one by G2; it is a count of runs, not a weighting.
+- **Seed** — how many turns of fabricated prior conversation the run was fed (§4.4).
+- **Runs** — how many archived runs match today's assertion text for that query.
+- **Assertion-level passes** — runs × assertions-per-run, and how many of those passed. The
+  denominator differs per row because queries have different numbers of assertions.
+- **Per-assertion** — the same total broken out by position (§10's `A1`–`A4` shorthand).
+
+**Reading a row.** `commit-4` was run four times on today's assertion text — three of those runs
+under the older grader (G1), one under the current one (G2) — each time from a one-turn seed. Each
+run graded four assertions, so 4 × 4 = 16 assertion evaluations, of which 11 passed. The last column
+breaks that down: A3 failed once, and A4 failed every time.
 
 | Query | Grader | Seed | Runs | Assertion-level passes | Per-assertion |
 |---|---|---|---|---|---|
@@ -1150,7 +1544,7 @@ the last of the three PR #530 commits, and every archived batch predates it. The
 fires" wording — with A1, A3 and A4 byte-identical to today's. It is good corroboration and it is
 not a measurement of the eval as it stands.
 
-**Three numbers that are routinely misquoted.**
+**Three numbers appear in older comments and reviews. Here is what each actually measured.**
 
 - **`commit-5a` "≈0.35".** The pooled history of a *superseded* single bundled assertion, whose
   failures were the model hand-rolling the workflow without a `Skill()` call — behavior the current
@@ -1160,8 +1554,8 @@ not a measurement of the eval as it stands.
   included the clear-on-read clause. All three failures cite clear-on-read alone, and each failure's
   own evidence affirms both of the assertions that exist today. So the two surviving assertions have
   six corroborating runs plus the one formally graded run, and zero observed failures.
-- **`commit-5b` "0/3" in the auditor batch.** A retired three-turn seed whose first turn is
-  `commit this`. In all three runs the model self-announced — the behavior the seed change was made
+- **`commit-5b` "0/3" in the 2026-07-20 auditor batch** (the batch directory named
+  `AUDITOR-20260720T135520Z`). A retired three-turn seed whose first turn is `commit this`. In all three runs the model self-announced — the behavior the seed change was made
   to remove. Evidence about a retired fixture, not about today's eval.
 
 **Three archived runs are failures rather than data,** counted as failures and excluded from every
@@ -1184,9 +1578,11 @@ Note that `summarizeEval()` aggregates from `summary.pass_rate`, so the harness'
 `routing_summary.json` would have reported the flattering 23. No other run in the archive shows this
 mismatch.
 
-**Reproducing the table.** From the repo root, with the workspaces present:
+**Reproducing the table.** From the repo root, on the machine that holds the workspaces. The
+inventory commands come in both shells; the counting script is `node`, so it is the same either
+way.
 
-```sh
+```bash
 # the 74-run inventory, and the two runs with no grading.json at all
 # (the third failure, ship-5 run-1, HAS a grading.json — it just is not a grade)
 find .claude/skills/routing-evals-workspace -name "run-*" -type d | wc -l
@@ -1195,6 +1591,18 @@ find .claude/skills/routing-evals-workspace -name "run-*" -type d \
 
 # grader version per run: G2 iff seeded-turns.md is present (21 of the 74)
 find .claude/skills/routing-evals-workspace -name seeded-turns.md | wc -l
+```
+
+```powershell
+# the same three inventory commands, in PowerShell
+$runs = Get-ChildItem .claude/skills/routing-evals-workspace -Recurse -Directory -Filter run-*
+$runs.Count
+$runs | Where-Object { -not (Test-Path (Join-Path $_.FullName grading.json)) } |
+  ForEach-Object { "UNGRADED $($_.FullName)" }
+(Get-ChildItem .claude/skills/routing-evals-workspace -Recurse -Filter seeded-turns.md).Count
+```
+
+```bash
 
 # per-run assertion verdicts, seed turn count, and whether the assertion text
 # matches today's — the script that produced every count above
@@ -1229,6 +1637,9 @@ A query absent from that output has **no** run on its current assertion text —
 `commit-5a-slash`'s zero was established.
 
 ## 12. Legacy-ID glossary
+
+**This section answers: you found an id in an old comment — what is it, and where does it live
+now?** §0's Notation key is the short version; this is the full resolution.
 
 Ids used by code comments, older docs, commit messages and the archived spec, and where each
 resolves now.
@@ -1278,8 +1689,11 @@ only; nothing in the system depends on it.
 
 | Id | Meaning |
 |---|---|
-| **F-A** | The Phase-3 audit finding that the raw evidence legs were never preserved, so CLEAN verdicts rested on self-graded orchestrator prose. Closed by making archiving harness behavior (§4.5, §9) |
-| **F-B** | The Phase-3 audit finding that merge assertions were non-discriminating because the `ask` rule intercepts above the stub. Closed by the merge-discrimination rule (§5) |
+| **F-A** | A finding of the Phase-3 audit (below): the raw evidence legs were never preserved, so CLEAN verdicts rested on self-graded orchestrator prose. Closed by making archiving harness behavior (§4.5, §9) |
+| **F-B** | A finding of the Phase-3 audit (below): merge assertions were non-discriminating, because the permission layer intercepts above the stub. Closed by the merge-discrimination rule (§5) |
+| **`G1` / `G2`** | Two generations of the routing grader. A run is G2 if its directory contains `seeded-turns.md`, meaning the grader was shown the fabricated turns verbatim instead of inferring them (§11) |
+| **`A1`–`A4`** | This doc's shorthand for an eval's expectations in the order they appear in the file today. Not ids — the schema has none (§10) — so an A-number is only meaningful against the current text of that eval |
+| **`5a` / `5b` / `5c`** | The three sub-scenarios `commit-5` fans out to, run as the routing queries `commit-5a-slash`, `commit-5b-delegation` and `commit-5c-optout` (§4.4, §6) |
 | **E1–E4** | The four escalations from the 2026-07-19 peer review: E1 the safety-Must's scope, E2 the hook's deferral, E3 adversarial hardening, E4 the maintainer-reviewer role. All four are rows in §9 |
 | **"ruling N"** | A numbered maintainer decision from a review session, cited in code comments. **Ruling 3** — the one that appears in `archive-evidence.mjs`, `teardown-sandbox.mjs` and `lib/sandbox.mjs` — is "archive the raw evidence before teardown, as harness behavior rather than prompt guidance". The `.claude/` notes that recorded the full lists are gitignored; treat an unresolvable "ruling N" as provenance, not as a live instruction |
 | **`#507`** | The program tracker issue. Still open for post-baseline bookkeeping |
@@ -1287,3 +1701,21 @@ only; nothing in the system depends on it.
 | **`#527`, `#528`** | The two routing-eval defects closed by PR #530 (`7b8f157`); see §6's worked example |
 | **`#531`, `#576`** | Open: sandbox `permissions.allow` ignored; `tool_result` blocks dropped from the rendered transcript |
 | **`#512`** | The one open baseline tracker: the cloud Layer-C run. The macOS platform-validation artifact has no tracking issue — `platform-validation-prompt.md` names the Phase-2 issue **#510**, which is closed. See §10 |
+| **`#62`, `#133`, `#283`** | Stage 1 (§2): the issue that asked for the three skills; the PR that landed the spec defining them; and the PR that landed the implementation plan. The skills themselves arrived in commit `e61ddbe` |
+| **`#353`, `#484`** | Stage 2 (§2): the natural-language-invocation issue, and the follow-on PR that added the announcement and affirmation routing |
+| **`#396`** | Stage 3 (§2): vendoring the `/skill-creator` copy |
+| **`#513`** | The Phase-5 issue carrying the golden-path walkthrough evidence (§1) |
+| **`#530`** | The PR (`7b8f157`) that closed #527 and #528; its three commits are `ddf0e3f`, `7447f5f`, `41e0368` |
+| **`#508`–`#516`** | One issue per phase, in order, each confirmed by its issue title: #508 Phase 0, #509 Phase 1, #510 Phase 2, #511 Phase 3, #512 Phase 4, #513 Phase 5, #514 Phase 6, #515 Phase 7, #516 Phase 8 |
+
+### Review episodes
+
+Four distinct reviews are referred to by name in this doc and in code comments. They are not the
+same event.
+
+| Episode | What it was |
+|---|---|
+| **The 2026-07-19 peer review** | A multi-reviewer pass over the *plan*, before the build ran. It produced the four escalations E1–E4 (§9) |
+| **The Phase-3 audit** | The review at the end of Phase 3, which checked whether the first graded iteration's CLEAN verdicts were independently supported. They were not: it produced findings F-A and F-B, and its gate-close is issue #511 |
+| **The #527/#528 review** | The 2026-09 independent review of the routing harness that produced PR #530 and the worked example in §6 |
+| **The 2026-07-20 auditor batch** | Not a review of the docs but a *run*: the batch directory `AUDITOR-20260720T135520Z`, cited in §11 because its `commit-5b` runs used a since-retired seed |
