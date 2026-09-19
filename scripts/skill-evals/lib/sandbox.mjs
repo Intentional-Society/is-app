@@ -393,7 +393,7 @@ function writeActivateScripts(sandboxDir, { binDir, ghConfigDir, repoDir }) {
   // APIs directly). A forward-slashed-but-still-drive-lettered PATH entry is silently
   // unresolvable, so `gh` falls through to the next PATH entry — which, on a dev machine
   // with the real GitHub CLI installed, is the real `gh` (found and confirmed empirically
-  // during Phase 3 execution, 2026-07-20 — see docs/spec-skill-evals-baseline.md / #511).
+  // 2026-07-20 — see docs/design-skill-evals-harness.md §8 / #511).
   // Credential scrubbing (unset tokens + isolated GH_CONFIG_DIR) independently prevented
   // any authenticated reach to real GitHub even while this bug was live, but the stub's
   // call-log — and hence its liveness/evidence guarantees — could silently go dark for

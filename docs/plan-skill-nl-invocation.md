@@ -1,7 +1,11 @@
 # Plan: Natural-Language Invocation for /commit /pr /ship
 
-> The durable record of what was decided and why, structured around a **PR‑phase spine** (PR1/PR2
-> merged under #353; **PR3** — the announcement + affirmation‑routing follow‑on — in flight). Moved
+> **Status: SHIPPED.** PR1/PR2 merged under #353; **PR3** — the announcement + affirmation‑routing
+> follow‑on — shipped as **PR #484 on 2026‑07‑02**. Everything described here is live policy, not a
+> proposal. One heading below still reads "(in flight)": it is historical phase framing, left as
+> written because this pass deliberately changes no heading in this file and the doc's deeper
+> cleanup is parked. Read it as "PR3", not as a live state — the status table below governs.
+> The durable record of what was decided and why, structured around a **PR‑phase spine**. Moved
 > here from `.scratch/skill-nl-invocation-bootstrap.md` when implementation began; **referenced by
 > path** from `CLAUDE.md`, both `commit`/`pr` SKILL.md, and `docs/spec-portable-ai-procedures.md`, so
 > the filename is stable. Local working logs (gitignored): `.scratch/skill-nl-invocation-tracker.md`
@@ -17,13 +21,12 @@
 |---|---|---|
 | **PR1** (#353) | NL invocation for `/commit`+`/pr`: drop `disable-model-invocation`, **Step 0** intent gate, single‑use **delegation marker**, v1.1 docs sweep, 4 NL‑routing evals | ✅ **Merged** |
 | **PR2** (#353 fast‑follow) | Harness **merge gate** (checked‑in `.claude/settings.json` `ask` on `gh pr merge`), `/ship` Y/n deletion (Thread‑14 proof), `strategy-security` line | ✅ **Merged** |
-| **PR3** (this branch `skill-nl-announce-affirmation`) | **`Using /commit`/`/pr` announcement** + **affirmation routing** + over‑trigger scope + **delegation‑announce**; announcement reliability relocation; semantic over‑trigger evals | 🚧 **In flight** |
+| **PR3** (#484) | **`Using /commit`/`/pr` announcement** + **affirmation routing** + over‑trigger scope + **delegation‑announce**; announcement reliability relocation; semantic over‑trigger evals | ✅ **Shipped 2026‑07‑02** |
 
 **Tracking:** #353 (`Closes`‑ed by PR1+PR2). **PR3 is a follow‑on** — no issue filed; motivated by the
-#459 commit incident. **Branch commits:** `ba9dc59` (announcement + affirmation routing + initial
-evals/docs), `48d497c` (over‑trigger scope + `commit-7` + README→disposable‑fixture refactor +
-pick‑up guide). The cold verification (below) added Finding 1 + Finding 2, resolved in the
-in‑progress follow‑up.
+#459 commit incident. It merged as **PR #484 on 2026‑07‑02**; its branch
+(`skill-nl-announce-affirmation`) no longer exists. The cold verification (below) added Finding 1 +
+Finding 2, both resolved before merge.
 
 ## Shared mechanism facts (apply to every phase — don't re‑litigate without re‑checking the docs)
 
@@ -59,7 +62,9 @@ contributors opt out; `/ship` is held to a stricter, harness‑enforced standard
 
 # 🚧 PR3 — Announcement + affirmation routing (in flight)
 
-> The current work, on branch `skill-nl-announce-affirmation`. Everything below the "Landed" divider
+> **Shipped as PR #484, 2026‑07‑02.** The heading above is historical phase framing — this pass
+> changes no heading in this file — so read "(in flight)" as "PR3". The branch it was written on,
+> `skill-nl-announce-affirmation`, no longer exists. Everything below the "Landed" divider
 > is the merged #353 record, kept for rationale.
 
 ## Pick‑up guide (resume cold)
@@ -83,9 +88,9 @@ Invocation paths + Step 0 + over‑trigger scope); `.claude/skills/{pr,ship}/SKI
 narration); `docs/spec-portable-ai-procedures.md` §2; `docs/strategy-committing.md` "How to invoke";
 `evals/evals.json`.
 
-**Remaining actions until merge:** apply the Finding 1/2 fixes → cold re‑verify (direct + delegation
-cascade) → reconciliation pass on this doc → `/pr` → `/ship`. Full step order:
-`.scratch/plan-skill-nl-announce-affirmation.md`.
+**How it landed (all complete):** the Finding 1/2 fixes were applied, the cold re‑verify ran on both
+the direct and the delegation‑cascade paths (bar met — prompt‑level; the `PreToolUse` hook stays
+deferred), and PR #484 merged on 2026‑07‑02.
 
 ## Scope (what PR3 delivers)
 
@@ -239,18 +244,11 @@ of scope (unproven‑on‑Windows spike).
 
 ## What to commit / remaining actions
 
-PR3 continues on this branch as up to **three follow‑up commits** to `ba9dc59`+`48d497c`:
-1. `docs(skills): restructure plan-skill-nl-invocation around PR1/PR2/PR3` — this doc rework (after
-   Blake approves the draft).
-2. `fix(skills): announce at the routing decision + narrate delegation handoffs` — the Finding‑1
-   SKILL/CLAUDE.md/spec edits + the Finding‑2 eval rewrite (`commit-7`/`commit-8`, `ship-5`) +
-   delegation evals (`pr-3` ext., `ship-6`) + scenario 9 rewrite.
-3. `docs(skills): record PR3 cold re‑verify results` — the reconciliation pass filling this doc's
-   placeholders (and adding the hook if the bar wasn't met). Separate because it can only be written
-   *after* the cold re‑verify.
-
-Then `/pr` → `/ship`. (Commits 1–2 order is flexible locally; 3 is gated on the re‑verify.) Full step
-order: `.scratch/plan-skill-nl-announce-affirmation.md`.
+PR3 landed as PR #484 on 2026‑07‑02, in the commits `d928e6e`, `a30626a`, `9d51f79`, `be8758f`, all
+reachable from `main`: this doc's restructure around the PR1/PR2/PR3 spine; the Finding‑1
+SKILL/CLAUDE.md/spec edits announcing at the routing decision and narrating delegation handoffs; the
+Finding‑2 eval rewrite (`commit-7`/`commit-8`, `ship-5`) plus the delegation evals; and the cold
+re‑verify record. Nothing here is outstanding.
 
 ---
 

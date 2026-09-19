@@ -49,11 +49,13 @@ human-at-the-keyboard authoring prerequisite only.
 skill-creator is the **front door** for every skill task in this repo — creating, editing,
 eval-running, and description-tuning a skill all start by invoking it (slash or natural
 language). How the team actually *tests* those skills — the per-skill eval schema, the
-disposable sandbox harness that executes mutating-skill evals safely, the one testing rule,
-platform routing, and the golden-path walkthrough — lives in
-[`docs/strategy-skill-evals.md`](strategy-skill-evals.md) (with design rationale in
-[`docs/spec-skill-evals-baseline.md`](spec-skill-evals-baseline.md)). Read that before running
-or changing any skill's evals.
+disposable sandbox harness that executes mutating-skill evals safely, the one testing rule, and
+platform routing — lives in
+[`docs/strategy-skill-evals.md`](strategy-skill-evals.md) (with the as-built design and rationale in
+[`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md)). Read that before running
+or changing any skill's evals. The golden-path walkthrough — one operator building or re-evaluating
+a skill end to end through this front door — is recorded as a success criterion in the design doc's
+§1, not as a procedure in the strategy doc.
 
 Known divergence, expected: upstream's `scripts/quick_validate.py` enforces a strict frontmatter
 key allowlist and rejects the Claude Code key `disable-model-invocation` used by team skills.
