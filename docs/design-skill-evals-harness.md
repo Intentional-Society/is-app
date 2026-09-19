@@ -173,8 +173,9 @@ file for the full rules.
 - **Subagent** — a separate Claude session an orchestrating session launches for a scoped task. Here
   it is what runs one execution eval, and what grades it.
 - **Cowork** — Anthropic's Claude Cowork, a separate Claude environment from Claude Code. It matters
-  in this doc for one reason only: it is one of the two places a teammate on Windows can run Layer C,
-  which crashes on native Windows (constraint C4, decision DP3). Upstream's `/skill-creator`
+  in this doc for one reason only: Layer C crashes on native Windows (constraint C2), and Cowork is
+  one of the two places a teammate on Windows can run it instead (constraint C4, decision DP3).
+  Upstream's `/skill-creator`
   `SKILL.md` carries a "Cowork-Specific Instructions" section and states the Layer-C scripts work
   there because they drive `claude -p` as a subprocess rather than a browser.
 - **Advisory check** — a CI check that runs and is reported but is not required to pass. `/ship`
@@ -554,8 +555,8 @@ a profile itself declares are:
 | Field | What it does |
 |---|---|
 | `summary` | One-line human description. Not read by the builder beyond being copied into the manifest. |
-| `branch` | The feature branch the sandbox checks out after the baseline commit on `main`. |
-| `baseFilesExtra` | Extra files committed alongside `BASE_FILES` in the baseline commit on `main`. |
+| `branch` | The feature branch the sandbox checks out after the seed commit on `main`. |
+| `baseFilesExtra` | Extra files committed alongside `BASE_FILES` in the seed commit on `main`. |
 | `branchCommits` | Ordered commits replayed on the feature branch; each is `{message, write, delete}`. |
 | `pushedBranchCommits` | Push the branch to the bare origin **after** the Nth of those commits, leaving the rest unpushed. Omit it and nothing is pushed unless `openPr` is set. |
 | `openPr` | `true` pushes the whole feature branch to the bare origin when `pushedBranchCommits` is absent. Set it whenever `gh.branchPr` claims a PR exists — a PR's head has to exist on origin, and a profile that sets `branchPr` without pushing builds a sandbox whose git state silently contradicts its own `preconditions`. |
@@ -699,14 +700,14 @@ sequenceDiagram
   participant AE as archive-evidence.mjs
   participant G as Grader (agents/grader.md)
 
-  O->>MS: --fixture <eval.fixture> --json
+  O->>MS: --fixture {eval.fixture} --json
   MS->>SB: buildSandbox() — git repo, bare origin,<br/>marker, gh stub, fake npm test, activate scripts
   MS-->>O: manifest.json (repoDir, activate.*, ghCallLog)
   O->>X: executor-prompt.md, placeholders filled
   X->>SB: marker gate, then stub-liveness gate<br/>(gh auth status must print "(SANDBOX gh stub)")
   X->>SB: runs the skill's steps — git against the sandbox,<br/>gh answered and logged by the stub
   X-->>O: transcript incl. verbatim tool-call record
-  O->>AE: archiveEvidence(sandboxDir, <eval>/outputs)
+  O->>AE: archiveEvidence(sandboxDir, {eval}/outputs)
   AE-->>O: gh-calls.log · git-state.txt · gh-stub-state.json ·<br/>gh-fixture.json · manifest.json · sandbox-marker.json ·<br/>archive-manifest.json
   O->>G: transcript + archived raw files (the evidence triad —<br/>transcript, gh call log, sandbox git state) + eval.expectations
   G-->>O: grading.json
@@ -1296,7 +1297,10 @@ in `strategy-skill-evals.md` §7; add `handoff` to **all three** of `SKILLS`, `E
 `EXPECTED_EXECUTION_IDS` in `tests/functional/skills/skill-contract.test.ts` — the latter two are
 typed `Record<SkillName, …>`, so adding it to `SKILLS` alone will not compile; add it to the
 hardcoded skill list in `referencedFixtureNames()` in `scripts/skill-evals/selfcheck.mjs`, or its
-fixtures escape the fixture-completeness check silently; and add its evals to the roster in §4.
+fixtures escape the fixture-completeness check silently; and add its evals to the roster in §4. If
+`/handoff` ever gains routing evals, also add it to `TEAM_SKILLS` in
+`scripts/skill-evals/routing/lib/context.mjs`, which decides whose skill files are copied into a
+routing sandbox.
 
 ### Thin evidence on execution evals
 
