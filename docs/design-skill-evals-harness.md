@@ -1049,6 +1049,12 @@ Sorting by locus found three distinct causes, and not one of them was the skill.
 
 The measured outcome is in §11. **No skill changed.**
 
+**Check the grading's reasoning against its boolean before touching an assertion.** In 2026-09 two
+archived routing failures (`commit-6` run-2, `commit-7` run-1) had `evidence` prose that concluded
+PASS while `passed` was emitted as `false`, and a `summary` block that contradicted its own
+per-expectation verdicts. Rewording would not have moved either run. Read the evidence first; a
+grader output defect is filed (FF-4), not designed around.
+
 ## 7. Scenarios as built
 
 **This section answers: what does the whole thing actually look like in use?** Three walkthroughs —
@@ -1225,6 +1231,7 @@ in the Date column means the decision predates this program.
 | 2026-09-16 | Routing-harness pure functions get unit tests (#530) | `routing-harness.test.ts` in the existing `functional-skills` project — no config, no workflow change | A separate ticket for a clean agent later — the deferral overhead exceeded the work, and the `turns.length` versus `seeded.length` trap would have stayed unguarded |
 | 2026-09-16 | `commit-5b`'s clear-on-read assertion removed from the automated eval (#527) | Covered by the manual runbook instead; a failed deletion headless is never a skill defect | Keeping it and excusing failures in the grader — an assertion that can never pass is not an assertion |
 | 2026-09-16 | `commit-5a` is inline-fire, not a should-fire failure (#528) | `INLINE_FIRE` plus a three-way `polarityFor()`; `invocation_trigger_rate` reports `null` rather than a meaningless 0 | Leaving it labelled should-fire — the summary read "0%, broken" for correct behavior |
+| 2026-09-18 | Routing assertions considered and left unchanged (`commit-6`, `commit-7`, `commit-8`, `pr-9`, `commit-5a`, `commit-5b`) | Record the ruling in each eval's `notes`, in the manifest's third list and in strategy §6's procedure | Leaving them alone silently — the #527/#528 churn only stopped once `routing-plan.mjs` carried a do-not-remove-this-branch comment |
 
 ### Live risks
 
@@ -1338,21 +1345,25 @@ issue of its own; it sits on #507's Parked list.
 
 ### No procedure for changing a routing assertion
 
-Two operational questions have no answer in any doc today, and this section is where that is
-recorded rather than guessed at:
+**Closed 2026-09.** The procedure is written: "Changing a routing assertion" in
+[`strategy-skill-evals.md`](strategy-skill-evals.md) §6. This subsection is kept as the record of
+what was open and what closed it.
+
+Two operational questions had no answer in any doc:
 
 1. **What run is owed when only a routing eval changes?** The PR template's checklist box fires on
    any change to a team skill's evals, but the execution batch cannot exercise a routing eval, and
-   nothing says whether `run-routing-evals.mjs` discharges the obligation instead.
+   nothing said whether `run-routing-evals.mjs` discharges the obligation instead.
 2. **How many repetitions diagnose a flaky routing eval?** The runner's default is `--reps 3`, which
    is a reporting default. At N=3 a one-in-three flake and a real fix are indistinguishable, so §6's
-   "stop after the first fix that does not move the rate" has no usable threshold behind it.
+   "stop after the first fix that does not move the rate" had no usable threshold behind it.
 
-Both are planned work, tracked on **#507**. Until they land, **the maintainer decides case by case**
-— say in the PR which run you did, and why. Do not invent a rule and apply it silently.
-**When this lands, update:** this subsection, the "Not settled: what a routing-only change owes"
-paragraph in `strategy-skill-evals.md` §6, and — if the answer changes the checklist — the
-eval-batch box in `.github/PULL_REQUEST_TEMPLATE.md`.
+Both were the maintainer's case-by-case call until the Evals Gate B v2 sign-off (#507) settled them
+in that procedure: its step 9 says a routing-only change does not owe the full batch and records
+that reason in the PR-template box, and its step 3 sets six runs of the same seed and text as the
+bar for calling a measured number a rate. The eval-batch box in
+`.github/PULL_REQUEST_TEMPLATE.md` is unchanged — step 9 uses the one-line-reason skip it already
+allows.
 
 ### Assertions have no stable ids
 
@@ -1478,10 +1489,13 @@ that no single evidence source carries Must-level weight (§0) alone.
 
 ### Routing evals
 
-`.claude/skills/routing-evals-workspace/` holds **eleven batch directories and 74 runs**, all
-`with_skill`, all on the runner's default model. Every archived run predates the three PR #530
-commits — the fixes were developed in the working tree, verified by these batches, then committed.
-So pre- and post-fix must be read off the artifacts, not off commit dates.
+`.claude/skills/routing-evals-workspace/` held **eleven batch directories and 74 runs** when the
+table below was compiled, all `with_skill`, all on the runner's default model. As of 2026-09-19 it
+holds thirteen directories and 140 run folders: those 74, the 33 of the 2026-09 amendment's
+confirmation run, and 33 folders from a launch that crashed before any model call and carry no
+grading. Every one of the original 74 predates the three PR #530 commits — the fixes were developed
+in the working tree, verified by those batches, then committed. So pre- and post-fix must be read
+off the artifacts, not off commit dates.
 
 **Three axes vary across the archive, and pooling across any of them produces a meaningless number.**
 The table handles them two ways: it **filters** on assertion version, keeping only runs that match
@@ -1491,8 +1505,11 @@ number is made of.
 *Assertion version.* An eval's `expectations` text has been edited repeatedly, and assertions have
 no ids (§10), so runs can only be compared by verbatim assertion text. Every row below is filtered
 to runs whose archived assertion set is **byte-identical** (after whitespace normalisation) to the
-set `routing-plan.mjs` and the eval files carry today. Runs on any earlier text are excluded and
-called out separately.
+set `routing-plan.mjs` and the eval files carry today — except the four rows marked **†**, which
+are filtered to the **pre-2026-09 assertion text**, because the 2026-09 routing-assertion amendment
+(`spec-skill-evals-manifest.md`) changed those four and no run in the 74-run corpus this table was
+compiled from uses their current wording. Runs on any earlier text are excluded and called out
+separately.
 
 *Grader version.* The presence of `seeded-turns.md` in a run directory marks the change that started
 inlining the verbatim `input.jsonl` rendering into the grader prompt. Batches without it (**G1**)
@@ -1519,28 +1536,64 @@ gives its turn count.
   denominator differs per row because queries have different numbers of assertions.
 - **Per-assertion** — the same total broken out by position (§10's `A1`–`A4` shorthand).
 
-**Reading a row.** `commit-4` was run four times on today's assertion text — three of those runs
-under the older grader (G1), one under the current one (G2) — each time from a one-turn seed. Each
-run graded four assertions, so 4 × 4 = 16 assertion evaluations, of which 11 passed. The last column
-breaks that down: A3 failed once, and A4 failed every time.
+**Reading a row.** `commit-4` was run four times on the assertion text it carried before the
+2026-09 amendment — three of those runs under the older grader (G1), one under the current one
+(G2) — each time from a one-turn seed. Each run graded four assertions, so 4 × 4 = 16 assertion
+evaluations, of which 11 passed. The last column breaks that down: A3 failed once, and A4 failed
+every time. That eval carries three assertions today: A3 is the one the amendment reworded, and A4
+is the one it moved to `notes` as manual-only.
 
 | Query | Grader | Seed | Runs | Assertion-level passes | Per-assertion |
 |---|---|---|---|---|---|
-| `commit-4` | G1 ×3 + G2 ×1 | 1 turn | 4 | **11/16** | A1 4/4 · A2 4/4 · A3 3/4 · A4 0/4 |
+| `commit-4` † | G1 ×3 + G2 ×1 | 1 turn | 4 | **11/16** | A1 4/4 · A2 4/4 · A3 3/4 · A4 0/4 |
 | `commit-5a-slash` | — | 1 turn | **0** | — | no archived run uses today's text (see below) |
 | `commit-5b-delegation` | G2 | 3 turns | 1 | **2/2** | A1 1/1 · A2 1/1 |
-| `commit-5c-optout` | G1 | 1 turn | 6 | **5/6** | A1 5/6 |
+| `commit-5c-optout` † | G1 | 1 turn | 6 | **5/6** | A1 5/6 |
 | `commit-6` | G1 ×6 + G2 ×2 | 3 turns | 8 | **22/24** | A1 7/8 · A2 8/8 · A3 7/8 |
 | `commit-7` | G1 | 3 turns | 3 | **11/12** | A1 2/3 · A2 3/3 · A3 3/3 · A4 3/3 |
 | `commit-8` | G1 | 1 turn | 3 | **12/12** | A1–A4 3/3 each |
-| `pr-8` | G1 | 1 turn | 3 | **9/12** | A1 3/3 · A2 3/3 · A3 3/3 · A4 0/3 |
+| `pr-8` † | G1 | 1 turn | 3 | **9/12** | A1 3/3 · A2 3/3 · A3 3/3 · A4 0/3 |
 | `pr-9` | G1 ×6 + G2 ×2 | 3 turns | 8 | **23/24** | A1 8/8 · A2 7/8 · A3 8/8 |
-| `ship-4` | G1 | 1 turn | 3 | **9/12** | A1 3/3 · A2 2/3 · A3 3/3 · A4 1/3 |
+| `ship-4` † | G1 | 1 turn | 3 | **9/12** | A1 3/3 · A2 2/3 · A3 3/3 · A4 1/3 |
 | `ship-5` | G1 | 1 turn | 2 | **6/6** | A1–A3 2/2 each |
 
+**† measured on the pre-2026-09 assertion text.** Those four rows keep the numbers their archived
+gradings recorded, and those gradings were made against wording the 2026-09 routing-assertion
+amendment has since changed. `commit-4`, `pr-8` and `ship-4` each lost their fourth assertion to
+`notes` and had one of the remaining three reworded; `commit-5c-optout`'s single bundled assertion
+became three. So the A-numbering in those rows does not line up with the files today, and the four
+rows are not comparable with anything measured after the amendment.
+`spec-skill-evals-manifest.md` carries the map from old position to new.
+
 Ten of the eleven queries have n ≤ 8, four have n = 3, and one has none. These are counts, not rates
-with confidence. Two systematic failures are visible: `commit-4`'s A4 and `pr-8`'s A4 have never
-passed on any run.
+with confidence. Two systematic failures are visible: `commit-4`'s A4 and `pr-8`'s A4 never passed
+on any run — both were structurally unobservable headless, which is why the amendment moved them to
+their evals' `notes` as manual-only checks.
+
+**The four changed queries, measured again — and why this row set has two count columns.** A
+confirmation run of all eleven queries followed the amendment, at `--reps 3`, executor and grader
+both `claude-sonnet-4-5`. For the four † queries it is a **new series**: same queries, different
+assertion text, so it starts a count rather than extending one. The stock grader proved unreliable
+on that run, so each number is given twice — **raw** is the grader's own verdict counted from
+`grading.json`, **corrected** is what the run's files show when read by two agent passes, the second
+done without sight of the first. `commit-4` and `pr-8` carry two corrected readings because their
+Step-0 assertion and the grader's headless adaptation disagree about whether staging counts as an
+irreversible action, an inconsistency that predates the amendment. `commit-5c-optout`'s third
+assertion is disputed between the two passes. Per-assertion detail, both disputed cells and the
+method are in `spec-skill-evals-manifest.md`; the other seven queries ran on unchanged text and
+their counts are recorded there too.
+
+| Query | Grader | Seed | Runs | Raw assertion-level passes | Artifact-corrected |
+|---|---|---|---|---|---|
+| `commit-4` | G2 | 1 turn | 3 | **5/9** | 3/9 read literally · 5/9 under the headless proxy |
+| `commit-5c-optout` | G2 | 1 turn | 3 | **9/9** | 9/9 or 7/9 — **disputed** between the two passes |
+| `pr-8` | G2 | 1 turn | 3 | **9/9** | 7/9 read literally · 9/9 under the headless proxy |
+| `ship-4` | G2 | 1 turn | 3 | **9/9** | 9/9 |
+
+`ship-4`'s three assertions are not the archive's four, so its number here must not be read against
+the **9/12** above. `commit-5c-optout`'s third assertion needs a live sandbox and was measured for
+the first time in this run. Three repetitions of one seed on one text is a confirmation sample and
+nothing more.
 
 **`commit-5a-slash` has no runs on its current assertion text.** Its A2 was rewritten in `41e0368`,
 the last of the three PR #530 commits, and every archived batch predates it. The often-quoted
@@ -1637,8 +1690,22 @@ import("./scripts/skill-evals/routing/routing-plan.mjs").then(({ROUTING_QUERIES}
 '
 ```
 
-A query absent from that output has **no** run on its current assertion text — which is how
-`commit-5a-slash`'s zero was established.
+A query absent from that output had **no** run on its current assertion text in the 74-run corpus
+this table was compiled from — which is how `commit-5a-slash`'s zero was established.
+
+**These commands no longer reproduce the table as printed, and here is what to change.** The
+2026-09 confirmation run sits in the same workspace and matches today's text, so the script pools it
+into every row and prints all eleven queries, the four † rows included — no row comes out as the
+table has it. To get the table back, restrict the script's batch listing to the directories that
+made up the original 74-run corpus (everything except the two `JOB2-` directories), which reproduces
+the seven unmarked rows exactly; for the four † rows, additionally point **both** of the script's
+source reads at pre-amendment copies — the plan it imports *and* the `evals.json` files, which it
+reads by a path relative to the working directory, so an old `routing-plan.mjs` on its own still
+picks up today's eval files. With the listing restricted and both sources pre-amendment, the script
+reproduces all eleven rows. The three inventory commands count the whole workspace and now return
+140 run folders, 35 without a `grading.json` and 87 with a `seeded-turns.md`: the 33 crashed folders
+account for all of the first jump and half of the second, the confirmation run for the other half,
+and the parenthetical "21 of the 74" above is the figure for the original batches only.
 
 ## 12. Legacy-ID glossary
 
