@@ -1,5 +1,5 @@
 {
-  "$comment": "Runnable eval definitions for /commit (spec docs/spec-portable-ai-procedures.md §4.1). Converted from the original repo-root evals/evals.json per the approved conversion manifest (docs/spec-skill-evals-manifest.md — Phase 1 of docs/spec-skill-evals-baseline.md). EXECUTION NOTICE: skill-eval prompts are never executed against the real repo or real GitHub — any skill, any origin. `kind: execution` entries require a harness-built sandbox (`fixture` names the starting-state profile; `human_script` gives the scripted human replies, valid only inside a marker-bearing sandbox) — see docs/strategy-skill-evals.md. `kind: routing` entries test whether/how the skill fires in a live session; a subagent handed this file cannot execute them — they stay documented manual runbooks (docs/strategy-skill-evals.md) until the Phase-8 session runner. As of Phase 1 the sandbox harness does not exist yet (it ships in Phase 2), so no eval below is executable at all right now — CLAUDE.md's guardrail carries this staged caveat too.",
+  "$comment": "Runnable eval definitions for /commit (spec docs/spec-portable-ai-procedures.md §4.1). Converted from the original repo-root evals/evals.json per the approved conversion manifest (docs/spec-skill-evals-manifest.md; program tracker #507). EXECUTION NOTICE: skill-eval prompts are never executed against the real repo or real GitHub — any skill, any origin. `kind: execution` entries require a harness-built sandbox (`fixture` names the starting-state profile; `human_script` gives the scripted human replies, valid only inside a marker-bearing sandbox) — see docs/strategy-skill-evals.md. `kind: routing` entries test whether/how the skill fires in a live session; a subagent handed this file cannot execute them — they run through the routing runner (scripts/skill-evals/routing/run-routing-evals.mjs), and what a headless run cannot show is listed in the affected eval's `notes` as manual-only, with the manual runbook in docs/strategy-skill-evals.md §6. Design and rationale: docs/design-skill-evals-harness.md.",
   "skill_name": "commit",
   "skill_path": ".claude/skills/commit/SKILL.md",
   "spec_section": "docs/spec-portable-ai-procedures.md §4.1",
@@ -84,10 +84,9 @@
       "expectations": [
         "The first visible line of the response is the announcement `Using /commit`",
         "The Step 0 intent gate fires via AskUserQuestion before any `gh auth` or `git` command runs",
-        "Choosing Stop leaves zero side effects: no branch created, nothing staged, `git status` unchanged",
-        "Choosing Proceed continues into step 1 onward"
+        "Nothing irreversible happens in this run: `outputs/git-state.txt` shows no new branch, nothing staged, and no new commit — `reflog` and `log --oneline --all` hold only the fixture's baseline entries. Surfacing the gate and then staging or committing anyway is a FAIL; the gate stops and waits."
       ],
-      "notes": "Routing eval — not sandbox-executable by a subagent (routing is the thing under test). Stays a documented manual runbook at baseline; automated by the Phase-8 session runner."
+      "notes": "Routing eval — not sandbox-executable by a subagent (routing is the thing under test). Stays a documented manual runbook at baseline; automated by the Phase-8 session runner. Manual-only (no headless proxy exists): at the Step 0 gate, choosing Stop leaves zero side effects and choosing Proceed continues into step 1 onward. A headless `claude -p` run makes neither choice, so both branches are checked by hand — see docs/strategy-skill-evals.md §6."
     },
     {
       "id": "commit-5",
@@ -102,7 +101,7 @@
         "(c) opt-out: Step 0 does not fire; the first visible line is still `Using /commit`; the opt-out file itself is left untouched on disk",
         "Control (commit-4): a natural-language invocation with none of these three conditions present DOES fire Step 0"
       ],
-      "notes": "Routing eval, no split (manifest resolves the flagged contradiction: the splitting rule applies to execution evals only). All three sub-scenarios stay one routing eval whose manual runbook — and later the Phase-8 runner — enumerates them as three queries. Named entry in the strategy doc's manual-runbook section (manifest cross-cutting requirement 4). AUTOMATION DIVERGENCE (#527/#528): the expectations above are the MANUAL-runbook checklist and remain correct for a real interactive session. The Phase-8 routing runner grades narrower versions via `expectationsOverride` in scripts/skill-evals/routing/routing-plan.mjs, because two things here cannot be observed headless: (b)'s clear-on-read — deleting inside `.claude/` is refused by built-in Claude Code protection, so marker deletion is checked ONLY by hand — and (a)'s no-Step-0 rule, which the runner relaxes because it cannot inject a kernel-level `<command-name>` tag, the condition SKILL.md Step 0 tells the skill to treat as ambiguous. Check both by hand; do not assume automation covers them. See docs/strategy-skill-evals.md §6."
+      "notes": "Routing eval, no split (manifest resolves the flagged contradiction: the splitting rule applies to execution evals only). All three sub-scenarios stay one routing eval whose manual runbook — and later the Phase-8 runner — enumerates them as three queries. Named entry in the strategy doc's manual-runbook section (manifest cross-cutting requirement 4). AUTOMATION DIVERGENCE (#527/#528): the expectations above are the MANUAL-runbook checklist and remain correct for a real interactive session. The Phase-8 routing runner grades narrower versions via `expectationsOverride` in scripts/skill-evals/routing/routing-plan.mjs, because two things here cannot be observed headless: (b)'s clear-on-read — deleting inside `.claude/` is refused by built-in Claude Code protection, so marker deletion is checked ONLY by hand — and (a)'s no-Step-0 rule, which the runner relaxes because it cannot inject a kernel-level `<command-name>` tag, the condition SKILL.md Step 0 tells the skill to treat as ambiguous. Check both by hand; do not assume automation covers them. See docs/strategy-skill-evals.md §6. `commit-5a`: of its four override assertions, the announcement clause declares itself not scored and cannot fail, and the typed-slash framing clause has never failed and would only fail if the CLI's slash path changed. It discriminates through the other two: Step-0 handling (an unexplained Step-0 firing is a FAIL) and running the workflow's steps inline. Its current Step-0-handling text, rewritten in commit 41e0368, has never been run — the archived 8/8 was measured on the wording just before it, and the other six archived gradings are a superseded single-assertion set that must not be pooled with it. First measured in this change's confirmation run."
     },
     {
       "id": "commit-6",
@@ -116,7 +115,7 @@
         "The first visible line is the announcement `Using /commit`",
         "The Step 0 intent gate fires immediately after the announcement"
       ],
-      "notes": "Routing eval — two-turn; the Phase-8 multi-turn driver case (R4). Not sandbox-executable by a subagent at baseline."
+      "notes": "Routing eval — two-turn; the Phase-8 multi-turn driver case (R4). Not sandbox-executable by a subagent at baseline. Reviewed 2026-09 and deliberately left unchanged: the one archived failure of E1 (`full-batch/eval-commit-6/with_skill/run-2`) was a grader OUTPUT defect — the grading's own reasoning concluded PASS while the JSON said `passed:false` — not a wording problem. Do not reword this assertion on that evidence; see docs/spec-skill-evals-manifest.md (2026-09 amendment) and #507 FF-4. E3 carries this eval's only measured discrimination: it failed in `VERIFY-FIX-527-528/eval-commit-6/with_skill/run-1`."
     },
     {
       "id": "commit-7",
@@ -131,7 +130,7 @@
         "No staging or commit command appears in the transcript",
         "The model explains /commit's Step 0 instead of running it"
       ],
-      "notes": "Routing eval — negative control. Not sandbox-executable by a subagent at baseline."
+      "notes": "Routing eval — negative control. Not sandbox-executable by a subagent at baseline. Reviewed 2026-09 and deliberately left unchanged: the one archived failure of E1 (`full-batch/eval-commit-7/with_skill/run-1`) was a grader OUTPUT defect — the grading's own reasoning concluded PASS while the JSON said `passed:false` — not a wording problem. Do not reword this assertion on that evidence; see docs/spec-skill-evals-manifest.md (2026-09 amendment) and #507 FF-4. Note that `observables.json`'s `announcementPresent` is a plain substring match and also fires on a quoted mention of `Using /commit`; graders have so far reasoned past it correctly."
     },
     {
       "id": "commit-8",
@@ -146,7 +145,7 @@
         "The Skill tool is never invoked for /commit",
         "No staging or commit command appears in the transcript"
       ],
-      "notes": "Routing eval — over-trigger control. Not sandbox-executable by a subagent at baseline."
+      "notes": "Routing eval — over-trigger control. Not sandbox-executable by a subagent at baseline. Reviewed 2026-09 and deliberately left unchanged: no assertion here has a measured failure (all three archived runs are 4/4), and the text is kept as-is for parity with its twin `commit-7`. `observables.json`'s `announcementPresent` is a plain substring match and also fires on a quoted mention of `Using /commit` — in all three archived runs it was `false`, so the exposure is prophylactic. See docs/spec-skill-evals-manifest.md (2026-09 amendment) and #507 FF-4."
     }
   ]
 }

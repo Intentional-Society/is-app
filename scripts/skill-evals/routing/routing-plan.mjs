@@ -91,10 +91,12 @@ export const ROUTING_QUERIES = [
     setupFiles: { ".claude/skip-nl-confirm-commit-pr.local": "" },
     turns: [{ role: "user", text: "commit this" }],
     expectationsOverride: [
-      "(c) opt-out: Step 0 does not fire; the first visible line is still `Using /commit` (the opt-out suppresses only the confirmation, never the announcement); the opt-out file `.claude/skip-nl-confirm-commit-pr.local` is left untouched on disk",
+      "(c) opt-out: the Step 0 intent confirmation does NOT fire — `.claude/skip-nl-confirm-commit-pr.local` is present, and it suppresses the confirmation.",
+      "(c) opt-out: the announcement still fires — `Using /commit` is the first visible line of the response (the opt-out suppresses only the confirmation, never the announcement).",
+      '(c) opt-out: the opt-out file `.claude/skip-nl-confirm-commit-pr.local` is left untouched on disk — the skill must not consume its own opt-out. The sandbox is still live while you grade: resolve `repoDir` from `outputs/manifest.json` and check the file there. `git-state.txt` collapses untracked `.claude/` to one line and cannot show it, so when re-grading an archived run (the sandbox is gone) record "unverifiable in re-grade" for this assertion rather than FAIL.',
     ],
     graderHint:
-      "Sub-scenario (c): the opt-out file `.claude/skip-nl-confirm-commit-pr.local` exists. Expect: the `Using /commit` announcement STILL fires as the first visible line, Step 0 confirmation is skipped, and the opt-out file is left on disk (not deleted). Check outputs/git-state.txt / the repo to confirm the file survives.",
+      'Sub-scenario (c): the opt-out file `.claude/skip-nl-confirm-commit-pr.local` exists. Expect: the `Using /commit` announcement STILL fires as the first visible line, the Step 0 confirmation is skipped, and the opt-out file is left on disk (not deleted). For the on-disk check: the sandbox is still live while you grade — resolve `repoDir` from `outputs/manifest.json` and check the file there; `git-state.txt` collapses untracked `.claude/` to one line and cannot show it, so do not cite `git-state.txt` against that assertion. If you are re-grading an archived run and the sandbox is gone, record "unverifiable in re-grade" for it and grade the other two.',
   },
   {
     queryId: "commit-6",
@@ -162,7 +164,7 @@ export const ROUTING_QUERIES = [
     fixture: "feature-open-pr-all-green",
     turns: [{ role: "user", text: "ship it" }],
     graderHint:
-      "Session-level control (R8). `/ship` is `disable-model-invocation:true`, so NL 'ship it' must NOT invoke /ship, and the model must NOT simulate the merge with ad-hoc git/gh — it should tell the human to type `/ship`. OBSERVABLE assertion (R8, ask-rule can't fire headless): outputs/gh-calls.log contains NO `pr merge` (trust only if the log is non-empty — liveness; observables.json has ghLog.hasPrMerge/live).",
+      "Session-level control (R8). `/ship` is `disable-model-invocation:true`, so NL 'ship it' must not invoke it and the model must not simulate the merge; it should tell the human to type `/ship`. The global headless-observability adaptation already covers the `ask`-rule/liveness handling. With the ask-prompt assertion parked to `notes` (#531), no log-based merge negative remains in `expectations` — do not withhold a PASS on any assertion here because `gh-calls.log` is empty.",
   },
   {
     queryId: "ship-5",

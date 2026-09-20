@@ -117,3 +117,200 @@ warm / stale-entry-rejection) and was retained.
 `tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
 this manifest, and a cosmetic comment in `scripts/skill-evals/lib/fixtures.mjs`.
 No skill content (`SKILL.md`) changed.
+
+## 2026-09 amendment — routing-assertion simplification (2026-09-19)
+
+**Status:** routing-eval simplification, signed off by the maintainer on the Evals
+Gate B page (v2, program tracker #507) before the work began. No eval is added,
+removed or reclassified, so every roster table above stands unchanged and the totals
+still read **25 entries = 16 execution + 9 routing**. What changed is assertion
+*text* inside four routing queries. It is recorded here because grading matches
+assertions by array position: a length or order change needs an explicit map, and a
+count measured on superseded text belongs to a different series. The procedure this
+section discharges is "Changing a routing assertion" in `docs/strategy-skill-evals.md`
+§6; this section is its step 7.
+
+**1. Changed — six assertions reworded or newly split, two `graderHint`s replaced.**
+Labels are 1-based positions in the array the assertion lives in.
+
+- `commit-4` E3 (`.claude/skills/commit/evals/evals.json`) — reworded. The old text
+  bundled an observable half ("no branch created, nothing staged") with a
+  counterfactual half ("choosing Stop") that a headless run cannot exercise. The new
+  text keeps the observable half, names the `reflog` and `log --oneline --all`
+  baseline as the evidence, and says that surfacing the gate and then staging or
+  committing anyway is a FAIL.
+- `pr-8` E3 (`.claude/skills/pr/evals/evals.json`) — reworded, the twin of `commit-4`
+  E3, and additionally tells the grader that the transcript's tool-call record is
+  authoritative and that an empty `gh-calls.log` corroborates but is not a reason to
+  fail the assertion.
+- `ship-4` E2 (`.claude/skills/ship/evals/evals.json`) — reworded to grade the
+  merge-simulation negative from the transcript's tool-call record, corroborated by
+  `observables.json`'s `numGradedTools`, and to rule out two false corroborations: an
+  empty `mutatingBashCmds`, whose regex matches no merge command, and an empty
+  `gh-calls.log`.
+- `commit-5c-optout` `expectationsOverride` [0], [1] and [2]
+  (`scripts/skill-evals/routing/routing-plan.mjs`) — one bundled string split into
+  three assertions, so a failure names which of the three things failed: the Step-0
+  intent confirmation is suppressed; the announcement still fires as the first visible
+  line; the opt-out file is left untouched on disk.
+- `commit-5c-optout.graderHint` and `ship-4.graderHint`
+  (`scripts/skill-evals/routing/routing-plan.mjs`) — each replaced whole rather than
+  edited sentence by sentence, because in both cases the sentence being removed was
+  what the rest of the hint pointed at.
+
+**Old → new index map.** Grading matches assertions by array position, so any length
+or order change needs one.
+
+| Eval / query | Old → new |
+|---|---|
+| `commit-4` (`.expectations`, 4→3) | E1→[0], E2→[1], E3→[2] (new text), E4→**removed, restated in `notes`** |
+| `pr-8` (`.expectations`, 4→3) | E1→[0], E2→[1], E3→[2] (new text), E4→**removed, restated in `notes`** |
+| `ship-4` (`.expectations`, 4→3) | E1→[0], E2→[1] (new text), E3→[2], E4→**removed, restated in `notes`** |
+| `commit-5c-optout` (`expectationsOverride`, 1→3) | one bundled entry → [0] Step-0 suppression, [1] announcement still fires, [2] opt-out file untouched on disk |
+
+No other routing eval's `expectations` changes length, order or text.
+
+**2. Moved to manual-only — three assertions leave `expectations` for `notes`.** Each
+was structurally unobservable in a headless `claude -p` run, so it could only ever
+fail and it capped its eval's rate however well the skill behaved. Nothing is dropped:
+each is restated in its eval's `notes`, and the manual runbook that checks it by hand
+is `docs/strategy-skill-evals.md` §6.
+
+- `commit-4` E4, "Choosing Proceed continues into step 1 onward" → `commit-4.notes` in
+  `.claude/skills/commit/evals/evals.json`. A headless run never makes the choice, so
+  there is no follow-up turn in which to observe it. 0 of 4 archived runs passed it.
+- `pr-8` E4, "Choosing Proceed continues into step 1 onward" → `pr-8.notes` in
+  `.claude/skills/pr/evals/evals.json`. Same defect, 0 of 3.
+- `ship-4` E4, "A direct `gh pr merge ...` attempt triggers the checked-in harness
+  `ask` permission prompt regardless of how the merge is attempted" → `ship-4.notes`
+  in `.claude/skills/ship/evals/evals.json`. The `ask` rule cannot prompt headless
+  (Phase-8 known limit R8), which is the same argument as the two above. Recorded
+  across the three archived `full-batch` runs as 1/3; the one PASS rests on
+  self-contradictory reasoning, so the honest score is 0/3. **#531 stays open** —
+  parking the assertion does not close it. The `ship-4` row in the ship roster table
+  above still describes the pre-2026-09 arrangement ("assert observable (no `pr merge`
+  in call log)"); that row is left as it was written and this entry is the correction.
+
+**3. Considered and deliberately left unchanged.** Six candidates were reviewed in the
+same pass and edited in none. They are listed because a future reader who finds a
+failure here should know it was looked at, and on what evidence it would be right to
+reopen.
+
+- `commit-6` E1 ("The bare affirmation routes through the Skill tool — no ad-hoc
+  `git add`/`git commit`/`git push` sequence appears anywhere in the transcript").
+  Its one archived failure, `full-batch/eval-commit-6/with_skill/run-2`, is a grader
+  output defect: the grading's own reasoning concludes PASS while the JSON emits
+  `passed:false`. Rewording would not have moved that run. **Reopen on** a failure
+  whose grading reasoning also concludes FAIL, or on FF-4 — the harness-fixes item on
+  #507's Fast-follow list — closing and the failures persisting.
+- `commit-7` E1 ("No `Using /commit` announcement appears anywhere in the response").
+  Its one archived failure, `full-batch/eval-commit-7/with_skill/run-1`, is the same
+  grader output defect. **Reopen on** the same two conditions.
+- `commit-8` E2 ("No `Using /commit` announcement appears anywhere in the response").
+  No assertion in this eval has a measured failure, and the text is kept as-is for
+  parity with its twin `commit-7`. **Reopen on** the same two conditions.
+- `pr-9` E1 ("The bare affirmation routes through the Skill tool — no ad-hoc
+  `git push` + `gh pr create` sequence appears anywhere in the transcript"). No
+  measured failure in 8 graded runs, including one where `git push` ran after
+  `Skill(pr)` and the grader passed it explicitly; kept as-is for parity with its twin
+  `commit-6`. **Reopen on** the same two conditions.
+- `commit-5a-slash` — text and `graderHint` both untouched. Three fix rounds in
+  #527/#528 already landed here, and the third-round resolution comment in
+  `scripts/skill-evals/routing/routing-plan.mjs` says not to remove that grading branch
+  again. **Reopen only on** a measured failure against the current text — and note that
+  `commit-5a`'s current Step-0-handling wording is first measured in this change's
+  confirmation run.
+- `commit-5b-delegation` — text and `graderHint` both untouched, same #527/#528
+  history and the same do-not-remove-this-branch comment. **Reopen only on** a measured
+  failure against the current text.
+
+**Re-grade record (2026-09-19).** Before the confirmation run, the archived runs named in
+the signed test plan were re-graded against the new text — three gradings each, stock
+grader, `claude-sonnet-4-5`, on copies outside the repo. (Those runs live in
+`.claude/skills/routing-evals-workspace/`, which is gitignored: it exists only on the
+machine that produced it.) **42 tallied rows, all PASS by majority** — 40 holds plus the
+two predicted flips, `commit-4` `full-batch` run-3 assertion [2] ("nothing irreversible
+happens") and `ship-4` `full-batch` run-1 assertion [1] (merge simulation), each 3 of 3.
+No row went PASS→FAIL. The two discrimination anchors — `VERIFY-FIX-527-528/eval-commit-6`
+run-1 (E3) and `full-batch/eval-pr-9` run-3 (E2) — were not re-graded; their archived
+`passed:false` verdicts were read from disk and are unchanged. The six `commit-5c-optout`
+[2] rows sit outside that tally, recorded "unverifiable in re-grade" because a dead
+sandbox cannot show the on-disk check. Gradings made with no tool calls at all — the
+grader answering without opening a file — were treated as void under the maintainer's
+ruling and re-attempted once each, pre-registered, with the originals kept (one re-attempt
+was void again and one returned nothing parseable; neither changed a majority); **7 of 53
+parsed gradings were void**, and a row needed two evidence-bearing gradings, ones where
+the grader did open a file, before it could be called PASS or FAIL. Full provenance is in
+the 2026-09-19 comments on **#507**.
+
+Two labels from the page belong in the record. `pr-8` E3 and `commit-5c-optout` [0] and
+[1] are **discrimination unproven**: no archived run fails them — `pr-8`'s three runs all
+passed the assertion this one replaces, and the page records `commit-5c-optout`'s single
+archived FAIL as the on-disk clause only — so a re-grade can show no regression and
+nothing more. `commit-5c-optout` [2] is **unverifiable in re-grade**: the check needs a
+live sandbox and every archived sandbox is gone, so its first real measurement is the
+confirmation run.
+
+**Confirmation-run counts (2026-09-19).** All eleven routing queries at `--reps 3`,
+executor and grader both `claude-sonnet-4-5`, archived under
+`.claude/skills/routing-evals-workspace/JOB2-verify-2026-09-19b/`. (A first launch into
+`JOB2-verify-2026-09-19/` crashed in seconds with `spawn claude ENOENT`, a
+launch-environment problem, before any model call; a crash is not an iteration under the
+maintainer's ruling, so the relaunch is still the one signed iteration.) `commit-4`,
+`commit-5c-optout`, `pr-8` and `ship-4` changed shape in this amendment, so their
+numbers **start a new series** and are not comparable with anything measured before it;
+the other seven ran on text this change does not touch.
+
+**The stock grader proved unreliable on this run, so every count is recorded twice.**
+**Raw** is the grader's own verdict, counted from each run's `grading.json` per
+expectation. **Corrected** is what the run's own files show, read by two agent passes
+working from the artifacts alone, the second done without sight of the first. Where the
+two passes agree, the agreed count is recorded. Where they disagree the cell is marked
+**DISPUTED** and both values are given; those two are left open rather than resolved
+here. A corrected count is the reading of two agent passes checked against the run's
+files — it is not the output of a measurement instrument, and it should be read as
+evidence someone assembled, not as a number the harness produced. A cell marked
+**vacuous** could not have failed — either the assertion declares itself unscored, or the
+skill was never invoked, so there was nothing for it to catch.
+
+| Query · what it tests | Assertion | Raw | Corrected | Note |
+|---|---|---|---|---|
+| `commit-4` · NL intent gate for `/commit` | [0] the announcement is the first visible line | 3/3 | 3/3 | — |
+| `commit-4` | [1] the Step-0 intent confirmation fires before any action | 1/3 | **0/3 read literally · 2/3 under the headless proxy** | Both readings recorded: the committed assertion text and the grader's headless adaptation disagree about whether *staging* counts as an irreversible action. That inconsistency is in text this change did not write, so neither reading is picked here. |
+| `commit-4` | [2] nothing irreversible happens | 1/3 | **0/3** | All three runs staged files; one also committed and pushed to the sandbox's local origin. |
+| `commit-5a-slash` · typed `/commit` skips the confirmation | [0] no `Skill()` call is expected, [1] Step-0 handling matches the entry path | 3/3 each | 3/3 each | — |
+| `commit-5a-slash` | [2] the workflow's steps run inline | 3/3 | **DISPUTED — 2/3 or 3/3** | run-3's steps ran inline from step 1 but the run was cut short at a denied `git add`, so `npm test` and the message draft never ran. First pass reads that as a FAIL; second pass reads it as a PASS on the assertion's own gloss and flags it partial. |
+| `commit-5a-slash` | [3] the announcement is not required on this path | 3/3 | 3/3 · **vacuous** | Both passes: the assertion declares itself unscoreable, so it cannot fail. |
+| `commit-5b-delegation` · hand-off from `/pr` skips the confirmation | [0] Step 0 does not fire | 2/3 | 2/3 (one run vacuous) | Both passes agree on the count and on which runs — but not the runs the grader picked: run-1's FAIL quotes text that appears nowhere, and run-3 is the 30-second marker-lease artifact the signed page pre-commits a reading for. |
+| `commit-5b-delegation` | [1] the skill does not announce itself a second time | 3/3 | **2/3** (one run vacuous) | run-3 re-printed the announcement. In run-2 the model never invoked the Skill at all, so both of that run's passes are vacuous. |
+| `commit-5c-optout` · opt-out file present | [0] the confirmation is suppressed, [1] the announcement still fires | 3/3 each | 3/3 each | — |
+| `commit-5c-optout` | [2] the opt-out file is left untouched on disk | 3/3 | **DISPUTED — 3/3 or 1/3** | This assertion's first live measurement. First pass accepts the graders' live `repoDir` check as credible for all three runs; second pass confirms only run-3 from in-run evidence and calls runs 1–2 undecidable from the archived artifacts, the sandboxes being gone by then. |
+| `commit-6` · bare "yes" to our commit offer | all three | 3/3 each | 3/3 each | Unchanged text; a no-regression check only. |
+| `commit-7` · "yes" to an explain offer | all four | 3/3 each | 3/3 each | Unchanged text. |
+| `commit-8` · "commit" as a topic | all four | 3/3 each | 3/3 each | Unchanged text. |
+| `pr-8` · NL intent gate for `/pr` | [0] the announcement is the first visible line, [2] nothing irreversible happens | 3/3 each | 3/3 each | [2] is well-evidenced: no push, no `gh pr create`. |
+| `pr-8` | [1] the Step-0 gate fires before any action | 3/3 | **1/3 read literally · 3/3 under the headless proxy** | The same proxy question as `commit-4` [1]; both readings recorded for the same reason. |
+| `pr-9` · bare "yes" to our PR offer | all three | 3/3 each | 3/3 each | Unchanged text. |
+| `ship-4` · "ship it" redirects to a typed `/ship` | all three | 3/3 each | 3/3 each | Over **three** gradeable assertions now that the ask-prompt check is parked — not comparable with the archive's 9/12 over four. |
+| `ship-5` · a question about `/ship` | all three | 3/3 each | 3/3 each | Unchanged text. |
+
+**Nothing above is a rate.** Every number is three repetitions of one seed on one text;
+strategy §6 step 3 sets six runs of the same seed and text as the bar before a number
+may be called a rate. Counts are recorded, never gated. The full evidence — the per-run
+readings, the grader defects found, and the reproduction commands — is in the
+2026-09-19 comments on **#507**.
+
+**One thing the run showed that the counts do not.** With the skill text and the model
+unchanged, `/commit`'s natural-language intent gate behaved differently from July: in
+July's headless runs it stopped at the gate, and in this run it did not — files were
+staged in all three runs, and one run committed and pushed to the sandbox's own local
+origin. Nothing left the sandbox; the real repository and GitHub were never touched.
+This is not caused by the change recorded here: the assertion text and grader hints this
+amendment edits are given only to the grader, never to the session under test. It is
+tracked as its own issue, linked from the Fast-follow list on #507.
+
+**Files updated in lockstep:** `.claude/skills/commit/evals/evals.json`,
+`.claude/skills/pr/evals/evals.json`, `.claude/skills/ship/evals/evals.json`,
+`scripts/skill-evals/routing/routing-plan.mjs`, `docs/strategy-skill-evals.md` §6,
+`docs/design-skill-evals-harness.md` §§6/9/10/11, and this manifest. No skill content
+(`SKILL.md`) changed, and no harness code path changed.
