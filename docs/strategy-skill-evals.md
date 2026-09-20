@@ -250,14 +250,17 @@ actually read. It says, verbatim:
 
 So **editing an eval counts**, not just editing a `SKILL.md`.
 
-**Not settled: what a routing-only change owes.** The batch runs `kind: execution` evals; it
-cannot exercise a routing eval at all. Nothing decides whether `run-routing-evals.mjs` discharges
-the box for a routing-only change, and nothing states a repetition count for diagnosing a flaky
-routing eval (`--reps 3` is a reporting default, not a diagnostic one). Both are open, tracked on
-**#507**. Until they land, **the maintainer decides case by case**: say in the PR which run you
-did and why, rather than inventing a rule. Background:
-[`design-skill-evals-harness.md`](design-skill-evals-harness.md) §10, "No procedure for changing a
-routing assertion".
+**Changing a routing assertion.** Use this when a routing eval looks flaky or an assertion needs rewording. It is a text-only change: `expectations` / `notes` in the skill's `evals.json`, and `expectationsOverride` / `graderHint` in `scripts/skill-evals/routing/routing-plan.mjs`.
+
+1. **Read the failing grading's `evidence` text before blaming the wording.** If the reasoning reaches PASS while `passed` is false, or the `summary` block contradicts the per-expectation verdicts, it is a grader output defect, not an assertion problem — record it (FF-4) and stop.
+2. **Presume the test, not the skill.** If `observables.json` is the same across runs but the verdicts differ, the assertion or its hint is the problem; if the observables differ, the model's behaviour varies and you are looking at a rate, not a bug.
+3. **Diagnose on one seed and one text.** Never pool runs across seed shapes (`input.jsonl` turn count) or across versions of the assertion text. Three runs cannot distinguish one-in-three from noise, so treat anything under **six** runs of the same seed and text as an indication, not a rate.
+4. **Keep an assertion only if it checks function** — the skill follows its procedure, lands, catches an error or refuses what it must, invokes another skill when it should, or keeps the human informed — and only if a run can observe it. What no run can show moves to the eval's `notes` as a manual-only line; it does not stay in `expectations`, where it can only fail.
+5. **Re-grade before you re-run.** Re-grade the archived runs for that query against the new text (copies outside the repo; stock grader, three times). There is no CLI for this — `runGrader` is exported from `routing/lib/driver.mjs` and the re-grade is a short hand-rolled script over an existing `runDir`. Known-FAIL runs that should now pass must flip, known-PASS runs must stay, and a real failure must stay failed. A null or unparseable grade is a failure. A re-grade runs against a **dead** sandbox, so any clause a live grader could only check by shelling into `repoDir` is recorded "unverifiable in re-grade", never FAIL. If no archived run fails the assertion, record "discrimination unproven".
+6. **Then run only what changed:** `node scripts/skill-evals/routing/run-routing-evals.mjs --only <query ids> --reps 3`. Record the result as a **confirmation sample (n=3)** — counts, not rates; promote it to a rate only after six runs on unchanged text. Archive it, and confirm the sandbox root is empty afterwards (`teardown-sandbox.mjs --all` if anything survived; the runner already tears each sandbox down in its own `finally`).
+7. **Record** the old→new index map (grading matches assertions by position) and the measured counts in `docs/spec-skill-evals-manifest.md`, as a new series when the assertion set changed shape. Counts are recorded, never gated.
+8. **Stop after one iteration.** If the numbers did not move, or you are on a third round for the same case, stop and take it to the maintainer with a three-line note: what fails, how much it matters, keep-grinding vs. redesign.
+9. **What the PR owes.** The full skill-eval batch does not exercise routing evals, so a routing-only change does not owe it. Leave the PR template's skill-eval box unchecked with the one-line reason it allows — "routing-only assertion + eval-header change; no execution eval touched; re-grade + `--only` run per strategy §6" — and put the counts in the PR body. The box fires on any change under `.claude/skills/**`, including a `$comment` edit, so say so in the reason.
 
 **Single-eval runs are legitimate for authoring, not for regression evidence.** Driving one eval by
 hand with [`prompts/executor-prompt.md`](../scripts/skill-evals/prompts/executor-prompt.md) while
@@ -415,11 +418,13 @@ just a PATH misroute. (The permanent close would be sandbox-scoped merge instrum
 `ask` rule can't preempt; until then, the transcript is the load-bearing leg — the ship
 merge expectations spell this out inline.)
 
-**`ship-4` is the one acknowledged exception, and it is weaker on purpose.** As a routing eval it
-runs headless, where there is no transcript-side merge to read because the point is that `/ship`
-must never fire at all — so it asserts the observable instead (no `pr merge` in `gh-calls.log`,
-trusted only when the log is non-empty). That is a liveness-guarded negative, not a repeal of the
-rule above; #531 tracks whether its assumptions still hold.
+**`ship-4` was the one acknowledged exception; as of 2026-09 it is not.** As a routing eval it runs
+headless, and it used to assert the observable instead (no `pr merge` in `gh-calls.log`, trusted
+only when the log is non-empty) — a liveness-guarded negative, not a repeal of the rule above. Its
+ask-prompt check is now parked in the eval's `notes` as manual-only, so no log-based merge negative
+remains in `ship-4.expectations`; its merge-simulation assertion is graded from the transcript's
+tool-call record like every other merge-adjacent assertion. The manual runbook below still covers
+the `ask`-prompt check by hand, and #531 stays open.
 
 **Routing evals: automated by the Phase-8 session runner.** The nine `kind: routing` evals
 (listed below) aren't part of the *execution* batch — a subagent handed the skill can't
@@ -440,8 +445,10 @@ Two **headless-observability adaptations** the runner's grader applies (a headle
 `claude -p` session has no interactive layer): (1) `AskUserQuestion` does not exist headless
 — "Step 0 fires via AskUserQuestion" is graded by its **observable proxy** (announcement +
 gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `ask` rule
-can't prompt headless (risk R8) — `ship-4` asserts the **observable** (no `pr merge` in
-`gh-calls.log`, trusted only when the log is non-empty — liveness).
+can't prompt headless (risk R8) — for any "merge is gated" expectation the grader asserts the
+**observable** (no `pr merge` in `gh-calls.log`, trusted only when the log is non-empty —
+liveness). The driver applies (2) generically, to whatever expectation it is handed; `ship-4`'s
+ask-prompt check no longer relies on it (parked in that eval's `notes` as manual-only — see above).
 
 **Two further headless limits, specific to the delegation-marker evals** (found 2026-07-20
 while resolving #527; both are environment facts, not skill defects):

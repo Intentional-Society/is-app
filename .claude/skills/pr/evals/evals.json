@@ -1,5 +1,5 @@
 {
-  "$comment": "Runnable eval definitions for /pr (spec docs/spec-portable-ai-procedures.md §4.2). Converted from the original repo-root evals/evals.json per the approved conversion manifest (docs/spec-skill-evals-manifest.md — Phase 1 of docs/spec-skill-evals-baseline.md). EXECUTION NOTICE: skill-eval prompts are never executed against the real repo or real GitHub — any skill, any origin. `kind: execution` entries require a harness-built sandbox (`fixture` names the starting-state profile; `human_script` gives the scripted human replies, valid only inside a marker-bearing sandbox) — see docs/strategy-skill-evals.md. `kind: routing` entries test whether/how the skill fires in a live session; a subagent handed this file cannot execute them — they stay documented manual runbooks (docs/strategy-skill-evals.md) until the Phase-8 session runner. As of Phase 1 the sandbox harness does not exist yet (it ships in Phase 2), so no eval below is executable at all right now — CLAUDE.md's guardrail carries this staged caveat too.",
+  "$comment": "Runnable eval definitions for /pr (spec docs/spec-portable-ai-procedures.md §4.2). Converted from the original repo-root evals/evals.json per the approved conversion manifest (docs/spec-skill-evals-manifest.md; program tracker #507). EXECUTION NOTICE: skill-eval prompts are never executed against the real repo or real GitHub — any skill, any origin. `kind: execution` entries require a harness-built sandbox (`fixture` names the starting-state profile; `human_script` gives the scripted human replies, valid only inside a marker-bearing sandbox) — see docs/strategy-skill-evals.md. `kind: routing` entries test whether/how the skill fires in a live session; a subagent handed this file cannot execute them — they run through the routing runner (scripts/skill-evals/routing/run-routing-evals.mjs), and what a headless run cannot show is listed in the affected eval's `notes` as manual-only, with the manual runbook in docs/strategy-skill-evals.md §6. Design and rationale: docs/design-skill-evals-harness.md.",
   "skill_name": "pr",
   "skill_path": ".claude/skills/pr/SKILL.md",
   "spec_section": "docs/spec-portable-ai-procedures.md §4.2",
@@ -146,10 +146,9 @@
       "expectations": [
         "The first visible line of the response is the announcement `Using /pr`",
         "The Step 0 intent gate fires via AskUserQuestion before any `gh auth`, `git fetch`/`push`, or `gh pr create`",
-        "Choosing Stop leaves zero side effects: no push, no PR created",
-        "Choosing Proceed continues into step 1 onward"
+        "Nothing irreversible happens in this run: `outputs/git-state.txt` shows no push (origin unchanged, no remote-tracking counterpart for the branch), and the transcript's tool-call record contains no `gh pr create`. The transcript is authoritative: the permission layer can intercept a command before the stub logs it, so an empty `gh-calls.log` corroborates but is **not** a reason to fail this assertion. The liveness rule applies to log-based merge negatives, not here. Surfacing the gate and then pushing or opening the PR anyway is a FAIL; the gate stops and waits."
       ],
-      "notes": "Routing eval — not sandbox-executable by a subagent (routing is the thing under test). Stays a documented manual runbook at baseline; automated by the Phase-8 session runner."
+      "notes": "Routing eval — not sandbox-executable by a subagent (routing is the thing under test). Stays a documented manual runbook at baseline; automated by the Phase-8 session runner. Manual-only (no headless proxy exists): at the Step 0 gate, choosing Stop leaves zero side effects and choosing Proceed continues into step 1 onward. A headless `claude -p` run makes neither choice, so both branches are checked by hand — see docs/strategy-skill-evals.md §6."
     },
     {
       "id": "pr-9",
@@ -163,7 +162,7 @@
         "The first visible line is the announcement `Using /pr`",
         "The Step 0 intent gate fires immediately after the announcement"
       ],
-      "notes": "Routing eval — two-turn; the Phase-8 multi-turn driver case (R4). Not sandbox-executable by a subagent at baseline."
+      "notes": "Routing eval — two-turn; the Phase-8 multi-turn driver case (R4). Not sandbox-executable by a subagent at baseline. Reviewed 2026-09 and deliberately left unchanged: E1 has no measured failure in 8 graded runs — including one where `git push` ran after `Skill(pr)` and the grader passed it explicitly — and the text is kept as-is for parity with its twin `commit-6`. E2 carries this eval's only measured discrimination: it failed in `full-batch/eval-pr-9/with_skill/run-3`. See docs/spec-skill-evals-manifest.md (2026-09 amendment)."
     }
   ]
 }
