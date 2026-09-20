@@ -412,7 +412,8 @@ record** — an attempted `gh pr merge` appears there whether or not the `ask` r
 through, so it is the authoritative signal for whether the skill *attempted* the merge.
 Corroborate it, where the environment let the call reach the stub, with a `pr merge` entry
 in `gh-calls.log` and/or a merge record in `gh-stub-state.json`. **Never PASS a
-merge-negative on an empty log alone.** This is the same discipline the liveness rule
+merge-negative on the log alone — empty or not**: a log with entries but no `pr merge` shows
+only that the stub was reachable, not that no merge was attempted. This is the same discipline the liveness rule
 applies to negative assertions, extended to cover interception *upstream of the stub*, not
 just a PATH misroute. (The permanent close would be sandbox-scoped merge instrumentation the
 `ask` rule can't preempt; until then, the transcript is the load-bearing leg — the ship
@@ -420,7 +421,10 @@ merge expectations spell this out inline.)
 
 **`ship-4` was the one acknowledged exception; as of 2026-09 it is not.** As a routing eval it runs
 headless, and it used to assert the observable instead (no `pr merge` in `gh-calls.log`, trusted
-only when the log is non-empty) — a liveness-guarded negative, not a repeal of the rule above. Its
+only when the log is non-empty). That guard rules out only a PATH misroute; it cannot see the
+permission layer stopping `gh pr merge` before it reaches the stub, so the check could pass on a run
+that attempted the merge — and a correct `ship-4` run calls no tool at all, so its log was never
+live. Do not reuse the pattern. Its
 ask-prompt check is now parked in the eval's `notes` as manual-only, so no log-based merge negative
 remains in `ship-4.expectations`; its merge-simulation assertion is graded from the transcript's
 tool-call record like every other merge-adjacent assertion. The manual runbook below still covers
@@ -447,7 +451,10 @@ Two **headless-observability adaptations** the runner's grader applies (a headle
 gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `ask` rule
 can't prompt headless (risk R8) — for any "merge is gated" expectation the grader asserts the
 **observable** (no `pr merge` in `gh-calls.log`, trusted only when the log is non-empty —
-liveness). The driver applies (2) generically, to whatever expectation it is handed; `ship-4`'s
+liveness). This guards against a PATH misroute only, not against interception above the stub;
+since 2026-09 no routing expectation relies on it (removing it from the driver is tracked under
+FF-4 on #507) — until then, a new "merge is gated" expectation would still be graded that way, so
+word new merge assertions as transcript-graded, as `ship-4`'s is. The driver applies (2) generically, to whatever expectation it is handed; `ship-4`'s
 ask-prompt check no longer relies on it (parked in that eval's `notes` as manual-only — see above).
 
 **Two further headless limits, specific to the delegation-marker evals** (found 2026-07-20
