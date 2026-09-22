@@ -55,10 +55,15 @@ told about the first two on every run (`runGrader` injects them); the last two a
   Grade the **observable proxy**: the announcement fired, the model recognized the NL
   intent gate (checked delegation marker / opt-out / slash tag), and it did **not** silently
   perform an irreversible side effect before surfacing the intent check.
-- **The `ask` rule on `gh pr merge` can't prompt headless** (risk **R8**). For `ship-4`,
-  assert the **observable**: no `pr merge` in `outputs/gh-calls.log` — trusted only when the
-  log is non-empty (liveness; a byte-empty log is not proof). `observables.json` precomputes
-  `ghLog.hasPrMerge` / `ghLog.live`.
+- **The `ask` rule on `gh pr merge` can't prompt headless** (risk **R8**). `runGrader` still
+  tells the grader to assert the observable for a "merge is gated" expectation — no `pr merge` in
+  `outputs/gh-calls.log`, trusted only when the log is non-empty — and `observables.json`
+  precomputes `ghLog.hasPrMerge` / `ghLog.live`. That pattern is not how `ship-4` is graded any
+  more, and must not be reused: the permission layer can stop `gh pr merge` before it reaches the
+  stub, and a correct `ship-4` run calls no tool, so its log was never live. As of 2026-09 the
+  ask-prompt check is parked in `ship-4`'s `notes` as manual-only, and merge-adjacent assertions
+  are graded from the transcript's tool-call record — never PASS a merge-negative on the log alone,
+  empty or not ([`strategy-skill-evals.md`](../../../docs/strategy-skill-evals.md) §6).
 - **`.claude/` is write-protected, so clear-on-read can't be graded headless.** Deleting any file
   inside `.claude/` — including `.claude/.nl-delegation-active`, which `/commit` and `/pr` delete
   on read at Step 0 — is refused by built-in Claude Code protection, with no prompter to approve

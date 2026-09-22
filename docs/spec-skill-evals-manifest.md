@@ -61,7 +61,7 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 | ship-1-happy-path-preexisting-pr | execution | ship-1 | `feature-open-pr-all-green` | Stub: checks all-green, merge, post-merge run list |
 | ship-2-refusal-pending-advisory (3 option branches) | execution | **ship-2a** (wait+5, then abort), **ship-2b** (troubleshoot); ~~ship-2c (abort)~~ **removed in Phase 7** | `feature-open-pr-advisory-pending` (shared) | **Resolves the branch-keyed-script finding:** one entry per scripted branch, each a single-prose `human_script`; retained arms assert the exact three-option menu, no `proceed`. First-wave (2a ≈ 10 min wall clock — the batch's long pole). **Phase-7 right-sizing: `ship-2c` (immediate abort) removed — every one of its assertions is a strict subset of `ship-2a`, which reaches the identical abort behavior via a superset path (wait+5 → abort); `ship-2b` retains the distinct troubleshoot arm. Abort-abandons-merge safety stays covered by `ship-2a`.** |
 | ship-3-edge-docs-only-pr | execution | ship-3 | `docs-only-open-pr` | Asserts NO 5-min advisory wait on the docs-only path |
-| ship-4-nl-ship-intent-redirects | routing | ship-4 | — | Session-level (`disable-model-invocation` + harness ask-rule); Phase-8 known limit R8: assert observable (no `pr merge` in call log) |
+| ship-4-nl-ship-intent-redirects | routing | ship-4 | — | Session-level (`disable-model-invocation` + harness ask-rule); Phase-8 known limit R8. Until 2026-09 it asserted the observable (no `pr merge` in call log); that check is now parked in `ship-4.notes` as manual-only — see the 2026-09 amendment below, item 2 |
 | ship-5-explain-ship-question | routing | ship-5 | — | Over-trigger control |
 | ship-6-delegation-cascade | **execution** | ship-6 | `feature-dirty-no-pr` (reused) | **Resolves the flagged classification:** the cascade *mechanics* (markers written/cleared, handoff lines in transcript, Step-0 suppression, commit→PR→merge through stubs) are sandbox-executable by an executor following the three SKILL.md files; the live Skill-tool announcement nuance stays additionally covered by the routing runbook next to ship-4/5 (cross-noted there). Accepted-compromise per R7: scripted "typed /ship" premise tests step-following, not live UX |
 
@@ -199,8 +199,8 @@ is `docs/strategy-skill-evals.md` §6.
   across the three archived `full-batch` runs as 1/3; the one PASS rests on
   self-contradictory reasoning, so the honest score is 0/3. **#531 stays open** —
   parking the assertion does not close it. The `ship-4` row in the ship roster table
-  above still describes the pre-2026-09 arrangement ("assert observable (no `pr merge`
-  in call log)"); that row is left as it was written and this entry is the correction.
+  above described the pre-2026-09 arrangement ("assert observable (no `pr merge`
+  in call log)"); it was left as written when this entry was added, and that row was corrected in #586.
 
 **3. Considered and deliberately left unchanged.** Six candidates were reviewed in the
 same pass and edited in none. They are listed because a future reader who finds a
