@@ -5,8 +5,10 @@
 // interprets these fields; adding an eval is usually just naming a new profile here.
 //
 // Every `fixture` name referenced by a `kind: execution` eval in
-// .claude/skills/{commit,pr,ship}/evals/evals.json must appear in FIXTURES below. The
-// list of names is the binding acceptance criterion for Phase 2, not a target count.
+// .claude/skills/{commit,pr,ship,handoff}/evals/evals.json must appear in FIXTURES below.
+// The list of names is the binding acceptance criterion for Phase 2, not a target count.
+// Several evals may name the same profile — four of the ten `/handoff` evals have a profile
+// of their own and the other six reuse one, each saying so in its own `notes` (issue #585).
 //
 // Case rule (macOS default FS is case-insensitive): no two file paths within a single
 // profile may differ only by case. assertNoCaseCollisions() enforces this at build time.
@@ -157,7 +159,120 @@ function featureModule(slug) {
 }
 
 // ---------------------------------------------------------------------------------------
-// The 15 profiles.
+// /handoff worlds (issue #585). File bodies for the four `/handoff` profiles, derived from
+// the pre-harness builder `.claude/skills/handoff/evals/build_fixtures.mjs` but rebuilt on
+// this module's own baseline so a handoff sandbox is the same shape as every other one.
+// ---------------------------------------------------------------------------------------
+
+// `/handoff` writes its doc to `.scratch/<slug>-bootstrap.md` and its SKILL.md promises that
+// path is already gitignored. The shared baseline does not ignore it, so the handoff profiles
+// extend the baseline rather than changing `.gitignore` for all eighteen profiles.
+const HANDOFF_GITIGNORE = `${BASE_GITIGNORE}# agent scratch notes — where /handoff writes its hand-off doc
+.scratch/
+`;
+
+const NOTIFIER_BUGGY = `const MAX_RETRIES = 3;
+
+export async function sendWithRetry(send: () => Promise<void>) {
+  let attempts = 0;
+  for (;;) {
+    try {
+      await send();
+      return;
+    } catch (err) {
+      attempts += 1;
+      if (isTimeout(err)) attempts += 1; // timeouts count twice, exhausting retries early
+      if (attempts >= MAX_RETRIES) throw err;
+    }
+  }
+}
+
+function isTimeout(err: unknown) {
+  return err instanceof Error && err.message.includes("timeout");
+}
+`;
+
+const NOTIFIER_FIXED = NOTIFIER_BUGGY.replace(
+  "      attempts += 1;\n      if (isTimeout(err)) attempts += 1; // timeouts count twice, exhausting retries early\n",
+  "      attempts += 1; // every failure counts exactly once, timeout or not\n",
+);
+
+const BUTTONDOWN_BASE = `export async function mirrorProgramTags(
+  api: { setTags(email: string, tags: string[]): Promise<void> },
+  rows: { email: string; tags: string[] }[],
+) {
+  for (const row of rows) {
+    await api.setTags(row.email, row.tags);
+  }
+}
+`;
+
+const BUTTONDOWN_BATCHED = `const BATCH_SIZE = 25;
+
+export async function mirrorProgramTags(
+  api: { setTags(email: string, tags: string[]): Promise<void> },
+  rows: { email: string; tags: string[] }[],
+) {
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map((row) => api.setTags(row.email, row.tags)));
+  }
+}
+`;
+
+// The uncommitted follow-up edit: the session's own open question, left in the tree.
+const BUTTONDOWN_OPEN_QUESTION = BUTTONDOWN_BATCHED.replace(
+  "const BATCH_SIZE = 25;",
+  `const BATCH_SIZE = 25;
+// TODO(open question): does Buttondown's rate limit require backoff between batches?
+const BATCH_DELAY_MS = 0;`,
+);
+
+const API_TAG_MIRROR = `${BASE_API_TS}
+api.post("/cron/buttondown-mirror", (c) => c.json({ mirrored: true, includesProgramTags: true }));
+`;
+
+const SCHEMA_WITH_STATUS = BASE_SCHEMA_TS.replace(
+  '  createdAt: timestamp("created_at").defaultNow(),',
+  '  status: text("status").notNull().default("active"),\n  createdAt: timestamp("created_at").defaultNow(),',
+);
+
+// The expand half of an expand-contract migration: the new column lands alongside the old one.
+const SCHEMA_STATUS_EXPANDED = SCHEMA_WITH_STATUS.replace(
+  '  status: text("status").notNull().default("active"),',
+  '  status: text("status").notNull().default("active"),\n  statusV2: text("status_v2").notNull().default("active"),',
+);
+
+const MIGRATION_EXPAND_SQL = `-- expand step: add the new column alongside the old one (the contract step ships later)
+ALTER TABLE "members" ADD COLUMN "status_v2" text NOT NULL DEFAULT 'active';
+`;
+
+// Write path dual-writes; the read path is still on the old column — the half-implemented change.
+const API_DUAL_WRITE = `${BASE_API_TS}
+// Read path above still serves the OLD column only — the reader migration is not written yet.
+api.post("/members/:id/status", (c) => c.json({ wrote: ["status", "status_v2"] }));
+`;
+
+const MEMBERS_PAGE_BASE = `export default function MembersPage() {
+  return (
+    <main>
+      <h1>Members</h1>
+      <ul data-testid="member-list" />
+    </main>
+  );
+}
+`;
+
+// A teammate's work-in-progress edit sitting in the tree, which this session never made.
+const MEMBERS_PAGE_TEAMMATE_WIP = MEMBERS_PAGE_BASE.replace(
+  '      <ul data-testid="member-list" />',
+  `      {/* WIP: status filter experiment */}
+      <select data-testid="status-filter" />
+      <ul data-testid="member-list" />`,
+);
+
+// ---------------------------------------------------------------------------------------
+// The 19 profiles.
 // ---------------------------------------------------------------------------------------
 
 /** @type {Record<string, object>} */
@@ -523,6 +638,145 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       vercelProductionUrl: VERCEL_PROD_URL,
       pullComments: [],
       reviewThreads: [],
+    },
+  },
+
+  // handoff-1 (reused by handoff-6) — the fix is still in the working tree, nothing committed
+  "feature-uncommitted-fix-no-pr": {
+    summary:
+      "Feature branch for issue 486; the retry-count fix is UNCOMMITTED in the working tree; no commits ahead of main; no PR.",
+    branch: "486-notifier-retry-fix",
+    baseFilesExtra: { ".gitignore": HANDOFF_GITIGNORE, "src/server/notifier.ts": NOTIFIER_BUGGY },
+    branchCommits: [],
+    working: { write: { "src/server/notifier.ts": NOTIFIER_FIXED } },
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      branchPr: null,
+      issues: {
+        486: {
+          number: 486,
+          state: "OPEN",
+          title: "Notifier retry count double-increments on timeout",
+          body: "A timeout increments the attempt counter twice, so the retry budget is exhausted early.",
+        },
+      },
+    },
+  },
+
+  // handoff-4 (reused by handoff-2 and handoff-3) — one commit ahead, clean tree, no PR
+  "feature-one-commit-clean-no-pr": {
+    summary: "Feature branch for issue 486 with the retry-count fix COMMITTED (one commit ahead); clean tree; no PR.",
+    branch: "486-notifier-retry-fix",
+    baseFilesExtra: { ".gitignore": HANDOFF_GITIGNORE, "src/server/notifier.ts": NOTIFIER_BUGGY },
+    branchCommits: [
+      {
+        message: "fix(notifier): stop double-counting retries",
+        write: { "src/server/notifier.ts": NOTIFIER_FIXED },
+      },
+    ],
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      branchPr: null,
+      issues: {
+        486: {
+          number: 486,
+          state: "OPEN",
+          title: "Notifier retry count double-increments on timeout",
+          body: "A timeout increments the attempt counter twice, so the retry budget is exhausted early.",
+        },
+      },
+    },
+  },
+
+  // handoff-7 — two commits ahead, one uncommitted follow-up, an open issue, no PR
+  "feature-two-commits-dirty-open-issue": {
+    summary:
+      "Two workstreams on one branch: two commits ahead of main, one uncommitted follow-up edit, open issue 512, no PR.",
+    branch: "512-buttondown-tag-mirror",
+    baseFilesExtra: { ".gitignore": HANDOFF_GITIGNORE, "src/server/buttondown.ts": BUTTONDOWN_BASE },
+    branchCommits: [
+      {
+        message: "fix(buttondown): batch tag-mirror calls in the cron",
+        write: { "src/server/buttondown.ts": BUTTONDOWN_BATCHED },
+      },
+      {
+        message: "fix(api): include program tags in the mirror endpoint",
+        write: { "src/server/api.ts": API_TAG_MIRROR },
+      },
+    ],
+    working: { write: { "src/server/buttondown.ts": BUTTONDOWN_OPEN_QUESTION } },
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      branchPr: null,
+      issues: {
+        512: {
+          number: 512,
+          state: "OPEN",
+          title: "Buttondown tag mirror misses program tags",
+          body: "The nightly mirror drops program tags; batching may also be needed for the rate limit.",
+        },
+      },
+    },
+  },
+
+  // handoff-8 (reused by handoff-5, handoff-9 and handoff-10) — half-done expand-contract
+  // migration, an open PR with one check still running, and a teammate's WIP file in the tree
+  "feature-migration-open-pr-teammate-wip": {
+    summary:
+      "Expand migration + dual-write committed (two commits, pushed) with the read path still on the old column; a teammate's WIP file modified in the tree; open PR 520, one check pending.",
+    branch: "518-member-status-migration",
+    baseFilesExtra: {
+      ".gitignore": HANDOFF_GITIGNORE,
+      "src/server/schema.ts": SCHEMA_WITH_STATUS,
+      "src/app/members/page.tsx": MEMBERS_PAGE_BASE,
+    },
+    branchCommits: [
+      {
+        message: "feat(db): expand migration — add members.status_v2 alongside status",
+        write: {
+          "drizzle/0042_member_status_expand.sql": MIGRATION_EXPAND_SQL,
+          "src/server/schema.ts": SCHEMA_STATUS_EXPANDED,
+        },
+      },
+      {
+        message: "feat(api): dual-write member status to the old and new columns",
+        write: { "src/server/api.ts": API_DUAL_WRITE },
+      },
+    ],
+    openPr: true,
+    working: { write: { "src/app/members/page.tsx": MEMBERS_PAGE_TEAMMATE_WIP } },
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      // `gh pr view --json …statusCheckRollup,reviewDecision` (the /handoff step-2 call) gets
+      // the whole object back from the stub, so the PR carries those two extra fields.
+      branchPr: {
+        ...existingPr(520, "518-member-status-migration", "feat(members): status expand migration + dual write path"),
+        reviewDecision: "REVIEW_REQUIRED",
+        statusCheckRollup: [
+          { name: "Lint & Functional Tests", status: "COMPLETED", conclusion: "SUCCESS" },
+          { name: "E2E", status: "IN_PROGRESS", conclusion: "" },
+        ],
+      },
+      issues: {
+        518: {
+          number: 518,
+          state: "OPEN",
+          title: "Member status enum migration (expand-contract)",
+          body: "Migrate members.status to status_v2 in expand-contract order; the contract step ships last.",
+        },
+      },
     },
   },
 };

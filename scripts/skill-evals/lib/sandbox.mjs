@@ -63,7 +63,10 @@ export function buildSandbox({ fixture, root, note }) {
   git(["-C", repoDir, "push", "origin", "main"]);
 
   // --- feature branch: commits + optional push point ----------------------------------
-  git(["-C", repoDir, "switch", "-c", profile.branch]);
+  // `branch` is optional: a profile may deliberately stay on `main` (the starting world some
+  // /handoff evals describe — nothing in flight). Without the guard, a branchless profile
+  // fails at `git switch -c undefined` instead of building (#585, decision 1).
+  if (profile.branch) git(["-C", repoDir, "switch", "-c", profile.branch]);
   const branchCommits = profile.branchCommits || [];
   for (let i = 0; i < branchCommits.length; i++) {
     const c = branchCommits[i];
@@ -160,9 +163,16 @@ export function teardownSandbox(sandboxDir) {
  * The transcript (the third leg) is the executor's own output, written to the eval
  * workspace separately; this function captures only the legs the harness itself owns.
  *
+ * It also copies the sandbox repo's `.scratch/` directory into `scratch/` when one exists:
+ * a skill whose deliverable is a FILE rather than a command (`/handoff` writes
+ * `.scratch/<slug>-bootstrap.md`) leaves nothing in the two legs above — the doc is
+ * gitignored inside the sandbox, so `git-state.txt` never shows it. Copying it verbatim is
+ * what lets the grader read the produced document instead of prose about it (#585,
+ * decision 2). A no-op for every skill that produces no such file.
+ *
  * @param {string} sandboxDir  the sandbox to archive (must be outside the real repo).
  * @param {string} destDir     where to write the artifacts (an eval's `outputs/` dir).
- * @returns {{destDir:string, files:string[], gitState:boolean, ghCallLog:boolean}}
+ * @returns {{destDir:string, files:string[], gitState:boolean, ghCallLog:boolean, producedDocs:string[]}}
  */
 export function archiveEvidence(sandboxDir, destDir) {
   const resolved = assertOutsideRepo(sandboxDir);
@@ -223,6 +233,20 @@ export function archiveEvidence(sandboxDir, destDir) {
     captured.push("git-state.txt");
   }
 
+  // --- produced artifacts: the doc a file-producing skill wrote ------------------------
+  const scratchSrc = path.join(repoDir, ".scratch");
+  let producedDocs = [];
+  if (fs.existsSync(scratchSrc)) {
+    try {
+      fs.cpSync(scratchSrc, path.join(destDir, "scratch"), { recursive: true });
+      producedDocs = listFilesRelative(scratchSrc);
+      for (const rel of producedDocs) captured.push(`scratch/${rel}`);
+    } catch {
+      // A copy failure must never abort the archive — the two objective legs above matter more.
+      producedDocs = [];
+    }
+  }
+
   // --- archive manifest: provenance + what was captured -------------------------------
   const archiveManifest = {
     archivedAt: new Date().toISOString(),
@@ -232,6 +256,7 @@ export function archiveEvidence(sandboxDir, destDir) {
     legs: {
       ghCallLog,
       gitState,
+      producedDocs,
       transcript: "authored by the executor to the eval workspace — not a harness artifact",
     },
     note:
@@ -240,12 +265,14 @@ export function archiveEvidence(sandboxDir, destDir) {
       "any orchestrator narration, so the grade is executor-independent. Merge assertions are " +
       "corroborated against the transcript's tool-call record: the checked-in `ask` rule on " +
       "`gh pr merge *` can intercept a merge before the stub logs it, so an empty log is NOT " +
-      "proof no merge was attempted (merge-discrimination rule, docs/strategy-skill-evals.md).",
+      "proof no merge was attempted (merge-discrimination rule, docs/strategy-skill-evals.md). " +
+      "`producedDocs` lists whatever the run left in the sandbox repo's .scratch/ (copied to scratch/ here) — " +
+      "for a skill whose deliverable is a document, that copy IS the primary evidence.",
   };
   fs.writeFileSync(path.join(destDir, "archive-manifest.json"), `${JSON.stringify(archiveManifest, null, 2)}\n`);
   captured.push("archive-manifest.json");
 
-  return { destDir, files: captured, gitState, ghCallLog };
+  return { destDir, files: captured, gitState, ghCallLog, producedDocs };
 }
 
 /** Remove every sandbox under the root. Returns the removed dirs. */
@@ -283,6 +310,24 @@ function gitSafe(args) {
   } catch (err) {
     return `<git ${args.join(" ")} failed: ${err?.message ? err.message : err}>`;
   }
+}
+
+/** Every file under `dir`, as forward-slashed paths relative to it (for the archive manifest). */
+function listFilesRelative(dir) {
+  const out = [];
+  const walk = (current, prefix) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(path.join(current, entry.name), rel);
+      else out.push(rel);
+    }
+  };
+  try {
+    walk(dir, "");
+  } catch {
+    // Unreadable partway through — report what was listed rather than failing the archive.
+  }
+  return out;
 }
 
 /** Remove a dir tree, tolerating Windows read-only git objects + transient locks. */

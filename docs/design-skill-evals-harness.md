@@ -293,7 +293,8 @@ Carried forward from the baseline program that built this (§2, stage 4) and sti
   issue #507's body checklist, evidence on issue #513.
 - Structural validation (Layer A — the three test layers are defined in §2) recorded for the four
   skills in the contract and vendored sets — `/commit`, `/pr`, `/ship`, `/skill-creator`.
-  (Unrelated to `/handoff`, which §10 calls a fourth *team* skill.)
+  (`/handoff`, the fourth *team* skill, joined the same contract test in #585 — §10; the Layer-A
+  record above predates it.)
 - Every execution eval runnable end to end in a sandbox, graded by the native grader, aggregated by
   `aggregate_benchmark.py` (which rolls per-run grades into one `benchmark.json`), reviewed through
   `eval-viewer/generate_review.py` (which serves a browser page over that). Both are vendored, so
@@ -349,7 +350,7 @@ and affirmation routing.
 > assistant's own offer to commit is an **affirmation**, and counts as invoking it too. Three
 > situations skip the Step-0 confirmation: a typed slash, a fresh delegation hand-off file, and an
 > opt-out file. `/ship` is excluded from all of this deliberately — it fires only on an explicit
-> `/ship`. Nine of the twenty-five evals test exactly these behaviors. Full design:
+> `/ship`. Nine of the thirty-five evals test exactly these behaviors. Full design:
 > [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md).
 
 **That `ask` rule matters to everything after it.** It fires at the Claude Code permission layer —
@@ -455,8 +456,8 @@ re-checks it at runtime so a too-old Node fails with a sentence instead of an ob
 
 ### The eval roster
 
-Twenty-six evals: seventeen `kind: execution` and nine `kind: routing`. The rest of this doc argues
-about them by id, so here they are.
+Thirty-six evals: twenty-seven `kind: execution` and nine `kind: routing`. The rest of this doc
+argues about them by id, so here they are.
 
 **Id scheme:** `<skill>-<n>` — the skill's name, then a number, scoped per skill. A letter suffix
 (`commit-3a`, `ship-2a`) marks one sub-scenario of a single original eval that was split. Routing
@@ -493,15 +494,34 @@ The first four columns are generated; the last is written by hand from each eval
 | `ship-5` | routing | ship | — | Over-trigger control: "remind me what /ship does" explains, it does not ship |
 | `ship-6` | execution | ship | `feature-dirty-no-pr` | The `/ship` → `/pr` → `/commit` cascade announces each hop exactly once |
 | `ship-7` | execution | ship | `feature-open-pr-unanswered-comment` | A comment posted after the last push: it lists it, asks `1 unanswered since the last push — merge anyway?`, and does not merge on `no` |
+| `handoff-1` | execution | handoff | `feature-uncommitted-fix-no-pr` | It reports the fix as uncommitted, contradicting the human's belief that it landed |
+| `handoff-2` | execution | handoff | `feature-one-commit-clean-no-pr` | An existing hand-off doc is updated in place, with the old state kept under `Historical` |
+| `handoff-3` | execution | handoff | `feature-one-commit-clean-no-pr` | Nothing in flight: it asks what the hand-off is for instead of inventing work |
+| `handoff-4` | execution | handoff | `feature-one-commit-clean-no-pr` | `--mode minimal` contracts the doc, and the slug comes from the argument, not the flag |
+| `handoff-5` | execution | handoff | `feature-migration-open-pr-teammate-wip` | `--mode full` produces the decision log, split validation and gated resume plan |
+| `handoff-6` | execution | handoff | `feature-uncommitted-fix-no-pr` | Minimal depth selected from natural language alone, with no clarifying question |
+| `handoff-7` | execution | handoff | `feature-two-commits-dirty-open-issue` | An explicit "compact" beats the complexity that would otherwise escalate to full |
+| `handoff-8` | execution | handoff | `feature-migration-open-pr-teammate-wip` | Unprompted escalation to full when the recovery risk justifies it |
+| `handoff-9` | execution | handoff | `feature-migration-open-pr-teammate-wip` | Compact overall, but the working-tree section expands for a file nobody owns |
+| `handoff-10` | execution | handoff | `feature-migration-open-pr-teammate-wip` | Full depth from natural language, on the same world as the slash-full twin |
 
-The first four columns regenerate with this read-only command, from the three eval files:
+**The `/handoff` block is the one place a `Fixture` cell does not mean "a world built for this
+eval".** Four profiles were built (`handoff-1`, `-4`, `-7`, `-8`); the other six name the nearest
+one and record in their own `notes` exactly what that world is missing — `handoff-2`, `-3` and
+`-5` are **not** gradeable as written until profiles of their own exist. That was decision 5 on
+issue #585, and the ten worlds themselves are described file by file in the pre-harness builder
+`.claude/skills/handoff/evals/build_fixtures.mjs`, kept as that record. `/handoff` has no routing
+evals — if it gains any, add it to `TEAM_SKILLS` in `routing/lib/context.mjs`, which decides whose
+skill files are copied into a routing sandbox.
+
+The first four columns regenerate with this read-only command, from the four eval files:
 
 ```bash
-node -e 'const fs=require("fs");for(const s of ["commit","pr","ship"]){for(const e of JSON.parse(fs.readFileSync(`.claude/skills/${s}/evals/evals.json`,"utf8")).evals){console.log([e.id,e.kind,s,e.fixture??"-",e.eval_name].join(" | "));}}'
+node -e 'const fs=require("fs");for(const s of ["commit","pr","ship","handoff"]){for(const e of JSON.parse(fs.readFileSync(`.claude/skills/${s}/evals/evals.json`,"utf8")).evals){console.log([e.id,e.kind,s,e.fixture??"-",e.eval_name].join(" | "));}}'
 ```
 
 ```powershell
-node -e 'const fs=require("fs");for(const s of ["commit","pr","ship"]){for(const e of JSON.parse(fs.readFileSync(".claude/skills/"+s+"/evals/evals.json","utf8")).evals){console.log([e.id,e.kind,s,e.fixture??"-",e.eval_name].join(" | "));}}'
+node -e 'const fs=require("fs");for(const s of ["commit","pr","ship","handoff"]){for(const e of JSON.parse(fs.readFileSync(".claude/skills/"+s+"/evals/evals.json","utf8")).evals){console.log([e.id,e.kind,s,e.fixture??"-",e.eval_name].join(" | "));}}'
 ```
 
 **One eval, shown.** Illustrative only — the schema of record is `strategy-skill-evals.md` §3.
@@ -546,7 +566,7 @@ contribute more than one row — `default-deny`, for example, yields `exit`, `lo
 |---|---|---|
 | `lib/paths.mjs` | Path resolution and the load-bearing location guard. | `HARNESS_DIR`, `REPO_ROOT`, `MARKER_FILENAME` (`.skill-eval-sandbox`), `SANDBOX_PREFIX` (`skill-eval-`), `sandboxRoot(override)`, `assertOutsideRepo(target)`, `isSandbox(dir)` |
 | `lib/engine.mjs` | Node floor, enforced at runtime. | `NODE_ENGINE_FLOOR`, `assertNodeEngine()` |
-| `lib/fixtures.mjs` | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Fifteen profiles at the Status date — a count that moves whenever an eval is added, in lockstep with the file's own `// The 15 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` |
+| `lib/fixtures.mjs` | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Nineteen profiles at the Status date — a count that moves whenever an eval is added, in lockstep with the file's own `// The 18 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` |
 | `lib/gh-fixture.mjs` | Turn a profile's `gh` block into the `gh-fixture.json` the stub answers from, deriving the reviewer display-name map. | `buildGhFixture(profile)` |
 | `lib/sandbox.mjs` | Build, tear down and archive. The biggest module. | `buildSandbox({fixture, root, note})`, `teardownSandbox(dir)`, `teardownAll(root)`, `archiveEvidence(sandboxDir, destDir)`; internal helpers `git`, `gitSafe`, `forceRemove`, `clearReadOnly`, `setLocalConfig`, `writeFiles`, `writeTeamCache`, `writeMarker`, `installGhStub`, `writeActivateScripts`; the constant `SCRUB_UNSET` |
 
@@ -812,11 +832,17 @@ its three wrappers), `gh-config/` (the isolated `GH_CONFIG_DIR`), `gh-fixture.js
 and a root-level marker so an audit or sweep can identify the directory even if `repo/` is gone.
 
 **Archived into an eval's `outputs/`** — `gh-calls.log`, `gh-stub-state.json`, `gh-fixture.json`,
-`manifest.json`, `sandbox-marker.json`, `git-state.txt`, `archive-manifest.json`. `git-state.txt`
+`manifest.json`, `sandbox-marker.json`, `git-state.txt`, `archive-manifest.json`, and `scratch/`
+when the run left anything in the sandbox repo's `.scratch/`. `git-state.txt`
 is a labelled dump of `rev-parse HEAD`, `status --porcelain=v1 -b`, `log --oneline --all -n 50`,
 `branch -avv`, `reflog -n 50`, unstaged and staged diffs, plus the bare origin's log and branch
 list. Every command runs through `gitSafe()`, so a failure becomes a bracketed note in the dump
-rather than aborting the archive.
+rather than aborting the archive. The `scratch/` copy exists because a skill whose deliverable is
+a **file** leaves nothing in the two objective legs: `/handoff` writes
+`.scratch/<slug>-bootstrap.md`, which is gitignored inside the sandbox and so never appears in
+`git-state.txt`. Copying it verbatim is what lets the grader read the produced document instead of
+prose about it (#585, decision 2); `archive-manifest.json`'s `legs.producedDocs` lists what was
+copied, and is empty for every skill that produces no such file.
 
 **A routing run adds** `input.jsonl`, `seeded-turns.md` (the on-disk audit copy of what the grader
 was shown), `raw.jsonl`, `executor.err`, `transcript.md`, `grader-envelope.json` (the grader's own
@@ -845,8 +871,9 @@ person or their session's agent, by design (the reasoning is in §6). The only o
 workflow is `.github/workflows/skill-creator-drift.yml`, a monthly read-only check that opens one
 tracking issue when the vendored pin falls behind upstream.
 
-`tests/functional/skills/skill-contract.test.ts` holds `/commit`, `/pr` and `/ship` to their
-structure — frontmatter `name` matching the directory, the per-skill invocation policy in
+`tests/functional/skills/skill-contract.test.ts` holds all four team skills — `/commit`, `/pr`,
+`/ship`, and `/handoff` since issue #585 — to their
+structure: frontmatter `name` matching the directory, the per-skill invocation policy in
 `EXPLICIT_ONLY`, the `REQUIRED_SECTIONS` subsequence, the `SOFT_LINE_CAP` warning — and pins the
 eval artifacts: allowed `kind` values in `ALLOWED_KINDS`, `fixture` plus ≥1 expectation on every
 execution eval, the exact execution-eval id set in `EXPECTED_EXECUTION_IDS`, and the continued
@@ -875,7 +902,7 @@ The mechanisms, named to where they live:
 | 8 | **Every call is evidence.** Answered and denied calls alike are appended to `gh-calls.log`, with whether credentials were present at call time. | `logCall()` in `gh-stub/gh-stub.mjs` |
 | 9 | **Liveness before any negative.** A "the log contains no X" claim is trusted only when the log is non-empty. | `ghLog.live` from `routingObservables()` in `routing/lib/transcript.mjs`; stated to the grader by `runGrader()` in `routing/lib/driver.mjs`; stated to humans in `prompts/executor-prompt.md` |
 | 10 | **Fixtures can never depend on case-distinct filenames**, because macOS's default filesystem is case-insensitive. | `assertNoCaseCollisions()` in `lib/fixtures.mjs`, called from `getFixture()` |
-| 11 | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of ten of the fifteen fixture branch names is additionally checked by name, belt-and-braces. | `checkZeroMutation()` in `selfcheck.mjs` |
+| 11 | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of thirteen of the eighteen distinct fixture branch names is additionally checked by name, belt-and-braces. | `checkZeroMutation()` in `selfcheck.mjs` |
 | 12 | **The whole checklist is executable.** Thirteen named checks, twenty-three rows, exit 0 only if every row passes; among them a genuine POSIX-shell activation check that sources `activate.sh` and runs a bare `gh`. | `selfcheck.mjs`, especially `checkGitBashActivation()` and `findPosixShell()` |
 
 ### Above the stub
@@ -1314,29 +1341,23 @@ tracking issue. It appears in no other committed doc.
 `strategy-skill-evals.md` §8's platform table — Windows would move from "never natively" to
 "optional routing". Tracked only on #507's Parked list.
 
-### `/handoff` is knowingly outside the contract test and the harness
+### `/handoff` is inside the gates but has never been run
 
-`/handoff` is a fourth team skill. `skill-contract.test.ts` pins `SKILLS` to `commit`, `pr` and
-`ship`, so `/handoff` is outside the contract gate; its `evals/evals.json` uses a pre-harness,
-bespoke shape — bare integer ids, no `kind`, no `fixture`, no `expectations`, plus its own
-`build_fixtures.mjs` — so it is outside the harness too. Its `SKILL.md` carries a maintainer TODO
-saying exactly this, and the work is parked on #507.
+Issue #585 migrated `/handoff` in: its evals are `kind: execution` entries in the per-skill schema,
+`handoff` is in `SKILLS`, `EXPLICIT_ONLY` and `EXPECTED_EXECUTION_IDS` in
+`skill-contract.test.ts` and in `referencedFixtureNames()` in `selfcheck.mjs`, and four fixture
+profiles were built. Two gaps remain, both deliberate and both on #507.
 
-**This is a known exception pending migration, not a violation of the scope boundary.** The
-migration is: build the fixture profiles its evals describe in `lib/fixtures.mjs`, convert the eval
-file to the per-skill schema, then decide whether `handoff` joins the `SKILLS` list. Until then, its
-evals must still never be executed outside a harness sandbox — the safety rule is about origin-agnostic
-execution, and it applies to `/handoff` exactly as it applies to the other three. The migration
-carries no owner and no date; it sits on #507's Parked list.
-**When this lands, update:** delete this whole subsection; delete the `/handoff` exception paragraph
-in `strategy-skill-evals.md` §7; add `handoff` to **all three** of `SKILLS`, `EXPLICIT_ONLY` and
-`EXPECTED_EXECUTION_IDS` in `tests/functional/skills/skill-contract.test.ts` — the latter two are
-typed `Record<SkillName, …>`, so adding it to `SKILLS` alone will not compile; add it to the
-hardcoded skill list in `referencedFixtureNames()` in `scripts/skill-evals/selfcheck.mjs`, or its
-fixtures escape the fixture-completeness check silently; and add its evals to the roster in §4. If
-`/handoff` ever gains routing evals, also add it to `TEAM_SKILLS` in
-`scripts/skill-evals/routing/lib/context.mjs`, which decides whose skill files are copied into a
-routing sandbox.
+- **Six of the ten evals share a profile** rather than owning one, each saying so in its `notes`.
+  Three of those six — `handoff-2`, `handoff-3`, `handoff-5` — are **not gradeable as written**,
+  because the thing they test is missing from the world they name: a pre-existing hand-off doc, an
+  on-`main` clean tree, a decision-review doc. Closing this is fixture data, not harness work.
+- **No `/handoff` eval has been executed or graded.** Nothing here rests on a measured run, and
+  the "How this work is done" assertions its `SKILL.md` TODO flags have still never fired.
+
+**When this lands, update:** this subsection, the `/handoff` block under the roster in §4, and the
+`/handoff` paragraph in `strategy-skill-evals.md` §7. A first graded run also belongs in §11's
+execution-eval inventory.
 
 ### Thin evidence on execution evals
 
@@ -1473,10 +1494,12 @@ audit every number, and so the numbers survive the machine.
 ### Execution evals
 
 One graded iteration per skill, in `.claude/skills/{commit,pr,ship}-workspace/iteration-1/`.
-Seventeen eval directories carry a `grading.json`: the sixteen execution evals of that iteration plus the
-since-retired `ship-2c` (`ship-7`, added for #580, has none yet). Each has exactly one `with_skill/run-1`; `commit-2`, `pr-2` and `ship-3`
-also have an `old_skill/run-1` control arm — twenty grading files in all. That is the entire
-execution-eval evidence base.
+Seventeen eval directories carry a `grading.json`: the sixteen `/commit`, `/pr` and `/ship`
+execution evals of that iteration plus the since-retired `ship-2c` (`ship-7`, added for #580, has
+none there; its two graded arms live in the #580 batch workspace). Each has exactly one
+`with_skill/run-1`; `commit-2`, `pr-2` and `ship-3` also have an `old_skill/run-1` control arm —
+twenty grading files in all. That is the entire execution-eval evidence base. The ten `/handoff`
+execution evals added in #585 have **no** graded run of any kind, and no workspace of their own.
 
 ```bash
 find .claude/skills/{commit,pr,ship}-workspace -name grading.json | sort

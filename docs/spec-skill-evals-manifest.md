@@ -16,8 +16,16 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 > rationale and the coverage proof. The contract test's pinned execution-ID set and this
 > file are updated together.
 >
+> **`/handoff` migration amendment (2026-09-21):** the fourth team skill's ten evals were
+> converted into this schema → **35 entries = 26 execution + 9 routing**, and the fixture
+> set grew from 14 profiles to **18**. Nothing above is changed, added or reclassified: the
+> three tables below are the Phase-1 conversion record for `/commit`, `/pr` and `/ship`, and
+> `/handoff` has its own section at the end of this file.
+>
 > **#580 amendment (2026-09-23):** `ship-7` added → **26 entries = 17 execution + 9 routing**;
 > see the #580 amendment section at the end of this file.
+>
+> **Combined (after both amendments, 2026-09-23): 36 entries = 27 execution + 9 routing; 19 fixture profiles.**
 
 ## commit (8 originals → 9 entries: 4 execution, 5 routing)
 
@@ -318,6 +326,63 @@ tracked as its own issue, linked from the Fast-follow list on #507.
 `docs/design-skill-evals-harness.md` §§6/9/10/11, and this manifest. No skill content
 (`SKILL.md`) changed, and no harness code path changed.
 
+## `/handoff` migration amendment (2026-09-21)
+
+**Status:** the fourth team skill's evals joined the harness schema — issue #585, whose
+seven decisions the maintainer approved in full before the work began. This is a
+**conversion**, like Phase 1: the ten evals in `.claude/skills/handoff/evals/evals.json`
+were written before the harness existed and are carried over 1:1, no eval split, added,
+dropped or reclassified. It is recorded here because this file is the pinned source for
+`EXPECTED_EXECUTION_IDS` in `tests/functional/skills/skill-contract.test.ts`, which now
+carries a fourth skill.
+
+**New totals: 35 entries = 26 execution + 9 routing.** Fixture profiles: **18** (was 14).
+
+## handoff (10 originals → 10 entries: 10 execution, 0 routing)
+
+| Original | Kind | Resulting | Fixture | Notes |
+|---|---|---|---|---|
+| 1 verify-over-memory | execution | handoff-1 (1:1) | `feature-uncommitted-fix-no-pr` | **Profile built.** The human's "I already committed it" belief is in the prompt (NL interface) |
+| 2 preserve-historical | execution | handoff-2 (1:1) | `feature-one-commit-clean-no-pr` (reused) | Profile **not** built. The pre-existing hand-off doc the eval updates is absent, so it is not gradeable as written |
+| 3 nothing-in-flight | execution | handoff-3 (1:1) | `feature-one-commit-clean-no-pr` (reused) | Profile **not** built; no profile builds an on-`main` clean tree. `buildSandbox`'s `git switch -c` is now guarded by `if (profile.branch)` (decision 1), so a branchless profile *can* be added |
+| 4 slash-minimal-parse | execution | handoff-4 (1:1) | `feature-one-commit-clean-no-pr` | **Profile built.** "The PR is already up" is attributed in `preconditions` (slash interface) |
+| 5 slash-full-decision-log | execution | handoff-5 (1:1) | `feature-migration-open-pr-teammate-wip` (reused) | Profile **not** built. The open PR with a pending check is there; the `.scratch` decision-review doc is not, so the decision-log expectations are not gradeable |
+| 6 nl-minimal-explicit | execution | handoff-6 (1:1) | `feature-uncommitted-fix-no-pr` (reused) | Profile **not** built — and not needed: the reused world matches every expectation; only the branch and file names differ |
+| 7 nl-compact-explicit-overrides | execution | handoff-7 (1:1) | `feature-two-commits-dirty-open-issue` | **Profile built.** The session's open question is a TODO comment in the uncommitted diff |
+| 8 auto-escalate-full | execution | handoff-8 (1:1) | `feature-migration-open-pr-teammate-wip` | **Profile built.** Half-migrated read path, a teammate's WIP file in the tree, PR 520 with E2E still running |
+| 9 compact-selective-expansion | execution | handoff-9 (1:1) | `feature-migration-open-pr-teammate-wip` (reused) | Profile **not** built. The reused world supplies the unowned modified file the eval turns on, so all five expectations are gradeable against it |
+| 10 nl-full-explicit | execution | handoff-10 (1:1) | `feature-migration-open-pr-teammate-wip` (reused) | Profile **not** built. Shares handoff-5's profile deliberately — the slash/NL pair must run on one identical world. The claim moved into the prompt (NL interface, decision 3), the only prompt text this conversion changed |
+
+**What the maintainer's seven decisions settled** (all recorded as accepted on #585):
+(1) guard `buildSandbox`'s branch switch; (2) `archiveEvidence` also copies the sandbox
+repo's `.scratch/`, so the grader reads the produced hand-off doc itself; (3) an unverified
+conversation claim lives in the prompt where the interface is natural language and is
+attributed in `preconditions` where it is a slash invocation; (4) `spec_section` points at
+issue #585, `/handoff` having no section in `spec-portable-ai-procedures.md`; (5) four
+profiles built, six evals reusing one and saying so in `notes`; (6) `CLAUDE.md` left alone
+even though its `/handoff`-adjacent lines are copied into every routing sandbox; (7) the
+converted eval text shown to the maintainer before the first commit.
+
+**Known gaps this amendment does not close** — both on #507, neither a defect of the
+conversion:
+
+- **No `/handoff` eval has been executed or graded.** The batch lock was held elsewhere for
+  the duration of this change, and the exit criteria cut the one graded run before the
+  conversion. Every claim here is about file shape, not measured behavior.
+- **The documented full batch still runs three skills.** `docs/strategy-skill-evals.md` §6
+  and `scripts/skill-evals/prompts/batch-prompt.md` both scope "the full batch" to
+  `/commit`, `/pr` and `/ship`; this change deliberately did not widen them, since it can
+  only run 7 of 10 evals meaningfully today. Whether `/handoff` joins the batch — and what
+  that does to the advisory 60–90 minute range — is the open question.
+
+**Files updated in lockstep:** `.claude/skills/handoff/evals/evals.json`,
+`.claude/skills/handoff/SKILL.md` (maintainer TODO), `scripts/skill-evals/lib/fixtures.mjs`,
+`scripts/skill-evals/lib/sandbox.mjs`, `scripts/skill-evals/selfcheck.mjs`,
+`tests/functional/skills/skill-contract.test.ts`, `docs/strategy-skill-evals.md` §7,
+`docs/design-skill-evals-harness.md` §§1/2/4/5/10/11, `docs/devjournal.md`, and this
+manifest. `.claude/skills/handoff/evals/build_fixtures.mjs` is kept unchanged as the
+file-by-file record of the six worlds no profile implements; it is not a way to run an eval.
+
 ## 2026-09 amendment — `ship-7` added (#580) (2026-09-23)
 
 **Status:** a net-new execution eval, authorized by the maintainer's decision "580: A" on
@@ -329,7 +394,7 @@ net-new eval cannot fill (`docs/strategy-skill-evals.md`, "Adding a new eval").
 |---|---|---|---|
 | ship-7 | execution | `feature-open-pr-unanswered-comment` (new) | Red control for `/ship` step 10 (read the PR conversation right before the merge): one top-level bot comment posted after the head commit; asserts it is listed, the run stops with `1 unanswered since the last push — merge anyway?`, and no merge is attempted |
 
-**Totals:** **26 entries = 17 execution + 9 routing** (ship: 6 execution, 2 routing).
+**Totals:** **26 entries = 17 execution + 9 routing** for `/commit`, `/pr` and `/ship` (ship: 6 execution, 2 routing); with the `/handoff` amendment above, **36 entries = 27 execution + 9 routing** and **19** fixture profiles.
 
 **Files updated in lockstep:** `.claude/skills/ship/SKILL.md` (the new step 10),
 `.claude/skills/ship/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs` (the new
