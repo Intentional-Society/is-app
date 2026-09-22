@@ -642,7 +642,8 @@ rate, not a verdict.
 | `routing/routing-plan.mjs` | The driver plan: one entry per **query**, carrying the seeded turns, the fixture, setup files, an optional `expectationsOverride` (replaces the eval's committed `expectations` for one sub-scenario — §6), and a `graderHint` (freeform scenario context appended to the grader's prompt — §6). | `ROUTING_QUERIES`, `FRESH_DELEGATION` |
 | `routing/run-routing-evals.mjs` | Orchestrates build → context → setup → drive → archive → observe → render → grade → tear down, per query per repetition; then aggregates. | **Nothing** — the script executes on import, so `loadExpectations`, `buildInputJsonl` and `applySetupFiles` are module-local and cannot be pulled into a test. That is why `lib/summary.mjs` was extracted. |
 | `routing/lib/context.mjs` | Copy the real repo's routing context into a sandbox so a fresh session *discovers* the skills. | `REPO_ROOT`, `extractAiSkillsSection(repoRoot)`, `populateRoutingContext(repoDir, repoRoot)` |
-| `routing/lib/driver.mjs` | Shell out to `claude -p` twice — once as executor, once as grader — and recover the grader's JSON. | `sandboxEnv(manifest)`, `runExecutor(...)`, `runGrader(...)`, `extractJsonObject(text)`; internal `repairEscapes`, `parseOrRepair`, and the constant `GRADER_MD_REL` |
+| `routing/lib/driver.mjs` | Shell out to `claude -p` twice — once as executor, once as grader — and recover the grader's JSON. | `sandboxEnv(manifest)`, `runExecutor(...)`, `runGrader(...)` (resolves `{grading, numTurns, envelopeParsed, raw, stderr}`), `extractJsonObject(text)`; internal `repairEscapes`, `parseOrRepair`, and the constant `GRADER_MD_REL` |
+| `routing/lib/grading.mjs` | Decide what a grader's answer is worth. A seam: the runner script cannot be imported, so the void rule lives here, pure and testable. | `interpretGraderEnvelope(raw)`, `graderPersistenceDecision({...})`; internal `voidReason`. It imports `extractJsonObject` from `driver.mjs`, which imports `interpretGraderEnvelope` back — a deliberate cycle, safe because both are hoisted function declarations used only at call time. |
 | `routing/lib/transcript.mjs` | Turn the stream-json output into a graded transcript, render the fed input turns as ground truth, and compute observables. | `renderInputTurns(path)`, `parseEvents(outFile)`, `splitTurns(events)`, `turnItems(turn)`, `renderTurnMarkdown(turn, heading)`, `routingObservables(events, {skill, ghCallLog})` |
 | `routing/lib/summary.mjs` | Per-eval aggregation, extracted from the runner script so it is unit-testable. | `NEGATIVE_CONTROLS`, `INLINE_FIRE`, `polarityFor(queryId)`, `summarizeEval({...})`, `formatSummaryLine(e)` |
 
@@ -755,13 +756,14 @@ sequenceDiagram
   R->>T: parseEvents → routingObservables → splitTurns →<br/>renderTurnMarkdown(last turn)
   T-->>R: observables.json · transcript.md
   R->>GR: grader.md verbatim + rendered input.jsonl +<br/>expectations + headless adaptations + graderHint
-  GR-->>R: grading JSON → extractJsonObject → grading.json
+  GR-->>R: envelope → grader-envelope.json (always)
+  R->>R: interpretGraderEnvelope → graderPersistenceDecision<br/>(void a zero-tool-call grading) → grading.json
   R->>SB: teardownSandbox (unless --keep-sandboxes)
   R->>S: summarizeEval per query
   S-->>R: routing_summary.json, then aggregate_benchmark.py
 ```
 
-Three details in that flow matter and are easy to get wrong:
+Four details in that flow matter and are easy to get wrong:
 
 1. **The grader is handed the fed input turns as ground truth.** `runGrader()` inlines
    `renderInputTurns(input.jsonl)` into the prompt and states a **seed-presence rule**: any claim
@@ -775,10 +777,21 @@ Three details in that flow matter and are easy to get wrong:
    `user_notes_summary` and `expectations` to the shapes `aggregate_benchmark.py` expects. A grader
    that emits `null` there would otherwise crash the Python aggregate.
 3. **Ungraded runs are loud.** When `extractJsonObject()` returns null the runner writes
-   `grader-raw.txt` instead of `grading.json`, `summarizeEval()` counts the run in `ungraded_runs`
+   `grader-raw.txt` instead of `grading.json` — beside the `grader-envelope.json` it saves for
+   every grading (4) — `summarizeEval()` counts the run in `ungraded_runs`
    and names it in `ungraded`, and the runner prints a warning. The mean is still taken over graded
    runs only — you cannot average a result you do not have — but the count sits beside it so a
    batch cannot quietly shed failing reps and report a flattering number.
+4. **A grading that gathered no evidence is void.** The runner saves the grader's raw envelope to
+   `grader-envelope.json` for *every* grading, before deciding anything, so how a verdict was
+   reached is always on disk. `graderPersistenceDecision()` in `lib/grading.mjs` then voids the
+   grading when the envelope reports `num_turns <= 1` — a grader that answered in one turn opened
+   no file — or when the turn count is unknowable (stdout was not an envelope, or the envelope
+   carries no numeric `num_turns`). A void grading is discarded symmetrically, PASS or FAIL: no
+   `grading.json`, no `timing.json`, a null pass rate, and an `error` naming which of the three
+   conditions fired, so it lands in `ungraded_runs` with its reason instead of inside the mean.
+   The runner prints `pass=VOID` for that run. The defect this closes was real: a `ship-5` re-grade
+   returned a clean 3/3 PASS having made zero tool calls, and that 1.0 counted (#583).
 
 ### 4.7 Artifacts
 
@@ -796,8 +809,11 @@ list. Every command runs through `gitSafe()`, so a failure becomes a bracketed n
 rather than aborting the archive.
 
 **A routing run adds** `input.jsonl`, `seeded-turns.md` (the on-disk audit copy of what the grader
-was shown), `raw.jsonl`, `executor.err`, `transcript.md`, `timing.json`, `grading.json` (or
-`grader-raw.txt`), `runner-error.txt` on a thrown error, and `outputs/observables.json`. At batch
+was shown), `raw.jsonl`, `executor.err`, `transcript.md`, `grader-envelope.json` (the grader's own
+raw stdout, written for every grading), `timing.json` and `grading.json` — present only when the
+grading stands, absent when it was voided (§4.6) and replaced by
+`grader-raw.txt` when no verdict could be extracted at all —
+`runner-error.txt` on a thrown error, and `outputs/observables.json`. At batch
 level: `eval_metadata.json` per query, `routing_summary.json`, and `benchmark.json` / `benchmark.md`
 from `aggregate_benchmark.py`. The tree shape is documented in
 [`../scripts/skill-evals/routing/README.md`](../scripts/skill-evals/routing/README.md).
@@ -825,8 +841,9 @@ structure — frontmatter `name` matching the directory, the per-skill invocatio
 eval artifacts: allowed `kind` values in `ALLOWED_KINDS`, `fixture` plus ≥1 expectation on every
 execution eval, the exact execution-eval id set in `EXPECTED_EXECUTION_IDS`, and the continued
 absence of root `evals/evals.json`. `tests/functional/skills/routing-harness.test.ts` covers the
-routing harness's pure functions — `extractJsonObject`, `renderInputTurns`, `summarizeEval`,
-`polarityFor` — one case per defect found in the #527/#528 review.
+routing harness's pure functions — `extractJsonObject`, `interpretGraderEnvelope`,
+`graderPersistenceDecision`, `renderInputTurns`, `summarizeEval`, `polarityFor` — one case per
+defect found in the #527/#528 review, plus the zero-tool-call void rule from #583.
 
 ## 5. Safety and the trust boundary
 

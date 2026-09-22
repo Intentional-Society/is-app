@@ -9,6 +9,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { interpretGraderEnvelope } from "./grading.mjs";
 import { renderInputTurns } from "./transcript.mjs";
 
 /**
@@ -125,7 +126,11 @@ const GRADER_MD_REL = ".claude/skills/skill-creator/agents/grader.md";
  * Grade one run's transcript against its expectations, per agents/grader.md. Runs a
  * headless `claude -p` grader with cwd = runDir (so it can Read transcript.md + outputs/),
  * and requires it to print a single grading JSON object. The runner writes grading.json.
- * @returns {Promise<{grading:object|null, raw:string}>}
+ *
+ * `numTurns` comes back beside the verdict because the envelope is the only place the grader's
+ * own effort is recorded: a one-turn grading opened no file and is not evidence (#583). What to
+ * do about that is `graderPersistenceDecision`'s call, not this driver's.
+ * @returns {Promise<{grading:object|null, numTurns:number|null, envelopeParsed:boolean, raw:string, stderr:string}>}
  */
 export function runGrader({
   runDir,
@@ -215,15 +220,8 @@ export function runGrader({
     child.on("close", () => {
       clearTimeout(timer);
       const raw = Buffer.concat(chunks).toString("utf8");
-      let grading = null;
-      try {
-        const envelope = JSON.parse(raw);
-        const text = typeof envelope.result === "string" ? envelope.result : raw;
-        grading = extractJsonObject(text);
-      } catch {
-        grading = extractJsonObject(raw);
-      }
-      resolve({ grading, raw, stderr: Buffer.concat(errChunks).toString("utf8") });
+      const { grading, numTurns, envelopeParsed } = interpretGraderEnvelope(raw);
+      resolve({ grading, numTurns, envelopeParsed, raw, stderr: Buffer.concat(errChunks).toString("utf8") });
     });
     child.stdin.end(prompt);
   });

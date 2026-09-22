@@ -4,6 +4,10 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { extractJsonObject, sandboxEnv } from "../../../scripts/skill-evals/routing/lib/driver.mjs";
+import {
+  graderPersistenceDecision,
+  interpretGraderEnvelope,
+} from "../../../scripts/skill-evals/routing/lib/grading.mjs";
 import { polarityFor, summarizeEval } from "../../../scripts/skill-evals/routing/lib/summary.mjs";
 import { renderInputTurns } from "../../../scripts/skill-evals/routing/lib/transcript.mjs";
 
@@ -86,6 +90,118 @@ describe("sandboxEnv", () => {
   });
 });
 
+// The real thing (#583): a `ship-5` re-grade of 2026-09-19 in which the grader answered in ONE
+// turn — it opened no file, read no transcript — and returned a clean 3/3 PASS that fed straight
+// into the eval's mean. Trimmed to the fields the decision reads; the byte-for-byte original is
+// preserved in the issue.
+const ZERO_TOOL_CALL_ENVELOPE = JSON.stringify({
+  type: "result",
+  subtype: "success",
+  is_error: false,
+  num_turns: 1,
+  permission_denials: [],
+  stop_reason: "end_turn",
+  result:
+    '```json\n{"expectations":[{"text":"…","passed":true}],"summary":{"passed":3,"failed":0,"total":3,"pass_rate":1.0}}\n```',
+});
+
+describe("interpretGraderEnvelope", () => {
+  // CHARACTERISATION: pins the extraction that used to sit inline in runGrader, so moving it to
+  // the seam is provably a move and not a rewrite.
+  it("pulls the verdict out of an ordinary envelope and reports its turn count", () => {
+    const raw = JSON.stringify({
+      type: "result",
+      num_turns: 9,
+      result: '```json\n{"summary":{"passed":2,"failed":1,"total":3,"pass_rate":0.6667}}\n```',
+    });
+    const interpreted = interpretGraderEnvelope(raw);
+    expect(interpreted.grading?.summary?.pass_rate).toBe(0.6667);
+    expect(interpreted.numTurns).toBe(9);
+    expect(interpreted.envelopeParsed).toBe(true);
+  });
+
+  it("falls back to scanning the blob when stdout is not an envelope at all", () => {
+    const interpreted = interpretGraderEnvelope('chatter first.\n\n```json\n{"summary":{"pass_rate":0.5}}\n```\n');
+    expect(interpreted.grading?.summary?.pass_rate).toBe(0.5);
+    expect(interpreted.envelopeParsed).toBe(false);
+    expect(interpreted.numTurns).toBeNull();
+  });
+
+  it("reports no turn count when a parsed envelope omits num_turns", () => {
+    const raw = JSON.stringify({ type: "result", result: '{"summary":{"pass_rate":1}}' });
+    const interpreted = interpretGraderEnvelope(raw);
+    expect(interpreted.grading?.summary?.pass_rate).toBe(1);
+    expect(interpreted.envelopeParsed).toBe(true);
+    expect(interpreted.numTurns).toBeNull();
+  });
+
+  it("reads the real zero-tool-call envelope as a clean PASS taken in one turn", () => {
+    const interpreted = interpretGraderEnvelope(ZERO_TOOL_CALL_ENVELOPE);
+    expect(interpreted.grading?.summary?.pass_rate).toBe(1);
+    expect(interpreted.numTurns).toBe(1);
+  });
+});
+
+describe("graderPersistenceDecision", () => {
+  const passing = { summary: { passed: 3, failed: 0, total: 3, pass_rate: 1.0 } };
+  const failing = { summary: { passed: 0, failed: 3, total: 3, pass_rate: 0 } };
+
+  // THE DEFECT (#583): this exact input — a parsed PASS from a grader that took one turn —
+  // counted as full evidence and carried pass_rate 1.0 into the mean.
+  it("voids a one-turn grading: no persistence, no pass rate, a named reason", () => {
+    const { grading, numTurns, envelopeParsed } = interpretGraderEnvelope(ZERO_TOOL_CALL_ENVELOPE);
+    const decision = graderPersistenceDecision({ grading, numTurns, envelopeParsed });
+    expect(decision.passRate).toBeNull(); // the harm: 1.0 used to reach the mean
+    expect(decision.persistGrading).toBe(false);
+    expect(decision.voided).toBe(true);
+    expect(decision.error).toBe("void: grader made no tool calls (num_turns: 1)");
+  });
+
+  it("voids on the turn count alone, with nothing else known", () => {
+    const decision = graderPersistenceDecision({ numTurns: 1 });
+    expect(decision.voided).toBe(true);
+    expect(decision.passRate).toBeNull();
+  });
+
+  // The rule is mechanical and symmetric — a void FAIL is no more evidence than a void PASS.
+  it("voids a one-turn FAIL exactly as it voids a one-turn PASS", () => {
+    const decision = graderPersistenceDecision({ grading: failing, numTurns: 1, envelopeParsed: true });
+    expect(decision.voided).toBe(true);
+    expect(decision.passRate).toBeNull();
+    expect(decision.error).toBe("void: grader made no tool calls (num_turns: 1)");
+  });
+
+  it("voids a grading whose envelope never parsed, naming that condition", () => {
+    const decision = graderPersistenceDecision({ grading: passing, numTurns: null, envelopeParsed: false });
+    expect(decision.voided).toBe(true);
+    expect(decision.error).toBe("void: grader turn count unknown (envelope unparseable)");
+  });
+
+  it("voids a grading whose parsed envelope carries no numeric num_turns", () => {
+    const decision = graderPersistenceDecision({ grading: passing, numTurns: null, envelopeParsed: true });
+    expect(decision.voided).toBe(true);
+    expect(decision.error).toBe("void: grader turn count unknown (no num_turns in envelope)");
+  });
+
+  it("keeps an ordinary multi-turn grading and its pass rate", () => {
+    const decision = graderPersistenceDecision({ grading: passing, numTurns: 6, envelopeParsed: true });
+    expect(decision.voided).toBe(false);
+    expect(decision.persistGrading).toBe(true);
+    expect(decision.passRate).toBe(1);
+    expect(decision.error).toBeNull();
+  });
+
+  // An unparseable verdict was already loud (grader-raw.txt + ungraded_runs). It is a different
+  // failure from a void one, and must not borrow the void wording.
+  it("leaves an unextractable verdict ungraded without calling it void", () => {
+    const decision = graderPersistenceDecision({ grading: null, numTurns: 6, envelopeParsed: true });
+    expect(decision.voided).toBe(false);
+    expect(decision.persistGrading).toBe(false);
+    expect(decision.passRate).toBeNull();
+    expect(decision.error).toBeNull();
+  });
+});
+
 describe("renderInputTurns", () => {
   let tmp: string;
   const write = (name: string, body: string) => {
@@ -160,6 +276,22 @@ describe("summarizeEval", () => {
     expect(summary.ungraded[0].run).toBe(3);
     expect(summary.mean_expectation_pass_rate).toBe(0.5);
     expect(summary.runs).toHaveLength(3);
+  });
+
+  // CONTRACT GUARD (#583): decision 3a nulls a void run's pass rate at the decision seam, so the
+  // void row reaches summarizeEval looking like any other ungraded row. This pins that the two
+  // halves fit: a voided run must leave graded_runs at 0 and carry its reason through.
+  it("treats a voided run as ungraded and carries the void reason through", () => {
+    const summary = summarizeEval({
+      ...base,
+      queryId: "ship-5",
+      reps: 1,
+      perRep: [{ run: 1, invoked: false, passRate: null, error: "void: grader made no tool calls (num_turns: 1)" }],
+    });
+    expect(summary.graded_runs).toBe(0);
+    expect(summary.ungraded_runs).toBe(1);
+    expect(summary.ungraded[0].reason).toBe("void: grader made no tool calls (num_turns: 1)");
+    expect(summary.mean_expectation_pass_rate).toBeNull();
   });
 
   it("reports no trigger rate for inline-fire evals rather than a misleading 0%", () => {

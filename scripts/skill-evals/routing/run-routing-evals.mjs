@@ -32,6 +32,7 @@ import path from "node:path";
 import { archiveEvidence, buildSandbox, teardownSandbox } from "../lib/sandbox.mjs";
 import { populateRoutingContext, REPO_ROOT } from "./lib/context.mjs";
 import { runExecutor, runGrader } from "./lib/driver.mjs";
+import { graderPersistenceDecision } from "./lib/grading.mjs";
 import { formatSummaryLine, NEGATIVE_CONTROLS, summarizeEval } from "./lib/summary.mjs";
 import {
   parseEvents,
@@ -180,7 +181,7 @@ for (const q of queries) {
 
       // Grade.
       const gradeStart = Date.now();
-      const { grading, raw } = await runGrader({
+      const { grading, numTurns, envelopeParsed, raw } = await runGrader({
         runDir,
         repoRoot: REPO_ROOT,
         expectations,
@@ -188,7 +189,13 @@ for (const q of queries) {
         model,
       });
       const graderSeconds = (Date.now() - gradeStart) / 1000;
-      if (grading) {
+      // The grader's own envelope is evidence about the GRADING, and it is saved for every
+      // grading — before any decision about whether the verdict counts, and whatever that
+      // decision turns out to be. Without it nothing on disk shows how a verdict was reached
+      // (#583). A separate name from `grader-raw.txt`, which means "ungraded" in two docs.
+      fs.writeFileSync(path.join(runDir, "grader-envelope.json"), raw);
+      const decision = graderPersistenceDecision({ grading, numTurns, envelopeParsed });
+      if (decision.persistGrading) {
         // The runner OWNS timing + metrics (real numbers) — overwrite the grader's
         // block, which may carry nulls (no timing.json existed) that crash the Python
         // aggregate. This also gives benchmark.json faithful wall-clock data.
@@ -214,20 +221,22 @@ for (const q of queries) {
         // Also mirror a sibling timing.json (the aggregate's secondary source).
         fs.writeFileSync(path.join(runDir, "timing.json"), JSON.stringify(grading.timing, null, 2));
         fs.writeFileSync(path.join(runDir, "grading.json"), JSON.stringify(grading, null, 2));
-      } else {
+      } else if (!grading) {
+        // Reserved for its established meaning: no verdict could be extracted at all.
         fs.writeFileSync(path.join(runDir, "grader-raw.txt"), raw);
       }
-      const passRate = grading?.summary?.pass_rate ?? null;
-      perRep.push({
+      const passRate = decision.passRate;
+      const row = {
         run: k,
         invoked: obs.invokedThisSkill,
         passRate,
         ghPrMerge: obs.ghLog.hasPrMerge,
         ghLive: obs.ghLog.live,
-      });
-      process.stdout.write(
-        `invoked=${obs.invokedThisSkill} pass=${passRate == null ? "?" : passRate} ${exec.timedOut ? "(timeout)" : ""}\n`,
-      );
+      };
+      if (decision.error) row.error = decision.error;
+      perRep.push(row);
+      const passLabel = decision.voided ? "VOID" : passRate == null ? "?" : passRate;
+      process.stdout.write(`invoked=${obs.invokedThisSkill} pass=${passLabel} ${exec.timedOut ? "(timeout)" : ""}\n`);
     } catch (e) {
       process.stdout.write(`ERROR: ${e.message}\n`);
       fs.writeFileSync(path.join(runDir, "runner-error.txt"), String(e.stack || e));
