@@ -161,13 +161,20 @@ above. The grader prints the standard grading JSON; the runner saves its raw env
 it. Merge-adjacent negatives follow the merge-discrimination rule (strategy §6): grade from the
 transcript's tool-call record, corroborated by the call log's liveness.
 
+**The grader runs outside this repo.** It is given a copy of the run folder under the OS temp dir as
+its cwd, never the run folder itself (which lives inside the checkout, where a `git log` reaches the
+real repo's history — #584). The copy is deleted after a verdict is extracted; when none is, it is
+left and its path printed to stderr. Everything the runner writes still lands in the original run
+folder. This moves where the grader starts; it is not a sandbox.
+
 **A grading that gathered no evidence is void.** The envelope records how many turns the grader
 took; one turn or fewer means it answered without opening a single file. That verdict is discarded
 whether it said PASS or FAIL, as is any grading whose turn count cannot be read at all. The void
 rule is mechanical, lives in `lib/grading.mjs`, and applies before the pass rate is taken (#583).
 
 The runner's pure functions — `extractJsonObject`, `interpretGraderEnvelope`,
-`graderPersistenceDecision`, `renderInputTurns`, `summarizeEval`, `polarityFor` — are unit-tested
-in `tests/functional/skills/routing-harness.test.ts`, one case per defect found in the #527/#528
-review plus the #583 void rule. It rides the existing `functional-skills` Vitest project, so it
-runs in the required `Lint & Functional Tests` check with no config or workflow change.
+`graderPersistenceDecision`, `graderSpawnSpec`, `renderInputTurns`, `summarizeEval`, `polarityFor`
+— are unit-tested in `tests/functional/skills/routing-harness.test.ts`, one case per defect found
+in the #527/#528 review plus the #583 void rule and the #584 grader cwd. It rides the existing
+`functional-skills` Vitest project, so it runs in the required `Lint & Functional Tests` check with
+no config or workflow change.

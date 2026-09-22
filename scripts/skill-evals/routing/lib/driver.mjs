@@ -6,7 +6,9 @@
 // crashes on native Windows; the no-patching rule applies only to the vendored dir).
 
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { interpretGraderEnvelope } from "./grading.mjs";
@@ -122,10 +124,49 @@ export function runExecutor({
 
 const GRADER_MD_REL = ".claude/skills/skill-creator/agents/grader.md";
 
+const GRADER_ALLOWED_TOOLS = "Read Grep Glob Bash";
+
+/** True when `child` is `parent` or lies beneath it (path.relative, so no prefix false-matches). */
+function isInside(child, parent) {
+  const rel = path.relative(path.resolve(parent), path.resolve(child));
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
 /**
- * Grade one run's transcript against its expectations, per agents/grader.md. Runs a
- * headless `claude -p` grader with cwd = runDir (so it can Read transcript.md + outputs/),
- * and requires it to print a single grading JSON object. The runner writes grading.json.
+ * Where and how the grader is spawned (#584, shape B2c). Pure: computes, touches nothing.
+ *
+ * The grader runs from a COPY of the run folder under the OS temp dir, never from the run folder
+ * itself: that folder defaults to inside this checkout, and with `Bash` allowed a `git log` from
+ * there walked up into the real repo — a 2026-09-19 grading took the real repo's history for the
+ * sandbox's and passed wrongly. `Bash` stays in the allow-list (a clean probe P1 did not license
+ * dropping it). This moves the cwd; it does not stop the grader naming an absolute path.
+ * @param {object} opts
+ * @param {string} opts.runDir  the run folder being graded (named in the copy for traceability).
+ * @param {string} opts.repoRoot  the real repo; the copy must resolve outside it.
+ * @param {string} opts.model  the grader model.
+ * @param {string} opts.nonce  unique per grading, so two gradings never share a copy.
+ * @param {string} [opts.tmpRoot]  where the copy goes; defaults to `os.tmpdir()`.
+ * @returns {{cwd: string, args: string[]}}  the copy's path (the grader's cwd) and the `claude` argv.
+ */
+export function graderSpawnSpec({ runDir, repoRoot, model, nonce, tmpRoot = os.tmpdir() }) {
+  const label = `${path.basename(path.dirname(runDir))}-${path.basename(runDir)}`.replace(/[^\w.-]/g, "_");
+  const cwd = path.join(path.resolve(tmpRoot), `is-skill-eval-grade-${label}-${nonce}`);
+  if (isInside(cwd, repoRoot)) {
+    throw new Error(`driver: refusing to grade from a path inside the real repo: ${cwd}`);
+  }
+  return {
+    cwd,
+    args: ["-p", "--output-format", "json", "--model", model, "--allowedTools", GRADER_ALLOWED_TOOLS],
+  };
+}
+
+/**
+ * Grade one run's transcript against its expectations, per agents/grader.md. Copies the run
+ * folder to a temp directory outside the repo (see `graderSpawnSpec`), runs a headless
+ * `claude -p` grader with that copy as its cwd (so the prompt's ./transcript.md, ./outputs/ …
+ * resolve unchanged), and requires it to print a single grading JSON object. The runner writes
+ * grader-envelope.json and grading.json into the ORIGINAL run folder. The copy is removed once
+ * a verdict was extracted; otherwise it is left in place and its path printed, as evidence.
  *
  * `numTurns` comes back beside the verdict because the envelope is the only place the grader's
  * own effort is recorded: a one-turn grading opened no file and is not evidence (#583). What to
@@ -200,27 +241,38 @@ export function runGrader({
     "Do not write any file; print the JSON as your entire final message.",
   ].join("\n");
 
+  const { cwd, args } = graderSpawnSpec({ runDir, repoRoot, model, nonce: randomUUID().slice(0, 8) });
+  fs.mkdirSync(path.dirname(cwd), { recursive: true });
+  fs.cpSync(runDir, cwd, { recursive: true, errorOnExist: true, force: false });
+  const keepCopy = (why) => process.stderr.write(`\n  [grader] ${why}; left the grading copy for inspection: ${cwd}\n`);
+
   return new Promise((resolve, reject) => {
     const chunks = [];
     const errChunks = [];
     const env = { ...process.env };
     delete env.CLAUDECODE;
-    const child = spawn(
-      "claude",
-      ["-p", "--output-format", "json", "--model", model, "--allowedTools", "Read Grep Glob Bash"],
-      { cwd: runDir, env, shell: false },
-    );
+    const child = spawn("claude", args, { cwd, env, shell: false });
     const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
     child.stdout.on("data", (c) => chunks.push(c));
     child.stderr.on("data", (c) => errChunks.push(c));
     child.on("error", (e) => {
       clearTimeout(timer);
+      keepCopy(`spawn failed (${e.message})`);
       reject(e);
     });
     child.on("close", () => {
       clearTimeout(timer);
       const raw = Buffer.concat(chunks).toString("utf8");
       const { grading, numTurns, envelopeParsed } = interpretGraderEnvelope(raw);
+      if (grading) {
+        try {
+          fs.rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+        } catch (e) {
+          keepCopy(`cleanup failed (${e.message})`);
+        }
+      } else {
+        keepCopy("no verdict could be extracted");
+      }
       resolve({ grading, numTurns, envelopeParsed, raw, stderr: Buffer.concat(errChunks).toString("utf8") });
     });
     child.stdin.end(prompt);
