@@ -15,14 +15,42 @@ import { renderInputTurns } from "./transcript.mjs";
  * Build the child env that reproduces a sandbox activation (env.json in the manifest):
  * prepend the stub bin/ to PATH, unset GH tokens, isolate GH_CONFIG_DIR, and remove
  * CLAUDECODE so a nested `claude -p` is permitted (matches vendored run_eval.py).
+ *
+ * `baseEnv` defaults to `process.env` and exists as a test seam: the Windows bug below only
+ * shows up when the base env spells the search path `Path`, which no test can arrange by
+ * reading the ambient environment (#582).
+ *
+ * @param {object} manifest
+ * @param {Record<string, string | undefined>} [baseEnv]
+ * @returns {Record<string, string | undefined>}
  */
-export function sandboxEnv(manifest) {
-  const env = { ...process.env };
+export function sandboxEnv(manifest, baseEnv = process.env) {
+  const env = { ...baseEnv };
   delete env.CLAUDECODE;
   for (const k of manifest.env?.unset ?? []) delete env[k];
   for (const [k, v] of Object.entries(manifest.env?.set ?? {})) env[k] = v;
+  // Windows is case-insensitive about env keys, but a plain object is not: a process launched
+  // from PowerShell carries the search path as `Path`, so `env.PATH` was undefined and the real
+  // path — the one holding `claude.exe` — was dropped, leaving only the stub folder and killing
+  // every run with `spawn claude ENOENT`. Collapse every case-variant onto the single key Node
+  // reads, exact `PATH` winning a tie (#582).
+  let basePath;
+  let exact = false;
+  for (const k of Object.keys(env)) {
+    if (!/^path$/i.test(k)) continue;
+    const v = env[k];
+    delete env[k];
+    if (exact) continue;
+    if (k === "PATH") {
+      basePath = v;
+      exact = true;
+    } else if (basePath === undefined) {
+      basePath = v;
+    }
+  }
   const sep = process.platform === "win32" ? ";" : ":";
-  env.PATH = `${manifest.env?.prependPath ?? manifest.binDir}${sep}${env.PATH ?? ""}`;
+  const prepend = manifest.env?.prependPath ?? manifest.binDir;
+  env.PATH = basePath ? `${prepend}${sep}${basePath}` : prepend;
   return env;
 }
 
