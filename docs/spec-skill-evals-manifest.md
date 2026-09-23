@@ -15,6 +15,9 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 > behavior stays covered; see the Phase-7 amendment section at the end of this file for the
 > rationale and the coverage proof. The contract test's pinned execution-ID set and this
 > file are updated together.
+>
+> **#580 amendment (2026-09-23):** `ship-7` added → **26 entries = 17 execution + 9 routing**;
+> see the #580 amendment section at the end of this file.
 
 ## commit (8 originals → 9 entries: 4 execution, 5 routing)
 
@@ -314,3 +317,26 @@ tracked as its own issue, linked from the Fast-follow list on #507.
 `scripts/skill-evals/routing/routing-plan.mjs`, `docs/strategy-skill-evals.md` §6,
 `docs/design-skill-evals-harness.md` §§6/9/10/11, and this manifest. No skill content
 (`SKILL.md`) changed, and no harness code path changed.
+
+## 2026-09 amendment — `ship-7` added (#580) (2026-09-23)
+
+**Status:** a net-new execution eval, authorized by the maintainer's decision "580: A" on
+#580 (2026-09-23); its text is shown to him before it lands. It is recorded here, not in the
+ship table above, because that table's `Original` column is a Phase-1 conversion record a
+net-new eval cannot fill (`docs/strategy-skill-evals.md`, "Adding a new eval").
+
+| Resulting | Kind | Fixture | Notes |
+|---|---|---|---|
+| ship-7 | execution | `feature-open-pr-unanswered-comment` (new) | Red control for `/ship` step 10 (read the PR conversation right before the merge): one top-level bot comment posted after the head commit; asserts it is listed, the run stops with `1 unanswered since the last push — merge anyway?`, and no merge is attempted |
+
+**Totals:** **26 entries = 17 execution + 9 routing** (ship: 6 execution, 2 routing).
+
+**Files updated in lockstep:** `.claude/skills/ship/SKILL.md` (the new step 10),
+`.claude/skills/ship/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs` (the new
+profile; `comments`, `reviews` and `commits` on every fixture PR; PR 301 viewable by
+number for `ship-6`), `scripts/skill-evals/lib/gh-fixture.mjs`,
+`scripts/skill-evals/gh-stub/gh-stub.mjs` (two read-only routes: `pulls/<N>/comments` and
+the `reviewThreads` GraphQL query), `scripts/skill-evals/README.md`,
+`tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
+`tests/functional/skills/gh-stub.test.ts` (new), `docs/design-skill-evals-harness.md`, and
+this manifest.

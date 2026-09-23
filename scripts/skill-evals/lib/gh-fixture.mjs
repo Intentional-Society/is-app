@@ -25,5 +25,8 @@ export function buildGhFixture(profile) {
     createPr: gh.createPr || null,
     sequences: gh.sequences || {},
     vercelProductionUrl: gh.vercelProductionUrl || null,
+    // /ship step 10 (#580): inline review comments and review threads, empty by default.
+    pullComments: gh.pullComments || [],
+    reviewThreads: gh.reviewThreads || [],
   };
 }

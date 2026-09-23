@@ -61,19 +61,38 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
    - Vercel preview is skipped per `vercel.json`'s `ignoreCommand`, so no preview `deployment_status` event fires and preview `e2e.yml` does not run.
    - Treat the absent pre-merge advisory checks (E2E, anything else gated on the preview deploy) as **expected** per `docs/doc-github.md`'s docs-only rule. Proceed on required-green only — do not wait for advisories that the docs-only path skipped by design.
 
-10. **Merge confirmation policy.** The checked-in `.claude/settings.json` `ask` rule on `gh pr merge` (step 11) is the merge confirmation in every case — whether `/ship` opened the PR during this run or the PR pre-existed — **under default permission mode** (it is not an absolute gate; see step 11's caveat). Do **not** add a separate conversational Y/n; the required one-line pre-merge narration (step 11) supplies the harness prompt's context. *(History: a path-dependent Y/n for the PR-created-this-run case was kept additively until the Thread-14 actual-`/ship`-path proof passed on 2026-06-24; removed here so the harness prompt is the one confirmation and that path no longer double-prompts. See `docs/plan-skill-nl-invocation.md`.)*
+10. **Read the PR conversation — right before the merge.** Run this after CI is green and after any wait above, immediately before the merge: review bots post several minutes after a push (17 minutes on PR #578), so a read taken the moment CI turns green can miss one. If anything else is waited on after this read, read again.
 
-11. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — then run `gh pr merge <N> --merge --delete-branch`.
+    Read every source — a bot can post a plain top-level comment rather than a review, so reading reviews alone misses it:
 
-    - **Harness merge confirmation.** A checked-in `.claude/settings.json` `ask` rule on `Bash(gh pr merge *)` / `PowerShell(gh pr merge *)` makes the harness prompt a human to approve this exact command in every session — un-weakenable by a local `allow` or `bypassPermissions` (precedence is deny→ask→allow, first match). The required narration above gives that prompt context. Under default permission mode this is the merge confirmation — but it is **not** an absolute gate (see the caveat below). **Never add `allowed-tools: Bash(gh *)` (or any `gh` grant) to this Skill's frontmatter** — it would let the merge run without the human prompt and silently defeat this gate. **Note (#353 / #463):** step 10's conversational Y/n was removed in the #353 fast-follow, so this harness prompt is the merge confirmation. **It fires per-merge in _default_ mode (verified 2026-06-26), but it is NOT an absolute gate:** `auto` mode auto-approves it, and a prior "Yes, don't ask again" silences it for the rest of the session — that is how PR #460 merged with no prompt (an auto-mode session). For a guaranteed confirmation, run `/ship` in **default** mode. Re-adding a model-level Y/n is an available option (precise recipe in #463) but is **deferred by decision (2026-06-26)** — the default-mode gate is sufficient for normal human-typed use. See `docs/plan-skill-nl-invocation.md` and #463.
+    - **Last push time:** `gh pr view <N> --json commits --jq '.commits[-1].committedDate'`. GitHub does not expose when an ordinary push happened; the head commit's committer date is never later than its push, so using it can only list extra items, never hide one.
+    - **Top-level comments and reviews:** `gh pr view <N> --json comments,reviews` (`comments[].createdAt`; `reviews[].submittedAt`, `.state`, `.body`).
+    - **Inline review comments:** `gh api --paginate repos/<owner>/<repo>/pulls/<N>/comments` (`created_at`, `path`).
+    - **Review threads' resolved state:** `gh api graphql -F owner=<owner> -F repo=<repo> -F n=<N> -f query='query($owner:String!,$repo:String!,$n:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$n){reviewThreads(first:100){pageInfo{hasNextPage} nodes{isResolved path comments(first:1){nodes{author{login} createdAt body}}}}}}}'`. The REST API has no resolved flag; GraphQL's `reviewThreads.isResolved` is the only place `gh` exposes it.
+
+    **Unanswered** (the maintainer's definition, recorded on #580) means:
+
+    - any top-level comment, review or inline comment posted after the last push — by anyone, **including the PR's author and the account running `/ship`**, because agent sessions post under the maintainer's account, so authorship shows nothing;
+    - plus every inline review thread with `isResolved: false`, however old;
+    - except an approval with no text (`state: APPROVED`, empty `body`), which never counts. Every other review counts, even one with an empty body.
+
+    List each item once, even when it matches both rules. If nothing is unanswered, print `Conversation: nothing unanswered since the last push (<time>).` and continue. Otherwise list each item — author, time (UTC), first line of its text (`(no text)` if empty), and the file for inline items — then **STOP** and ask `N unanswered since the last push — merge anyway?`. Continue to the merge only on an explicit yes; any other reply ends the run without merging, with the PR URL surfaced. If any read above fails, or `hasNextPage` is true, the conversation is not proven clear: say which read failed and ask the same question. Never treat a failed read as nothing unanswered.
+
+    This stop is about the conversation, not the merge command, and fires only when something is unanswered or unread. It does not replace or duplicate step 11's merge confirmation; the harness `ask` prompt still fires at step 12.
+
+11. **Merge confirmation policy.** The checked-in `.claude/settings.json` `ask` rule on `gh pr merge` (step 12) is the merge confirmation in every case — whether `/ship` opened the PR during this run or the PR pre-existed — **under default permission mode** (it is not an absolute gate; see step 12's caveat). Do **not** add a separate conversational Y/n; the required one-line pre-merge narration (step 12) supplies the harness prompt's context. *(History: a path-dependent Y/n for the PR-created-this-run case was kept additively until the Thread-14 actual-`/ship`-path proof passed on 2026-06-24; removed here so the harness prompt is the one confirmation and that path no longer double-prompts. See `docs/plan-skill-nl-invocation.md`.)*
+
+12. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — then run `gh pr merge <N> --merge --delete-branch`.
+
+    - **Harness merge confirmation.** A checked-in `.claude/settings.json` `ask` rule on `Bash(gh pr merge *)` / `PowerShell(gh pr merge *)` makes the harness prompt a human to approve this exact command in every session — un-weakenable by a local `allow` or `bypassPermissions` (precedence is deny→ask→allow, first match). The required narration above gives that prompt context. Under default permission mode this is the merge confirmation — but it is **not** an absolute gate (see the caveat below). **Never add `allowed-tools: Bash(gh *)` (or any `gh` grant) to this Skill's frontmatter** — it would let the merge run without the human prompt and silently defeat this gate. **Note (#353 / #463):** step 11's conversational Y/n was removed in the #353 fast-follow, so this harness prompt is the merge confirmation. **It fires per-merge in _default_ mode (verified 2026-06-26), but it is NOT an absolute gate:** `auto` mode auto-approves it, and a prior "Yes, don't ask again" silences it for the rest of the session — that is how PR #460 merged with no prompt (an auto-mode session). For a guaranteed confirmation, run `/ship` in **default** mode. Re-adding a model-level Y/n is an available option (precise recipe in #463) but is **deferred by decision (2026-06-26)** — the default-mode gate is sufficient for normal human-typed use. See `docs/plan-skill-nl-invocation.md` and #463.
     - Do **not** pass `--merge-title` or `--body` flags. GitHub uses the PR title and body verbatim per the repo's `merge_commit_title: PR_TITLE` / `merge_commit_message: PR_BODY` settings; custom flags would override that and create inconsistent history.
     - Never `--admin`, `--auto`, force-merge, `--squash` (repo-disabled), or any branch-protection bypass.
 
-12. **Tidy.** `git switch main && git pull --ff-only`. Then `git branch -d <feature-branch>` if the local branch still exists and is fully merged. The remote branch is auto-deleted on merge (`delete_branch_on_merge: true`); the explicit `--delete-branch` flag on `gh pr merge` covers both the local-cleanup intent and the rare case where remote deletion didn't happen.
+13. **Tidy.** `git switch main && git pull --ff-only`. Then `git branch -d <feature-branch>` if the local branch still exists and is fully merged. The remote branch is auto-deleted on merge (`delete_branch_on_merge: true`); the explicit `--delete-branch` flag on `gh pr merge` covers both the local-cleanup intent and the rare case where remote deletion didn't happen.
 
-13. **Capture merge SHA + discover post-merge runs.** `git log -1 --format=%H` on `main` after the pull gives the merge SHA. Then `gh run list --branch main --commit <merge-sha> --limit 10` to discover the post-merge runs (typically Vercel production deploy and `e2e.yml` against the production environment).
+14. **Capture merge SHA + discover post-merge runs.** `git log -1 --format=%H` on `main` after the pull gives the merge SHA. Then `gh run list --branch main --commit <merge-sha> --limit 10` to discover the post-merge runs (typically Vercel production deploy and `e2e.yml` against the production environment).
 
-14. **Post-merge watch on `main` (up to 5 minutes).** Poll the discovered runs via `gh run watch <run-id>`. Expected runs:
+15. **Post-merge watch on `main` (up to 5 minutes).** Poll the discovered runs via `gh run watch <run-id>`. Expected runs:
 
     - Vercel production deploy.
     - `e2e.yml` against the production environment (gated on the production `deployment_status` event).
@@ -97,6 +116,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - **`npm test` fails after rebase.** Refuse; surface the failing test.
 - **Any pre-merge check is red, pending past wait limits, or missing where it shouldn't be missing.** Refuse and offer the three supervised-handoff options (`wait+5`, `troubleshoot`, `abort`). No `proceed`.
 - **Schema expand required but `npm run prod:db:expand` dispatch fails, maintainer approval is denied, or post-deploy e2e fails.** Refuse; surface the failing run.
+- **Unanswered PR conversation since the last push, or a conversation read that failed (step 10).** List the items (or the failed read) and ask `N unanswered since the last push — merge anyway?`; merge only on an explicit yes.
 - **`gh pr merge` rejected by branch protection or ruleset enforcement.** Surface the protection rule that blocked the merge (e.g., "Branches must be up to date with `main`"). Do not retry blindly.
 - **Local branch deletion fails.** Report; do not retry blindly.
 - **Post-merge `main` check goes red within the 5-minute watch window.** Alert; suggest hotfix or revert. The watch reports; it does not auto-act.
@@ -116,6 +136,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `.github/workflows/ci.yml` (required check; `dorny/paths-filter` docs-only handling)
 - `.github/workflows/e2e.yml` (post-deploy advisory; gated on `deployment_status.environment` ∈ {Preview, Production})
 - `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/ship` dispatches for expand changes)
-- `gh` CLI
+- `gh` CLI (including `gh api` REST and `gh api graphql` for step 10's conversation read)
+- Issue #580 (the maintainer's definition of "unanswered" that step 10 implements)
 - `.claude/skills/pr/SKILL.md` (delegated to on dirty / on-main pre-flight; delegates further to `/commit`)
 - `.claude/skills/commit/SKILL.md` (leaf in the delegation chain)
