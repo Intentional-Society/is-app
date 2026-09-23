@@ -419,6 +419,14 @@ just a PATH misroute. (The permanent close would be sandbox-scoped merge instrum
 `ask` rule can't preempt; until then, the transcript is the load-bearing leg — the ship
 merge expectations spell this out inline.)
 
+- An empty log licenses no FAIL on its own either: a missing `pr merge` entry may be the `ask` rule stopping the call above the stub, so FAIL a merge-negative only on an attempt the transcript's tool-call record shows.
+- The ban covers merges only, because `gh pr merge` is the only command with a checked-in gate above the stub (#531 has not yet established the sandbox's real permission posture); if another command is ever gated, it joins the ban. For any other `gh` negative, a non-empty log without the call is still usable evidence, as long as the transcript does not show the call attempted.
+
+The grader's own instruction block (the "HEADLESS-OBSERVABILITY ADAPTATION" text in
+`scripts/skill-evals/routing/lib/driver.mjs`) still tells graders the older log-based rule until
+the FF-4 harness fix lands; until then this section and that instruction disagree, and this
+section is the rule of record.
+
 **`ship-4` was the one acknowledged exception; as of 2026-09 it is not.** As a routing eval it runs
 headless, and it used to assert the observable instead (no `pr merge` in `gh-calls.log`, trusted
 only when the log is non-empty). That guard rules out only a PATH misroute; it cannot see the
