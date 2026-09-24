@@ -4,12 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getFixture } from "../../../scripts/skill-evals/lib/fixtures.mjs";
+import { getFixture, listFixtures } from "../../../scripts/skill-evals/lib/fixtures.mjs";
 import { buildGhFixture } from "../../../scripts/skill-evals/lib/gh-fixture.mjs";
 
-// Unit coverage for the skill-eval `gh` stub's read-only conversation routes (#580): the
-// pull-request review-comments REST endpoint and the review-threads GraphQL query that
-// `/ship` step 10 reads right before the merge. Each test lays out the minimal directory
+// Unit coverage for the skill-eval `gh` stub's read-only conversation routes (#580, #601):
+// the pull-request review-comments REST endpoint, the issue-comments REST endpoint (poster
+// account type and posting app) and the review-threads GraphQL query that `/ship` step 10
+// reads right before the merge. Each test lays out the minimal directory
 // shape the stub expects (bin/gh-stub.mjs, repo/.skill-eval-sandbox, gh-fixture.json) in a
 // temp dir — no git, no make-sandbox, no network — and runs the stub as a child process.
 
@@ -105,6 +106,75 @@ describe("gh stub — api repos/<owner>/<repo>/pulls/<N>/comments", () => {
   });
 });
 
+const ISSUE_COMMENT = {
+  id: 2000000011,
+  user: { login: "vercel[bot]", type: "Bot" },
+  performed_via_github_app: { slug: "vercel" },
+  body: "[vc]: #abc123",
+  created_at: "2026-09-20T12:05:00Z",
+  html_url: "https://github.com/Intentional-Society/is-app/pull/224#issuecomment-2000000011",
+};
+const ISSUE_COMMENTS_PATH = "repos/Intentional-Society/is-app/issues/224/comments";
+
+describe("gh stub — api repos/<owner>/<repo>/issues/<N>/comments (#601)", () => {
+  it("answers a GET with the fixture's issueComments and logs it as answered", () => {
+    const dir = layout({ ...BASE, issueComments: [ISSUE_COMMENT] });
+    const out = gh(dir, ["api", ISSUE_COMMENTS_PATH]);
+    expect(out.code).toBe(0);
+    expect(JSON.parse(out.stdout)).toEqual([ISSUE_COMMENT]);
+    expect(out.log.at(-1)).toMatchObject({
+      decision: "answered",
+      exitCode: 0,
+      api: "issues/comments",
+      paginate: false,
+    });
+  });
+
+  it("accepts --paginate (one page holds everything) and an explicit -X GET", () => {
+    const dir = layout({ ...BASE, issueComments: [ISSUE_COMMENT] });
+    const paged = gh(dir, ["api", "--paginate", ISSUE_COMMENTS_PATH]);
+    expect(paged.code).toBe(0);
+    expect(JSON.parse(paged.stdout)).toEqual([ISSUE_COMMENT]);
+    expect(paged.log.at(-1)).toMatchObject({ decision: "answered", api: "issues/comments", paginate: true });
+    const explicit = gh(dir, ["api", "-X", "GET", `/${ISSUE_COMMENTS_PATH}`]);
+    expect(explicit.code).toBe(0);
+    expect(JSON.parse(explicit.stdout)).toHaveLength(1);
+  });
+
+  it("answers an empty array when the fixture seeds no issue comments", () => {
+    const dir = layout(BASE);
+    const out = gh(dir, ["api", "--paginate", ISSUE_COMMENTS_PATH]);
+    expect(out.code).toBe(0);
+    expect(JSON.parse(out.stdout)).toEqual([]);
+  });
+
+  it("default-denies a write to the same endpoint (-X POST / --method POST): the route is read-only", () => {
+    const dir = layout({ ...BASE, issueComments: [ISSUE_COMMENT] });
+    for (const args of [
+      ["api", ISSUE_COMMENTS_PATH, "-X", "POST", "-f", "body=hi"],
+      ["api", "--method", "POST", ISSUE_COMMENTS_PATH, "-f", "body=hi"],
+      ["api", "--paginate", "-X", "post", ISSUE_COMMENTS_PATH, "-f", "body=hi"],
+    ]) {
+      const out = gh(dir, args);
+      expect(out.code).toBe(64);
+      expect(out.stdout).toBe("");
+      expect(out.log.at(-1)).toMatchObject({ decision: "denied", exitCode: 64 });
+    }
+  });
+
+  it("still default-denies a neighbouring endpoint (issues/<N>, issues/<N>/events)", () => {
+    const dir = layout(BASE);
+    for (const endpoint of [
+      "repos/Intentional-Society/is-app/issues/224",
+      "repos/Intentional-Society/is-app/issues/224/events",
+    ]) {
+      const out = gh(dir, ["api", endpoint]);
+      expect(out.code).toBe(64);
+      expect(out.log.at(-1)).toMatchObject({ decision: "denied", exitCode: 64 });
+    }
+  });
+});
+
 describe("gh stub — api graphql (reviewThreads)", () => {
   it("answers a reviewThreads query from the fixture, one page, and logs it as answered", () => {
     const dir = layout({ ...BASE, reviewThreads: [THREAD] });
@@ -179,6 +249,111 @@ describe("fixtures — the PR conversation step 10 reads", () => {
     expect(pr.comments).toHaveLength(1);
     expect(Date.parse(pr.comments[0].createdAt)).toBeGreaterThan(Date.parse(pr.commits.at(-1).committedDate));
     expect(pr.reviews).toEqual([]);
+    expect(fx.pullComments).toEqual([]);
+    expect(fx.reviewThreads).toEqual([]);
+  });
+});
+
+// #601: every top-level comment a profile seeds is served twice — by `gh pr view --json
+// comments` (GraphQL shape, logins without `[bot]`) and by the REST issue-comments route
+// (`[bot]` logins, `user.type`, app slug). The two reads must describe the same comments.
+type RestComment = {
+  user: { login: string; type: string };
+  performed_via_github_app: { slug: string } | null;
+  body: string;
+  created_at: string;
+  html_url: string;
+};
+type ViewComment = { author: { login: string }; createdAt: string; body: string; url: string };
+
+describe("fixtures — top-level comments agree across both reads (#601)", () => {
+  it("listFixtures() includes the two #601 profiles", () => {
+    const names = listFixtures();
+    expect(names).toContain("feature-open-pr-bot-cards-only");
+    expect(names).toContain("feature-open-pr-review-with-findings");
+  });
+
+  it.each([
+    ["feature-open-pr-unanswered-comment", 223, 1],
+    ["feature-open-pr-bot-cards-only", 224, 3],
+    ["feature-open-pr-review-with-findings", 225, 2],
+  ])("%s: PR %i's comments match in both shapes (%i each)", (name, number, count) => {
+    const fx = buildGhFixture(getFixture(name));
+    const dir = layout(fx);
+    const view = gh(dir, ["pr", "view", String(number), "--json", "comments,reviews,commits"]);
+    const rest = gh(dir, ["api", "--paginate", `repos/Intentional-Society/is-app/issues/${number}/comments`]);
+    expect(view.code).toBe(0);
+    expect(rest.code).toBe(0);
+    const pr = JSON.parse(view.stdout);
+    const viewComments: ViewComment[] = pr.comments;
+    const restComments: RestComment[] = JSON.parse(rest.stdout);
+    expect(viewComments).toHaveLength(count);
+    expect(restComments).toHaveLength(count);
+    const headAt = Date.parse(pr.commits.at(-1).committedDate);
+    restComments.forEach((r, i) => {
+      const v = viewComments[i];
+      expect(r.created_at).toBe(v.createdAt);
+      expect(r.body).toBe(v.body);
+      expect(r.html_url).toBe(v.url);
+      expect(Date.parse(r.created_at)).toBeGreaterThan(headAt);
+      // GraphQL drops the suffix; REST keeps it — and only a Bot carries it.
+      expect(v.author.login.endsWith("[bot]")).toBe(false);
+      if (r.user.type === "Bot") {
+        expect(r.user.login).toBe(`${v.author.login}[bot]`);
+        expect(r.performed_via_github_app?.slug).toEqual(expect.any(String));
+      } else {
+        expect(r.user.type).toBe("User");
+        expect(r.user.login).toBe(v.author.login);
+        expect(r.performed_via_github_app).toBeNull();
+      }
+    });
+  });
+
+  it("feature-open-pr-bot-cards-only: a Vercel card, a clean Claude review, and /pr's note by the account `gh api user` names", () => {
+    const fx = buildGhFixture(getFixture("feature-open-pr-bot-cards-only"));
+    const dir = layout(fx);
+    const self = gh(dir, ["api", "user", "--jq", ".login"]).stdout.trim();
+    const rest: RestComment[] = JSON.parse(
+      gh(dir, ["api", "repos/Intentional-Society/is-app/issues/224/comments"]).stdout,
+    );
+    expect(
+      rest.map((c) => [c.user.login, c.user.type, c.performed_via_github_app?.slug ?? null, c.created_at]),
+    ).toEqual([
+      ["vercel[bot]", "Bot", "vercel", "2026-09-20T12:05:00Z"],
+      ["claude[bot]", "Bot", "claude", "2026-09-20T12:17:00Z"],
+      [self, "User", null, "2026-09-20T12:20:00Z"],
+    ]);
+    expect(rest[0].body.startsWith("[vc]:")).toBe(true);
+    expect(rest[1].body.split("\n").slice(0, 3)).toEqual([
+      "## Code review",
+      "",
+      "No issues found. Checked for bugs and CLAUDE.md compliance.",
+    ]);
+    const note = rest[2].body.split("\n");
+    expect(note[0]).toBe("_/pr: new commits since the PR body was written_");
+    expect(note.filter((l) => l.startsWith("- "))).toHaveLength(1);
+    expect(fx.checks.every((c: { bucket: string }) => c.bucket === "pass")).toBe(true);
+    expect(fx.runs.length).toBeGreaterThan(0);
+    expect(fx.pullComments).toEqual([]);
+    expect(fx.reviewThreads).toEqual([]);
+    expect(fx.branchPr?.reviews).toEqual([]);
+  });
+
+  it("feature-open-pr-review-with-findings: a Vercel card and a Claude review that reports 2 issues", () => {
+    const fx = buildGhFixture(getFixture("feature-open-pr-review-with-findings"));
+    const rest: RestComment[] = JSON.parse(
+      gh(layout(fx), ["api", "repos/Intentional-Society/is-app/issues/225/comments"]).stdout,
+    );
+    expect(rest.map((c) => [c.user.login, c.performed_via_github_app?.slug, c.created_at])).toEqual([
+      ["vercel[bot]", "vercel", "2026-09-20T12:05:00Z"],
+      ["claude[bot]", "claude", "2026-09-20T12:17:00Z"],
+    ]);
+    expect(
+      rest[1].body.startsWith(
+        "## Code review\n\n2 issues found. Checked for bugs and CLAUDE.md compliance.\n\n### 1. ",
+      ),
+    ).toBe(true);
+    expect(fx.checks.every((c: { bucket: string }) => c.bucket === "pass")).toBe(true);
     expect(fx.pullComments).toEqual([]);
     expect(fx.reviewThreads).toEqual([]);
   });

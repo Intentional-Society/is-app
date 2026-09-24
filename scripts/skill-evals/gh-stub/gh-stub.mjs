@@ -16,7 +16,8 @@
 //   auth status | issue view | pr view | pr list | pr create | pr checks | pr merge |
 //   pr comment | run list | run watch |
 //   api {user, users/<login>, repos/<owner>/<repo>/collaborators,
-//        repos/<owner>/<repo>/pulls/<N>/comments, graphql (reviewThreads query only)}
+//        repos/<owner>/<repo>/pulls/<N>/comments, repos/<owner>/<repo>/issues/<N>/comments,
+//        graphql (reviewThreads query only)}
 // (`pr list` is included as the read-only branch-PR-detection alias for `pr view`; both are
 //  pure reads the skills need to decide "is there a PR for this branch?".)
 
@@ -293,6 +294,16 @@ function handleApi(fx) {
   if (/^\/?repos\/[^/]+\/[^/]+\/pulls\/\d+\/comments$/.test(endpoint || "") && apiMethod() === "GET") {
     emitArray(fx.pullComments || []);
     logCall({ decision: "answered", exitCode: 0, api: "pulls/comments", paginate: hasFlag("--paginate") });
+    return 0;
+  }
+  // /ship step 10 (#601): the PR's top-level comments via the REST issue-comments endpoint,
+  // the only read that shows the poster's account type (`user.type`, `[bot]`-suffixed
+  // `user.login`) and posting app (`performed_via_github_app.slug`). Served from the
+  // fixture's `issueComments` array. GET-only, like the pulls/<N>/comments route above: a
+  // write (`-X POST` / `--method POST`, i.e. posting a comment) falls through to default-deny.
+  if (/^\/?repos\/[^/]+\/[^/]+\/issues\/\d+\/comments$/.test(endpoint || "") && apiMethod() === "GET") {
+    emitArray(fx.issueComments || []);
+    logCall({ decision: "answered", exitCode: 0, api: "issues/comments", paginate: hasFlag("--paginate") });
     return 0;
   }
   // /ship step 10 (#580): review threads' resolved state. Only a query that names

@@ -457,7 +457,7 @@ re-checks it at runtime so a too-old Node fails with a sentence instead of an ob
 
 ### The eval roster
 
-Thirty-six evals: twenty-seven `kind: execution` and nine `kind: routing`. The rest of this doc
+Thirty-eight evals: twenty-nine `kind: execution` and nine `kind: routing`. The rest of this doc
 argues about them by id, so here they are.
 
 **Id scheme:** `<skill>-<n>` — the skill's name, then a number, scoped per skill. A letter suffix
@@ -495,6 +495,8 @@ The first four columns are generated; the last is written by hand from each eval
 | `ship-5` | routing | ship | — | Over-trigger control: "remind me what /ship does" explains, it does not ship |
 | `ship-6` | execution | ship | `feature-dirty-no-pr` | The `/ship` → `/pr` → `/commit` cascade announces each hop exactly once |
 | `ship-7` | execution | ship | `feature-open-pr-unanswered-comment` | A comment posted after the last push: it lists it, asks `1 unanswered since the last push — merge anyway?`, and does not merge on `no` |
+| `ship-8` | execution | ship | `feature-open-pr-bot-cards-only` | Only a Vercel card, a clean Claude review and its own `/pr` note follow the push: all three are excluded, so it merges |
+| `ship-9` | execution | ship | `feature-open-pr-review-with-findings` | A Claude review that reports issues after the push still counts: it lists it, asks, and does not merge on `no` |
 | `handoff-1` | execution | handoff | `feature-uncommitted-fix-no-pr` | It reports the fix as uncommitted, contradicting the human's belief that it landed |
 | `handoff-2` | execution | handoff | `feature-one-commit-clean-no-pr` | An existing hand-off doc is updated in place, with the old state kept under `Historical` |
 | `handoff-3` | execution | handoff | `feature-one-commit-clean-no-pr` | Nothing in flight: it asks what the hand-off is for instead of inventing work |
@@ -567,7 +569,7 @@ contribute more than one row — `default-deny`, for example, yields `exit`, `lo
 |---|---|---|
 | `lib/paths.mjs` | Path resolution and the load-bearing location guard. | `HARNESS_DIR`, `REPO_ROOT`, `MARKER_FILENAME` (`.skill-eval-sandbox`), `SANDBOX_PREFIX` (`skill-eval-`), `sandboxRoot(override)`, `assertOutsideRepo(target)`, `isSandbox(dir)` |
 | `lib/engine.mjs` | Node floor, enforced at runtime. | `NODE_ENGINE_FLOOR`, `assertNodeEngine()` |
-| `lib/fixtures.mjs` | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Nineteen profiles at the Status date — a count that moves whenever an eval is added, in lockstep with the file's own `// The 18 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` |
+| `lib/fixtures.mjs` | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Twenty-one profiles (as of #601) — a count that moves whenever an eval is added, in lockstep with the file's own `// The 21 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` |
 | `lib/gh-fixture.mjs` | Turn a profile's `gh` block into the `gh-fixture.json` the stub answers from, deriving the reviewer display-name map. | `buildGhFixture(profile)` |
 | `lib/sandbox.mjs` | Build, tear down and archive. The biggest module. | `buildSandbox({fixture, root, note})`, `teardownSandbox(dir)`, `teardownAll(root)`, `archiveEvidence(sandboxDir, destDir)`; internal helpers `git`, `gitSafe`, `forceRemove`, `clearReadOnly`, `setLocalConfig`, `writeFiles`, `writeTeamCache`, `writeMarker`, `installGhStub`, `writeActivateScripts`; the constant `SCRUB_UNSET` |
 
@@ -635,6 +637,7 @@ and per-handler extras.
 | `run list` / `run watch <id>` | `handleRunList` / `handleRunWatch` | Post-merge run discovery and watch, from the fixture's `runs`. |
 | `api user` / `api users/<login>` / `api repos/<o>/<r>/collaborators` | `handleApi` | Emulates exactly the `--jq` filters `/pr` uses (`.login`, `.name // .login`, `.[].login`). Any other endpoint falls through to default-deny. |
 | `api repos/<o>/<r>/pulls/<N>/comments` / `api graphql` | `handleApi` | `/ship` step 10's conversation read (#580): the fixture's `pullComments`, and — only for a query naming `reviewThreads` — the fixture's `reviewThreads` as one page (`hasNextPage: false`). Both empty by default; any other GraphQL query is default-denied. |
+| `api repos/<o>/<r>/issues/<N>/comments` | `handleApi` | `/ship` step 10's poster-identity read (#601): the fixture's `issueComments` — top-level comments in GitHub's REST shape (`user.login` with `[bot]` for a bot, `user.type`, `performed_via_github_app.slug`), which `gh pr view` cannot show. Empty by default. GET only (`--paginate` accepted); `-X POST` / `--method POST` falls through to default-deny. |
 | anything else | `dispatch` default branch | **Default-deny.** |
 
 Exit codes: **64** un-stubbed subcommand (default-deny), **66** sandbox marker missing, **70**

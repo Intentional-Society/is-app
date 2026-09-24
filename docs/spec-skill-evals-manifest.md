@@ -26,6 +26,10 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 > see the #580 amendment section at the end of this file.
 >
 > **Combined (after both amendments, 2026-09-23): 36 entries = 27 execution + 9 routing; 19 fixture profiles.**
+>
+> **#601 amendment (2026-09-24):** `ship-8` and `ship-9` added → **28 entries = 19 execution + 9 routing**
+> for `/commit`, `/pr` and `/ship`; with `/handoff`, **38 entries = 29 execution + 9 routing; 21 fixture
+> profiles.** See the #601 amendment section at the end of this file.
 
 ## commit (8 originals → 9 entries: 4 execution, 5 routing)
 
@@ -405,3 +409,27 @@ the `reviewThreads` GraphQL query), `scripts/skill-evals/README.md`,
 `tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
 `tests/functional/skills/gh-stub.test.ts` (new), `docs/design-skill-evals-harness.md`, and
 this manifest.
+
+## 2026-09 amendment — `ship-8` and `ship-9` added (#601) (2026-09-24)
+
+**Status:** two net-new execution evals for `/ship` step 10's three automated-post exclusions
+(#601). Their text is drafted for the maintainer's approval (#601, "Decisions for the
+maintainer" 2) and is recorded here, not in the ship table above, for the same reason as `ship-7`.
+
+| Resulting | Kind | Fixture | Notes |
+|---|---|---|---|
+| ship-8 | execution | `feature-open-pr-bot-cards-only` (new) | Green control: after the head commit only a Vercel deployment card (`vercel[bot]`, `vercel` app), a clean Claude review (`claude[bot]`, `claude` app, `No issues found.`) and the running account's own `/pr` new-commits note; asserts the REST issue-comments read happens, `Conversation: nothing unanswered since the last push` is printed, and exactly one merge runs |
+| ship-9 | execution | `feature-open-pr-review-with-findings` (new) | Red control: a Vercel card plus a Claude review reporting 2 issues; asserts only the review is listed, the run stops with `1 unanswered since the last push — merge anyway?`, and no merge is attempted |
+
+**Totals:** **28 entries = 19 execution + 9 routing** for `/commit`, `/pr` and `/ship` (ship: 8 execution, 2 routing); with the `/handoff` amendment above, **38 entries = 29 execution + 9 routing** and **21** fixture profiles.
+
+**Files updated in lockstep:** `.claude/skills/ship/evals/evals.json`,
+`scripts/skill-evals/lib/fixtures.mjs` (the two new profiles; top-level comments now written once
+and rendered into both the `gh pr view` shape and the REST `issueComments` shape, which
+`ship-7`'s profile also gains so its two reads agree), `scripts/skill-evals/lib/gh-fixture.mjs`
+(passes `issueComments` through), `scripts/skill-evals/gh-stub/gh-stub.mjs` (one read-only
+route: `issues/<N>/comments`), `scripts/skill-evals/README.md`,
+`tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
+`tests/functional/skills/gh-stub.test.ts`, `docs/design-skill-evals-harness.md`, and this
+manifest. The `/ship` and `/pr` SKILL.md changes and `docs/spec-portable-ai-procedures.md`
+land with the maintainer-approved wording.

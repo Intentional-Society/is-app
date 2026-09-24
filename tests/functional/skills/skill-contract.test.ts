@@ -177,7 +177,7 @@ describe("skill contract — .claude/skills/{commit,pr,ship,handoff}", () => {
     const EXPECTED_EXECUTION_IDS: Record<SkillName, string[]> = {
       commit: ["commit-1", "commit-2", "commit-3a", "commit-3b"],
       pr: ["pr-1", "pr-2", "pr-3", "pr-4", "pr-5", "pr-6", "pr-7"],
-      ship: ["ship-1", "ship-2a", "ship-2b", "ship-3", "ship-6", "ship-7"],
+      ship: ["ship-1", "ship-2a", "ship-2b", "ship-3", "ship-6", "ship-7", "ship-8", "ship-9"],
       handoff: [
         "handoff-1",
         "handoff-2",
