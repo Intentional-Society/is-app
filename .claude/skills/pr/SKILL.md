@@ -140,7 +140,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 10. **If an open PR for this branch exists — comment-by-default, body-update only on material scope change.**
 
-    Post a short PR-conversation comment summarizing each new commit pushed in this run (one bullet per commit; subject + short rationale).
+    Post a short PR-conversation comment summarizing each new commit pushed in this run — **its first line is exactly `_/pr: new commits since the PR body was written_`** (so `/ship` step 10 can recognize the note as the skill's own and not count it as unanswered, #601) — then one bullet per commit: subject + short rationale.
 
     Update the PR body **only** if the new commits materially change the PR's scope. Because the body is the durable merge commit message, ask for human approval before saving any body update. Phrase the question concretely — show the proposed diff to the body, not just "want me to update?"
 

@@ -69,6 +69,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
     - **Last push time:** the cutoff captured at step 4, before any rebase — not a fresh read of the head commit's date, which a rebase moves forward. GitHub does not expose when an ordinary push happened; the pre-rebase head commit's committer date is never later than its push, so using it can only list extra items, never hide one.
     - **Top-level comments and reviews:** `gh pr view <N> --json comments,reviews` (`comments[].createdAt`; `reviews[].submittedAt`, `.state`, `.body`).
+    - **Poster identity for top-level comments:** `gh api --paginate repos/<owner>/<repo>/issues/<N>/comments` (`user.login`, `user.type`, `performed_via_github_app.slug`, `body`, `created_at`). `gh pr view` drops the `[bot]` suffix from logins, so this REST read is the only place the account type and the posting app are visible; match it to the `gh pr view` comments by `created_at` and body.
     - **Inline review comments:** `gh api --paginate repos/<owner>/<repo>/pulls/<N>/comments` (`created_at`, `path`).
     - **Review threads' resolved state:** `gh api graphql -F owner=<owner> -F repo=<repo> -F n=<N> -f query='query($owner:String!,$repo:String!,$n:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$n){reviewThreads(first:100){pageInfo{hasNextPage} nodes{isResolved path comments(first:1){nodes{author{login} createdAt body}}}}}}}'`. The REST API has no resolved flag; GraphQL's `reviewThreads.isResolved` is the only place `gh` exposes it.
 
@@ -77,6 +78,11 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     - any top-level comment, review or inline comment posted after the last push — by anyone, **including the PR's author and the account running `/ship`**, because agent sessions post under the maintainer's account, so authorship shows nothing;
     - plus every inline review thread with `isResolved: false`, however old;
     - except an approval with no text (`state: APPROVED`, empty `body`), which never counts. Every other review counts, even one with an empty body.
+    - except three automated posts that never carry anything a human must answer (#601), each keyed on the poster's account type and posting app, never on a display name or wording alone:
+      - a **deployment card** — `user.type: Bot`, posted via the `vercel` app, body beginning `[vc]:`;
+      - an **automated review that found nothing** — posted via the `claude` app, first lines `## Code review` then `No issues found.`; a Claude review reporting one or more issues **counts and stops the merge**;
+      - **`/pr`'s own new-commits note** — first line exactly `_/pr: new commits since the PR body was written_`, posted by the account running this ship (`gh api user --jq .login`). Any other comment by that account still counts.
+      A new bot gets its own explicit line here; never a wildcard on `[bot]`.
 
     List each item once, even when it matches both rules. If nothing is unanswered, print `Conversation: nothing unanswered since the last push (<time>).` and continue. Otherwise list each item — author, time (UTC), first line of its text (`(no text)` if empty), and the file for inline items — then **STOP** and ask `N unanswered since the last push — merge anyway?`. Continue to the merge only on an explicit yes; any other reply ends the run without merging, with the PR URL surfaced. If any read above fails, or `hasNextPage` is true, the conversation is not proven clear: say which read failed and ask the same question. Never treat a failed read as nothing unanswered.
 
@@ -138,7 +144,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `.github/workflows/ci.yml` (required check; `dorny/paths-filter` docs-only handling)
 - `.github/workflows/e2e.yml` (post-deploy advisory; gated on `deployment_status.environment` ∈ {Preview, Production})
 - `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/ship` dispatches for expand changes)
-- `gh` CLI (including `gh api` REST and `gh api graphql` for step 10's conversation read)
-- Issue #580 (the maintainer's definition of "unanswered" that step 10 implements)
+- `gh` CLI (including `gh api` REST — `issues/<N>/comments` for poster identity, `pulls/<N>/comments` — and `gh api graphql` for step 10's conversation read)
+- Issue #580 (the maintainer's definition of "unanswered" that step 10 implements) and #601 (its three automated-post exclusions)
 - `.claude/skills/pr/SKILL.md` (delegated to on dirty / on-main pre-flight; delegates further to `/commit`)
 - `.claude/skills/commit/SKILL.md` (leaf in the delegation chain)

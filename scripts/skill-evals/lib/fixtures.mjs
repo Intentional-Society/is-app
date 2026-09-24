@@ -91,6 +91,94 @@ function existingPr(number, headRefName, title) {
 }
 
 // ---------------------------------------------------------------------------------------
+// Top-level PR comments, seeded in both shapes /ship step 10 reads (#580, #601):
+//   * `gh pr view --json comments` (GraphQL): `author.login` WITHOUT the `[bot]` suffix —
+//     real GraphQL drops it, so this read cannot tell a bot from a person;
+//   * `gh api repos/<o>/<r>/issues/<N>/comments` (REST, the stub's `issueComments`):
+//     `user.login` WITH `[bot]` for a bot, plus `user.type` and
+//     `performed_via_github_app.slug`.
+// A comment spec is written once and rendered into both (viewComments / restIssueComments,
+// below the profiles), so the two reads always agree: same count, order, time, body, link.
+//   spec: { id, login, type: "User" | "Bot", app: <slug> | null, association, createdAt, body }
+//   `login` is the account's base login (no `[bot]`); the REST render appends it for a Bot.
+// Declared here, above FIXTURES, because the profiles read them at module load.
+// ---------------------------------------------------------------------------------------
+
+// ship-7: a plain top-level comment by a non-app account (the #578-miss shape).
+const REVIEWED_COMMENT = {
+  id: 2000000001,
+  login: "sandbox-review-bot",
+  type: "User",
+  app: null,
+  association: "NONE",
+  createdAt: "2026-09-20T12:17:00Z",
+  body:
+    "The README still describes the old report flag; update it before merging.\n\n" +
+    "It says `--report` writes to `out/`, but the code in this PR writes to `reports/`.",
+};
+
+// The Vercel deployment card: a Bot posting via the `vercel` app, body beginning `[vc]:`.
+const VERCEL_CARD = {
+  id: 2000000011,
+  login: "vercel",
+  type: "Bot",
+  app: "vercel",
+  association: "NONE",
+  createdAt: "2026-09-20T12:05:00Z",
+  body:
+    "[vc]: #abc123def456:eyJpc01vbm9yZXBvIjpmYWxzZSwidHlwZSI6ImdpdGh1YiJ9\n" +
+    "The latest updates on your projects. Learn more about [Vercel for GitHub](https://vercel.link/github-learn-more).\n\n" +
+    "| Name | Status | Preview | Updated (UTC) |\n" +
+    "| :--- | :----- | :------ | :------ |\n" +
+    "| **is-app** | Ready ([Inspect](https://vercel.com/intentional-society/is-app/abc123)) | " +
+    "[Visit Preview](https://is-app-git-feature.vercel.app) | Sep 20, 2026 12:05pm |\n",
+};
+
+// A Claude review that found nothing, posted via the `claude` app — excluded (#601).
+const CLAUDE_REVIEW_CLEAN = {
+  id: 2000000012,
+  login: "claude",
+  type: "Bot",
+  app: "claude",
+  association: "NONE",
+  createdAt: "2026-09-20T12:17:00Z",
+  body: "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance.",
+};
+
+// A Claude review that REPORTS issues — still counts as unanswered (#601).
+const CLAUDE_REVIEW_WITH_FINDINGS = {
+  id: 2000000013,
+  login: "claude",
+  type: "Bot",
+  app: "claude",
+  association: "NONE",
+  createdAt: "2026-09-20T12:17:00Z",
+  body:
+    "## Code review\n\n2 issues found. Checked for bugs and CLAUDE.md compliance.\n\n" +
+    "### 1. The new handler never awaits the write\n\n" +
+    "`src/app/flagged.ts` returns before the insert resolves, so a failure is silently dropped.\n\n" +
+    "### 2. CLAUDE.md: raw `fetch` instead of `apiClient`\n\n" +
+    "CLAUDE.md says to use the Hono RPC client (`apiClient`) rather than raw `fetch`.",
+};
+
+// /pr step 10's new-commits note, posted by the account running the ship (SELF — the
+// fixture's `self`, which the stub's `gh api user --jq .login` returns), stamped with the
+// fixed first line.
+function prNoteBySelf(commitSubject) {
+  return {
+    id: 2000000014,
+    login: SELF,
+    type: "User",
+    app: null,
+    association: "MEMBER",
+    createdAt: "2026-09-20T12:20:00Z",
+    body:
+      "_/pr: new commits since the PR body was written_\n\n" +
+      `- \`${commitSubject}\` — the change this PR describes, pushed after the body was drafted.`,
+  };
+}
+
+// ---------------------------------------------------------------------------------------
 // Shared baseline: the files committed to `main` in every sandbox's first commit.
 // ---------------------------------------------------------------------------------------
 
@@ -166,7 +254,7 @@ function featureModule(slug) {
 
 // `/handoff` writes its doc to `.scratch/<slug>-bootstrap.md` and its SKILL.md promises that
 // path is already gitignored. The shared baseline does not ignore it, so the handoff profiles
-// extend the baseline rather than changing `.gitignore` for all eighteen profiles.
+// extend the baseline rather than changing `.gitignore` for all twenty-one profiles.
 const HANDOFF_GITIGNORE = `${BASE_GITIGNORE}# agent scratch notes — where /handoff writes its hand-off doc
 .scratch/
 `;
@@ -272,7 +360,7 @@ const MEMBERS_PAGE_TEAMMATE_WIP = MEMBERS_PAGE_BASE.replace(
 );
 
 // ---------------------------------------------------------------------------------------
-// The 19 profiles.
+// The 21 profiles.
 // ---------------------------------------------------------------------------------------
 
 /** @type {Record<string, object>} */
@@ -633,6 +721,58 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       self: SELF,
       branchPr: prWithComment(223, "feature-reviewed", "feat: reviewed feature"),
       prs: { 223: prWithComment(223, "feature-reviewed", "feat: reviewed feature") },
+      // The same comment as the REST issue-comments endpoint returns it (#601), so the two
+      // reads of the one conversation agree.
+      issueComments: restIssueComments(223, [REVIEWED_COMMENT]),
+      checks: CHECKS_ALL_GREEN,
+      runs: POST_MERGE_RUNS,
+      vercelProductionUrl: VERCEL_PROD_URL,
+      pullComments: [],
+      reviewThreads: [],
+    },
+  },
+
+  // ship-8 — pre-existing PR, all green; the only post-push comments are the three automated
+  // posts /ship step 10 excludes (#601): the Vercel card, a clean Claude review and /pr's own
+  // new-commits note. Merges.
+  "feature-open-pr-bot-cards-only": {
+    summary:
+      "Pre-existing open PR; clean; all checks green; after the head commit only a Vercel deployment card, a clean Claude review and the running account's own /pr new-commits note; merges.",
+    branch: "feature-carded",
+    branchCommits: [{ message: "feat: carded feature", write: { "src/app/carded.ts": featureModule("carded") } }],
+    openPr: true,
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      ...prWithComments(224, "feature-carded", "feat: carded feature", [
+        VERCEL_CARD,
+        CLAUDE_REVIEW_CLEAN,
+        prNoteBySelf("feat: carded feature"),
+      ]),
+      checks: CHECKS_ALL_GREEN,
+      runs: POST_MERGE_RUNS,
+      vercelProductionUrl: VERCEL_PROD_URL,
+      pullComments: [],
+      reviewThreads: [],
+    },
+  },
+
+  // ship-9 — pre-existing PR, all green; after the push a Vercel card (excluded) and a Claude
+  // review that REPORTS issues (not excluded, #601). No merge.
+  "feature-open-pr-review-with-findings": {
+    summary:
+      "Pre-existing open PR; clean; all checks green; after the head commit a Vercel deployment card and a Claude review reporting 2 issues; no merge.",
+    branch: "feature-flagged",
+    branchCommits: [{ message: "feat: flagged feature", write: { "src/app/flagged.ts": featureModule("flagged") } }],
+    openPr: true,
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      ...prWithComments(225, "feature-flagged", "feat: flagged feature", [VERCEL_CARD, CLAUDE_REVIEW_WITH_FINDINGS]),
       checks: CHECKS_ALL_GREEN,
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
@@ -781,22 +921,41 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
   },
 };
 
-// A plain top-level comment, not a review — the shape of the PR #578 miss.
+/** The `gh pr view --json comments` shape of seeded comment specs (no `[bot]` suffix). */
+function viewComments(number, specs) {
+  return specs.map((c) => ({
+    author: { login: c.login },
+    authorAssociation: c.association,
+    createdAt: c.createdAt,
+    body: c.body,
+    url: `${prLink(number)}#issuecomment-${c.id}`,
+  }));
+}
+
+/** The REST `issues/<N>/comments` shape of seeded comment specs (`[bot]` suffix for a Bot). */
+function restIssueComments(number, specs) {
+  return specs.map((c) => ({
+    id: c.id,
+    user: { login: c.type === "Bot" ? `${c.login}[bot]` : c.login, type: c.type },
+    performed_via_github_app: c.app ? { slug: c.app } : null,
+    body: c.body,
+    created_at: c.createdAt,
+    html_url: `${prLink(number)}#issuecomment-${c.id}`,
+  }));
+}
+
+/**
+ * An open PR carrying seeded top-level comments, as the `gh` fixture fields that hold it:
+ * `branchPr` and `prs[number]` (the `gh pr view` shape) plus `issueComments` (the REST shape).
+ */
+function prWithComments(number, headRefName, title, specs) {
+  const pr = { ...existingPr(number, headRefName, title), comments: viewComments(number, specs) };
+  return { branchPr: pr, prs: { [number]: pr }, issueComments: restIssueComments(number, specs) };
+}
+
+// ship-7's PR: one plain top-level comment, not a review — the shape of the PR #578 miss.
 function prWithComment(number, headRefName, title) {
-  return {
-    ...existingPr(number, headRefName, title),
-    comments: [
-      {
-        author: { login: "sandbox-review-bot" },
-        authorAssociation: "NONE",
-        createdAt: "2026-09-20T12:17:00Z",
-        body:
-          "The README still describes the old report flag; update it before merging.\n\n" +
-          "It says `--report` writes to `out/`, but the code in this PR writes to `reports/`.",
-        url: `${prLink(number)}#issuecomment-2000000001`,
-      },
-    ],
-  };
+  return { ...existingPr(number, headRefName, title), comments: viewComments(number, [REVIEWED_COMMENT]) };
 }
 
 /** All fixture names, sorted. */

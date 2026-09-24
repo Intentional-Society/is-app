@@ -96,6 +96,7 @@ Stubbed surface (traced from `.claude/skills/{commit,pr,ship}/SKILL.md`):
 | `run list` / `run watch <id>` | ship | post-merge run discovery/watch |
 | `api user` / `api users/<login>` / `api repos/.../collaborators` | pr | reviewer team cache; emulates the `--jq` filters the skill uses |
 | `api repos/.../pulls/<N>/comments` / `api graphql` (`reviewThreads` query only) | ship | step 10's pre-merge conversation read (#580), from fixture `pullComments` / `reviewThreads` (empty by default); any other GraphQL query is default-denied |
+| `api repos/.../issues/<N>/comments` | ship | step 10's poster-identity read (#601): top-level comments in the REST shape (`user.type`, `[bot]` logins, `performed_via_github_app.slug`), from fixture `issueComments` (empty by default); GET only — a POST is default-denied |
 
 This is a **superset** of the original design's illustrative list
 ([`design-skill-evals-harness.md`](../../docs/design-skill-evals-harness.md) §4.3) — it adds `pr comment`, `run list`,

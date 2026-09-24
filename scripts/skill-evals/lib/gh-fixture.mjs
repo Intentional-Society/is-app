@@ -28,5 +28,8 @@ export function buildGhFixture(profile) {
     // /ship step 10 (#580): inline review comments and review threads, empty by default.
     pullComments: gh.pullComments || [],
     reviewThreads: gh.reviewThreads || [],
+    // /ship step 10 (#601): top-level comments in the REST issue-comments shape (poster
+    // account type and posting app), empty by default.
+    issueComments: gh.issueComments || [],
   };
 }
