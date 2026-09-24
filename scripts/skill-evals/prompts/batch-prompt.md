@@ -9,6 +9,16 @@ thing CI runs automatically is the deterministic `skill-contract.test.ts` shape 
 
 Copy the block below into an orchestrating session.
 
+**Before you launch, print the run briefing** from `docs/strategy-skill-evals.md` §6 ("Run
+briefing"): an H1 that names it an eval test run briefing, one or two lines saying what the run
+is for and what it re-tests, then an H2 per phase with the five labelled one-liners (Tests ·
+Size · I do · You do · Watch for), numbers taken from the previous run's record, and a heading
+of the same size at every phase boundary. The execution batch below is one phase of it, and
+the one that needs the human: **three `gh pr merge` approvals** (ship-1, ship-3, ship-6), each
+inside a `skill-eval-sandboxes` folder, each hitting the stub and never GitHub, each waiting
+for a one-time click in every permission mode. Say so, with the expected timing, before you
+launch.
+
 ---
 
 ```
@@ -55,6 +65,20 @@ docs/strategy-skill-evals.md §6, not part of this batch):
      `teardown-sandbox.mjs <sandboxDir> --archive <eval-workspace>/outputs`):
        node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
 
+HUMAN APPROVALS (docs/strategy-skill-evals.md §6, "What you will be asked to approve"):
+  - The positive /ship evals (ship-1, ship-3, ship-6) each reach ONE `gh pr merge` that the
+    checked-in `ask` rule holds for a human's one-time approval — in every permission mode,
+    `auto` included. Nothing in the session clears it. Tell the human before launch: three
+    prompts, the first ~15 minutes in, the folder in the prompt says `skill-eval-sandboxes`
+    so it is the stub, approve each once.
+  - Run those executors as BACKGROUND agents so you can see a hold. When a run's gh-calls.log
+    shows the step-10 reads and no merge within 60 seconds, print and push a notice naming
+    the eval and the fixture PR: "sandbox merge prompt waiting for ship-1 — safe, tap approve".
+  - If a hold passes 30 minutes, mark that run INTERCEPTED, grade its merge assertion from
+    the transcript (MERGE-DISCRIMINATION below), mark its post-merge expectations
+    unreachable-unattended, archive and tear down its sandbox, and continue. Say so in the
+    phase-boundary heading.
+
 SCHEDULING:
   - Run executors in parallel batches (pairs), not all at once.
   - Schedule ship-2a in the FIRST wave: it deliberately waits ~10 minutes of wall clock
@@ -70,7 +94,9 @@ AGGREGATE + REPORT:
     from a run should ever appear in `git status`.
 
 WHEN COMPLETE:
-  - Run node scripts/skill-evals/teardown-sandbox.mjs --all to sweep any stragglers.
+  - Tear down any straggler individually (`teardown-sandbox.mjs <sandboxDir> --archive ...`);
+    never `--all` - it would also remove another session's live sandbox. List the sandbox
+    root and show it empty.
   - Confirm the zero-mutation posture: the real repo's `git status`, branch list, and HEAD
     are unchanged, and `gh` was never called against real GitHub (the stub is the only gh
     that ran).

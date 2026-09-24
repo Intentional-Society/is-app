@@ -250,6 +250,38 @@ actually read. It says, verbatim:
 
 So **editing an eval counts**, not just editing a `SKILL.md`.
 
+**Run briefing — print this before every full pass, and a heading at every phase boundary.**
+A full pass is four phases and takes hours; a person who comes back to the chat after being
+away must be able to scan the headings and see where the run is, what finished, and what is
+expected of them. Open with an H1 that names it an **eval test run** briefing, then one or two
+lines saying what the run is for and what it re-tests, then an H2 per phase, each phase carrying five
+labelled one-liners (the last only when there is something to say): **Tests** — what the
+phase checks, one sentence; **Size** — count · last time's duration · prompts yes/no;
+**I do** — the agent's actions; **You do** — the human's actions, or "nothing"; **Watch
+for** — the one gotcha a returning human should know. At every boundary print a heading of
+the same size (`## Phase 2 done — <one-line result> · Phase 3 starting (<what to expect>)`)
+and at the end `# Full pass done — <headline>`. Filled example, numbers from the
+2026-09-23/24 pass (refresh them from the previous run's record):
+
+> # Skill-eval test run briefing — full pass (`DATE`, main @ `SHA`)
+> This run re-tests the team's Claude Code skills (`/commit`, `/pr`, `/ship`) after `THE CHANGE`: four phases, about `N` hours. Three phases need nothing from you; phase 3 needs three approvals.
+> ## Phase 1 — selfcheck
+> **Tests** the test rig, not the skills: builds a throwaway sandbox and proves the gh stub denies by default, credentials are scrubbed, the real repo is untouched.
+> **Size** 23 checks · ~2 min · no prompts. **I do** run it, read the 23 rows, stop the run if any row is red. **You do** nothing.
+> ## Phase 2 — routing runner
+> **Tests** whether the model picks the right skill from plain language: fires on "commit this", stays quiet on "does this follow Conventional Commits?", announces `Using /commit`, respects Step 0. Headless, no GitHub.
+> **Size** 11 queries × 3 reps = 33 runs · last time 77 min · no prompts. **I do** launch it headless, summarize the trigger-rate table, name every VOID run. **You do** nothing.
+> **Watch for** VOID runs: the grader answered without opening a file; excluded from the mean by design, not failures.
+> ## Phase 3 — execution batch
+> **Tests** whether each skill follows its procedure end to end: `/commit`, `/pr`, `/ship` run real scenarios inside sandboxes against the gh stub, graded against written expectations.
+> **Size** 17 evals · last time ~45 min of work · **3 prompts**. **I do** run executors and graders in sandboxes, archive each run, prove zero mutation, write the report.
+> **You do** approve three `gh pr merge` prompts, one each for ship-1, ship-3, ship-6, once each; the first arrives ~15 min after launch and the batch waits until you do. I push a notice when one is waiting.
+> **Watch for** the folder in the prompt: `skill-eval-sandboxes` means the stub, never GitHub. Misses labelled ENVIRONMENT are the auto-mode classifier refusing sandbox commands, not skill failures.
+> ## Phase 4 — manual natural-language evals
+> **Tests** what only a person can see: the Step 0 picker rendering, the announcement landing where a human reads it, the `/ship` → `/pr` → `/commit` cascade announcing each hop once.
+> **Size** 6 runs · ~30 min · you type every prompt. **I do** set up a throwaway worktree, hand you each prompt, verify each run from its transcript, tear down, post the attestation. **You do** type the prompts in a fresh terminal, never the IDE panel; say "done" after each.
+> **Watch for** skipped-with-reason is a valid outcome when no invocation surface changed.
+
 **Changing a routing assertion.** Use this when a routing eval looks flaky or an assertion needs rewording. It is a text-only change: `expectations` / `notes` in the skill's `evals.json`, and `expectationsOverride` / `graderHint` in `scripts/skill-evals/routing/routing-plan.mjs`.
 
 1. **Read the failing grading's `evidence` text before blaming the wording.** If the reasoning reaches PASS while `passed` is false, or the `summary` block contradicts the per-expectation verdicts, it is a grader output defect, not an assertion problem — record it (FF-4) and stop.
@@ -403,9 +435,11 @@ intercepted and never reaches the stub to be logged. Consequently:
   correct abort — a false PASS (the Phase-3 audit's F-B finding: the ship red control's
   designated "no `gh pr merge` in the log" assertion passed *vacuously* against a mutant
   that did attempt the merge).
-- A **missing log entry is not proof a correct merge failed.** Whether the `ask` rule
-  auto-clears is environment-stochastic, not skill behavior (F-B: ship-3's positive merge
-  assertion passed on one arm and failed the byte-identical other arm).
+- A **missing log entry is not proof a correct merge failed.** The `ask` rule waits for a
+  human's one-time approval in every permission mode; whether someone was there to click
+  decides whether the merge reached the stub, and that is environment, not skill behavior
+  (F-B: ship-3's positive merge assertion passed on one arm and failed the byte-identical
+  other arm; 2026-09-24: two merges waited 6 h 52 min for the maintainer to wake).
 
 **The rule:** grade every merge-adjacent assertion from the **transcript's tool-call
 record** — an attempted `gh pr merge` appears there whether or not the `ask` rule lets it
@@ -525,6 +559,20 @@ manual runs — same session, same "does this read right to a human watching it"
 **`ship-2a` is the batch's long pole** (~10 minutes wall clock — it waits 5 minutes,
 picks `wait+5`, waits another 5, then aborts). Schedule it in the first parallel wave so
 its wait overlaps the rest of the batch rather than adding serially to the total run time.
+
+**What you will be asked to approve.** A full execution batch asks a human to approve three
+commands, one each for `ship-1`, `ship-3` and `ship-6`: a `gh pr merge` whose working
+directory is a folder under `skill-eval-sandboxes`. That folder means the command hits the gh
+stub, never GitHub — approve each once. The `ask` rule waits for that click in every
+permission mode, `auto` included (Claude Code's docs list `ask` rules among the actions no
+mode auto-approves; on 2026-09-24 two such prompts waited 6 h 52 min for a sleeping
+maintainer). The prompt offers only a one-time approve, and a saved `allow` cannot outrank an
+`ask` rule, so nothing in the session can silence it. Plan a batch with a person reachable, or
+expect it to pause at the first positive `/ship` merge. The orchestrator runs those executors
+in the background so it can see the hold, pushes a notice within a minute of a prompt
+waiting ("sandbox merge prompt waiting for ship-1 — safe, tap approve"), and after 30 minutes
+marks the run INTERCEPTED and grades its merge from the transcript (below) so the batch never
+stalls silently.
 
 ### Human-in-the-loop runs: the human types, the agent orchestrates
 
