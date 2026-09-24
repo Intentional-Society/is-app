@@ -154,10 +154,11 @@ file for the full rules.
   rule, on `Bash(gh pr merge *)` and the PowerShell equivalent
   ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
 - **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
-  how an `ask` behaves. A checked-in `ask` cannot be weakened by a local `allow` or by
-  `bypassPermissions`, but **`auto` mode auto-approves it**, and a prior "Yes, don't ask again"
-  silences it for the rest of the session (`.claude/skills/ship/SKILL.md` step 12). §5 depends on
-  this.
+  how prompts behave. A checked-in `ask` cannot be weakened by a local `allow` or by
+  `bypassPermissions`, and **no mode auto-approves it, `auto` included**: it waits for a human's
+  one-time click in every session (`.claude/skills/ship/SKILL.md` step 12; corrected 2026-09-24
+  from the Claude Code docs and the 2026-09-23/24 batch record — an earlier note claimed `auto`
+  mode auto-approved it). §5 depends on this.
 - **Untrusted workspace** — a directory in which Claude Code silently ignores local
   `permissions.allow` entries. Every sandbox is one; that is issue #531 (§5, §10).
 - **Hook / `PreToolUse`** — a program Claude Code runs before a matching tool call, whose exit code
@@ -914,9 +915,12 @@ permission layer, before any command runs, so it sits **above** the sandbox rath
 That has two consequences the harness is built around. First, it is the sturdiest gate C8 can point
 to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` step 12, which is the source of
 record for this rule's behavior: precedence is deny → ask → allow, first match, so the checked-in
-`ask` cannot be weakened by a local `allow` or by `bypassPermissions` — but **`auto` mode
-auto-approves it, and a prior "Yes, don't ask again" silences it for the rest of the session.** A
-guaranteed prompt means running in default mode. Second, it
+`ask` cannot be weakened by a local `allow` or by `bypassPermissions`, and **no permission mode
+auto-approves it: in every session, `auto` included, it waits for a human's one-time click** (corrected
+2026-09-24; the earlier claim that `auto` mode auto-approved it did not survive the docs or the
+2026-09-23/24 record, where two sandbox merges waited 6 h 52 min for the maintainer). A batch therefore
+needs a reachable human for its three positive `/ship` merges, or grades them as intercepted —
+`strategy-skill-evals.md` §6 "What you will be asked to approve" and #599. Second, it
 breaks naive merge grading — an intercepted `gh pr merge` never reaches the stub, so it is never
 logged, so an empty log proves nothing. The rule for grading is therefore: **grade merge-adjacent
 assertions from the transcript's tool-call record**, corroborated by the log and
@@ -1528,10 +1532,11 @@ what happened — the sandboxes were torn down after grading.
 **The `/ship` row's mechanism, precisely.** The archived `RESULT.md` is the only first-hand record,
 and it names the intervening layer as *"this orchestrating session's own Claude-Code auto-mode
 permission classifier"* — not the checked-in `ask` rule. That is consistent with how the rule
-actually behaves, per `.claude/skills/ship/SKILL.md` step 12: `auto` mode auto-approves the `ask`,
-so in an auto-mode session it would not have prompted, and the same classifier is recorded blocking
-a plain `git push` in the `/pr` red control, where no `ask` rule exists. In default mode the `ask`
-rule is what prompts instead — unless a prior "Yes, don't ask again" has already silenced it.
+actually behaves, per `.claude/skills/ship/SKILL.md` step 12 (corrected 2026-09-24): the `ask` rule
+prompts a human once per merge in every mode, `auto` included, and the classifier is a separate layer
+that decides the commands no rule matches — it is recorded blocking a plain `git push` in the `/pr`
+red control, where no `ask` rule exists. A merge that reached the stub in an unattended session did so
+because a person approved the prompt, not because a mode cleared it.
 Both are the **Claude Code permission layer, sitting above the sandbox `gh` stub**, and the design
 lesson is identical either way: whatever intercepts above the stub leaves no call-log line, so an
 empty log proves nothing and merges must be graded from the transcript's tool-call record.
