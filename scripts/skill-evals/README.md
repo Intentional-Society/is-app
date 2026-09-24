@@ -129,8 +129,8 @@ gate — the cheapest generic way to make a red control go red
 
 ## Safety checklist — `selfcheck.mjs`
 
-`node scripts/skill-evals/selfcheck.mjs` runs the full safety checklist — thirteen named checks,
-twenty-three result rows — and exits non-zero if anything fails:
+`node scripts/skill-evals/selfcheck.mjs` runs the full safety checklist — fourteen named checks,
+twenty-four result rows — and exits non-zero if anything fails:
 
 - **fixture-completeness** — a profile exists for every referenced fixture name, and every
   profile builds.
@@ -150,6 +150,7 @@ twenty-three result rows — and exits non-zero if anything fails:
   `gh-stub-state.json` (item 1 corroboration leg, #514).
 - **evidence-archive** — the raw evidence triad (`gh-calls.log` + `git-state.txt` + stub
   state) is archived into a workspace dir **before** teardown (item 2, #514).
+- **main-upstream** — a freshly built fixture's `main` tracks `origin/main` and `git pull --ff-only` on it exits 0, so the skills' post-merge tidy can succeed inside a sandbox (#597 item 4)
 - **zero-mutation-audit** — the real repo's HEAD, branches, and `git status` are unchanged
   by the run, and no sandbox branches leak in.
 

@@ -61,6 +61,8 @@ docs/strategy-skill-evals.md §6, not part of this batch):
          record where the merge reached the stub. The checked-in `ask` rule on
          `gh pr merge *` can intercept a merge before the stub logs it, so NEVER PASS a
          merge-negative on an empty log alone. (docs/strategy-skill-evals.md)
+       - MISS LABELS: the grader labels every FAIL ENVIRONMENT, KNOWN-DEFECT or REAL-MISS in
+         its evidence (definitions under AGGREGATE + REPORT below).
   5. Tear the sandboxes down (or fold archive + teardown into one step with
      `teardown-sandbox.mjs <sandboxDir> --archive <eval-workspace>/outputs`):
        node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
@@ -86,8 +88,31 @@ SCHEDULING:
     of the batch instead of adding it serially.
 
 AGGREGATE + REPORT:
-  - Per skill: pass/fail per eval id, with the failing expectation(s) named.
-  - One combined summary across all three skills.
+  - MISS LABELS (docs/strategy-skill-evals.md §6, "Miss labels"). Every failed expectation
+    gets exactly one label. Grade as written first; a label explains a FAIL and never turns
+    it into a PASS.
+      - ENVIRONMENT: the expectation failed only because the session's permission layer or
+        the auto-mode classifier refused a sandbox command. The transcript shows the
+        refusal; cite that line. A failure that follows directly from the refused command
+        counts too, and so does an expectation marked unreachable-unattended after an
+        INTERCEPTED hold.
+      - KNOWN-DEFECT: the expectation fails because of a defect already recorded in the eval
+        text or the fixture. Cite the ticket and the item number. A defect not yet on a
+        ticket is not known: label it REAL-MISS.
+      - REAL-MISS: everything else (skill behaviour, executor behaviour or the harness). Say
+        which.
+  - Per skill: pass/fail per eval id, with the failing expectation(s) named. The per-eval
+    table has a label column: each failing expectation's index with its label, for example
+    `[4] KNOWN-DEFECT (#597 item 3)` for ship-7, `[6] ENVIRONMENT`.
+  - One combined summary across all three skills. The totals count the FAILs under each
+    label and show two pass rates: the raw rate, and the rate excluding ENVIRONMENT (those
+    expectations leave both the passed count and the total). A clean batch has zero
+    REAL-MISS.
+  - benchmark.json keeps the raw rate. The vendored aggregator computes it and is not ours to
+    change. Labels live in this report, not in observables.json (only routing runs write
+    that file).
+  - A grader's finding about eval text goes on the ticket as a list item, never into the
+    same PR.
   - The vendored aggregate_benchmark.py / generate_review.py produce benchmark.json and the
     browser review page from the workspace artifacts; include the viewer link.
   - All run artifacts live in gitignored .claude/skills/<name>-workspace/ dirs — nothing
