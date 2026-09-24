@@ -629,7 +629,7 @@ and per-handler extras.
 |---|---|---|
 | `auth status` | `handleAuthStatus` | Writes to **stderr**, like real `gh`, and includes the literal `(SANDBOX gh stub)` — the string the executor prompt's stub-liveness gate greps for. Exit 0 logged in, 1 not. |
 | `issue view <N>` | `handleIssueView` | Emits the fixture's issue JSON, or exit 1 if it is not `OPEN`. |
-| `pr view [N]` | `handlePrView` | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. Every fixture PR carries `comments`, `reviews` and `commits[].committedDate` for `/ship` step 10 (#580). |
+| `pr view [N]` | `handlePrView` | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. Every fixture PR carries `comments`, `reviews` and `commits[].committedDate` for `/ship` step 10 (#580). One `--jq` special case (#597 item 1): `--json commits --jq '.commits[-1].committedDate'` (dotless spelling accepted) prints the head commit's date as a bare string, the way real `gh` does; every other form, including any other `--jq`, still prints the full object. |
 | `pr list` | `handlePrList` | The read-only branch-PR-detection alias: emits `[branchPr]` or `[]`. |
 | `pr create` | `handlePrCreate` | Consults the per-call sequence `sequences["pr create"]` **first**; only if the profile has none does it fall back to `createPr`'s URL. (`pr-7`'s error-then-success run depends on that precedence.) Logs the `--reviewer` and `--assignee` values. |
 | `pr checks <N> [--watch]` | `handlePrChecks` | Prints one tab-separated line per fixture check. Exit **0** all pass, **8** any pending, **1** any fail — real `gh`'s codes. |
