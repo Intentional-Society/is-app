@@ -76,6 +76,9 @@ told about the first two on every run (`runGrader` injects them); the last two a
 
 ## Usage
 
+**Shell:** run these from Git Bash — the PowerShell launch was fixed in #582 but is not yet shown
+to work end to end.
+
 ```sh
 # List the query plan (11 queries: 9 evals, commit-5 → 3 sub-queries).
 node scripts/skill-evals/routing/run-routing-evals.mjs --list

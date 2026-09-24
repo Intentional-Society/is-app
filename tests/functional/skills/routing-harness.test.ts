@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { extractJsonObject } from "../../../scripts/skill-evals/routing/lib/driver.mjs";
+import { extractJsonObject, sandboxEnv } from "../../../scripts/skill-evals/routing/lib/driver.mjs";
 import { polarityFor, summarizeEval } from "../../../scripts/skill-evals/routing/lib/summary.mjs";
 import { renderInputTurns } from "../../../scripts/skill-evals/routing/lib/transcript.mjs";
 
@@ -48,6 +48,41 @@ describe("extractJsonObject", () => {
   it("returns null when there is genuinely nothing parseable", () => {
     expect(extractJsonObject("{{{ not json at all")).toBeNull();
     expect(extractJsonObject("no braces here")).toBeNull();
+  });
+});
+
+describe("sandboxEnv", () => {
+  // REGRESSION GUARD (#582): a PowerShell-launched process carries the search path under the key
+  // `Path`, so reading `env.PATH` returned undefined and the child's path became the stub folder
+  // alone — the real path holding `claude.exe` was gone, and every run died with
+  // `spawn claude ENOENT` before any model call. The base env is injected rather than read from
+  // `process.env` so the case-variant lives in the fixture: an ambient-only test would be red on
+  // one person's shell and green on CI (ubuntu-latest always exports `PATH`).
+  const STUB = "/sandbox/bin";
+  const manifest = { binDir: STUB, repoDir: "/sandbox/repo", env: { prependPath: STUB } };
+  const pathKeys = (env: Record<string, string | undefined>) => Object.keys(env).filter((k) => /^path$/i.test(k));
+
+  it("keeps the real search path when the base env spells it `Path` (PowerShell)", () => {
+    const env = sandboxEnv(manifest, { Path: "/usr/bin" });
+    expect(env.PATH).toBe(`${STUB}${path.delimiter}/usr/bin`);
+    expect(pathKeys(env)).toEqual(["PATH"]);
+  });
+
+  it("keeps the real search path when the base env spells it `PATH` (bash)", () => {
+    const env = sandboxEnv(manifest, { PATH: "/usr/bin" });
+    expect(env.PATH).toBe(`${STUB}${path.delimiter}/usr/bin`);
+    expect(pathKeys(env)).toEqual(["PATH"]);
+  });
+
+  it("leaves no trailing separator when the base env has no search path at all", () => {
+    const env = sandboxEnv(manifest, { HOME: "/home/x" });
+    expect(env.PATH).toBe(STUB);
+  });
+
+  it("collapses both case-variants onto one `PATH`, with the exact-case value winning", () => {
+    const env = sandboxEnv(manifest, { Path: "/lower", PATH: "/upper" });
+    expect(pathKeys(env)).toEqual(["PATH"]);
+    expect(env.PATH).toBe(`${STUB}${path.delimiter}/upper`);
   });
 });
 
