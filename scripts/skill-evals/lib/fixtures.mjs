@@ -68,6 +68,10 @@ function prLink(n, sub) {
   return sub ? `${base}/${sub}` : base;
 }
 
+// The committer date every fixture PR's head commit carries — /ship step 10 (#580) takes it
+// as the last push time. A fixed instant, so a seeded comment can sit before or after it.
+const PR_HEAD_COMMITTED_AT = "2026-09-20T12:00:00Z";
+
 function existingPr(number, headRefName, title) {
   return {
     number,
@@ -77,6 +81,10 @@ function existingPr(number, headRefName, title) {
     isDraft: false,
     title,
     url: prLink(number),
+    // The conversation /ship step 10 reads: nothing by default.
+    comments: [],
+    reviews: [],
+    commits: [{ committedDate: PR_HEAD_COMMITTED_AT }],
   };
 }
 
@@ -149,7 +157,7 @@ function featureModule(slug) {
 }
 
 // ---------------------------------------------------------------------------------------
-// The 14 profiles.
+// The 15 profiles.
 // ---------------------------------------------------------------------------------------
 
 /** @type {Record<string, object>} */
@@ -312,6 +320,8 @@ export const members = pgTable("members", {
       collaborators: REVIEWER_COLLABORATORS,
       branchPr: null,
       createPr: { number: 301, url: prLink(301) },
+      // ship-6 reads the created PR's conversation by number before the merge (step 10, #580).
+      prs: { 301: existingPr(301, "wire-up-dashboard", "feat: wire up dashboard") },
       // ship-6 continues past PR creation into the merge — the created PR's checks are green.
       checks: CHECKS_ALL_GREEN,
       runs: POST_MERGE_RUNS,
@@ -493,7 +503,47 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       vercelProductionUrl: VERCEL_PROD_URL,
     },
   },
+
+  // ship-7 — pre-existing PR, all green, but a review bot commented after the last push (#580)
+  "feature-open-pr-unanswered-comment": {
+    summary:
+      "Pre-existing open PR; clean; all checks green; one top-level bot comment posted 17 minutes after the head commit; no merge.",
+    branch: "feature-reviewed",
+    branchCommits: [{ message: "feat: reviewed feature", write: { "src/app/reviewed.ts": featureModule("reviewed") } }],
+    openPr: true,
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      branchPr: prWithComment(223, "feature-reviewed", "feat: reviewed feature"),
+      prs: { 223: prWithComment(223, "feature-reviewed", "feat: reviewed feature") },
+      checks: CHECKS_ALL_GREEN,
+      runs: POST_MERGE_RUNS,
+      vercelProductionUrl: VERCEL_PROD_URL,
+      pullComments: [],
+      reviewThreads: [],
+    },
+  },
 };
+
+// A plain top-level comment, not a review — the shape of the PR #578 miss.
+function prWithComment(number, headRefName, title) {
+  return {
+    ...existingPr(number, headRefName, title),
+    comments: [
+      {
+        author: { login: "sandbox-review-bot" },
+        authorAssociation: "NONE",
+        createdAt: "2026-09-20T12:17:00Z",
+        body:
+          "The README still describes the old report flag; update it before merging.\n\n" +
+          "It says `--report` writes to `out/`, but the code in this PR writes to `reports/`.",
+        url: `${prLink(number)}#issuecomment-2000000001`,
+      },
+    ],
+  };
+}
 
 /** All fixture names, sorted. */
 export function listFixtures() {

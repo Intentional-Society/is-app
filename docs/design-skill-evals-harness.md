@@ -156,7 +156,7 @@ file for the full rules.
 - **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
   how an `ask` behaves. A checked-in `ask` cannot be weakened by a local `allow` or by
   `bypassPermissions`, but **`auto` mode auto-approves it**, and a prior "Yes, don't ask again"
-  silences it for the rest of the session (`.claude/skills/ship/SKILL.md` step 11). §5 depends on
+  silences it for the rest of the session (`.claude/skills/ship/SKILL.md` step 12). §5 depends on
   this.
 - **Untrusted workspace** — a directory in which Claude Code silently ignores local
   `permissions.allow` entries. Every sandbox is one; that is issue #531 (§5, §10).
@@ -455,7 +455,7 @@ re-checks it at runtime so a too-old Node fails with a sentence instead of an ob
 
 ### The eval roster
 
-Twenty-five evals: sixteen `kind: execution` and nine `kind: routing`. The rest of this doc argues
+Twenty-six evals: seventeen `kind: execution` and nine `kind: routing`. The rest of this doc argues
 about them by id, so here they are.
 
 **Id scheme:** `<skill>-<n>` — the skill's name, then a number, scoped per skill. A letter suffix
@@ -492,6 +492,7 @@ The first four columns are generated; the last is written by hand from each eval
 | `ship-4` | routing | ship | — | Session control: "ship it" must *not* fire `/ship`, and must not simulate the merge |
 | `ship-5` | routing | ship | — | Over-trigger control: "remind me what /ship does" explains, it does not ship |
 | `ship-6` | execution | ship | `feature-dirty-no-pr` | The `/ship` → `/pr` → `/commit` cascade announces each hop exactly once |
+| `ship-7` | execution | ship | `feature-open-pr-unanswered-comment` | A comment posted after the last push: it lists it, asks `1 unanswered since the last push — merge anyway?`, and does not merge on `no` |
 
 The first four columns regenerate with this read-only command, from the three eval files:
 
@@ -545,7 +546,7 @@ contribute more than one row — `default-deny`, for example, yields `exit`, `lo
 |---|---|---|
 | `lib/paths.mjs` | Path resolution and the load-bearing location guard. | `HARNESS_DIR`, `REPO_ROOT`, `MARKER_FILENAME` (`.skill-eval-sandbox`), `SANDBOX_PREFIX` (`skill-eval-`), `sandboxRoot(override)`, `assertOutsideRepo(target)`, `isSandbox(dir)` |
 | `lib/engine.mjs` | Node floor, enforced at runtime. | `NODE_ENGINE_FLOOR`, `assertNodeEngine()` |
-| `lib/fixtures.mjs` | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Fourteen profiles at the Status date — a count that moves whenever an eval is added, in lockstep with the file's own `// The 14 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` |
+| `lib/fixtures.mjs` | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Fifteen profiles at the Status date — a count that moves whenever an eval is added, in lockstep with the file's own `// The 15 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` |
 | `lib/gh-fixture.mjs` | Turn a profile's `gh` block into the `gh-fixture.json` the stub answers from, deriving the reviewer display-name map. | `buildGhFixture(profile)` |
 | `lib/sandbox.mjs` | Build, tear down and archive. The biggest module. | `buildSandbox({fixture, root, note})`, `teardownSandbox(dir)`, `teardownAll(root)`, `archiveEvidence(sandboxDir, destDir)`; internal helpers `git`, `gitSafe`, `forceRemove`, `clearReadOnly`, `setLocalConfig`, `writeFiles`, `writeTeamCache`, `writeMarker`, `installGhStub`, `writeActivateScripts`; the constant `SCRUB_UNSET` |
 
@@ -604,7 +605,7 @@ and per-handler extras.
 |---|---|---|
 | `auth status` | `handleAuthStatus` | Writes to **stderr**, like real `gh`, and includes the literal `(SANDBOX gh stub)` — the string the executor prompt's stub-liveness gate greps for. Exit 0 logged in, 1 not. |
 | `issue view <N>` | `handleIssueView` | Emits the fixture's issue JSON, or exit 1 if it is not `OPEN`. |
-| `pr view [N]` | `handlePrView` | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. |
+| `pr view [N]` | `handlePrView` | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. Every fixture PR carries `comments`, `reviews` and `commits[].committedDate` for `/ship` step 10 (#580). |
 | `pr list` | `handlePrList` | The read-only branch-PR-detection alias: emits `[branchPr]` or `[]`. |
 | `pr create` | `handlePrCreate` | Consults the per-call sequence `sequences["pr create"]` **first**; only if the profile has none does it fall back to `createPr`'s URL. (`pr-7`'s error-then-success run depends on that precedence.) Logs the `--reviewer` and `--assignee` values. |
 | `pr checks <N> [--watch]` | `handlePrChecks` | Prints one tab-separated line per fixture check. Exit **0** all pass, **8** any pending, **1** any fail — real `gh`'s codes. |
@@ -612,6 +613,7 @@ and per-handler extras.
 | `pr comment <N>` | `handlePrComment` | Returns a synthetic comment URL; logs whether a body was supplied. |
 | `run list` / `run watch <id>` | `handleRunList` / `handleRunWatch` | Post-merge run discovery and watch, from the fixture's `runs`. |
 | `api user` / `api users/<login>` / `api repos/<o>/<r>/collaborators` | `handleApi` | Emulates exactly the `--jq` filters `/pr` uses (`.login`, `.name // .login`, `.[].login`). Any other endpoint falls through to default-deny. |
+| `api repos/<o>/<r>/pulls/<N>/comments` / `api graphql` | `handleApi` | `/ship` step 10's conversation read (#580): the fixture's `pullComments`, and — only for a query naming `reviewThreads` — the fixture's `reviewThreads` as one page (`hasNextPage: false`). Both empty by default; any other GraphQL query is default-denied. |
 | anything else | `dispatch` default branch | **Default-deny.** |
 
 Exit codes: **64** un-stubbed subcommand (default-deny), **66** sandbox marker missing, **70**
@@ -846,7 +848,7 @@ The mechanisms, named to where they live:
 | 8 | **Every call is evidence.** Answered and denied calls alike are appended to `gh-calls.log`, with whether credentials were present at call time. | `logCall()` in `gh-stub/gh-stub.mjs` |
 | 9 | **Liveness before any negative.** A "the log contains no X" claim is trusted only when the log is non-empty. | `ghLog.live` from `routingObservables()` in `routing/lib/transcript.mjs`; stated to the grader by `runGrader()` in `routing/lib/driver.mjs`; stated to humans in `prompts/executor-prompt.md` |
 | 10 | **Fixtures can never depend on case-distinct filenames**, because macOS's default filesystem is case-insensitive. | `assertNoCaseCollisions()` in `lib/fixtures.mjs`, called from `getFixture()` |
-| 11 | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of ten of the fourteen fixture branch names is additionally checked by name, belt-and-braces. | `checkZeroMutation()` in `selfcheck.mjs` |
+| 11 | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of ten of the fifteen fixture branch names is additionally checked by name, belt-and-braces. | `checkZeroMutation()` in `selfcheck.mjs` |
 | 12 | **The whole checklist is executable.** Thirteen named checks, twenty-three rows, exit 0 only if every row passes; among them a genuine POSIX-shell activation check that sources `activate.sh` and runs a bare `gh`. | `selfcheck.mjs`, especially `checkGitBashActivation()` and `findPosixShell()` |
 
 ### Above the stub
@@ -856,7 +858,7 @@ and `PowerShell(gh pr merge *)` in `.claude/settings.json`. It is evaluated at t
 permission layer, before any command runs, so it sits **above** the sandbox rather than inside it.
 
 That has two consequences the harness is built around. First, it is the sturdiest gate C8 can point
-to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` step 11, which is the source of
+to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` step 12, which is the source of
 record for this rule's behavior: precedence is deny → ask → allow, first match, so the checked-in
 `ask` cannot be weakened by a local `allow` or by `bypassPermissions` — but **`auto` mode
 auto-approves it, and a prior "Yes, don't ask again" silences it for the rest of the session.** A
@@ -1444,8 +1446,8 @@ audit every number, and so the numbers survive the machine.
 ### Execution evals
 
 One graded iteration per skill, in `.claude/skills/{commit,pr,ship}-workspace/iteration-1/`.
-Seventeen eval directories carry a `grading.json`: today's sixteen execution evals plus the
-since-retired `ship-2c`. Each has exactly one `with_skill/run-1`; `commit-2`, `pr-2` and `ship-3`
+Seventeen eval directories carry a `grading.json`: the sixteen execution evals of that iteration plus the
+since-retired `ship-2c` (`ship-7`, added for #580, has none yet). Each has exactly one `with_skill/run-1`; `commit-2`, `pr-2` and `ship-3`
 also have an `old_skill/run-1` control arm — twenty grading files in all. That is the entire
 execution-eval evidence base.
 
@@ -1475,7 +1477,7 @@ what happened — the sandboxes were torn down after grading.
 **The `/ship` row's mechanism, precisely.** The archived `RESULT.md` is the only first-hand record,
 and it names the intervening layer as *"this orchestrating session's own Claude-Code auto-mode
 permission classifier"* — not the checked-in `ask` rule. That is consistent with how the rule
-actually behaves, per `.claude/skills/ship/SKILL.md` step 11: `auto` mode auto-approves the `ask`,
+actually behaves, per `.claude/skills/ship/SKILL.md` step 12: `auto` mode auto-approves the `ask`,
 so in an auto-mode session it would not have prompted, and the same classifier is recorded blocking
 a plain `git push` in the `/pr` red control, where no `ask` rule exists. In default mode the `ask`
 rule is what prompts instead — unless a prior "Yes, don't ask again" has already silenced it.

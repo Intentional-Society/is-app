@@ -15,7 +15,8 @@
 // Stubbed surface (traced from .claude/skills/{commit,pr,ship}/SKILL.md):
 //   auth status | issue view | pr view | pr list | pr create | pr checks | pr merge |
 //   pr comment | run list | run watch |
-//   api {user, users/<login>, repos/<owner>/<repo>/collaborators}
+//   api {user, users/<login>, repos/<owner>/<repo>/collaborators,
+//        repos/<owner>/<repo>/pulls/<N>/comments, graphql (reviewThreads query only)}
 // (`pr list` is included as the read-only branch-PR-detection alias for `pr view`; both are
 //  pure reads the skills need to decide "is there a PR for this branch?".)
 
@@ -285,6 +286,28 @@ function handleApi(fx) {
     logCall({ decision: "answered", exitCode: 0, api: "collaborators" });
     return 0;
   }
+  // /ship step 10 (#580): the PR's inline review comments. One page holds everything, so
+  // `--paginate` needs no handling beyond being accepted. Read-only: a write to the same
+  // endpoint (`-X POST` / `--method POST`, e.g. posting a review comment) is NOT this route
+  // and falls through to default-deny like every other un-stubbed mutation.
+  if (/^\/?repos\/[^/]+\/[^/]+\/pulls\/\d+\/comments$/.test(endpoint || "") && apiMethod() === "GET") {
+    emitArray(fx.pullComments || []);
+    logCall({ decision: "answered", exitCode: 0, api: "pulls/comments", paginate: hasFlag("--paginate") });
+    return 0;
+  }
+  // /ship step 10 (#580): review threads' resolved state. Only a query that names
+  // `reviewThreads` is answered; any other GraphQL query stays default-deny.
+  if (endpoint === "graphql" && /\breviewThreads\b/.test(graphqlQuery())) {
+    emitObject({
+      data: {
+        repository: {
+          pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: fx.reviewThreads || [] } },
+        },
+      },
+    });
+    logCall({ decision: "answered", exitCode: 0, api: "graphql reviewThreads" });
+    return 0;
+  }
   // Unknown api endpoint -> default-deny.
   logCall({ decision: "denied", exitCode: EXIT_DEFAULT_DENY, api: endpoint });
   stderr(`skill-eval gh stub: api endpoint not stubbed (default-deny): \`gh ${rawArgv.join(" ")}\`.`);
@@ -361,14 +384,34 @@ const FLAGS_WITH_VALUE = new Set([
   "--head",
   "--base",
   "-F",
+  "--field",
+  "--raw-field",
   "-f",
   "-H",
+  "-X",
+  "--method",
 ]);
 
 /** Positional at absolute index `n` (counting the subcommand tokens too). */
 function firstPositional(n) {
   const ps = positionals();
   return ps[n] ?? null;
+}
+
+/** The HTTP method of a `gh api` call: `-X`/`--method` if given (upper-cased), else GET. */
+function apiMethod() {
+  const m = flagValue("-X") ?? flagValue("--method");
+  return (m || "GET").toUpperCase();
+}
+
+/** The `query=` field of a `gh api graphql` call (`-f`, `-F`, `--raw-field` or `--field`), or "". */
+function graphqlQuery() {
+  for (let i = 0; i < argv.length - 1; i++) {
+    if (["-f", "-F", "--raw-field", "--field"].includes(argv[i]) && argv[i + 1].startsWith("query=")) {
+      return argv[i + 1].slice("query=".length);
+    }
+  }
+  return "";
 }
 
 function hasFlag(name) {

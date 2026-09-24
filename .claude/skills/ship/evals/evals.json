@@ -123,6 +123,24 @@
         "No `Using /commit` or `Using /pr` announcement is printed by any Skill other than the parent that actually delegated"
       ],
       "notes": "Resolves the manifest's flagged classification: the cascade mechanics (markers written/cleared, handoff lines in transcript, Step-0 suppression, commit→PR→merge through stubs) are sandbox-executable by an executor following the three SKILL.md files. The live Skill-tool announcement nuance stays additionally covered by the routing runbook next to ship-4/ship-5 (cross-noted there — manifest cross-cutting requirement 4). Accepted compromise per R7: the scripted 'typed /ship' premise tests step-following, not live UX."
+    },
+    {
+      "id": "ship-7",
+      "kind": "execution",
+      "eval_name": "refusal-unanswered-comment-since-last-push",
+      "prompt": "/ship",
+      "fixture": "feature-open-pr-unanswered-comment",
+      "preconditions": "On a feature branch with a pre-existing open PR; tree clean; `origin/main` has not advanced; required + visible advisory checks are all green; no schema expand pending. The PR's head commit was committed at 2026-09-20T12:00:00Z, and one plain top-level comment by `sandbox-review-bot` was posted at 2026-09-20T12:17:00Z; there are no reviews, no inline review comments and no review threads.",
+      "human_script": "When the skill asks `1 unanswered since the last push — merge anyway?`, the human replies: no.",
+      "expected_output": "Skill runs as in ship-1 up to and including the green CI check, then, right before the merge, reads the PR conversation from every source (`gh pr view <N> --json` with comments, reviews and commits; `gh api .../pulls/<N>/comments`; `gh api graphql` on `reviewThreads`). It lists the one comment posted after the last push (author `sandbox-review-bot`, time 2026-09-20 12:17 UTC, first line `The README still describes the old report flag; update it before merging.`), stops with `1 unanswered since the last push — merge anyway?`, and on `no` ends the run without merging, with the PR URL surfaced.",
+      "expectations": [
+        "The conversation is read after CI is green and before any merge attempt: the gh call log shows a `pr view <N>` call whose `--json` fields include `comments`, a `pulls/<N>/comments` api call and a `graphql` reviewThreads api call, each logged as answered and each after the `pr checks` call",
+        "The skill lists the seeded comment with its author (`sandbox-review-bot`), its time (2026-09-20 12:17 UTC, in any unambiguous UTC form) and its first line (`The README still describes the old report flag; update it before merging.`), and lists nothing else as unanswered",
+        "The skill stops with the question `1 unanswered since the last push — merge anyway?` and waits for the reply before doing anything further",
+        "No merge is attempted: the transcript's tool-call record shows NO `gh pr merge` invocation at any point (authoritative merge-negative signal — a wrongful merge appears in the transcript even when the checked-in `ask` rule intercepts it before the stub logs it), corroborated by a non-empty gh call log (liveness) that contains no `pr merge` entry and a `gh-stub-state.json` with no merge record (merge-discrimination rule, docs/strategy-skill-evals.md)",
+        "After `no`, the run ends with the PR URL surfaced and no post-merge step: `git switch main`, `git branch -d` and `gh run list --branch main` do not appear in the command log"
+      ],
+      "notes": "Red control for #580's step 10, which ship-1, ship-3 and ship-6 cannot give: their fixtures seed no conversation, so step 10 finds nothing and they merge. The fixture dates the comment after the head commit's `committedDate` as the gh stub reports it; the sandbox's own git commits carry the run's real clock time, so a run that takes the last-push time from local `git log` instead of `gh pr view --json commits`, as step 10 says, will not list the comment and fails the second expectation."
     }
   ]
 }
