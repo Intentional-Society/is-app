@@ -112,15 +112,20 @@ layout so `aggregate_benchmark.py` and the eval viewer work unchanged:
       raw.jsonl                  # full stream-json event stream
       executor.err               # the executor child's stderr
       transcript.md              # the graded (last) turn, rendered for the grader
+      grader-envelope.json       # the grader's own raw stdout, saved for EVERY grading before
+                                 #   any decision about whether the verdict counts (#583)
       timing.json                # wall-clock, written by the runner (not the grader)
       outputs/                   # archived evidence triad (BEFORE teardown, ruling 3):
         gh-calls.log             #   what the skill asked GitHub to do
         git-state.txt            #   raw sandbox git dump
         gh-stub-state.json       #   stub durable state (merge records)
         observables.json         #   script-checkable routing observables
-      grading.json               # grader output (per agents/grader.md); if the grade could
-                                 #   not be parsed, grader-raw.txt appears instead and the
-                                 #   run is counted as ungraded
+      grading.json               # grader output (per agents/grader.md). Absent — along with
+                                 #   timing.json — when the grading was VOIDED: a grader that
+                                 #   answered in one turn (num_turns <= 1) opened no file, so
+                                 #   its verdict is discarded PASS or FAIL. If no verdict could
+                                 #   be parsed at all, grader-raw.txt appears instead. Either
+                                 #   way the run is counted as ungraded, with its reason named
   routing_summary.json           # per-eval TRIGGER RATES across the reps
   benchmark.json / benchmark.md  # aggregate_benchmark.py output
 ```
@@ -135,10 +140,14 @@ layout so `aggregate_benchmark.py` and the eval viewer work unchanged:
   and injected directly, so no `Skill()` call is ever made and the rate is structurally 0 —
   reporting it as 0 made the summary read "broken" for correct behavior, which is what produced
   #528. `null` keeps a meaningless ratio out of the report.
-- `graded_runs` / `ungraded_runs` / `ungraded[]` — a run whose grade could not be parsed is
-  **counted and named**, never silently dropped. The mean is taken over graded runs only, so a
-  non-zero `ungraded_runs` beside it is what stops a batch quietly shedding failing reps and
-  reporting a flattering number (#527). The runner prints a warning for each.
+- `graded_runs` / `ungraded_runs` / `ungraded[]` — a run whose grade could not be parsed, **or
+  whose grading was voided**, is **counted and named**, never silently dropped. The mean is taken
+  over graded runs only, so a non-zero `ungraded_runs` beside it is what stops a batch quietly
+  shedding failing reps and reporting a flattering number (#527). The runner prints a warning for
+  each. A void run's `reason` is one of three strings naming what was observed — `void: grader
+  made no tool calls (num_turns: <n>)`, `void: grader turn count unknown (envelope unparseable)`,
+  `void: grader turn count unknown (no num_turns in envelope)` — and its live console line reads
+  `pass=VOID` (#583).
 - `mean_expectation_pass_rate` — mean graded pass rate, `null` if nothing graded.
 
 Routing is probabilistic (risk R5) — rates, never a single binary verdict, and never a threshold.
@@ -147,11 +156,18 @@ Routing is probabilistic (risk R5) — rates, never a single binary verdict, and
 
 Each run's transcript + the eval's committed `expectations` go to a headless grader
 (`claude -p`) that follows `agents/grader.md` verbatim, plus the two headless adaptations
-above. The grader prints the standard grading JSON; the runner writes it to `grading.json`.
-Merge-adjacent negatives follow the merge-discrimination rule (strategy §6): grade from the
+above. The grader prints the standard grading JSON; the runner saves its raw envelope to
+`grader-envelope.json` and writes the verdict to `grading.json` — unless `lib/grading.mjs` voids
+it. Merge-adjacent negatives follow the merge-discrimination rule (strategy §6): grade from the
 transcript's tool-call record, corroborated by the call log's liveness.
 
-The runner's pure functions — `extractJsonObject`, `renderInputTurns`, `summarizeEval`,
-`polarityFor` — are unit-tested in `tests/functional/skills/routing-harness.test.ts`, one case per
-defect found in the #527/#528 review. It rides the existing `functional-skills` Vitest project, so
-it runs in the required `Lint & Functional Tests` check with no config or workflow change.
+**A grading that gathered no evidence is void.** The envelope records how many turns the grader
+took; one turn or fewer means it answered without opening a single file. That verdict is discarded
+whether it said PASS or FAIL, as is any grading whose turn count cannot be read at all. The void
+rule is mechanical, lives in `lib/grading.mjs`, and applies before the pass rate is taken (#583).
+
+The runner's pure functions — `extractJsonObject`, `interpretGraderEnvelope`,
+`graderPersistenceDecision`, `renderInputTurns`, `summarizeEval`, `polarityFor` — are unit-tested
+in `tests/functional/skills/routing-harness.test.ts`, one case per defect found in the #527/#528
+review plus the #583 void rule. It rides the existing `functional-skills` Vitest project, so it
+runs in the required `Lint & Functional Tests` check with no config or workflow change.
