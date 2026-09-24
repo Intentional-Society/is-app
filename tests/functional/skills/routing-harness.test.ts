@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { extractJsonObject, sandboxEnv } from "../../../scripts/skill-evals/routing/lib/driver.mjs";
+import { REPO_ROOT } from "../../../scripts/skill-evals/routing/lib/context.mjs";
+import { extractJsonObject, graderSpawnSpec, sandboxEnv } from "../../../scripts/skill-evals/routing/lib/driver.mjs";
 import {
   graderPersistenceDecision,
   interpretGraderEnvelope,
@@ -314,5 +315,46 @@ describe("polarityFor", () => {
     expect(polarityFor("commit-5a-slash")).toBe("should-fire-inline");
     expect(polarityFor("commit-7")).toBe("should-NOT-fire");
     expect(polarityFor("commit-6")).toBe("should-fire");
+  });
+});
+
+// #584: the grader used to run with cwd = the run folder, which by default lives INSIDE this
+// checkout (.claude/skills/routing-evals-workspace/<stamp>/...). With Bash allowed, a `git log`
+// from there walked up into the real repo, and in the 2026-09-19 batch a grader mistook the real
+// repo's history for the sandbox's and produced a wrong PASS. The fix (B2c) grades from a copy
+// of the run folder under the OS temp dir; these pin the two properties that decide it.
+describe("graderSpawnSpec", () => {
+  const isInside = (child: string, parent: string) => {
+    const rel = path.relative(path.resolve(parent), path.resolve(child));
+    return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+  };
+  // The runner's default run folder: inside the checkout.
+  const runDir = path.join(REPO_ROOT, ".claude", "skills", "routing-evals-workspace", "stamp", "ship-5", "run-1");
+
+  it("puts the grader's cwd under the OS temp dir, never under the repo root", () => {
+    const { cwd } = graderSpawnSpec({ runDir, repoRoot: REPO_ROOT, model: "m", nonce: "n1" });
+    expect(isInside(cwd, REPO_ROOT)).toBe(false);
+    expect(isInside(cwd, os.tmpdir())).toBe(true);
+    expect(isInside(cwd, runDir)).toBe(false);
+  });
+
+  it("keeps the allow-list Read Grep Glob Bash (B2 keeps Bash; decision 1a after a clean P1)", () => {
+    const { args } = graderSpawnSpec({ runDir, repoRoot: REPO_ROOT, model: "claude-sonnet-4-5", nonce: "n1" });
+    const i = args.indexOf("--allowedTools");
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(args[i + 1]).toBe("Read Grep Glob Bash");
+    expect(args.slice(0, 5)).toEqual(["-p", "--output-format", "json", "--model", "claude-sonnet-4-5"]);
+  });
+
+  it("gives each grading its own directory", () => {
+    const a = graderSpawnSpec({ runDir, repoRoot: REPO_ROOT, model: "m", nonce: "a" });
+    const b = graderSpawnSpec({ runDir, repoRoot: REPO_ROOT, model: "m", nonce: "b" });
+    expect(a.cwd).not.toBe(b.cwd);
+  });
+
+  it("refuses a temp root that resolves inside the repo", () => {
+    expect(() =>
+      graderSpawnSpec({ runDir, repoRoot: REPO_ROOT, model: "m", nonce: "n1", tmpRoot: path.join(REPO_ROOT, "tmp") }),
+    ).toThrow(/inside the real repo/);
   });
 });

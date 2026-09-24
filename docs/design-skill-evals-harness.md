@@ -642,7 +642,7 @@ rate, not a verdict.
 | `routing/routing-plan.mjs` | The driver plan: one entry per **query**, carrying the seeded turns, the fixture, setup files, an optional `expectationsOverride` (replaces the eval's committed `expectations` for one sub-scenario — §6), and a `graderHint` (freeform scenario context appended to the grader's prompt — §6). | `ROUTING_QUERIES`, `FRESH_DELEGATION` |
 | `routing/run-routing-evals.mjs` | Orchestrates build → context → setup → drive → archive → observe → render → grade → tear down, per query per repetition; then aggregates. | **Nothing** — the script executes on import, so `loadExpectations`, `buildInputJsonl` and `applySetupFiles` are module-local and cannot be pulled into a test. That is why `lib/summary.mjs` was extracted. |
 | `routing/lib/context.mjs` | Copy the real repo's routing context into a sandbox so a fresh session *discovers* the skills. | `REPO_ROOT`, `extractAiSkillsSection(repoRoot)`, `populateRoutingContext(repoDir, repoRoot)` |
-| `routing/lib/driver.mjs` | Shell out to `claude -p` twice — once as executor, once as grader — and recover the grader's JSON. | `sandboxEnv(manifest)`, `runExecutor(...)`, `runGrader(...)` (resolves `{grading, numTurns, envelopeParsed, raw, stderr}`), `extractJsonObject(text)`; internal `repairEscapes`, `parseOrRepair`, and the constant `GRADER_MD_REL` |
+| `routing/lib/driver.mjs` | Shell out to `claude -p` twice — once as executor, once as grader — and recover the grader's JSON. | `sandboxEnv(manifest)`, `runExecutor(...)`, `graderSpawnSpec({...})` (pure: the grader's temp-dir cwd and argv, #584), `runGrader(...)` (resolves `{grading, numTurns, envelopeParsed, raw, stderr}`), `extractJsonObject(text)`; internal `isInside`, `repairEscapes`, `parseOrRepair`, and the constants `GRADER_MD_REL`, `GRADER_ALLOWED_TOOLS` |
 | `routing/lib/grading.mjs` | Decide what a grader's answer is worth. A seam: the runner script cannot be imported, so the void rule lives here, pure and testable. | `interpretGraderEnvelope(raw)`, `graderPersistenceDecision({...})`; internal `voidReason`. It imports `extractJsonObject` from `driver.mjs`, which imports `interpretGraderEnvelope` back — a deliberate cycle, safe because both are hoisted function declarations used only at call time. |
 | `routing/lib/transcript.mjs` | Turn the stream-json output into a graded transcript, render the fed input turns as ground truth, and compute observables. | `renderInputTurns(path)`, `parseEvents(outFile)`, `splitTurns(events)`, `turnItems(turn)`, `renderTurnMarkdown(turn, heading)`, `routingObservables(events, {skill, ghCallLog})` |
 | `routing/lib/summary.mjs` | Per-eval aggregation, extracted from the runner script so it is unit-testable. | `NEGATIVE_CONTROLS`, `INLINE_FIRE`, `polarityFor(queryId)`, `summarizeEval({...})`, `formatSummaryLine(e)` |
@@ -657,8 +657,18 @@ target that resolves inside the real repo, and refuses any directory without the
 --permission-mode acceptEdits`, cwd set to the sandbox repo and env from `sandboxEnv()`. It writes
 the input JSONL to the child's stdin, streams stdout to `raw.jsonl`, and kills the child with
 `SIGKILL` after 240 seconds — the routing decision lands early, so a timeout still leaves a
-gradeable turn. `runGrader()` spawns a second `claude -p` with `--output-format json` and read-only
-tools, cwd set to the run directory, with a 180-second timeout.
+gradeable turn. `runGrader()` spawns a second `claude -p` with `--output-format json`,
+`--allowedTools "Read Grep Glob Bash"` and a 180-second timeout. Its cwd is **not** the run
+directory: `graderSpawnSpec()` names a fresh directory under the OS temp dir, `runGrader()` copies
+the run directory there and grades from the copy, so the prompt's relative paths (`./transcript.md`,
+`./outputs/` …) resolve unchanged. The run directory defaults to inside this checkout, and with
+`Bash` allowed a `git log` from there walked up into the real repo — in the 2026-09-19 batch a
+grader took the real repo's history for the sandbox's and passed wrongly (#584). `Bash` stays
+allowed: a probe showed a read-only session still reads absolute paths outside its cwd, so dropping
+`Bash` alone was not shown to be enough. The move changes where the grader starts, not what it can
+name — it is not a sandbox. The copy is deleted once a verdict is extracted and left in place, its
+path printed to stderr, when none is; the grader's envelope and verdict are written back to the
+original run directory.
 
 **The eleven queries.** Nine routing evals, eleven queries, because `commit-5` fans out
 (§6 explains why):
