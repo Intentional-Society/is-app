@@ -257,7 +257,7 @@ So **editing an eval counts**, not just editing a `SKILL.md`.
 3. **Diagnose on one seed and one text.** Never pool runs across seed shapes (`input.jsonl` turn count) or across versions of the assertion text. Three runs cannot distinguish one-in-three from noise, so treat anything under **six** runs of the same seed and text as an indication, not a rate.
 4. **Keep an assertion only if it checks function** — the skill follows its procedure, lands, catches an error or refuses what it must, invokes another skill when it should, or keeps the human informed — and only if a run can observe it. What no run can show moves to the eval's `notes` as a manual-only line; it does not stay in `expectations`, where it can only fail.
 5. **Re-grade before you re-run.** Re-grade the archived runs for that query against the new text (copies outside the repo; stock grader, three times). There is no CLI for this — `runGrader` is exported from `routing/lib/driver.mjs` and the re-grade is a short hand-rolled script over an existing `runDir`. Known-FAIL runs that should now pass must flip, known-PASS runs must stay, and a real failure must stay failed. A null or unparseable grade is a failure. A re-grade runs against a **dead** sandbox, so any clause a live grader could only check by shelling into `repoDir` is recorded "unverifiable in re-grade", never FAIL. If no archived run fails the assertion, record "discrimination unproven".
-6. **Then run only what changed:** `node scripts/skill-evals/routing/run-routing-evals.mjs --only <query ids> --reps 3` — from Git Bash; the PowerShell launch was fixed in #582 but is not yet shown to work end to end. Record the result as a **confirmation sample (n=3)** — counts, not rates; promote it to a rate only after six runs on unchanged text. Archive it, and confirm the sandbox root is empty afterwards (`teardown-sandbox.mjs --all` if anything survived; the runner already tears each sandbox down in its own `finally`).
+6. **Then run only what changed:** `node scripts/skill-evals/routing/run-routing-evals.mjs --only <query ids> --reps 3` — from Git Bash or PowerShell (the PowerShell launch was fixed in #582 and verified end to end on 2026-09-23 (#586)). Record the result as a **confirmation sample (n=3)** — counts, not rates; promote it to a rate only after six runs on unchanged text. Archive it, and confirm the sandbox root is empty afterwards (`teardown-sandbox.mjs --all` if anything survived; the runner already tears each sandbox down in its own `finally`).
 7. **Record** the old→new index map (grading matches assertions by position) and the measured counts in `docs/spec-skill-evals-manifest.md`, as a new series when the assertion set changed shape. Counts are recorded, never gated.
 8. **Stop after one iteration.** If the numbers did not move, or you are on a third round for the same case, stop and take it to the maintainer with a three-line note: what fails, how much it matters, keep-grinding vs. redesign.
 9. **What the PR owes.** The full skill-eval batch does not exercise routing evals, so a routing-only change does not owe it. Leave the PR template's skill-eval box unchecked with the one-line reason it allows — "routing-only assertion + eval-header change; no execution eval touched; re-grade + `--only` run per strategy §6" — and put the counts in the PR body. The box fires on any change under `.claude/skills/**`, including a `$comment` edit, so say so in the reason.
@@ -448,12 +448,12 @@ it builds a sandbox, copies the three team skills + the real CLAUDE.md "AI Skill
 assistant turn), and grades the last turn per `.claude/skills/skill-creator/agents/grader.md`. Reports **trigger rates**
 over N repetitions (N=3 default); routing is probabilistic (never a single binary verdict).
 
+Run these from Git Bash or PowerShell — the PowerShell launch was fixed in #582 and verified end to end on 2026-09-23 (#586).
+
 ```sh
 node scripts/skill-evals/routing/run-routing-evals.mjs --reps 3          # all eleven queries (nine evals)
 node scripts/skill-evals/routing/run-routing-evals.mjs --only commit-6,ship-4 --reps 1
 ```
-
-Run these from Git Bash — the PowerShell launch was fixed in #582 but is not yet shown to work end to end.
 
 Two **headless-observability adaptations** the runner's grader applies (a headless
 `claude -p` session has no interactive layer): (1) `AskUserQuestion` does not exist headless
