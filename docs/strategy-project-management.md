@@ -12,8 +12,8 @@ Five statuses, in flow order:
 
 1. **No Status** — unvetted. Auto-added issues land here. Nobody has committed to doing these; they're candidates. Either promote to Backlog or close.
 2. **Backlog** — "we've decided to do this, just not yet." Prioritized, but not queued for the current cycle. Should stay scannable — if it grows past a few dozen items, prune rather than let it become a graveyard.
-3. **Ready** — next up. Has enough context that someone could pick it up and start. Small queue by design.
-4. **In progress** — actively being worked on. Usually has an assignee and a branch.
+3. **Ready** — next up. Has enough context that someone could pick it up and start. Small queue by design. Quests land here once the PO sets their base reward.
+4. **In progress** — actively being worked on, with an assignee. Whoever takes the issue moves it here when they start; no PR needed. Linking a PR also moves it here automatically.
 5. **Done** — merged / shipped / closed.
 
 The split between No Status and Backlog is deliberate: Backlog is supposed to mean something. If every idea and drive-by report went straight into Backlog, it would stop being a plan.
@@ -26,6 +26,11 @@ Two main views:
 
 - **All items** (table) — full list, sortable, bulk-edit friendly. The default working view.
 - **Kanban** (board) — kanban columns by Status. Useful for seeing what's moving and what's stuck.
+
+Two quest views (see [Quests](#quests)):
+
+- **Quest board** — `label:quest is:open`. Quests to take on, and quests in progress.
+- **Rewards due** — `label:quest is:closed -reward:paid`. Merged quests whose reward the PO hasn't paid yet.
 
 (We deleted the default Priority and Roadmap views. Priority will come back if/when we start using the Priority field seriously. Roadmap needs Start/Target dates per item, which only matters if we're scheduling releases.)
 
@@ -51,6 +56,15 @@ The rest of GitHub's built-in automations are off.
 
 `/pr` (`.claude/skills/pr/SKILL.md`) opens PRs (triggering the **PR Linked → In progress** automation when the PR body has `Closes #N`); `/ship` (`.claude/skills/ship/SKILL.md`) merges them (triggering the **PR Merged → Done** automation).
 
+## Quests
+
+A quest is a feature posted with a reward; see [`strategy-feature-development.md`](strategy-feature-development.md). Quests move through the same statuses as other work. Two additions track them:
+
+- **`quest` label** — marks an issue as a quest.
+- **Reward field** — a single-select with one option, **Paid**. The PO sets it after paying.
+
+Done means merged, for quests as for all other work: merging closes the issue, and the built-in automations set Done. The Reward field tracks payment on its own, which needs no custom automation. A closed quest with no Reward set has its reward due.
+
 ## Issue conventions
 
 > TODO: document title format, labels we actually use, when to file an issue vs just ship it, how to link PRs to issues, how we use assignees.
@@ -60,5 +74,5 @@ The rest of GitHub's built-in automations are off.
 ## When to reconsider
 
 - **Backlog past ~50 items and nobody's reading it** — prune, or split into themed sub-lists, or accept that the bottom of the list is effectively "No Status" and rename accordingly.
-- **Multiple people working in parallel on overlapping areas** — might need assignees, might need a WIP-limit column, might need a second board per workstream.
+- **Multiple people working in parallel on overlapping areas** — might need a WIP-limit column, might need a second board per workstream.
 - **External contributors start filing issues** — will need labels (bug/feature/question) and a triage cadence.
