@@ -617,15 +617,13 @@ teammate, imported from GitHub). A skill installed only at the user level, or si
 uncommitted locally, can use the stock flow and this harness freely — it's just not
 *governed* by these obligations until it's committed.
 
-**The one known exception — `/handoff`.** `.claude/skills/handoff/` is a committed team skill
-that is deliberately **not yet** under either gate: `skill-contract.test.ts` pins its skill list
-to `commit`/`pr`/`ship`, and `handoff`'s `evals/evals.json` is pre-harness (bare integer ids, no
-`kind`/`fixture`/`expectations`, its own `build_fixtures.mjs`). This is a migration pending, not
-a licence: **its evals are still never executed outside a harness sandbox** — the one rule is
-origin-agnostic and applies to it exactly as to the other three. The migration is: build the
-fixture profiles its evals describe, convert the file to the schema in §3, then decide whether
-`handoff` joins the contract test's list. Parked on #507; the skill's own `SKILL.md` carries the
-maintainer TODO.
+**The worked precedent — `/handoff`.** `.claude/skills/handoff/` was the fourth team skill and
+sat outside both gates until #585 moved it in: its evals became `kind: execution` entries in the
+§3 schema, four fixture profiles were added to `lib/fixtures.mjs`, and `handoff` joined
+`skill-contract.test.ts`'s skill list and `selfcheck.mjs`'s fixture-completeness sweep. Read that
+change if you are doing the same for a skill of your own — it is the smallest end-to-end example
+in the repo. Still open there: six of its ten evals share a profile rather than owning one (each
+says so in its `notes`), and no `/handoff` eval has been executed or graded yet. Tracked on #507.
 
 ## 8. Platform routing (Layer C)
 

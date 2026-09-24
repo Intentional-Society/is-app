@@ -271,14 +271,15 @@ or "PR is up, waiting on review feedback.">
 - `.gitignore` (the `.scratch/` convention)
 - `gh` CLI (optional — degrades gracefully without it)
 
-## TODO (maintainers) — as of 2026-09-18
+## TODO (maintainers) — as of 2026-09-21
 
 - The "How this work is done" section (working pattern, personas, the gap no role owned)
   has never been exercised: the three assertions covering it in `evals/evals.json` have
   not been run.
-- `evals/evals.json` is pre-harness (bespoke shape). Migrate it to the sandbox harness per
-  `docs/strategy-skill-evals.md` §7 (~10 fixture profiles in
-  `scripts/skill-evals/lib/fixtures.mjs`), then decide whether `handoff` joins the `SKILLS`
-  list in `tests/functional/skills/skill-contract.test.ts`. Never execute these evals
-  outside a harness sandbox.
+- `evals/evals.json` now uses the sandbox-harness schema (`docs/strategy-skill-evals.md`
+  §3) and `handoff` is in the `SKILLS` list in
+  `tests/functional/skills/skill-contract.test.ts` (#585). Still open: six of the ten evals
+  have no fixture profile of their own — each names the nearest built one and records in its
+  `notes` what that world is missing — and no `/handoff` eval has yet been executed or
+  graded. Never execute these evals outside a harness sandbox.
 - Tracker: #507, Parked list.

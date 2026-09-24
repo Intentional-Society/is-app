@@ -396,6 +396,9 @@ function checkZeroMutation(beforeState) {
     "add-report",
     "remove-legacy-id",
     "wire-up-dashboard",
+    "486-notifier-retry-fix",
+    "512-buttondown-tag-mirror",
+    "518-member-status-migration",
   ];
   const leaked = fixtureBranches.filter((b) => new RegExp(`(^|\\n)\\s*\\*?\\s*${b}(\\n|$)`).test(after.branches));
   add("zero-mutation/head", headOk, headOk ? `real-repo HEAD unchanged (${after.head.slice(0, 10)})` : "HEAD CHANGED");
@@ -419,7 +422,10 @@ function checkZeroMutation(beforeState) {
 
 function referencedFixtureNames() {
   const names = new Set();
-  for (const skill of ["commit", "pr", "ship"]) {
+  // Every skill whose evals.json can name a fixture. A skill missing from this list has its
+  // fixtures escape the completeness check silently, which is why `handoff` joined it when its
+  // evals were migrated into the harness schema (#585).
+  for (const skill of ["commit", "pr", "ship", "handoff"]) {
     const p = path.join(REPO_ROOT, ".claude", "skills", skill, "evals", "evals.json");
     const j = JSON.parse(fs.readFileSync(p, "utf8"));
     for (const e of j.evals) if (e.kind === "execution" && e.fixture) names.add(e.fixture);
