@@ -41,6 +41,8 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
    - **Proceed and don't ask again** — create `.claude/skip-nl-confirm-commit-pr.local` containing the standard note (below), then continue to step 1.
    - **Stop** — stop immediately, zero side effects.
 
+   **If `AskUserQuestion` is not available** (headless, cloud, or any non-interactive session), present the same question and the same three options as plain text, and **stop**. Do not proceed without an answer. A missing prompter is not a skip condition — the only skip conditions are the three listed above.
+
    Standard opt-out file contents: `Skips only the natural-language intent confirmation (Step 0) for /commit and /pr. All approval checkpoints still apply. /ship is unaffected. Delete this file to re-enable.`
 
    This gate confirms only *intent detection* on the natural-language path; it is not the content-approval checkpoint (step 14), which still runs regardless. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.

@@ -516,6 +516,63 @@ manual runs — same session, same "does this read right to a human watching it"
 picks `wait+5`, waits another 5, then aborts). Schedule it in the first parallel wave so
 its wait overlaps the rest of the batch rather than adding serially to the total run time.
 
+### Human-in-the-loop runs: the human types, the agent orchestrates
+
+Some checks can only be made by a human in a fresh interactive session: the Step 0 picker
+rendering, the `Using /commit` line appearing where a person would see it, a typed `/commit`
+skipping both. The 2026-09-23 run of the `docs/plan-skill-nl-invocation.md` checklist for
+PR #587 settled a division of labour that keeps the human's part to a few minutes and leaves
+an auditable record. Expect about 30 minutes end to end for six runs, roughly two minutes of
+the human's time each.
+
+**The agent does everything except type the prompts.**
+
+1. Build a **detached throwaway worktree** at the commit under test:
+   `git worktree add --detach <repo-parent>/is-app-worktrees/<name> <sha>`. Detached means no
+   branch is created and none has to be deleted. Never run the checklist in a checkout that
+   has other work in it.
+2. Verify the preconditions there: the change under test is present in the skill files,
+   `.claude/settings.json` is present, no `.claude/skip-nl-confirm-commit-pr.local`, no
+   `.claude/.nl-delegation-active`. Seed the fixture file; `git status --short` must show
+   only it.
+3. Hand the human **one run at a time**: the exact prompt to type, the reply to give, the
+   stop point (choose **Stop** at Step 0; press Esc once git inspection starts for the
+   no-question scenarios), and the two or three lines the screen should show at the stop
+   point (for example `Using /commit`, then the `Skill(commit)` badge, then the picker), so
+   they can tell a pass from a miss without asking. The fixture is deliberately unrelated to
+   any task, so in the scenarios with no Step 0 question the skill's own file-safety check
+   halts it before anything is staged; the human does not need to race the Esc key. Run the
+   opt-out scenario last, and delete the copied file before teardown, so it cannot leak into
+   any other run.
+4. After each run, read that session's transcript. Claude Code writes one JSONL file per
+   session under `~/.claude/projects/<folder-slug>/`; find it as the newest folder there
+   after the first run, since the slug's form differs by platform, and a fresh worktree gets a
+   folder holding only this run's sessions. Write the transcript checker once, before the
+   first run, and reuse it; it is the same six checks every time: the announcement text
+   appears exactly once (or not at all, for a typed slash command); the `Skill` tool call; the
+   `AskUserQuestion` call and the answer; no `git add`/`commit`/`push` ran; `git status`
+   shows only the fixture; model and CLI version recorded. Reset the fixture. Save the
+   excerpt (session id, model, CLI version, the checks) beside the ticket's evidence.
+5. Tear down: remove the fixture and any copied opt-out file, `git worktree remove <path>`,
+   `git worktree prune`. Leave the transcript folder; it is the human's.
+6. Record the attestation on the ticket: the human's per-run words verbatim, the transcript
+   findings with session ids, what the run shows and what it cannot show.
+
+**The human's part.** Open a **fresh terminal** (Windows: PowerShell or Git Bash;
+macOS/Linux: Terminal, iTerm or any shell), `cd` into the worktree, check the prompt shows
+that folder, start `claude`, type the prompt given, answer as scripted, `/exit`, report one
+line. **Not the Claude panel inside an IDE**: it runs in the IDE's workspace folder, which has
+the wrong skill text and its own opt-out file (the first attempt on 2026-09-23 went there and
+was voided). Local slash commands such as `/model` before the scripted prompt are fine; they
+are not conversational turns. Do not add a chat turn before the prompt; the checklist wants
+un-primed sessions. The agent reads the model and CLI version from the transcript; the human
+does not need to report them.
+
+**What the transcript proves and what it does not.** It records every tool call, the
+announcement text, the question and the answer, the model and the CLI version. It does not
+show how the picker rendered on screen; that, and anything that looked odd, is the human's
+report.
+
 ## 7. Reusable patterns for your own skill
 
 Written for a future skill author — human or agent — building *any* skill (not just

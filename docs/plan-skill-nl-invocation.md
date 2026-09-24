@@ -181,6 +181,14 @@ echo "throwaway nl-routing fixture" > _nl_routing_fixture.md   # untracked, not 
 rm -f _nl_routing_fixture.md && git switch - && git branch -D test/nl-checklist
 ```
 
+**Agent‑orchestrated variant (2026‑09‑23, PR #587).** When an agent session is driving, use the
+procedure in `docs/strategy-skill-evals.md` §6 "Human‑in‑the‑loop runs": a detached throwaway
+worktree instead of the `test/nl-checklist` branch (nothing to delete afterwards), the agent
+verifies each run from the session transcript and tells the human what the stop point should
+look like, and the human starts every session from a **fresh terminal after `cd` into the
+worktree, never the IDE's Claude panel**. Result on #587: A×3, B, C, D all passed on Opus 5.5 /
+Claude Code 2.1.281; attestation on #581.
+
 | # | Scenario | Pass | Eval |
 |---|---|---|---|
 | A | Affirm a `/commit` offer ("…then ask whether to commit" → "yes"), ×3 cold | first line `Using /commit` (**exactly once**); routes via Skill; Stop = clean | `commit-4`, `commit-6` |

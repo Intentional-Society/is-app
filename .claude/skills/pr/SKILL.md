@@ -34,7 +34,11 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
    - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 later.
    - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
 
-   When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: *[detected context — echo any user guidance]*?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects). The standard note text and the intent-vs-content rationale are identical to `/commit`'s Step 0. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.
+   When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: *[detected context — echo any user guidance]*?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects).
+
+   **If `AskUserQuestion` is not available** (headless, cloud, or any non-interactive session), present the same question and the same three options as plain text, and **stop**. Do not proceed without an answer. A missing prompter is not a skip condition — the only skip conditions are the three listed above.
+
+   The standard note text and the intent-vs-content rationale are identical to `/commit`'s Step 0. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.
 
 1. **Check `gh` auth.** `gh auth status`. If it fails, refuse and print `gh auth login` as the suggested next command.
 
