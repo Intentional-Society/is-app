@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-09-23 | Blake (with Fable 5.1) | `/ship` reads the PR conversation before merging
+
+`/ship` step 10 now reads every PR conversation source right before the merge and stops with `N unanswered since the last push — merge anyway?` when anything is unanswered — any comment, review or inline comment since the last push (by anyone, the PR's author included, since agent sessions post under the maintainer's account), plus every unresolved inline thread; a text-less approval never counts (#580). The cutoff is captured before any rebase. It caught its own review comment on the PR that introduced it (#596).
+
+---
+
 ## 2026-09-18 | Blake (with Fable 5.1) | Skill-evals: one as-built design doc, and the old spec archived
 
 `docs/design-skill-evals-harness.md` replaces `docs/spec-skill-evals-baseline.md`, which was written before the program it planned had run and never revised — three of its claims were actively wrong, the worst being R8's advice to grade `gh pr merge` assertions off the call log (the Claude Code permission layer intercepts above the sandbox stub — the checked-in `ask` rule in default mode, the session's auto-mode classifier in auto mode — so an empty log is not proof either way). The old spec is archived under `docs/old-archive/` behind a banner naming all three, with a ten-line stub left at its path. The new doc owns what nothing owned: the module map and data flow for every file under `scripts/skill-evals/`, the safety model named to file and function, the scenarios as built, the decision ledger, the assertion-design rules learned in #527/#528, the evidence digest, and a glossary so a legacy id in a code comment still resolves. `docs/strategy-skill-evals.md` stays the runbook and gains a "which doc do I want" table at its top. Baseline is done except the macOS validation artifact — which has no tracking issue of its own, only #507's Parked list — and the cloud Layer-C run (#512). (#507)

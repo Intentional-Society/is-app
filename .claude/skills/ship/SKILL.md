@@ -30,6 +30,8 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
 4. **Fetch — no shallow shortcuts.** `git fetch origin main`. Do not use shallow-fetch shortcuts (`--depth=1` etc.) for freshness checks — a shallow fetch breaks `git merge-base` and was the root cause of a recent expand-workflow bug ([PR #254](https://github.com/Intentional-Society/is-app/pull/254)).
 
+   **Capture the last-push cutoff now, before any rebase:** `gh pr view <N> --json commits --jq '.commits[-1].committedDate'`. Step 10 compares the conversation against this value. A rebase in steps 5–6 rewrites the head commit and its committer date, so a cutoff taken after it would sit later than the real push and hide every comment posted in between (PR #587, 2026-09-23: two comments fell into that gap). If this run opened the PR itself (step 3), the cutoff is the push `/pr` just made.
+
 5. **Freshness check + rebase if needed.** Run `git merge-base --is-ancestor origin/main HEAD`. If it fails (main has moved), `git rebase origin/main`. On rebase conflict, abort and surface — do not auto-resolve.
 
 6. **Re-gate after rebase.** If the rebase changed anything, re-run `npm test`, then `git push --force-with-lease`.
@@ -65,7 +67,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
     Read every source — a bot can post a plain top-level comment rather than a review, so reading reviews alone misses it:
 
-    - **Last push time:** `gh pr view <N> --json commits --jq '.commits[-1].committedDate'`. GitHub does not expose when an ordinary push happened; the head commit's committer date is never later than its push, so using it can only list extra items, never hide one.
+    - **Last push time:** the cutoff captured at step 4, before any rebase — not a fresh read of the head commit's date, which a rebase moves forward. GitHub does not expose when an ordinary push happened; the pre-rebase head commit's committer date is never later than its push, so using it can only list extra items, never hide one.
     - **Top-level comments and reviews:** `gh pr view <N> --json comments,reviews` (`comments[].createdAt`; `reviews[].submittedAt`, `.state`, `.body`).
     - **Inline review comments:** `gh api --paginate repos/<owner>/<repo>/pulls/<N>/comments` (`created_at`, `path`).
     - **Review threads' resolved state:** `gh api graphql -F owner=<owner> -F repo=<repo> -F n=<N> -f query='query($owner:String!,$repo:String!,$n:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$n){reviewThreads(first:100){pageInfo{hasNextPage} nodes{isResolved path comments(first:1){nodes{author{login} createdAt body}}}}}}}'`. The REST API has no resolved flag; GraphQL's `reviewThreads.isResolved` is the only place `gh` exposes it.

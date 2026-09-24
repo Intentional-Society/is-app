@@ -87,6 +87,22 @@ describe("gh stub — api repos/<owner>/<repo>/pulls/<N>/comments", () => {
     expect(out.code).toBe(64);
     expect(out.log.at(-1)).toMatchObject({ decision: "denied", exitCode: 64 });
   });
+  it("default-denies a write to the same endpoint (-X POST / --method POST): the route is read-only", () => {
+    const dir = layout({ ...BASE, pullComments: [INLINE] });
+    for (const args of [
+      ["api", "repos/Intentional-Society/is-app/pulls/223/comments", "-X", "POST", "-f", "body=hi"],
+      ["api", "--method", "POST", "repos/Intentional-Society/is-app/pulls/223/comments", "-f", "body=hi"],
+    ]) {
+      const out = gh(dir, args);
+      expect(out.code).toBe(64);
+      expect(out.stdout).toBe("");
+      expect(out.log.at(-1)).toMatchObject({ decision: "denied", exitCode: 64 });
+    }
+    // and an explicit GET still reads
+    const read = gh(dir, ["api", "-X", "GET", "repos/Intentional-Society/is-app/pulls/223/comments"]);
+    expect(read.code).toBe(0);
+    expect(JSON.parse(read.stdout)).toHaveLength(1);
+  });
 });
 
 describe("gh stub — api graphql (reviewThreads)", () => {

@@ -287,8 +287,10 @@ function handleApi(fx) {
     return 0;
   }
   // /ship step 10 (#580): the PR's inline review comments. One page holds everything, so
-  // `--paginate` needs no handling beyond being accepted.
-  if (/^\/?repos\/[^/]+\/[^/]+\/pulls\/\d+\/comments$/.test(endpoint || "")) {
+  // `--paginate` needs no handling beyond being accepted. Read-only: a write to the same
+  // endpoint (`-X POST` / `--method POST`, e.g. posting a review comment) is NOT this route
+  // and falls through to default-deny like every other un-stubbed mutation.
+  if (/^\/?repos\/[^/]+\/[^/]+\/pulls\/\d+\/comments$/.test(endpoint || "") && apiMethod() === "GET") {
     emitArray(fx.pullComments || []);
     logCall({ decision: "answered", exitCode: 0, api: "pulls/comments", paginate: hasFlag("--paginate") });
     return 0;
@@ -386,12 +388,20 @@ const FLAGS_WITH_VALUE = new Set([
   "--raw-field",
   "-f",
   "-H",
+  "-X",
+  "--method",
 ]);
 
 /** Positional at absolute index `n` (counting the subcommand tokens too). */
 function firstPositional(n) {
   const ps = positionals();
   return ps[n] ?? null;
+}
+
+/** The HTTP method of a `gh api` call: `-X`/`--method` if given (upper-cased), else GET. */
+function apiMethod() {
+  const m = flagValue("-X") ?? flagValue("--method");
+  return (m || "GET").toUpperCase();
 }
 
 /** The `query=` field of a `gh api graphql` call (`-f`, `-F`, `--raw-field` or `--field`), or "". */
