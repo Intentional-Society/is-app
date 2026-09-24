@@ -66,7 +66,7 @@ The doc uses several id schemes. This is the key; §12 resolves each one in full
 | "ruling N" | A numbered **maintainer decision** from a review session, cited in code comments | §12 |
 | Phase 0–8 | The nine **stages of the program** that built this, tracked as issues #508–#516 | §12 |
 | `G1` / `G2` | Two generations of the **routing grader** (§11's counts table) | §11, §12 |
-| `A1`–`A4` | This doc's shorthand for an eval's **expectations in file order today** — a display convention, not ids | §10, §12 |
+| `A1`–`A4` | This doc's shorthand for an eval's **expectations in file order** — a display convention, not ids, so an A-number is only meaningful against the current text of that eval | §10, §12 |
 | `commit-5a`, `pr-7`, `ship-2a` | **Eval ids**: skill name + number; a letter suffix marks a sub-scenario of one original eval | the roster in §4 |
 | `#nnn` | A **GitHub issue or PR** in this repo | §12 |
 | `7b8f157` | A **git commit** in this repo, cited to pin a claim to a point in history | — |
@@ -84,7 +84,7 @@ comments, tests, or a sibling doc. Unbolded ids are referenced only from inside 
 | Understand what stops an eval run reaching the real repo | §5 here, then `strategy-skill-evals.md` §4 |
 | Add a fixture profile | §4's fixture entry here, then `../scripts/skill-evals/lib/fixtures.mjs` |
 | Write or retire an assertion | §6's assertion-design rules here |
-| A routing eval is flaky | §6's assertion-design rules here — "sort variance by locus" and the #527/#528 worked example — then §11 for the measured counts, and §10's "No procedure for changing a routing assertion" for what is *not* decided yet |
+| A routing eval is flaky | §6's assertion-design rules here — "sort variance by locus" and the #527/#528 worked example — then §11 for the measured counts, and §10's "No procedure for changing a routing assertion" for what was open and how it closed |
 | The `gh` stub rejected a command | §4.3's subcommand table here (default-deny is deliberate), then [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md)'s gh-stub surface table |
 | Is this eval able to fail at all? | §11's red controls, then §6's assertion-design rules |
 | Find out what the evals actually test | the **eval roster** at the head of §4 — all 25, one line each |
@@ -900,7 +900,7 @@ The mechanisms, named to where they live:
 | 6 | **There is no real GitHub to reach.** `origin` is a local bare repository addressed by a `file://` URL, so a push lands on disk. | `buildSandbox()` in `lib/sandbox.mjs` |
 | 7 | **The sandbox repo runs no hooks and signs nothing.** `core.hooksPath` points at a directory that does not exist; `commit.gpgsign` and `tag.gpgsign` are false; `gc.auto` is 0. | `setLocalConfig()` in `lib/sandbox.mjs` |
 | 8 | **Every call is evidence.** Answered and denied calls alike are appended to `gh-calls.log`, with whether credentials were present at call time. | `logCall()` in `gh-stub/gh-stub.mjs` |
-| 9 | **Liveness before any negative.** A "the log contains no X" claim is trusted only when the log is non-empty. | `ghLog.live` from `routingObservables()` in `routing/lib/transcript.mjs`; stated to the grader by `runGrader()` in `routing/lib/driver.mjs`; stated to humans in `prompts/executor-prompt.md` |
+| 9 | **Liveness before any negative.** A "the log contains no X" claim is trusted only when the log is non-empty — and a merge-negative is stricter still: the log never PASSes a merge-negative on its own, empty or not (`strategy-skill-evals.md` §6). | `ghLog.live` from `routingObservables()` in `routing/lib/transcript.mjs`; stated to the grader by `runGrader()` in `routing/lib/driver.mjs`; stated to humans in `prompts/executor-prompt.md` |
 | 10 | **Fixtures can never depend on case-distinct filenames**, because macOS's default filesystem is case-insensitive. | `assertNoCaseCollisions()` in `lib/fixtures.mjs`, called from `getFixture()` |
 | 11 | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of thirteen of the eighteen distinct fixture branch names is additionally checked by name, belt-and-braces. | `checkZeroMutation()` in `selfcheck.mjs` |
 | 12 | **The whole checklist is executable.** Thirteen named checks, twenty-three rows, exit 0 only if every row passes; among them a genuine POSIX-shell activation check that sources `activate.sh` and runs a bare `gh`. | `selfcheck.mjs`, especially `checkGitBashActivation()` and `findPosixShell()` |
@@ -921,7 +921,7 @@ breaks naive merge grading — an intercepted `gh pr merge` never reaches the st
 logged, so an empty log proves nothing. The rule for grading is therefore: **grade merge-adjacent
 assertions from the transcript's tool-call record**, corroborated by the log and
 `gh-stub-state.json` where the environment let the call through, and never pass a merge-negative
-on an empty log alone. `handlePrMerge()` in `gh-stub/gh-stub.mjs` carries that caveat inline;
+on the log alone — empty or not. `handlePrMerge()` in `gh-stub/gh-stub.mjs` carries that caveat inline;
 `archiveEvidence()` restates it in every `archive-manifest.json`; `strategy-skill-evals.md` §6 is
 its home.
 
@@ -1384,7 +1384,7 @@ because it passes on either Step-0 branch and only an unexplained Step-0 firing 
 is falsifiable. So two of four discriminate.
 
 *(**A1**–**A4** are this doc's shorthand for an eval's expectations in the order they appear in the
-file **today**. They are not ids — the schema has none, see "Assertions have no stable ids" below —
+file. They are not ids — the schema has none, see "Assertions have no stable ids" below —
 so an A-number is only meaningful against the current text of that eval.)*
 
 Both facts are recorded rather than acted on: there is no measured failure to chase, and churning a
@@ -1439,9 +1439,10 @@ grader model as well as by grader version. On #507's Parked list.
 
 ### Sandbox `permissions.allow` is silently ignored — #531
 
-Covered in §5. The practical consequence: `ship-4`'s observable assertion rests on the permission
+Covered in §5. The practical consequence: `ship-4`'s observable assertion rested on the permission
 layer above the stub behaving a particular way, and the sandbox cannot locally change that
-behavior even deliberately.
+behavior even deliberately. That assertion is gone: as of 2026-09 the ask-prompt check is parked in
+`ship-4`'s `notes` as manual-only (`strategy-skill-evals.md` §6).
 **When this lands, update:** this subsection, §5's "What is not protected", and the `.claude/`
 write-protection bullet in `scripts/skill-evals/routing/README.md`. Tracked on **#531**.
 
@@ -1598,7 +1599,7 @@ is the one it moved to `notes` as manual-only.
 | Query | Grader | Seed | Runs | Assertion-level passes | Per-assertion |
 |---|---|---|---|---|---|
 | `commit-4` † | G1 ×3 + G2 ×1 | 1 turn | 4 | **11/16** | A1 4/4 · A2 4/4 · A3 3/4 · A4 0/4 |
-| `commit-5a-slash` | — | 1 turn | **0** | — | no archived run uses today's text (see below) |
+| `commit-5a-slash` | — | 1 turn | **0** | — | no run in the 74-run corpus this table was compiled from uses its current text (see below) |
 | `commit-5b-delegation` | G2 | 3 turns | 1 | **2/2** | A1 1/1 · A2 1/1 |
 | `commit-5c-optout` † | G1 | 1 turn | 6 | **5/6** | A1 5/6 |
 | `commit-6` | G1 ×6 + G2 ×2 | 3 turns | 8 | **22/24** | A1 7/8 · A2 8/8 · A3 7/8 |
@@ -1647,7 +1648,7 @@ the **9/12** above. `commit-5c-optout`'s third assertion needs a live sandbox an
 the first time in this run. Three repetitions of one seed on one text is a confirmation sample and
 nothing more.
 
-**`commit-5a-slash` has no runs on its current assertion text.** Its A2 was rewritten in `41e0368`,
+**`commit-5a-slash` has no runs on its current assertion text in the 74-run corpus this table was compiled from.** Its A2 was rewritten in `41e0368`,
 the last of the three PR #530 commits, and every archived batch predates it. The often-quoted
 8 runs / 32-of-32 figure is on the *immediately preceding* A2 — the stricter "no Step-0 confirmation
 fires" wording — with A1, A3 and A4 byte-identical to today's. It is good corroboration and it is
@@ -1815,7 +1816,7 @@ only; nothing in the system depends on it.
 | **F-A** | A finding of the Phase-3 audit (below): the raw evidence legs were never preserved, so CLEAN verdicts rested on self-graded orchestrator prose. Closed by making archiving harness behavior (§4.5, §9) |
 | **F-B** | A finding of the Phase-3 audit (below): merge assertions were non-discriminating, because the permission layer intercepts above the stub. Closed by the merge-discrimination rule (§5) |
 | **`G1` / `G2`** | Two generations of the routing grader. A run is G2 if its directory contains `seeded-turns.md`, meaning the grader was shown the fabricated turns verbatim instead of inferring them (§11) |
-| **`A1`–`A4`** | This doc's shorthand for an eval's expectations in the order they appear in the file today. Not ids — the schema has none (§10) — so an A-number is only meaningful against the current text of that eval |
+| **`A1`–`A4`** | This doc's shorthand for an eval's expectations in the order they appear in the file. Not ids — the schema has none (§10) — so an A-number is only meaningful against the current text of that eval |
 | **`5a` / `5b` / `5c`** | The three sub-scenarios `commit-5` fans out to, run as the routing queries `commit-5a-slash`, `commit-5b-delegation` and `commit-5c-optout` (§4.4, §6) |
 | **E1–E4** | The four escalations from the 2026-07-19 peer review: E1 the safety-Must's scope, E2 the hook's deferral, E3 adversarial hardening, E4 the maintainer-reviewer role. All four are rows in §9 |
 | **"ruling N"** | A numbered maintainer decision from a review session, cited in code comments. **Ruling 3** — the one that appears in `archive-evidence.mjs`, `teardown-sandbox.mjs` and `lib/sandbox.mjs` — is "archive the raw evidence before teardown, as harness behavior rather than prompt guidance". The `.claude/` notes that recorded the full lists are gitignored; treat an unresolvable "ruling N" as provenance, not as a live instruction |

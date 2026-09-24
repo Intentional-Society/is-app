@@ -22,8 +22,7 @@
 //   node scripts/skill-evals/routing/run-routing-evals.mjs [--only id,id] [--reps N]
 //        [--model <m>] [--out <dir>] [--keep-sandboxes] [--list]
 //
-// Shell: run this from Git Bash — the PowerShell launch was fixed in #582 but is not yet shown
-// to work end to end.
+// Shell: Git Bash or PowerShell — the PowerShell launch was fixed in #582 and verified end to end on 2026-09-23 (#586).
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
