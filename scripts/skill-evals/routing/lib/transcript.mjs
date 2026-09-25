@@ -215,7 +215,11 @@ export function routingObservables(events, { skill, ghCallLog } = {}) {
   const invokedThisSkill = skillInvocations.some((s) => new RegExp(`(^|[^a-z])${skill}([^a-z]|$)`, "i").test(s));
 
   const announce = { commit: "Using /commit", pr: "Using /pr", ship: "Using /ship" }[skill];
-  const announcementPresent = announce ? allText.includes(announce) : false;
+  // At the start of a line, plain or bold (`**Using /commit**`); a quoted mention inside a
+  // sentence is not the announcement (#608).
+  const announcementPresent = announce
+    ? new RegExp(`^[ \\t]*(\\*\\*)?${announce}(?![\\w-])`, "m").test(allText)
+    : false;
   const announcementIsFirstLine = announce ? firstText.startsWith(announce) : false;
 
   // Ad-hoc bypass = a mutating git/gh command that appears with NO Skill invocation of

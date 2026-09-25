@@ -30,7 +30,7 @@ import path from "node:path";
 
 import { archiveEvidence, buildSandbox, teardownSandbox } from "../lib/sandbox.mjs";
 import { populateRoutingContext, REPO_ROOT } from "./lib/context.mjs";
-import { runExecutor, runGrader } from "./lib/driver.mjs";
+import { checkModelAvailable, DEFAULT_MODEL, runExecutor, runGrader } from "./lib/driver.mjs";
 import { graderPersistenceDecision } from "./lib/grading.mjs";
 import { formatSummaryLine, NEGATIVE_CONTROLS, summarizeEval } from "./lib/summary.mjs";
 import {
@@ -57,7 +57,7 @@ if (has("--list")) {
 }
 
 const reps = Number(opt("--reps", "3"));
-const model = opt("--model", "claude-sonnet-4-5");
+const model = opt("--model", DEFAULT_MODEL);
 const config = "with_skill";
 const onlyIds = opt("--only", null)
   ?.split(",")
@@ -103,6 +103,14 @@ function applySetupFiles(repoDir, setupFiles) {
     const body = content === FRESH_DELEGATION ? `pr\t${new Date().toISOString()}\n` : content;
     fs.writeFileSync(target, body);
   }
+}
+
+// Pre-batch check (#608): fail before any sandbox is built if the model cannot answer.
+try {
+  await checkModelAvailable(model);
+} catch (e) {
+  console.error(e.message);
+  process.exit(2);
 }
 
 fs.mkdirSync(outRoot, { recursive: true });

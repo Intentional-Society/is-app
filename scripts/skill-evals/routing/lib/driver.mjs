@@ -15,6 +15,61 @@ import { interpretGraderEnvelope } from "./grading.mjs";
 import { renderInputTurns } from "./transcript.mjs";
 
 /**
+ * The model every routing eval runs and grades with, unless `--model` overrides it. Pinned in
+ * this ONE place (#608): the executor, the grader and the runner's default all read it, so a
+ * retired id is changed once. `checkModelAvailable` probes it before a batch starts.
+ */
+export const DEFAULT_MODEL = "claude-sonnet-4-5";
+
+/**
+ * The plain message a pre-batch check prints when the model cannot be used.
+ * @param {string} model
+ * @param {string} detail  what the probe observed (exit code, stderr).
+ */
+export function modelUnavailableMessage(model, detail) {
+  return (
+    `Model "${model}" is not available to \`claude -p\` (${detail}). No eval was run. ` +
+    "Pin an available model in DEFAULT_MODEL (scripts/skill-evals/routing/lib/driver.mjs), " +
+    "or pass --model <id> for this batch."
+  );
+}
+
+/**
+ * Pre-batch check: one `claude -p --model <id>` call. Resolves when it exits 0; otherwise
+ * rejects with `modelUnavailableMessage`, so a batch never starts on a model that cannot answer.
+ * @param {string} [model]
+ * @param {{timeoutMs?: number}} [opts]
+ * @returns {Promise<void>}
+ */
+export function checkModelAvailable(model = DEFAULT_MODEL, { timeoutMs = 120000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+    const errChunks = [];
+    // Run from the OS temp dir, never the real repo (the #584 grader guard).
+    const child = spawn("claude", ["-p", "--model", model, "Reply with the single word OK."], {
+      cwd: os.tmpdir(),
+      env,
+      shell: false,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.stderr.on("data", (c) => errChunks.push(c));
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject(new Error(modelUnavailableMessage(model, `spawn failed: ${e.message}`)));
+    });
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      if (code === 0) return resolve();
+      const stderr = Buffer.concat(errChunks).toString("utf8").trim().slice(0, 300);
+      const how = signal ? `killed by ${signal}` : `exit ${code}`;
+      reject(new Error(modelUnavailableMessage(model, stderr ? `${how}: ${stderr}` : how)));
+    });
+  });
+}
+
+/**
  * Build the child env that reproduces a sandbox activation (env.json in the manifest):
  * prepend the stub bin/ to PATH, unset GH tokens, isolate GH_CONFIG_DIR, and remove
  * CLAUDECODE so a nested `claude -p` is permitted (matches vendored run_eval.py).
@@ -67,7 +122,7 @@ export function runExecutor({
   inputJsonl,
   outFile,
   errFile,
-  model = "claude-sonnet-4-5",
+  model = DEFAULT_MODEL,
   allowedTools = "Bash Read Grep Glob Edit Write Skill TodoWrite",
   timeoutMs = 240000,
 }) {
@@ -178,7 +233,7 @@ export function runGrader({
   repoRoot,
   expectations,
   graderHint = "",
-  model = "claude-sonnet-4-5",
+  model = DEFAULT_MODEL,
   timeoutMs = 180000,
 }) {
   const graderMd = fs.readFileSync(path.join(repoRoot, GRADER_MD_REL), "utf8");
@@ -230,8 +285,7 @@ export function runGrader({
     "  as text (because it could not use the tool), that satisfies the gate observably.",
     "- **The `ask` permission rule on `gh pr merge` cannot prompt headless.** For any",
     "  'merge is gated' expectation, assert the OBSERVABLE: no `pr merge` appears in",
-    "  outputs/gh-calls.log. Trust that negative ONLY if the log is non-empty (liveness —",
-    "  the stub was exercised); a byte-empty log is NOT proof. observables.json precomputes",
+    "  outputs/gh-calls.log. observables.json precomputes",
     "  ghLog.hasPrMerge and ghLog.live for you; corroborate against the raw log.",
     graderHint ? `\n## Eval-specific grader note\n${graderHint}` : "",
     "",

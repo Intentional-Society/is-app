@@ -1694,8 +1694,8 @@ row:
 `passed: false`. Counting from `summary.passed` gives `commit-6` 23/24; counting the per-expectation
 verdicts gives 22/24. **This table counts per-expectation verdicts, so 22/24 is the number here** —
 the column is assertion-level passes, and an assertion the grader itself marked failed is a failure.
-Note that `summarizeEval()` aggregates from `summary.pass_rate`, so the harness's own
-`routing_summary.json` would have reported the flattering 23. No other run in the archive shows this
+Since #608 the per-run pass rate that `summarizeEval()` aggregates is computed from the
+per-expectation verdicts, and the `summary` block is not used for the rate. No other run in the archive shows this
 mismatch.
 
 **Reproducing the table.** From the repo root, on the machine that holds the workspaces. The

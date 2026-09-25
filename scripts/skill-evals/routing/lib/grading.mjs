@@ -85,11 +85,36 @@ export function graderPersistenceDecision({ grading = null, numTurns = null, env
   const voided = voidReason(numTurns, envelopeParsed);
   if (voided) return { persistGrading: false, voided: true, passRate: null, error: voided };
 
-  const rate = grading?.summary?.pass_rate;
   return {
     persistGrading: Boolean(grading),
     voided: false,
-    passRate: typeof rate === "number" ? rate : null,
+    passRate: grading ? verdictPassRate(grading) : null,
     error: null,
   };
+}
+
+/**
+ * The pass rate from the per-expectation verdicts, not the grader's own `summary` block, which
+ * can disagree with them (commit-6: 22/24 by verdicts, 23/24 by summary; #608). Only
+ * `passed === true` counts as a pass; any other value counts as a fail and is logged. No
+ * verdicts at all gives null, so the run is counted as ungraded rather than guessed.
+ * @param {any} grading
+ * @returns {number|null}
+ */
+function verdictPassRate(grading) {
+  const verdicts = Array.isArray(grading.expectations) ? grading.expectations : [];
+  if (verdicts.length === 0) {
+    console.warn("[grading] no per-expectation verdicts; pass rate left null (ungraded)");
+    return null;
+  }
+  let passed = 0;
+  verdicts.forEach((v, i) => {
+    if (v?.passed === true) passed++;
+    else if (v?.passed !== false) {
+      console.warn(
+        `[grading] expectation ${i + 1} (${JSON.stringify(v?.text ?? "")}) has passed=${JSON.stringify(v?.passed)}; counted as failed`,
+      );
+    }
+  });
+  return passed / verdicts.length;
 }

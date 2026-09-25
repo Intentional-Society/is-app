@@ -95,7 +95,7 @@ node scripts/skill-evals/routing/run-routing-evals.mjs --reps 3
 ```
 
 Flags: `--only <id,id>`, `--reps N` (default 3), `--model <m>` (default
-`claude-sonnet-4-5`), `--out <dir>`, `--keep-sandboxes` (debug — skips teardown),
+`DEFAULT_MODEL` in `lib/driver.mjs`, `claude-sonnet-4-5`), `--out <dir>`, `--keep-sandboxes` (debug — skips teardown),
 `--list`.
 
 ## Output
