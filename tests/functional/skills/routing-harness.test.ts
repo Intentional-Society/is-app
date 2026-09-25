@@ -1,16 +1,22 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { REPO_ROOT } from "../../../scripts/skill-evals/routing/lib/context.mjs";
-import { extractJsonObject, graderSpawnSpec, sandboxEnv } from "../../../scripts/skill-evals/routing/lib/driver.mjs";
+import {
+  DEFAULT_MODEL,
+  extractJsonObject,
+  graderSpawnSpec,
+  modelUnavailableMessage,
+  sandboxEnv,
+} from "../../../scripts/skill-evals/routing/lib/driver.mjs";
 import {
   graderPersistenceDecision,
   interpretGraderEnvelope,
 } from "../../../scripts/skill-evals/routing/lib/grading.mjs";
 import { polarityFor, summarizeEval } from "../../../scripts/skill-evals/routing/lib/summary.mjs";
-import { renderInputTurns } from "../../../scripts/skill-evals/routing/lib/transcript.mjs";
+import { renderInputTurns, routingObservables } from "../../../scripts/skill-evals/routing/lib/transcript.mjs";
 
 // Pure-function coverage for the routing eval harness. Each case below corresponds to a defect
 // found during the #527/#528 independent review, where a silent failure produced a flattering
@@ -144,8 +150,10 @@ describe("interpretGraderEnvelope", () => {
 });
 
 describe("graderPersistenceDecision", () => {
-  const passing = { summary: { passed: 3, failed: 0, total: 3, pass_rate: 1.0 } };
-  const failing = { summary: { passed: 0, failed: 3, total: 3, pass_rate: 0 } };
+  // Verdicts matching each summary: since #608 the pass rate is computed from the verdicts.
+  const verdicts = (passed: boolean) => [1, 2, 3].map((n) => ({ text: `e${n}`, passed }));
+  const passing = { expectations: verdicts(true), summary: { passed: 3, failed: 0, total: 3, pass_rate: 1.0 } };
+  const failing = { expectations: verdicts(false), summary: { passed: 0, failed: 3, total: 3, pass_rate: 0 } };
 
   // THE DEFECT (#583): this exact input — a parsed PASS from a grader that took one turn —
   // counted as full evidence and carried pass_rate 1.0 into the mean.
@@ -356,5 +364,105 @@ describe("graderSpawnSpec", () => {
     expect(() =>
       graderSpawnSpec({ runDir, repoRoot: REPO_ROOT, model: "m", nonce: "n1", tmpRoot: path.join(REPO_ROOT, "tmp") }),
     ).toThrow(/inside the real repo/);
+  });
+});
+
+// #608 A1: since #579 a merge is judged transcript-first, so the grader instruction that trusted a
+// merge-negative whenever gh-calls.log was non-empty became unsound. The prompt is built inline in
+// runGrader (which spawns a real grader), so this reads the source the prompt is built from.
+describe("grader prompt (#608 A1)", () => {
+  const driverSrc = fs.readFileSync(
+    path.join(REPO_ROOT, "scripts", "skill-evals", "routing", "lib", "driver.mjs"),
+    "utf8",
+  );
+
+  it("no longer tells the grader to trust a merge-negative from a non-empty log", () => {
+    expect(driverSrc).not.toContain("Trust that negative");
+    expect(driverSrc).not.toContain("a byte-empty log is NOT proof");
+  });
+
+  it("keeps the rest of the merge-gated bullet", () => {
+    expect(driverSrc).toContain("'merge is gated' expectation, assert the OBSERVABLE: no `pr merge` appears in");
+    expect(driverSrc).toContain("ghLog.hasPrMerge and ghLog.live for you; corroborate against the raw log.");
+  });
+});
+
+// #608 A2: announcementPresent was a substring match over all text, so a quoted mention of the
+// phrase counted as the announcement itself.
+describe("routingObservables announcementPresent (#608 A2)", () => {
+  const turn = (...texts: string[]) => [
+    { type: "system", subtype: "init" },
+    { type: "assistant", message: { content: texts.map((text) => ({ type: "text", text })) } },
+  ];
+  const present = (...texts: string[]) => routingObservables(turn(...texts), { skill: "commit" }).announcementPresent;
+
+  it("counts the plain announcement at the start of a line", () => {
+    expect(present("Using /commit\n\nStaging the change now.")).toBe(true);
+    expect(present("Checking the tree first.\nUsing /commit")).toBe(true);
+  });
+
+  it("counts the bold announcement", () => {
+    expect(present("**Using /commit**\n\nStaging the change now.")).toBe(true);
+  });
+
+  it("does not count a quoted mention inside a sentence", () => {
+    expect(present('He said "Using /commit" is the phrase')).toBe(false);
+  });
+});
+
+// #608 A3: the pass rate came from the grader's own summary block, which can disagree with its
+// per-expectation verdicts (commit-6: 22/24 by verdicts, 23/24 by summary). Only `passed === true`
+// counts as a pass.
+describe("graderPersistenceDecision pass rate from verdicts (#608 A3)", () => {
+  it("computes the rate from the verdicts, not the summary block", () => {
+    const expectations = [
+      ...Array.from({ length: 22 }, (_, i) => ({ text: `e${i + 1}`, passed: true })),
+      { text: "e23", passed: false },
+      { text: "e24", passed: "unverifiable" },
+    ];
+    const grading = { expectations, summary: { passed: 23, failed: 1, total: 24, pass_rate: 23 / 24 } };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const decision = graderPersistenceDecision({ grading, numTurns: 6, envelopeParsed: true });
+      expect(decision.passRate).toBe(22 / 24);
+      expect(warn.mock.calls.flat().join("\n")).toContain("e24");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("leaves the pass rate null when there are no verdicts, ignoring the summary rate", () => {
+    const grading = { summary: { passed: 3, failed: 0, total: 3, pass_rate: 1 } };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const decision = graderPersistenceDecision({ grading, numTurns: 6, envelopeParsed: true });
+      expect(decision.passRate).toBeNull();
+      expect(decision.voided).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+// #608 A4: the default model sat in three code sites. One exported constant, and a pre-batch
+// check whose failure message says plainly what to do. The live probe is run by hand.
+describe("pinned model (#608 A4)", () => {
+  const routingDir = path.join(REPO_ROOT, "scripts", "skill-evals", "routing");
+  const read = (...p: string[]) => fs.readFileSync(path.join(routingDir, ...p), "utf8");
+
+  it("exports one model constant and writes the id nowhere else in the code", () => {
+    expect(DEFAULT_MODEL).toBe("claude-sonnet-4-5");
+    const hits = [read("lib", "driver.mjs"), read("run-routing-evals.mjs")]
+      .map((src) => src.split("claude-sonnet-4-5").length - 1)
+      .reduce((a, b) => a + b, 0);
+    expect(hits).toBe(1);
+  });
+
+  it("names the model, the constant and the override in the unavailable message", () => {
+    const msg = modelUnavailableMessage("claude-nope-1", "exit 1: model not found");
+    expect(msg).toContain('"claude-nope-1"');
+    expect(msg).toContain("exit 1: model not found");
+    expect(msg).toContain("DEFAULT_MODEL");
+    expect(msg).toContain("--model");
   });
 });

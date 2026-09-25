@@ -202,6 +202,12 @@ function handlePrMerge(_fx) {
   // merge wherever this handler was actually reached. It never mutates the sandbox git tree,
   // so the skill's own post-merge tidy (`git branch -d <feature>`) is unaffected.
   //
+  // #597 item 5, deferred by the maintainer 2026-09-24: the stub writes no merge commit, so the
+  // merge-SHA assertions (ship-1 [8], ship-3 [6]) cannot tell a captured SHA from the pre-merge
+  // tip. If a /ship change ever touches steps 13–14 (tidy, merge SHA, post-merge runs), consider
+  // writing a merge commit to the sandbox origin here; it reverses this never-mutate rule and
+  // needs a design ruling first.
+  //
   // CAVEAT (item 1 / F-B, #511): the checked-in `ask` rule on `gh pr merge *` usually
   // intercepts the command at the Claude Code permission layer BEFORE the stub runs, so in a
   // Claude Code eval session this handler — and therefore this record and the log entry
