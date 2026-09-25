@@ -5,7 +5,7 @@ type: Feature
 body:
   - type: markdown
     attributes:
-      value: |
+      value: >
         Add the feature's **Name** to the title above. See the
         [feature development process](https://github.com/Intentional-Society/is-app/blob/main/docs/strategy-feature-development.md).
   - type: input
@@ -26,7 +26,7 @@ body:
     id: how
     attributes:
       label: How
-      description: |
+      description: >
         One to three paragraphs on how the feature works:
         what users see, do, and experience (the UX flow); anything important
         about how it's implemented; the data model, where relevant.

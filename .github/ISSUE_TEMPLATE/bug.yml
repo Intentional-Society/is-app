@@ -5,7 +5,7 @@ type: Bug
 body:
   - type: markdown
     attributes:
-      value: |
+      value: >
         This repo is public, so don't include any members' personal details (names,
         emails, profile content). Report security vulnerabilities privately
         through [Security → Report a vulnerability](https://github.com/Intentional-Society/is-app/security/advisories/new).
