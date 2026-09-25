@@ -1,0 +1,44 @@
+name: Bug
+description: Something in the IS Web App isn't working.
+title: "Bug: "
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repo is public, so don't include any members' personal details (names,
+        emails, profile content). Report security vulnerabilities privately
+        through [Security → Report a vulnerability](https://github.com/Intentional-Society/is-app/security/advisories/new).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Page or URL, plus browser and device.
+      placeholder: /programs on Safari, iPhone 15
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Optional. Crop out other members' details.

@@ -1,0 +1,34 @@
+name: Feature
+description: Promote a feature definition from the Ideation doc into a GitHub issue.
+title: "Feature: "
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Add the feature's **Name** to the title above. See the
+        [feature development process](https://github.com/Intentional-Society/is-app/blob/main/docs/strategy-feature-development.md).
+  - type: input
+    id: what
+    attributes:
+      label: What
+      description: One sentence saying what the feature is.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: One or two sentences on the goal, outcomes, and motivation.
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How
+      description: |
+        One to three paragraphs on how the feature works:
+        what users see, do, and experience (the UX flow); anything important
+        about how it's implemented; the data model, where relevant.
+    validations:
+      required: true

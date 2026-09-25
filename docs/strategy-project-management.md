@@ -29,8 +29,8 @@ Two main views:
 
 Two quest views (see [Quests](#quests)):
 
-- **Quest board** — `label:quest is:open`. Quests to take on, and quests in progress.
-- **Rewards due** — `label:quest is:closed -reward:paid`. Merged quests whose reward the PO hasn't paid yet.
+- **Quests** — `label:quest`. Every quest, open and closed.
+- **Rewards** — `has:reward-status`. Quests whose reward the PO has set: awaiting payment, paid, or declined.
 
 (We deleted the default Priority and Roadmap views. Priority will come back if/when we start using the Priority field seriously. Roadmap needs Start/Target dates per item, which only matters if we're scheduling releases.)
 
@@ -58,12 +58,13 @@ The rest of GitHub's built-in automations are off.
 
 ## Quests
 
-A quest is a feature posted with a reward; see [`strategy-feature-development.md`](strategy-feature-development.md). Quests move through the same statuses as other work. Two additions track them:
+A quest is a feature posted with a reward; see [`strategy-feature-development.md`](strategy-feature-development.md). The board is public, so anyone can see each quest's reward and reward status. Quests move through the same statuses as other work. Three additions track them:
 
 - **`quest` label** — marks an issue as a quest.
-- **Reward field** — a single-select with one option, **Paid**. The PO sets it after paying.
+- **Reward ($USD)** — a number field: the base reward until payout, then the final reward.
+- **Reward status** — a single-select: **Awaiting Payment** once the PO has set the final reward, **Paid** once paid, **Declined** when no reward will be paid. Blank means not a quest, or not yet merged.
 
-Done means merged, for quests as for all other work: merging closes the issue, and the built-in automations set Done. The Reward field tracks payment on its own, which needs no custom automation. A closed quest with no Reward set has its reward due.
+Done means merged, for quests as for all other work: merging closes the issue, and the built-in automations set Done. Reward status tracks payment on its own, which needs no custom automation. A closed quest whose Reward status is blank or Awaiting Payment has its reward due.
 
 ## Issue conventions
 
