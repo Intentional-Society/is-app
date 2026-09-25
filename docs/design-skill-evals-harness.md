@@ -554,11 +554,11 @@ This is `commit-2`, trimmed:
 | `make-sandbox.mjs` | Build one sandbox for a named fixture and print either the human activation block or the raw manifest. | argument helpers `has`/`value`/`firstPositional`/`printHelp`; delegates to `listFixtures()` and `buildSandbox()` | humans, the batch prompt, the routing runner (indirectly, via `buildSandbox()`) |
 | `teardown-sandbox.mjs` | Remove one sandbox or sweep all of them; `--archive <destDir>` captures evidence first, so archive-then-teardown is one operation. | delegates to `archiveEvidence()`, `teardownSandbox()`, `teardownAll()` | humans, the batch prompt |
 | `archive-evidence.mjs` | Copy the harness-owned raw evidence legs into an eval's `outputs/` directory before teardown. | delegates to `archiveEvidence()` | the batch prompt, the executor prompt |
-| `selfcheck.mjs` | Run the whole safety checklist and exit non-zero if anything fails. | `checkFixtureCompleteness`, `checkStubBehaviors`, `checkEnvScrub`, `checkTeardown`, `checkWrapperOnPath`, `checkGitBashActivation`, `checkEvidenceArchive`, `checkZeroMutation`, plus `runStub`, `findPosixShell`, `repoState`, `referencedFixtureNames`, `report` | humans, after any harness change |
+| `selfcheck.mjs` | Run the whole safety checklist and exit non-zero if anything fails. | `checkFixtureCompleteness`, `checkStubBehaviors`, `checkEnvScrub`, `checkTeardown`, `checkWrapperOnPath`, `checkGitBashActivation`, `checkEvidenceArchive`, `checkMainUpstream`, `checkZeroMutation`, plus `runStub`, `findPosixShell`, `repoState`, `referencedFixtureNames`, `report` | humans, after any harness change |
 | `fake-test.mjs` | The sandbox's `npm test`. Passes instantly; exits non-zero if a `.skill-eval-fail-test` sentinel exists in the working directory. | — | copied into each sandbox as `.skill-eval-fake-test.mjs` by `buildSandbox()` |
 | `routing/run-routing-evals.mjs` | Drive the eleven routing queries as graded trigger rates. | `loadExpectations`, `buildInputJsonl`, `applySetupFiles`; top-level loop | humans |
 
-`selfcheck.mjs` declares thirteen named checks and emits twenty-three result rows. Several checks
+`selfcheck.mjs` declares fourteen named checks and emits twenty-four result rows. Several checks
 contribute more than one row — `default-deny`, for example, yields `exit`, `logged` and
 `no-passthrough`. The check list itself is documented in
 [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md).
@@ -603,7 +603,8 @@ writing one from scratch.
 5. `git init --bare` the origin, and `git init` the working repo.
 6. Apply `setLocalConfig()` to the working repo.
 7. Write `BASE_FILES` plus the profile's `baseFilesExtra`, commit them as the **seed commit**, add
-   the local origin as a remote, and push `main`.
+   the local origin as a remote, and push `main` with `-u`, so `main` tracks `origin/main` as it
+   would in a real clone and the skills' post-merge `git pull --ff-only` on `main` works (#597).
 8. Create the feature branch and replay `branchCommits`, pushing at `pushedBranchCommits` if set.
 9. Apply the profile's uncommitted `working` changes — this is what makes a fixture "dirty".
 10. Write the preseeded reviewer team cache, if the profile asks for one.
@@ -628,7 +629,7 @@ and per-handler extras.
 |---|---|---|
 | `auth status` | `handleAuthStatus` | Writes to **stderr**, like real `gh`, and includes the literal `(SANDBOX gh stub)` — the string the executor prompt's stub-liveness gate greps for. Exit 0 logged in, 1 not. |
 | `issue view <N>` | `handleIssueView` | Emits the fixture's issue JSON, or exit 1 if it is not `OPEN`. |
-| `pr view [N]` | `handlePrView` | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. Every fixture PR carries `comments`, `reviews` and `commits[].committedDate` for `/ship` step 10 (#580). |
+| `pr view [N]` | `handlePrView` | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. Every fixture PR carries `comments`, `reviews` and `commits[].committedDate` for `/ship` step 10 (#580). One `--jq` special case (#597 item 1): `--json commits --jq '.commits[-1].committedDate'` (dotless spelling accepted) prints the head commit's date as a bare string, the way real `gh` does; every other form, including any other `--jq`, still prints the full object. |
 | `pr list` | `handlePrList` | The read-only branch-PR-detection alias: emits `[branchPr]` or `[]`. |
 | `pr create` | `handlePrCreate` | Consults the per-call sequence `sequences["pr create"]` **first**; only if the profile has none does it fall back to `createPr`'s URL. (`pr-7`'s error-then-success run depends on that precedence.) Logs the `--reviewer` and `--assignee` values. |
 | `pr checks <N> [--watch]` | `handlePrChecks` | Prints one tab-separated line per fixture check. Exit **0** all pass, **8** any pending, **1** any fail — real `gh`'s codes. |
@@ -907,7 +908,7 @@ The mechanisms, named to where they live:
 | 9 | **Liveness before any negative.** A "the log contains no X" claim is trusted only when the log is non-empty — and a merge-negative is stricter still: the log never PASSes a merge-negative on its own, empty or not (`strategy-skill-evals.md` §6). | `ghLog.live` from `routingObservables()` in `routing/lib/transcript.mjs`; stated to the grader by `runGrader()` in `routing/lib/driver.mjs`; stated to humans in `prompts/executor-prompt.md` |
 | 10 | **Fixtures can never depend on case-distinct filenames**, because macOS's default filesystem is case-insensitive. | `assertNoCaseCollisions()` in `lib/fixtures.mjs`, called from `getFixture()` |
 | 11 | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of thirteen of the eighteen distinct fixture branch names is additionally checked by name, belt-and-braces. | `checkZeroMutation()` in `selfcheck.mjs` |
-| 12 | **The whole checklist is executable.** Thirteen named checks, twenty-three rows, exit 0 only if every row passes; among them a genuine POSIX-shell activation check that sources `activate.sh` and runs a bare `gh`. | `selfcheck.mjs`, especially `checkGitBashActivation()` and `findPosixShell()` |
+| 12 | **The whole checklist is executable.** Fourteen named checks, twenty-four rows, exit 0 only if every row passes; among them a genuine POSIX-shell activation check that sources `activate.sh` and runs a bare `gh`. | `selfcheck.mjs`, especially `checkGitBashActivation()` and `findPosixShell()` |
 
 ### Above the stub
 
@@ -1295,6 +1296,7 @@ in the Date column means the decision predates this program.
 | 2026-09-16 | `commit-5b`'s clear-on-read assertion removed from the automated eval (#527) | Covered by the manual runbook instead; a failed deletion headless is never a skill defect | Keeping it and excusing failures in the grader — an assertion that can never pass is not an assertion |
 | 2026-09-16 | `commit-5a` is inline-fire, not a should-fire failure (#528) | `INLINE_FIRE` plus a three-way `polarityFor()`; `invocation_trigger_rate` reports `null` rather than a meaningless 0 | Leaving it labelled should-fire — the summary read "0%, broken" for correct behavior |
 | 2026-09-18 | Routing assertions considered and left unchanged (`commit-6`, `commit-7`, `commit-8`, `pr-9`, `commit-5a`, `commit-5b`) | Record the ruling in each eval's `notes`, in the manifest's third list and in strategy §6's procedure | Leaving them alone silently — the #527/#528 churn only stopped once `routing-plan.mjs` carried a do-not-remove-this-branch comment |
+| 2026-09-24 | #597 option (b): classifier refusals graded as ENVIRONMENT, outside the pass rate; raw rate kept in `benchmark.json` | Every FAIL gets one label: ENVIRONMENT, KNOWN-DEFECT or REAL-MISS (defined in `strategy-skill-evals.md` §6, "Miss labels"). Labels live in the batch report, per eval and in the totals. The report shows the raw rate and the rate excluding ENVIRONMENT | Option (a), a harness-owned permission profile: a permission change, kept by the ticket as a later step if prompts keep reaching humans. Recording labels in `observables.json`: only routing runs write it. Rewriting `benchmark.json`'s rate: the vendored aggregator computes it |
 
 ### Live risks
 

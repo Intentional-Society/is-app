@@ -358,3 +358,46 @@ describe("fixtures — top-level comments agree across both reads (#601)", () =>
     expect(fx.reviewThreads).toEqual([]);
   });
 });
+
+// #597 item 11: each profile's check links point at its own PR, never at pull/1.
+describe("fixtures — check links name the fixture's own PR (#597)", () => {
+  it.each([
+    ["feature-open-pr-all-green", 220],
+    ["feature-open-pr-bot-cards-only", 224],
+  ])("%s: every check link is under /pull/%i/", (name, n) => {
+    const fx = buildGhFixture(getFixture(name));
+    expect(fx.checks.length).toBeGreaterThan(0);
+    for (const c of fx.checks as { link: string }[]) {
+      expect(c.link).toContain(`/pull/${n}/`);
+      expect(c.link).not.toContain("/pull/1/");
+    }
+  });
+});
+
+// #597 item 1: /ship step 4's last-push cutoff read.
+describe("gh stub — pr view --json commits --jq '.commits[-1].committedDate' (#597)", () => {
+  const fx = () => buildGhFixture(getFixture("feature-open-pr-all-green"));
+
+  it.each([".commits[-1].committedDate", "commits[-1].committedDate"])(
+    "--jq %s prints the head commit's committedDate as a bare string",
+    (expr) => {
+      const out = gh(layout(fx()), ["pr", "view", "220", "--json", "commits", "--jq", expr]);
+      expect(out.code).toBe(0);
+      expect(out.stdout).toBe("2026-09-20T12:00:00Z\n");
+    },
+  );
+
+  it("without --jq, `pr view <N> --json commits` still prints the full object", () => {
+    const out = gh(layout(fx()), ["pr", "view", "220", "--json", "commits"]);
+    expect(out.code).toBe(0);
+    const pr = JSON.parse(out.stdout);
+    expect(pr.number).toBe(220);
+    expect(pr.commits.at(-1).committedDate).toBe("2026-09-20T12:00:00Z");
+  });
+
+  it("any other --jq expression still gets the full object (no general jq)", () => {
+    const out = gh(layout(fx()), ["pr", "view", "220", "--json", "commits", "--jq", ".commits[0].oid"]);
+    expect(out.code).toBe(0);
+    expect(JSON.parse(out.stdout).number).toBe(220);
+  });
+});

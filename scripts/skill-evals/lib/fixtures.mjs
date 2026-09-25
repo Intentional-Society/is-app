@@ -36,17 +36,17 @@ const REVIEWER_COLLABORATORS = [SELF_COLLAB, ...HUMANS, ...BOTS];
 const AUTH_OK = { loggedIn: true, login: SELF, host: "github.com" };
 const VERCEL_PROD_URL = "https://app.intentionalsociety.org";
 
-const CHECKS_ALL_GREEN = [
-  { name: "Lint & Functional Tests", bucket: "pass", state: "SUCCESS", required: true, link: prLink(1, "checks") },
-  { name: "E2E", bucket: "pass", state: "SUCCESS", required: false, link: prLink(1, "checks") },
-  { name: "CodeQL", bucket: "pass", state: "SUCCESS", required: false, link: prLink(1, "checks") },
+const checksAllGreen = (n) => [
+  { name: "Lint & Functional Tests", bucket: "pass", state: "SUCCESS", required: true, link: prLink(n, "checks") },
+  { name: "E2E", bucket: "pass", state: "SUCCESS", required: false, link: prLink(n, "checks") },
+  { name: "CodeQL", bucket: "pass", state: "SUCCESS", required: false, link: prLink(n, "checks") },
 ];
-const CHECKS_ADVISORY_PENDING = [
-  { name: "Lint & Functional Tests", bucket: "pass", state: "SUCCESS", required: true, link: prLink(1, "checks") },
-  { name: "E2E", bucket: "pending", state: "PENDING", required: false, link: prLink(1, "checks") },
+const checksAdvisoryPending = (n) => [
+  { name: "Lint & Functional Tests", bucket: "pass", state: "SUCCESS", required: true, link: prLink(n, "checks") },
+  { name: "E2E", bucket: "pending", state: "PENDING", required: false, link: prLink(n, "checks") },
 ];
-const CHECKS_DOCS_ONLY = [
-  { name: "Lint & Functional Tests", bucket: "pass", state: "SUCCESS", required: true, link: prLink(1, "checks") },
+const checksDocsOnly = (n) => [
+  { name: "Lint & Functional Tests", bucket: "pass", state: "SUCCESS", required: true, link: prLink(n, "checks") },
 ];
 const POST_MERGE_RUNS = [
   {
@@ -526,7 +526,7 @@ export const members = pgTable("members", {
       // ship-6 reads the created PR's conversation by number before the merge (step 10, #580).
       prs: { 301: existingPr(301, "wire-up-dashboard", "feat: wire up dashboard") },
       // ship-6 continues past PR creation into the merge — the created PR's checks are green.
-      checks: CHECKS_ALL_GREEN,
+      checks: checksAllGreen(301),
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
     },
@@ -655,7 +655,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       self: SELF,
       branchPr: existingPr(220, "feature-ready", "feat: ready feature"),
       prs: { 220: existingPr(220, "feature-ready", "feat: ready feature") },
-      checks: CHECKS_ALL_GREEN,
+      checks: checksAllGreen(220),
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
     },
@@ -675,7 +675,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       self: SELF,
       branchPr: existingPr(221, "feature-pending", "feat: pending feature"),
       prs: { 221: existingPr(221, "feature-pending", "feat: pending feature") },
-      checks: CHECKS_ADVISORY_PENDING,
+      checks: checksAdvisoryPending(221),
     },
   },
 
@@ -701,7 +701,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       self: SELF,
       branchPr: existingPr(222, "docs-update", "docs: update devjournal and CLAUDE"),
       prs: { 222: existingPr(222, "docs-update", "docs: update devjournal and CLAUDE") },
-      checks: CHECKS_DOCS_ONLY,
+      checks: checksDocsOnly(222),
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
     },
@@ -724,7 +724,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       // The same comment as the REST issue-comments endpoint returns it (#601), so the two
       // reads of the one conversation agree.
       issueComments: restIssueComments(223, [REVIEWED_COMMENT]),
-      checks: CHECKS_ALL_GREEN,
+      checks: checksAllGreen(223),
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
       pullComments: [],
@@ -751,7 +751,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
         CLAUDE_REVIEW_CLEAN,
         prNoteBySelf("feat: carded feature"),
       ]),
-      checks: CHECKS_ALL_GREEN,
+      checks: checksAllGreen(224),
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
       pullComments: [],
@@ -773,7 +773,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       auth: AUTH_OK,
       self: SELF,
       ...prWithComments(225, "feature-flagged", "feat: flagged feature", [VERCEL_CARD, CLAUDE_REVIEW_WITH_FINDINGS]),
-      checks: CHECKS_ALL_GREEN,
+      checks: checksAllGreen(225),
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
       pullComments: [],

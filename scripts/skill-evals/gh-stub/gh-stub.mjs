@@ -138,10 +138,19 @@ function handlePrView(fx) {
     logCall({ decision: "answered", exitCode: 1 });
     return 1;
   }
-  emitObject(pr);
+  // /ship step 4 (#597): the last-push cutoff, `--json commits --jq '.commits[-1].committedDate'`.
+  // Only this one expression is answered, printed bare the way real gh prints a jq string;
+  // every other form still gets the full object.
+  const jq = flagValue("--jq");
+  if (jq != null && HEAD_COMMIT_DATE_JQ.has(stripSurroundingQuotes(jq))) {
+    stdout(pr.commits?.at(-1)?.committedDate ?? "null");
+  } else {
+    emitObject(pr);
+  }
   logCall({ decision: "answered", exitCode: 0 });
   return 0;
 }
+const HEAD_COMMIT_DATE_JQ = new Set([".commits[-1].committedDate", "commits[-1].committedDate"]);
 
 function handlePrList(fx) {
   const list = fx.branchPr ? [fx.branchPr] : [];

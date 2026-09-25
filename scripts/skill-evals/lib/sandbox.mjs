@@ -60,7 +60,10 @@ export function buildSandbox({ fixture, root, note }) {
   git(["-C", repoDir, "add", "-A"]);
   git(["-C", repoDir, "commit", "-m", "chore: sandbox baseline"]);
   git(["-C", repoDir, "remote", "add", "origin", pathToFileURL(originDir).href]);
-  git(["-C", repoDir, "push", "origin", "main"]);
+  // `-u` makes `main` track `origin/main`, as it does in a real clone. Without it, the skills'
+  // post-merge tidy (`git switch main && git pull --ff-only`) exits 1 with "no tracking
+  // information" in every sandbox (#597 item 4). Feature branches below already push with `-u`.
+  git(["-C", repoDir, "push", "-u", "origin", "main"]);
 
   // --- feature branch: commits + optional push point ----------------------------------
   // `branch` is optional: a profile may deliberately stay on `main` (the starting world some

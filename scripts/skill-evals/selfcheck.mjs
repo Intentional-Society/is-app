@@ -21,7 +21,10 @@
 //  12. evidence-archive      — the raw evidence triad (gh-calls.log + git-state dump + stub
 //                              state) is archived into a workspace dir BEFORE teardown (item 2,
 //                              ruling 3, #511 gate-close, #514).
-//  13. zero-mutation-audit   — the real repo's HEAD/branches/status are unchanged by the run.
+//  13. main-upstream         — a fresh fixture repo's `main` tracks `origin/main`, and
+//                              `git pull --ff-only` on `main` exits 0 (the skills' post-merge
+//                              tidy step; #597 item 4).
+//  14. zero-mutation-audit   — the real repo's HEAD/branches/status are unchanged by the run.
 //
 // Exit 0 iff every check passes.
 
@@ -46,6 +49,7 @@ try {
   checkWrapperOnPath();
   checkGitBashActivation();
   checkEvidenceArchive();
+  checkMainUpstream();
 } finally {
   for (const dir of built) {
     try {
@@ -378,6 +382,30 @@ function checkEvidenceArchive() {
   } finally {
     fs.rmSync(dest, { recursive: true, force: true });
   }
+}
+
+function checkMainUpstream() {
+  // #597 item 4: the skills' post-merge tidy is `git switch main && git pull --ff-only`. With no
+  // upstream on `main` the pull exits 1 ("no tracking information") in every sandbox, so a
+  // ship eval's tidy could only pass by luck. Prove the fixture sets the upstream and the pull
+  // works. One row: both legs must hold.
+  const m = buildSandbox({ fixture: "feature-open-pr-all-green", note: "selfcheck-upstream" });
+  built.push(m.sandboxDir);
+  const gitIn = (args) => {
+    const res = spawnSync("git", ["-C", m.repoDir, ...args], { encoding: "utf8" });
+    return { code: res.status ?? -1, out: `${res.stdout || ""}${res.stderr || ""}`.trim() };
+  };
+  const upstream = gitIn(["rev-parse", "--abbrev-ref", "main@{upstream}"]);
+  const onMain = gitIn(["switch", "main"]);
+  const pull = gitIn(["pull", "--ff-only"]);
+  const ok = upstream.code === 0 && upstream.out === "origin/main" && onMain.code === 0 && pull.code === 0;
+  add(
+    "main-upstream",
+    ok,
+    ok
+      ? "`main@{upstream}` is origin/main and `git pull --ff-only` on main exits 0"
+      : `upstream=${JSON.stringify(upstream.out)} (exit ${upstream.code}), switch exit ${onMain.code}, pull exit ${pull.code}: ${pull.out}`,
+  );
 }
 
 function checkZeroMutation(beforeState) {

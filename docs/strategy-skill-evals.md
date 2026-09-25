@@ -276,7 +276,7 @@ and at the end `# Full pass done — <headline>`. Filled example, numbers from t
 > **Tests** whether each skill follows its procedure end to end: `/commit`, `/pr`, `/ship` run real scenarios inside sandboxes against the gh stub, graded against written expectations.
 > **Size** 17 evals · last time ~45 min of work · **3 prompts**. **I do** run executors and graders in sandboxes, archive each run, prove zero mutation, write the report.
 > **You do** approve three `gh pr merge` prompts, one each for ship-1, ship-3, ship-6, once each; the first arrives ~15 min after launch and the batch waits until you do. I push a notice when one is waiting.
-> **Watch for** the folder in the prompt: `skill-eval-sandboxes` means the stub, never GitHub. Misses labelled ENVIRONMENT are the auto-mode classifier refusing sandbox commands, not skill failures.
+> **Watch for** the folder in the prompt: `skill-eval-sandboxes` means the stub, never GitHub. Misses labelled [ENVIRONMENT](#miss-labels) are the auto-mode classifier refusing sandbox commands, not skill failures.
 > ## Phase 4 — manual natural-language evals
 > **Tests** what only a person can see: the Step 0 picker rendering, the announcement landing where a human reads it, the `/ship` → `/pr` → `/commit` cascade announcing each hop once.
 > **Size** 6 runs · ~30 min · you type every prompt. **I do** set up a throwaway worktree, hand you each prompt, verify each run from its transcript, tear down, post the attestation. **You do** type the prompts in a fresh terminal, never the IDE panel; say "done" after each.
@@ -422,6 +422,31 @@ When you write a red control, mutate the *workspace copy* and pick an assertion 
 mutation must break. If an assertion still passes against a mutant that genuinely broke the
 behavior, that assertion is vacuous — fix the assertion, not the drill. Full write-ups and the
 grading context: [`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) §11.
+
+### Miss labels
+
+Every failed expectation in an execution batch gets exactly one of three labels. The grader
+writes it in the expectation's evidence. The batch report shows it per eval and in the totals.
+
+- **ENVIRONMENT.** The expectation failed only because the session's permission layer or the
+  auto-mode classifier refused a sandbox command. The transcript shows the refusal, and the
+  grader cites that line. A failure that follows directly from the refused command counts too.
+  So does an expectation marked unreachable-unattended after an INTERCEPTED merge hold.
+- **KNOWN-DEFECT.** The expectation fails because of a defect already recorded in the eval text
+  or the fixture. The grader cites the ticket and the item number. A defect that is not on a
+  ticket yet is not known: label it REAL-MISS.
+- **REAL-MISS.** Everything else: skill behaviour, executor behaviour or the harness. The grader
+  says which.
+
+The grader still grades every expectation as written. A label explains a FAIL. It never turns a
+FAIL into a PASS. A clean batch has zero REAL-MISS.
+
+The batch report shows two pass rates. The raw rate is the one `benchmark.json` records. The
+second rate leaves ENVIRONMENT expectations out of both the passed count and the total.
+`benchmark.json` stays raw because the vendored aggregator computes it, and that file is not
+ours to change. Labels live in the batch report, not in `observables.json`, which only routing
+runs write. A grader's finding about the eval text goes on the ticket as a list item. It never
+goes into the same PR. (#597, option (b), 2026-09-24.)
 
 ### The merge-discrimination rule (`gh pr merge`-adjacent assertions)
 
