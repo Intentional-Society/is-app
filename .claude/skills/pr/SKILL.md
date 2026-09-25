@@ -107,9 +107,9 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
     Reviewers? Reply with names, logins, numbers, "all", or blank:
       [1] AlexisChen99    (AlexisChen)
       [2] benjifriedman   (Benji Friedman)
-      [3] Ceantaur        (Sean)
-      [4] james-baker     (James Baker)
-      [5] oolu4236        (OLA)
+      [3] james-baker     (James Baker)
+      [4] oolu4236        (OLA)
+      [5] Ceantaur        (Sean)
     ```
 
     **Accept the human's reply** in any of these shapes and resolve to a list of GitHub logins:
