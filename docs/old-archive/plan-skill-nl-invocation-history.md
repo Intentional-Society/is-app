@@ -10,6 +10,8 @@
 > that has ended. Headings and cross-references ("below", "see PR3 Design", "Everything below the
 > Landed divider") were left as written; the sections they name may now be in the binding file.
 > `git log -- docs/plan-skill-nl-invocation.md` holds the full history before the split.
+> Where a line below calls itself live policy, or tells you to run, switch, restore or commit
+> something, this banner overrides it: do not act on it.
 
 > **Status: SHIPPED.** PR1/PR2 merged under #353; **PR3** — the announcement + affirmation‑routing
 > follow‑on — shipped as **PR #484 on 2026‑07‑02**. Everything described here is live policy, not a

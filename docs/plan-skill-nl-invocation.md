@@ -1,6 +1,6 @@
 # Plan: Natural-Language Invocation for /commit /pr /ship
 
-> **How to use this doc.** Everything here is live policy: PR1, PR2 and PR3 (#484, 2026-07-02) have all shipped. Other files cite these sections by title and item number, so keep both stable: Shared mechanism facts, Design (two-tier), PR3 Design, Verification (PR3), PR1/PR2 acceptance checklist, Key constraints, Decision log.
+> **How to use this doc.** Everything here is live policy: PR1, PR2 and PR3 (#484, 2026-07-02) have all shipped. Other files link here by path; the routing eval text (`routing-plan.mjs`) names two sections by title and item number, and the `/commit` and `/pr` skills send Step 0 editors to Verification (PR3) below. Keep these titles and item numbers stable: Shared mechanism facts, Design (two-tier), PR3 Design, Verification (PR3), PR1/PR2 acceptance checklist, Key constraints, Decision log.
 > The build history (pick-up guide, scope, cold verification, PR3 evals, what PR1/PR2 shipped, replay scenarios, preflight) is archived, marked do-not-follow, in [`old-archive/plan-skill-nl-invocation-history.md`](old-archive/plan-skill-nl-invocation-history.md) (split at commit `23ace81`, #609); a "below" or "see Findings" here that no longer resolves points there.
 
 ## Status at a glance
@@ -13,7 +13,7 @@
 
 **Tracking:** #353 (`Closes`‑ed by PR1+PR2). **PR3 is a follow‑on** — no issue filed; motivated by the
 #459 commit incident. It merged as **PR #484 on 2026‑07‑02**; its branch
-(`skill-nl-announce-affirmation`) no longer exists. The cold verification (below) added Finding 1 +
+(`skill-nl-announce-affirmation`) no longer exists. A cold verification run (Decision log, Thread 16, 2026‑06‑29) added Finding 1 and
 Finding 2, both resolved before merge.
 
 ## Shared mechanism facts (apply to every phase — don't re‑litigate without re‑checking the docs)
@@ -26,8 +26,8 @@ Finding 2, both resolved before merge.
    announcement placement — see PR3 Design.)*
 2. **Permission rules evaluate deny → ask → allow across ALL settings scopes and modes** (incl.
    `bypassPermissions`). A checked‑in `ask` rule can't be weakened locally — why PR2's `gh pr merge`
-   `ask` is an un‑weakenable merge guard *in default mode* (caveat: `auto` mode auto‑approves, and a
-   prior "don't ask again" silences it for the session — see Decision log, Thread 15).
+   `ask` is an un‑weakenable merge guard in every permission mode, `auto` included (verified
+   2026‑09‑23/24, #599; the 2026‑06‑26 `auto` caveat in Decision log, Thread 15 no longer holds).
 3. **Removing `disable-model-invocation` puts the Skill's `description` into every session's context**
    — a permanent token cost and the NL‑matching surface. *(PR3 uses the description as the
    announcement's primary home — see PR3 Design.)*
@@ -53,7 +53,7 @@ contributors opt out; `/ship` is held to a stricter, harness‑enforced standard
 ### Affirmation routing
 The CLAUDE.md "AI Skills" rule + both SKILL.md "Invocation paths" state that a bare affirmation of the
 assistant's own commit/PR offer is the trigger → route via the `Skill` tool. Scoped by the
-over‑trigger clause (next). Shipped in `ba9dc59`; verified 5/5 in the cold run (see Findings).
+over‑trigger clause (next). Shipped in `ba9dc59`; verified 5/5 in the cold run (see Decision log, Thread 16).
 
 ### Announcement — value, placement, delegation, contract
 **Value (two real jobs).** (i) A prominent, transcript‑portable, model‑*stated* cue on direct NL;
@@ -77,12 +77,12 @@ the child — because the parent is at its reliable routing‑decision moment. T
 marker, **suppresses its own self‑announce** (the marker already means "your parent announced and
 confirmed you"). So the cascade reads exactly once per hop: `/ship` → "Using /pr" → "Using /commit".
 *(The marker now suppresses **both** the child's Step‑0 confirmation **and** its self‑announce —
-without this, parent‑narration + child‑self‑announce would double the line. This is a change from the
-shipped `ba9dc59` behavior, where the child self‑announces on delegation.)*
+without this, parent‑narration + child‑self‑announce would double the line. This replaced the earlier
+`ba9dc59` behavior, where the child self‑announced on delegation.)*
 
 **Contract.** Goal = **every NL run**. The badge is a deterministic backstop; a `PreToolUse` Skill‑tool
-hook is the hard‑guarantee escalation — **deferred** (build only if the post‑fix re‑verify still
-shows misses). Neither is a reason to drop the line.
+hook is the hard‑guarantee escalation — **deferred** (build only if a later run
+misses the announcement). Neither is a reason to drop the line.
 
 ### Over‑trigger scope
 The affirmation trigger fires only on the assistant's own *commit/PR* offer — a "yes" to an unrelated
@@ -91,12 +91,15 @@ does not fire the Skill. Clause in CLAUDE.md + both SKILL.md + spec §2 + strate
 
 ## Verification (PR3)
 
+**Owed before merging any change to Step 0, the announcement, the delegation marker or the opt‑out:**
+run scenarios A–G below, each passing its Pass column, and link the results on the PR.
+
 One prompt per **fresh session** (a model‑level guardrail can't be self‑verified by the agent that
 wrote it). Use the disposable fixture; **stop at Step 0** so nothing commits.
 
 **Fixture** — bespoke disposable file, never README (smaller blast radius; no `git restore`
 collateral; the throwaway branch contains even a stray commit; untracked‑but‑not‑gitignored so it
-shows as a payload). Rationale: `.scratch/note-throwaway-test-fixtures.md`.
+shows as a payload). Rationale: as stated in the parenthesis above; the longer note stayed local, outside the repo.
 
 ```
 git switch -c test/nl-checklist        # branch from the code under test
@@ -170,10 +173,10 @@ One prompt per fresh session; human reviewer re‑ran one before approving.
 
 **Thread‑14 `/ship` ask‑path proof — ✅ PASSED 2026‑06‑24.** 3 cold `/ship 433` runs against the real
 PR #433 merge: narration + `ask` fired every run; `ask` beat a local `Bash(gh pr merge *)` allow
-(Run 2); declines left #433 unmerged, approve merged it (commit `20361c4`). Evidence:
-`.scratch/ship-proof-results.md`.
+(Run 2); declines left #433 unmerged, approve merged it (commit `20361c4`). Evidence: the run
+notes stayed local, outside the repo; the outcome is recorded in the Decision log (Thread 14).
 
-## Deferred evals — owed to #396 Plan PR 2 (tracked, not yet built)
+## Deferred evals — were owed to #396 Plan PR 2 (#396 closed 2026‑07‑04; not built; no open ticket)
 
 Pre‑existing `/commit` guardrail coverage (not PR3 evals, not NL‑routing) deferred from #353 to #396's
 structural‑gate test, recorded so nothing is lost. **Refer to them by fixture** — PR3 reuses the
@@ -192,7 +195,7 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
 
 - **`PreToolUse` hook on the `Skill` tool** — deterministically emits the announcement / enforces
   Step 0 (~20‑line script in checked‑in settings, covers direct + delegated uniformly). **This is
-  PR3's deferred Finding‑1 escalation** — build only if the post‑fix re‑verify still shows misses.
+  PR3's deferred Finding‑1 escalation** — build only if a later run misses the announcement.
 - **Triggering eval via vendored skill‑creator** (`run_eval.py` + `improve_description.py`) — tests
   descriptions against many NL phrasings for under/over‑triggering. Out of scope (unproven‑on‑Windows
   spike, tracked in #396).
@@ -262,5 +265,9 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
   narrated onward). **Decision: prompt‑level is sufficient — the `PreToolUse` hook stays deferred**
   (standing escalation if drift recurs). Lone blemish: one direct run prefaced `Using /commit` with a
   one‑sentence routing preamble (announce present + at the routing decision; accepted).
+- 2026‑09‑24 (#599/#600 — hub, merge‑gate correction) — the merge `ask` fires in **every** permission
+  mode, `auto` included: seven real merges and every sandbox merge prompted once on 2026‑09‑23/24, and
+  Claude Code's docs list `ask` rules among the actions no mode auto‑approves. Thread 15's `auto`
+  caveat (2026‑06‑26) is withdrawn; `ship/SKILL.md` step 12 was corrected in #600, shared fact 2 here in #609.
 - Prior context: PRs #304/#305 shipped the Skills; explicit‑only invocation was P0.4 from PR #133 —
   this is a deliberate, dated revision of it.
