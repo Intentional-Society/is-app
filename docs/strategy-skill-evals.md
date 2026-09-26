@@ -1,5 +1,7 @@
 # Strategy — Skill Evals
 
+_As of main @ 0347013 (2026-09-26): this doc was read and corrected against that commit (#610)._
+
 > Operational runbook for testing this repo's Claude Code Skills: the schema, the safety
 > rules, the exact commands, the runbooks. Every section is authoritative. Design rationale,
 > the module map, and the decision ledger live in
@@ -29,6 +31,10 @@ the one rule the stock workflow doesn't know about, and documents the thin addit
 (fixtures, a sandbox harness, this doc, a CI shape gate) that make *execution* safe for
 skills that mutate git/GitHub.
 
+Codes like C8, R2 and F-B are the design doc's constraint, risk and finding ids (its notation
+section, §0); Layer A, B and C are its three test layers (§2), and this doc's §5 and §8 cover A
+and C; phase numbers refer to the nine-phase program that built the harness (design doc §12).
+
 **The one rule, up front:** skill-eval prompts are never executed against the real repo —
 any skill, any origin. Execution happens only inside harness-built sandboxes. Everything
 else about a skill — reading it, editing its `SKILL.md`, writing or updating its evals,
@@ -50,7 +56,7 @@ repo's overlay adds at each one.
 | Step | Front door (stock skill-creator) | What our overlay adds | Where to look next |
 |---|---|---|---|
 | Intake / interview | Asks about goal, triggers, expected outputs | **Safety-triage question:** *does this skill mutate git or GitHub state?* Decides whether execution evals need a sandbox at all — a skill that only reads files or talks to non-GitHub APIs never touches the harness. | §7 (reusable patterns) |
-| Draft `SKILL.md` | Frontmatter + Invocation/Steps/Failure modes/Depends on body | Nothing — this step is 100% stock. If the skill is one of the three team skills (`/commit`/`/pr`/`/ship`), its contract is additionally checked by `tests/functional/skills/skill-contract.test.ts` on every CI run. | §5 |
+| Draft `SKILL.md` | Frontmatter + body (this repo's team skills also carry Invocation/Steps/Failure modes/Depends on, per the spec) | Nothing — this step is 100% stock. If the skill is one of the three team skills (`/commit`/`/pr`/`/ship`), its contract is additionally checked by `tests/functional/skills/skill-contract.test.ts` on every CI run. | §5 |
 | Write eval prompts | `evals/evals.json` inside the skill folder, upstream's own convention | **Schema:** for a mutating skill, each execution eval also needs `kind: execution`, a `fixture` name, a `human_script`, and an `expectations` list — the fields that make an eval *runnable* instead of just descriptive. | §3 |
 | Run with-skill vs baseline | Executor subagents, in parallel, graded against expectations | **For a mutating skill:** executors run inside `make-sandbox`-built sandboxes, never against this repo. For a non-mutating skill: no change — stock parallel baseline runs. | §4, §6 |
 | Review in the eval viewer | `generate_review.py` serves a browser page; human leaves feedback | Nothing — stock. The sandbox's transcript, gh call log, and git state are just more evidence the grader reads before writing `grading.json`. | §4 |
@@ -138,16 +144,16 @@ alongside the manifest — don't loosen the assertion to make it pass.
 
 **What this gate does NOT check:** eval *content* quality, whether an `expectations`
 entry is well-written, or whether a fixture profile actually exists for a referenced
-name (that's the harness selfcheck's fixture-completeness item). Human review of the
+name (that's the harness selfcheck's fixture-completeness item: `node scripts/skill-evals/selfcheck.mjs`, §6). Human review of the
 assertion lists is the graded truth — the checkpoint every phase of this program named
 explicitly.
 
 ### Adding a new eval
 
-Four files move in lockstep. The contract test catches two of the four — the eval object's shape
+Five files move in lockstep: the eval object, the fixture profile with its count comment, the contract test's id list, the manifest amendment, and the design doc's §4 roster and §4.2 count. The contract test catches two of the five — the eval object's shape
 and the pinned id set. It does **not** catch a missing manifest amendment, and it does not catch a
 missing fixture profile (it only checks that `fixture` is non-empty); fixture completeness is the
-harness selfcheck's job, so run it.
+harness selfcheck's job, so run it (`node scripts/skill-evals/selfcheck.mjs`, §6).
 
 1. **The eval object** — `.claude/skills/<skill>/evals/evals.json`, per the schema above.
 2. **The fixture profile** (execution evals only) — `scripts/skill-evals/lib/fixtures.mjs`, plus
@@ -160,6 +166,7 @@ harness selfcheck's job, so run it.
    net-new eval cannot fill, so a net-new eval is recorded as a new dated amendment section at
    the end, listing the files updated in lockstep and the new totals. The worked precedent in
    that file is the Phase-7 right-sizing amendment that removed `ship-2c`.
+5. **The design doc's §4 roster and §4.2 count** — [`design-skill-evals-harness.md`](design-skill-evals-harness.md).
 
 **Ids** are short, stable strings, scoped per skill (`commit-2`, `ship-2a`). Suffixed ids came from
 splitting one original eval. No rule fixes what a new id must be: read the ids already in use in
@@ -194,10 +201,10 @@ marker-bearing sandbox. In the real repo, every approval checkpoint always comes
 actual human — a `human_script` string is never a substitute for one outside a sandbox.
 
 **Honest limit (constraint C8):** these layers are prompt-level guidance, not hard enforcement.
-The gates that fire regardless of what any agent does are the checked-in `ask` permission
-rule on `gh pr merge` and the skills' own human-approval checkpoints (which stall rather
-than push forward when no real human answers). The backstop stack — the marker rule,
-the structural sandbox isolation, those hard gates, the CI shape gate, and plain git
+The only gate that fires regardless of what any agent does is the checked-in `ask` permission
+rule on `gh pr merge`. The skills' own human-approval checkpoints are prompt-level too: an agent
+holding a `human_script` can answer them from the script. The backstop stack — the marker rule,
+the structural sandbox isolation, that hard gate, the CI shape gate, and plain git
 recoverability — means a missed layer degrades to "recoverable and loud," never "silent
 damage." Full backstop-stack detail: [`design-skill-evals-harness.md`](design-skill-evals-harness.md) §5 (risk R3 in §9).
 
@@ -220,8 +227,8 @@ validator predates it and carries a strict key allowlist that doesn't know about
 divergence is accepted and permanent until upstream's validator catches up.
 
 **Why `skill-contract.test.ts` is the real gate:** it's this repo's own deterministic
-Vitest check, encodes the same structural rules `quick_validate.py` would (frontmatter
-present, section order, invocation-policy correctness) *plus* the eval-artifact shape from
+Vitest check, encodes frontmatter checks like `quick_validate.py`'s, plus section order and
+invocation policy, which `quick_validate.py` does not check, *plus* the eval-artifact shape from
 §3, and it doesn't choke on `disable-model-invocation`. It's what CI actually runs and
 what `/commit`'s local `npm test` gate actually checks.
 
@@ -233,11 +240,11 @@ check `skill-contract.test.ts` instead.
 
 **The rule:** when you change a skill **or its evals** (or refresh the vendored copy), you run the
 whole test suite. There is only one way to run the tests — the full batch — and the PR
-checklist shows whether you did it. No lighter per-skill variant exists in any doc or
+checklist shows whether you did it. Terms: the **full pass** is all four phases below; the **execution batch** is phase 3 alone, the part that runs execution evals in sandboxes. No lighter per-skill variant exists in any doc or
 template. Runs are human-triggered (a person, or their session's agent) — **never CI**. What CI runs
-automatically is the deterministic pair: the contract test (§3) and
+automatically is the three skill test files: the contract test (§3),
 `tests/functional/skills/routing-harness.test.ts`, which unit-tests the routing harness's pure
-functions. Neither executes an eval. A deliberate skip of the batch is an unchecked PR-template
+functions, and `tests/functional/skills/gh-stub.test.ts`. None executes an eval. A deliberate skip of the batch is an unchecked PR-template
 box with a stated reason, visible to reviewers.
 
 **What "change a skill" covers** is set by the PR-template box, which is the thing reviewers
@@ -264,31 +271,31 @@ and at the end `# Full pass done — <headline>`. Filled example, numbers from t
 2026-09-23/24 pass (refresh them from the previous run's record):
 
 > # Skill-eval test run briefing — full pass (`DATE`, main @ `SHA`)
-> This run re-tests the team's Claude Code skills (`/commit`, `/pr`, `/ship`) after `THE CHANGE`: four phases, about `N` hours. Three phases need nothing from you; phase 3 needs three approvals.
+> This run re-tests the team's Claude Code skills (`/commit`, `/pr`, `/ship`) after `THE CHANGE`: four phases, about `N` hours. Phases 1 and 2 need nothing from you; phase 3 needs approvals; phase 4 needs you to type six prompts.
 > ## Phase 1 — selfcheck
 > **Tests** the test rig, not the skills: builds a throwaway sandbox and proves the gh stub denies by default, credentials are scrubbed, the real repo is untouched.
-> **Size** 23 checks · ~2 min · no prompts. **I do** run it, read the 23 rows, stop the run if any row is red. **You do** nothing.
+> **Size** 24 checks · ~2 min · no prompts. **I do** run it, read the 24 rows, stop the run if any row is red. **You do** nothing.
 > ## Phase 2 — routing runner
 > **Tests** whether the model picks the right skill from plain language: fires on "commit this", stays quiet on "does this follow Conventional Commits?", announces `Using /commit`, respects Step 0. Headless, no GitHub.
 > **Size** 11 queries × 3 reps = 33 runs · last time 77 min · no prompts. **I do** launch it headless, summarize the trigger-rate table, name every VOID run. **You do** nothing.
 > **Watch for** VOID runs: the grader answered without opening a file; excluded from the mean by design, not failures.
 > ## Phase 3 — execution batch
 > **Tests** whether each skill follows its procedure end to end: `/commit`, `/pr`, `/ship` run real scenarios inside sandboxes against the gh stub, graded against written expectations.
-> **Size** 17 evals · last time ~45 min of work · **3 prompts**. **I do** run executors and graders in sandboxes, archive each run, prove zero mutation, write the report.
-> **You do** approve three `gh pr merge` prompts, one each for ship-1, ship-3, ship-6, once each; the first arrives ~15 min after launch and the batch waits until you do. I push a notice when one is waiting.
+> **Size** 19 evals · last time ~45 min of work · **4 prompts**. **I do** run executors and graders in sandboxes, archive each run, prove zero mutation, write the report.
+> **You do** approve four `gh pr merge` prompts, one each for ship-1, ship-3, ship-6, ship-8, once each; the first arrives ~15 min after launch and the batch waits until you do. I push a notice when one is waiting.
 > **Watch for** the folder in the prompt: `skill-eval-sandboxes` means the stub, never GitHub. Misses labelled [ENVIRONMENT](#miss-labels) are the auto-mode classifier refusing sandbox commands, not skill failures.
 > ## Phase 4 — manual natural-language evals
 > **Tests** what only a person can see: the Step 0 picker rendering, the announcement landing where a human reads it, the `/ship` → `/pr` → `/commit` cascade announcing each hop once.
 > **Size** 6 runs · ~30 min · you type every prompt. **I do** set up a throwaway worktree, hand you each prompt, verify each run from its transcript, tear down, post the attestation. **You do** type the prompts in a fresh terminal, never the IDE panel; say "done" after each.
 > **Watch for** skipped-with-reason is a valid outcome when no invocation surface changed.
 
-**Changing a routing assertion.** Use this when a routing eval looks flaky or an assertion needs rewording. It is a text-only change: `expectations` / `notes` in the skill's `evals.json`, and `expectationsOverride` / `graderHint` in `scripts/skill-evals/routing/routing-plan.mjs`.
+**Changing a routing assertion.** Use this when a routing eval looks flaky or an assertion needs rewording. For a flaky execution eval, follow §11's pointer to the design doc §6 instead. It is a text-only change: `expectations` / `notes` in the skill's `evals.json`, and `expectationsOverride` / `graderHint` in `scripts/skill-evals/routing/routing-plan.mjs`.
 
 1. **Read the failing grading's `evidence` text before blaming the wording.** If the reasoning reaches PASS while `passed` is false, or the `summary` block contradicts the per-expectation verdicts, it is a grader output defect, not an assertion problem — record it (FF-4) and stop.
-2. **Presume the test, not the skill.** If `observables.json` is the same across runs but the verdicts differ, the assertion or its hint is the problem; if the observables differ, the model's behaviour varies and you are looking at a rate, not a bug.
+2. **Presume the test, not the skill.** If `observables.json` (the per-run file of extracted facts the grader reads) is the same across runs but the verdicts differ, the assertion or its hint is the problem; if the observables differ, the model's behaviour varies and you are looking at a rate, not a bug.
 3. **Diagnose on one seed and one text.** Never pool runs across seed shapes (`input.jsonl` turn count) or across versions of the assertion text. Three runs cannot distinguish one-in-three from noise, so treat anything under **six** runs of the same seed and text as an indication, not a rate.
 4. **Keep an assertion only if it checks function** — the skill follows its procedure, lands, catches an error or refuses what it must, invokes another skill when it should, or keeps the human informed — and only if a run can observe it. What no run can show moves to the eval's `notes` as a manual-only line; it does not stay in `expectations`, where it can only fail.
-5. **Re-grade before you re-run.** Re-grade the archived runs for that query against the new text (copies outside the repo; stock grader, three times). There is no CLI for this — `runGrader` is exported from `routing/lib/driver.mjs` and the re-grade is a short hand-rolled script over an existing `runDir`. Known-FAIL runs that should now pass must flip, known-PASS runs must stay, and a real failure must stay failed. A null or unparseable grade is a failure. A re-grade runs against a **dead** sandbox, so any clause a live grader could only check by shelling into `repoDir` is recorded "unverifiable in re-grade", never FAIL. If no archived run fails the assertion, record "discrimination unproven".
+5. **Re-grade before you re-run.** Re-grade the archived runs for that query (under `.claude/skills/routing-evals-workspace/<stamp>`) against the new text (copies outside the repo; stock grader, three times). There is no CLI today; #608 PR B delivers one. `runGrader` is exported from `routing/lib/driver.mjs` and the re-grade is a short hand-rolled script over an existing `runDir`. Known-FAIL runs that should now pass must flip, known-PASS runs must stay, and a real failure must stay failed. A null or unparseable grade is a failure. A re-grade runs against a **dead** sandbox, so any clause a live grader could only check by shelling into `repoDir` is recorded "unverifiable in re-grade", never FAIL. If no archived run fails the assertion, record "discrimination unproven".
 6. **Then run only what changed:** `node scripts/skill-evals/routing/run-routing-evals.mjs --only <query ids> --reps 3` — from Git Bash or PowerShell (the PowerShell launch was fixed in #582 and verified end to end on 2026-09-23 (#586)). Record the result as a **confirmation sample (n=3)** — counts, not rates; promote it to a rate only after six runs on unchanged text. Archive it, and confirm the sandbox root is empty afterwards (`teardown-sandbox.mjs --all` if anything survived; the runner already tears each sandbox down in its own `finally`).
 7. **Record** the old→new index map (grading matches assertions by position) and the measured counts in `docs/spec-skill-evals-manifest.md`, as a new series when the assertion set changed shape. Counts are recorded, never gated.
 8. **Stop after one iteration.** If the numbers did not move, or you are on a third round for the same case, stop and take it to the maintainer with a three-line note: what fails, how much it matters, keep-grinding vs. redesign.
@@ -302,7 +309,7 @@ above — only the full batch is.
 **The batch prompt** — [`scripts/skill-evals/prompts/batch-prompt.md`](../scripts/skill-evals/prompts/batch-prompt.md),
 committed alongside the [executor-prompt template](../scripts/skill-evals/prompts/executor-prompt.md):
 the single documented regression operation — "run the full skill eval suite" — runs every
-`kind: execution` eval across all three skills, one sandbox per eval, executor pairs in
+`kind: execution` eval across all three skills (`/handoff`'s ten execution evals are governed by the same rules but the batch prompt runs only `/commit`, `/pr` and `/ship` today; #507 tracks that question), one sandbox per eval, executor pairs in
 parallel batches, graded, aggregated per skill, and reported as one combined summary plus
 viewer link. This is the *only* documented way to regression-test a skill change; there is
 no lighter alternative.
@@ -321,7 +328,7 @@ evidence and grades independently, which adds a small, expected amount of overhe
 that baseline.
 
 **Pass rate has no numeric threshold, by design.** The gate stays exactly what it has always
-been: every Must-level assertion passes, or a human explicitly dispositions the failure — no
+been: every assertion the eval requires passes, or a human explicitly dispositions the failure — no
 softer "95% is fine" bar sits alongside it. A numeric pass-rate floor would let a fixed slice
 of real regressions through unexamined, which defeats the point of a regression suite.
 
@@ -376,9 +383,9 @@ that directory, so run them from there (`npm run make-sandbox -- --fixture <name
 from the repo root, which always works. `archive-evidence.mjs` and the routing runner have no
 alias; call them with `node`.
 
-Node ≥ 20 is the only prerequisite for the harness itself (enforced at runtime). Python 3 +
-PyYAML + a logged-in `claude` CLI are needed **only** for Layer C (§8) — never for the
-execution batch. Sandboxes are created under the OS temp dir (override with
+Node ≥ 20 (enforced at runtime), git and a POSIX shell (Git Bash on Windows; selfcheck fails otherwise) are the prerequisites for the harness itself. Python 3 +
+PyYAML + a logged-in `claude` CLI are needed for Layer C (§8), and Python 3 for the batch's vendored aggregation and viewer scripts
+(`aggregate_benchmark.py`, `generate_review.py`). Sandboxes are created under the OS temp dir (override with
 `SKILL_EVAL_SANDBOX_ROOT` or `--root`), and `make-sandbox` refuses any root inside the real
 repo, so you can never build one over your own checkout. Harness-internals reference:
 [`scripts/skill-evals/README.md`](../scripts/skill-evals/README.md).
@@ -416,7 +423,7 @@ The three on record:
 |---|---|---|---|---|
 | `/commit` | suspicious-file blocker narrowed to `.suspicioustestmarker` only, disabling the real `.env*` rule | `commit-2` (`feature-dirty-with-env-local`) | names `.env.local` before any staging; no `git add` stages `.env.local` | **RED.** Both failed; `git diff --cached --name-status` confirmed `.env.local` staged |
 | `/pr` | step 10 (comment-on-push when an open PR exists) replaced with an unconditional no-op | `pr-1` (`feature-open-pr-two-new-commits`) | the call log shows exactly one PR-conversation comment | **RED.** Log held three entries — `auth status`, `pr list`, `pr view` — and no `pr comment` |
-| `/ship` | step 8 merges immediately on required-green, skipping the 5-minute advisory wait and the wait/troubleshoot/abort menu | advisory-pending scenario (`feature-open-pr-advisory-pending`) | enters the wait at step 8 and waits 5 minutes | **RED on the transcript/timing leg** — the merge was attempted with zero delay. The *log-only* "no `gh pr merge`" assertion still **passed**: the Claude Code permission layer intercepted the merge above the stub, so nothing was logged — a false PASS on a knowingly broken skill. In that run the intervening layer was the session's own auto-mode permission classifier (in auto mode the `ask` rule is auto-approved); in default mode the `ask` rule prompts instead. Either way the log goes blind, which is the first-hand evidence for the merge-discrimination rule below |
+| `/ship` | step 8 merges immediately on required-green, skipping the 5-minute advisory wait and the wait/troubleshoot/abort menu | advisory-pending scenario (`feature-open-pr-advisory-pending`) | enters the wait at step 8 and waits 5 minutes | **RED on the transcript/timing leg** — the merge was attempted with zero delay. The *log-only* "no `gh pr merge`" assertion still **passed**: the Claude Code permission layer intercepted the merge above the stub, so nothing was logged — a false PASS on a knowingly broken skill. The run's record attributes the stop to the session's auto-mode permission classifier (design doc §11). Either way the log goes blind, which is the first-hand evidence for the merge-discrimination rule below |
 
 When you write a red control, mutate the *workspace copy* and pick an assertion that the
 mutation must break. If an assertion still passes against a mutant that genuinely broke the
@@ -441,7 +448,7 @@ writes it in the expectation's evidence. The batch report shows it per eval and 
 The grader still grades every expectation as written. A label explains a FAIL. It never turns a
 FAIL into a PASS. A clean batch has zero REAL-MISS.
 
-The batch report shows two pass rates. The raw rate is the one `benchmark.json` records. The
+The batch report shows two pass rates. The raw rate is the one `benchmark.json` (the batch's machine-readable totals) records. The
 second rate leaves ENVIRONMENT expectations out of both the passed count and the total.
 `benchmark.json` stays raw because the vendored aggregator computes it, and that file is not
 ours to change. Labels live in the batch report, not in `observables.json`, which only routing
@@ -472,7 +479,7 @@ through, so it is the authoritative signal for whether the skill *attempted* the
 Corroborate it, where the environment let the call reach the stub, with a `pr merge` entry
 in `gh-calls.log` and/or a merge record in `gh-stub-state.json`. **Never PASS a
 merge-negative on the log alone — empty or not**: a log with entries but no `pr merge` shows
-only that the stub was reachable, not that no merge was attempted. This is the same discipline the liveness rule
+only that the stub was reachable, not that no merge was attempted. This is the same discipline the liveness rule (a negative from the log counts only when the log is non-empty)
 applies to negative assertions, extended to cover interception *upstream of the stub*, not
 just a PATH misroute. (The permanent close would be sandbox-scoped merge instrumentation the
 `ask` rule can't preempt; until then, the transcript is the load-bearing leg — the ship
@@ -482,9 +489,10 @@ merge expectations spell this out inline.)
 - The ban covers merges only, because `gh pr merge` is the only command with a checked-in gate above the stub (#531 has not yet established the sandbox's real permission posture); if another command is ever gated, it joins the ban. For any other `gh` negative, a non-empty log without the call is still usable evidence, as long as the transcript does not show the call attempted.
 
 The grader's own instruction block (the "HEADLESS-OBSERVABILITY ADAPTATION" text in
-`scripts/skill-evals/routing/lib/driver.mjs`) still tells graders the older log-based rule until
-the FF-4 harness fix lands; until then this section and that instruction disagree, and this
-section is the rule of record.
+`scripts/skill-evals/routing/lib/driver.mjs`) still tells graders to assert a merge-negative from
+`gh-calls.log`; #612 removed only its liveness clause, and rewording the rest is a grading change
+that needs a batch (#608, Won't). This section and that instruction disagree, and this section is
+the rule of record.
 
 **`ship-4` was the one acknowledged exception; as of 2026-09 it is not.** As a routing eval it runs
 headless, and it used to assert the observable instead (no `pr merge` in `gh-calls.log`, trusted
@@ -519,10 +527,8 @@ Two **headless-observability adaptations** the runner's grader applies (a headle
 — "Step 0 fires via AskUserQuestion" is graded by its **observable proxy** (announcement +
 gate-recognition + no silent irreversible side effect); (2) the `gh pr merge` `ask` rule
 can't prompt headless (risk R8) — for any "merge is gated" expectation the grader asserts the
-**observable** (no `pr merge` in `gh-calls.log`, trusted only when the log is non-empty —
-liveness). This guards against a PATH misroute only, not against interception above the stub;
-since 2026-09 no routing expectation relies on it (removing it from the driver is tracked under
-FF-4 on #507) — until then, a new "merge is gated" expectation would still be graded that way, so
+**observable** (no `pr merge` in `gh-calls.log`). This guards against neither a PATH misroute nor interception above the stub;
+since 2026-09 no routing expectation relies on it (rewording it is a grading change that needs a batch; #608 lists it as a Won't) — a new "merge is gated" expectation would still be graded that way, so
 word new merge assertions as transcript-graded, as `ship-4`'s is. The driver applies (2) generically, to whatever expectation it is handed; `ship-4`'s
 ask-prompt check no longer relies on it (parked in that eval's `notes` as manual-only — see above).
 
@@ -585,8 +591,8 @@ manual runs — same session, same "does this read right to a human watching it"
 picks `wait+5`, waits another 5, then aborts). Schedule it in the first parallel wave so
 its wait overlaps the rest of the batch rather than adding serially to the total run time.
 
-**What you will be asked to approve.** A full execution batch asks a human to approve three
-commands, one each for `ship-1`, `ship-3` and `ship-6`: a `gh pr merge` whose working
+**What you will be asked to approve.** A full execution batch asks a human to approve four
+commands, one each for `ship-1`, `ship-3`, `ship-6` and `ship-8`: a `gh pr merge` whose working
 directory is a folder under `skill-eval-sandboxes`. That folder means the command hits the gh
 stub, never GitHub — approve each once. The `ask` rule waits for that click in every
 permission mode, `auto` included (Claude Code's docs list `ask` rules among the actions no
@@ -715,7 +721,7 @@ that **can't run on native Windows** — `run_eval.py` calls `select.select()` o
 subprocess pipe, which raises `OSError [WinError 10093]` on Windows (constraint C2, re-verified
 2026-07-19). Layer C never touches `gh`, so the cloud-no-`gh` gap does not apply.
 
-**Scope:** only `/commit` and `/pr` — the two natural-language-invocable skills. `/ship` is
+**Scope:** only `/commit` and `/pr` — the two NL-invocable skills that have trigger-eval sets (`/handoff` is NL-invocable too). `/ship` is
 explicit-only (`disable-model-invocation: true`), so description optimization does not apply
 to it; its should-NOT-trigger behavior is covered by routing evals ship-4 / ship-5.
 
@@ -858,8 +864,8 @@ an un-cleaned smoke is a loose end someone must close, not something to leave si
   folder delete-and-recreate loses that skill's evals (risk R2). Git recovers
   either way, but editing in place avoids the churn.
 - **The vendored `.claude/skills/skill-creator/` directory is 100% stock.** Never
-  hand-edit it. Refresh via the monthly drift workflow (`node
-  scripts/update-skill-creator.mjs --check`) — see `docs/doc-skill-creator.md`.
+  hand-edit it. The monthly drift workflow runs `--check` and opens one tracking issue when upstream has moved ahead; refresh with
+  `node scripts/update-skill-creator.mjs` — see `docs/doc-skill-creator.md`.
 - **Run artifacts are gitignored, not committed.** Eval workspaces live under
   `.claude/skills/<name>-workspace/` (upstream's own default location) and are covered by
   the repo's `.gitignore`. Nothing about a normal eval run should ever show up in `git
@@ -867,10 +873,11 @@ an un-cleaned smoke is a loose end someone must close, not something to leave si
 - **An eval looks flaky?** Follow
   [`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) §6, "Assertion-design
   rules": presume the test before the skill, sort the variance by locus (grader / headless
-  environment / harness / tested agent), and stop after the third round or the first fix that
-  does not move the rate. The measured per-query counts you are comparing against are in that
-  doc's §11, which is where a new measurement gets recorded. What a routing-only change owes, and
-  how many repetitions settle it, are not decided — see §6 above.
+  environment / harness / tested agent). For a routing assertion, stop per this doc's §6 step 8:
+  after one iteration, or on a third round for the same case; the measured counts are recorded in
+  `docs/spec-skill-evals-manifest.md` as a series (§6 step 7), and design doc §11 keeps the
+  summary; what a routing-only change owes (§6 step 9) and how many runs settle a rate (§6 step
+  3, six) are decided there. For an execution eval, the design doc's own stop rule applies.
 - **Where decisions live vs. where state lives:** design decisions and their rationale are the
   ledger in [`docs/design-skill-evals-harness.md`](design-skill-evals-harness.md) §9 — add
   there, not as a dated aside in this doc. Live state (what is open, what is blocked) lives on
