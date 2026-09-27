@@ -16,15 +16,15 @@ Anyone, human or AI agent, who is new to this repo's Claude Code skills. A **ski
 
 Every skill task, new or existing, starts by invoking `/skill-creator`, the repo's front door for creating, changing and testing a skill ([Strategy doc section 2, "Lifecycle map"](strategy-skill-evals.md#2-lifecycle-map)). The steps, in section 2's order:
 
-1. Intake. `/skill-creator` asks what the skill is for. In this repo it also asks the safety-triage question: does the skill change git or GitHub state? A skill that does needs execution evals run in sandboxes; one that does not needs only routing evals.
+1. Intake. `/skill-creator` asks what the skill is for. In this repo you also answer the safety-triage question: does the skill change git or GitHub state? A skill that does needs execution evals run in sandboxes; one that does not runs its execution evals stock, without a sandbox.
 2. Draft `SKILL.md`, the skill's written procedure.
-3. Write its evals in `evals/evals.json`: routing evals for every skill, and execution evals with a **fixture** (a named starting state) for a skill that changes git or GitHub state ([Strategy doc section 3, "Adding a new eval"](strategy-skill-evals.md#adding-a-new-eval)).
+3. Write its evals in `evals/evals.json`: routing evals for a skill that should fire from plain words, and execution evals with a **fixture** (a named starting state) for a skill that changes git or GitHub state ([Strategy doc section 3, "Adding a new eval"](strategy-skill-evals.md#adding-a-new-eval)).
 4. Run the evals twice, with the skill and without it (the baseline), execution evals inside sandboxes. The **grader**, a separate AI agent, scores both runs ([Running the evals](#running-the-evals), below).
 5. Review the results. A REAL-MISS is a bug in the skill, the eval or the harness ([How to read a result](#how-to-read-a-result), below).
 6. Tune the skill's **description**, the sentence Claude Code reads to decide when the skill applies, until the right skill fires from plain words ([Strategy doc section 8, "Platform routing"](strategy-skill-evals.md#8-platform-routing-layer-c)).
 7. Ship through `/commit` and `/pr`, with a maintainer's sign-off on the `SKILL.md` and on the evals' expectations ([Who may change eval or skill text](#who-may-change-eval-or-skill-text), below).
 
-Afterwards, any change to a skill's `SKILL.md` or to one of its evals means a full pass before the pull request (the testing rule above; [Strategy doc section 8, "Landing a description change"](strategy-skill-evals.md#landing-a-description-change); [section 11, "Maintenance rules"](strategy-skill-evals.md#11-maintenance-rules)). Worked examples for a new skill, a changed skill and a teammate arriving cold: [Design doc, Scenario A](design-skill-evals-harness.md#scenario-a--create-a-brand-new-skill), [Scenario B](design-skill-evals-harness.md#scenario-b--update-an-existing-skill-and-re-run-its-evals), [Scenario C](design-skill-evals-harness.md#scenario-c--a-teammate-verifies-a-skill-by-natural-language).
+Afterwards, any change to a skill's `SKILL.md` or to one of its evals means a full pass before the pull request, unless it touches only routing evals (the testing rule above; [Strategy doc section 8, "Landing a description change"](strategy-skill-evals.md#landing-a-description-change); [section 11, "Maintenance rules"](strategy-skill-evals.md#11-maintenance-rules)). Worked examples for a new skill, a changed skill and a teammate arriving cold: [Design doc, Scenario A](design-skill-evals-harness.md#scenario-a--create-a-brand-new-skill), [Scenario B](design-skill-evals-harness.md#scenario-b--update-an-existing-skill-and-re-run-its-evals), [Scenario C](design-skill-evals-harness.md#scenario-c--a-teammate-verifies-a-skill-by-natural-language).
 
 ## Who may change eval or skill text
 
@@ -43,20 +43,20 @@ Anyone may propose a change in a pull request. A change to a skill's `SKILL.md` 
 
 ## Running the evals
 
-There are two kinds of runs. While you build a skill (step 4 above), you run one eval at a time by hand; that is for authoring only. Before a pull request that changes a skill or its evals, a person starts a **full pass**; that is the testing rule above. A full pass has four phases, each described in [Strategy doc section 6](strategy-skill-evals.md#6-running-evals--the-one-testing-rule): the **selfcheck**, which proves the sandbox rig is safe; the **routing runner**, which checks that plain words fire the right skill; the **execution batch**, which runs every execution eval of every skill, each in its own sandbox, and is the only phase that raises approval prompts; and the **manual natural-language evals**, which a person types.
+There are two kinds of runs. While you build a skill (step 4 above), you run one eval at a time by hand; that is for authoring only. Before a pull request that changes a skill or its evals, a person starts a **full pass**; that is the testing rule above. A full pass has four phases, each described in [Strategy doc section 6](strategy-skill-evals.md#6-running-evals--the-one-testing-rule): the **selfcheck**, which proves the sandbox rig is safe; the **routing runner**, which checks that plain words fire the right skill; the **execution batch**, which runs every execution eval of `/commit`, `/pr` and `/ship`, each in its own sandbox, and is the only phase that raises approval prompts; and the **manual natural-language evals**, which a person types.
 
-An AI agent given the batch prompt usually drives the execution batch: [`scripts/skill-evals/prompts/batch-prompt.md`](../scripts/skill-evals/prompts/batch-prompt.md). The exact commands, for PowerShell and bash, are in [Strategy doc section 6, "Running it"](strategy-skill-evals.md#running-it--the-exact-commands-powershell-and-bash). The sandbox steps below apply to any execution-eval run, one eval while authoring or the whole batch. Steps 1 to 5 follow the strategy doc's order; step 6 is the repo's rule for local Docker containers, from CLAUDE.md:
+An AI agent given the batch prompt usually drives the execution batch: [`scripts/skill-evals/prompts/batch-prompt.md`](../scripts/skill-evals/prompts/batch-prompt.md). The exact commands, for PowerShell and bash, are in [Strategy doc section 6, "Running it"](strategy-skill-evals.md#running-it--the-exact-commands-powershell-and-bash). The sandbox steps below apply to any execution-eval run, one eval while authoring or the whole batch. Steps 1 to 5 follow the strategy doc's order; step 6 applies if you started the local database yourself (CLAUDE.md, Local Development):
 
 1. Build a sandbox from the eval's fixture (its named starting state), then activate it so `gh` points at the stub.
-2. Run the selfcheck, which proves the sandbox is safe to use.
+2. Run the selfcheck, which proves the sandbox rig is safe.
 3. Run the eval inside the sandbox.
-4. Archive the evidence: the stub's log of `gh` calls, the git state and the stub's state. The grader, a separate AI agent, scores the run from these files.
+4. Archive the evidence: the stub's log of `gh` calls, the git state and the stub's state. The grader, a separate AI agent, scores the run from these files and the executor's transcript.
 5. Tear the sandbox down.
 6. At the end, run `npm run dev:db:stop` to stop the local database containers, which otherwise keep running.
 
 ## What you will be asked to approve
 
-During a full execution batch a human is asked to approve sandbox `gh pr merge` prompts. They reach only the stub. The batch waits until someone approves them. See ["What you will be asked to approve"](strategy-skill-evals.md#what-you-will-be-asked-to-approve) and the run briefing example in [#599](https://github.com/Intentional-Society/is-app/issues/599).
+During a full execution batch a human is asked to approve sandbox `gh pr merge` prompts. They reach only the stub. The batch waits for an approval; after 30 minutes it marks that run INTERCEPTED and grades its merge from the transcript. See ["What you will be asked to approve"](strategy-skill-evals.md#what-you-will-be-asked-to-approve) and the run briefing example in [#599](https://github.com/Intentional-Society/is-app/issues/599).
 
 ## How to read a result
 
