@@ -1,0 +1,9 @@
+# Harvest 2026-09-27 (#618): scrubbed inputs for #619 and #608 PR B
+
+This folder lives on a DRAFT branch and is never merged as is. #619 (the harness PR) and #608 PR B take what they need from it, file by file, after review.
+
+- `rules/GRADER-RULES.md`, `rules/EXECUTOR-RULES.md`: the newest per-batch rules files, both from the #597 item-8 batch workspace (2026-09-24); the grader file's first line names that batch, the executor file's does not. `rules/grader-rules.full-vs-item8.diff`: the full diff against the full-run grader-rules copy: a changed title line (hunk `1c1`) and the 19-line batch-specific tail; the first candidate for #619's cut list.
+- `sample/transcript.md`, `sample/harness-tool-calls.txt`: one executor transcript (pr-6, with-skill, run-1) and the tool-call record extracted from it; the test sample for #619's producer script. The record's `SOURCE:` line keeps the path pattern of the Claude Code subagent transcript it was extracted from.
+- `archive/eval-commit-4-with_skill-run-1/`: one routing-run archive from the 2026-09-24 full pass (post-#583, so it carries the saved grader envelope); the fixture for #608 PR B's re-grade CLI.
+- `sources.json`: where each file came from on the maintainer's laptop (gitignored workspaces).
+- `scrub.py`: the scrub. `--from-source` re-copies every file in `sources.json` and scrubs it; `--check` verifies without writing and exits 1 on any leak. It stores no identity: the user name comes from the machine running it. It replaces home paths, the user name, every UUID, pipe ids and subagent ids with placeholders, blanks thinking signatures, and empties the personal environment lists (connectors, plugins, skills, tools, commands) and usage and cost figures at any depth in JSON and stream-json files while keeping their keys; `--check` also fails if any such list or figure is non-empty. Path shapes are kept.
