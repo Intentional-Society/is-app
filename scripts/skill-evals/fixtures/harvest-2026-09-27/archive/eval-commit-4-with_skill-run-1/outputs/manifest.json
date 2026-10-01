@@ -1,0 +1,31 @@
+{
+  "fixture": "feature-dirty-clean-payload",
+  "summary": "Dirty feature branch; a handful of profile-redirect edits; no .env, no generated artifacts.",
+  "branch": "fix-profile-redirect",
+  "dirty": true,
+  "sandboxDir": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy",
+  "repoDir": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\repo",
+  "originDir": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\origin.git",
+  "binDir": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\bin",
+  "ghConfigDir": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\gh-config",
+  "ghFixturePath": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\gh-fixture.json",
+  "ghCallLog": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\gh-calls.log",
+  "marker": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\repo\\.skill-eval-sandbox",
+  "env": {
+    "prependPath": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\bin",
+    "unset": [
+      "GH_TOKEN",
+      "GITHUB_TOKEN",
+      "GH_ENTERPRISE_TOKEN",
+      "GITHUB_ENTERPRISE_TOKEN"
+    ],
+    "set": {
+      "GH_CONFIG_DIR": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\gh-config"
+    }
+  },
+  "activate": {
+    "sh": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\activate.sh",
+    "ps1": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy\\activate.ps1"
+  },
+  "createdAt": "2026-09-24T05:28:46.717Z"
+}
