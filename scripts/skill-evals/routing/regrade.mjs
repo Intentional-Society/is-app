@@ -527,7 +527,8 @@ export function summarizeIndices(runs, expectations) {
 // Report
 // ---------------------------------------------------------------------------------------------
 
-const cell = (s) => String(s).replace(/\|/g, "\\|").replace(/\s+/g, " ");
+// Escape backslashes first, then pipes, so a value cannot break out of a table cell.
+const cell = (s) => String(s).replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s+/g, " ");
 const flagText = (flags) =>
   Object.entries(flags)
     .map(([f, n]) => `${f} x${n}`)
@@ -586,7 +587,7 @@ export function renderReport(tally) {
     for (const n of r.noCurrentIndex) md.push(`- archived [${n.archivedIndex}] (${n.verdict}): no current index`);
     md.push("", "| pass | num_turns | void | decision |", "|---|---|---|---|");
     for (const p of r.passes) {
-      const why = p.error ? `threw: ${cell(p.error)}` : (p.decision?.error ?? "counted");
+      const why = p.error ? `threw: ${p.error}` : (p.decision?.error ?? "counted");
       md.push(`| ${p.pass} | ${p.numTurns ?? "?"} | ${p.decision?.voided ? "yes" : "no"} | ${cell(why)} |`);
     }
   }
@@ -661,9 +662,19 @@ export async function regrade({
   // be read by the grader of a later pass. `flush` writes whatever is held.
   let flush = null;
   let passesDone = 0;
+  let createdOut = null;
   try {
     return await regradeSteps();
   } catch (e) {
+    // A default output root made by mkdtemp but never used: remove it (rmdirSync only removes an
+    // empty folder).
+    if (createdOut && passesDone === 0) {
+      try {
+        fs.rmdirSync(createdOut);
+      } catch {
+        // not empty, or already gone: leave it
+      }
+    }
     // About to give up after at least one pass: no grader is running now, so keep what exists.
     if (flush && passesDone > 0) {
       try {
@@ -697,9 +708,10 @@ export async function regrade({
       throw new UsageError("the same run directory is named twice");
     }
 
-    const out = path.resolve(
-      outRoot ?? path.join(os.tmpdir(), `${OUT_PREFIX}${new Date().toISOString().replace(/[:.]/g, "-")}`),
-    );
+    // The default output root gets an unpredictable name from mkdtemp (created empty, so the
+    // "must be empty" check below passes); an explicit --out is checked as given.
+    if (!outRoot) createdOut = fs.mkdtempSync(path.join(os.tmpdir(), OUT_PREFIX));
+    const out = path.resolve(outRoot || createdOut);
     if (isInsidePath(out, repoRoot)) throw new SafetyError(`the output folder is inside the repo: ${out}`);
     for (const d of dirs) {
       if (isInsidePath(out, d) || isInsidePath(d, out)) {
@@ -899,7 +911,7 @@ export const USAGE = `Re-grade archived routing runs with the stock grader (docs
   --model          grader model (default ${DEFAULT_MODEL})
   --map            1-based archived:current index map when a rewording moved indices
   --unverifiable   1-based current indices only a live sandbox could check
-  --out            results folder (default <OS temp>/is-skill-eval-regrade-<stamp>; never in the repo)
+  --out            results folder (default <OS temp>/is-skill-eval-regrade-<random>; never in the repo)
   --keep-copies    keep the stripped copies the grader read
   --ignore-stale-results
                    start even though an earlier re-grade's output is still in the OS temp dir

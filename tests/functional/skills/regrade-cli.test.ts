@@ -461,6 +461,9 @@ describe("regrade CLI: errors, refusals and the guards", () => {
     expect(r.indices.map((x: { current: string }) => x.current)).toEqual(["PASS", "PASS", "FAIL"]);
     expect(r.indices[2].failVotes).toBe(2);
     expect(result.status).toBe(1);
+    // A backslash and a pipe in a table cell are escaped (backslash first), so the row stays whole.
+    r.passes[1].error = "C:\\dir|x";
+    expect(renderReport(result.tally)).toContain("| threw: C:\\\\dir\\|x |");
   });
 
   it("refuses to start while an earlier re-grade's output is in the temp dir, unless told to ignore it", async () => {
@@ -561,6 +564,35 @@ describe("regrade CLI: errors, refusals and the guards", () => {
     // An output folder placed inside the repo is still refused by the guard on its own.
     const inRepo = makeWriteGuard({ out: REPO_ROOT, repoRoot: REPO_ROOT, runDirs: [] });
     expect(() => inRepo(path.join(REPO_ROOT, "tally.json"))).toThrow(/refusing to write/);
+  });
+});
+
+describe("regrade CLI: the default output folder", () => {
+  const ownDirs = () => new Set(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("is-skill-eval-regrade-")));
+
+  it("is made by mkdtemp under the OS temp dir, and removed again if the run stops before grading", async () => {
+    const before = ownDirs();
+    const { result } = await run(allPass(), { outRoot: undefined });
+    try {
+      expect(result.status).toBe(0);
+      const out = result.outRoot as string;
+      expect(path.dirname(out).toLowerCase()).toBe(path.resolve(os.tmpdir()).toLowerCase());
+      expect(path.basename(out)).toMatch(/^is-skill-eval-regrade-[A-Za-z0-9]{6}$/);
+      expect(fs.existsSync(path.join(out, "tally.json"))).toBe(true);
+    } finally {
+      if (result.outRoot) fs.rmSync(result.outRoot, { recursive: true, force: true });
+    }
+
+    const stale = path.join(tmpBase, "is-skill-eval-regrade-earlier-2");
+    fs.mkdirSync(path.join(stale, "results"), { recursive: true });
+    try {
+      const refused = await run(allPass(), { outRoot: undefined });
+      expect(refused.result.status).toBe(3);
+      expect(refused.calls).toHaveLength(0);
+    } finally {
+      fs.rmSync(stale, { recursive: true, force: true });
+    }
+    expect(ownDirs()).toEqual(before);
   });
 });
 

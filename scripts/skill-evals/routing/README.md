@@ -109,7 +109,7 @@ Use it after rewording an assertion, before paying for a new batch
 `run-N` folders from an earlier batch and a query id from `routing-plan.mjs`; the query's text is
 read from the working tree, so the reworded assertion is what gets graded. It copies each run under
 the OS temp dir, deletes the old verdict from the copy, grades the copy three times with the stock
-`runGrader`, and writes `tally.json` and `report.md` to `<OS temp>/is-skill-eval-regrade-<stamp>`
+`runGrader`, and writes `tally.json` and `report.md` to `<OS temp>/is-skill-eval-regrade-<random>`
 (never inside the repo). The archived runs are only read. Options: `--passes N`, `--model <id>`,
 `--map old:new,...` (when the rewording moved indices), `--unverifiable i,j` (clauses only a live
 sandbox could check), `--out <dir>`, `--keep-copies`, `--ignore-stale-results`; `--help` lists them.
