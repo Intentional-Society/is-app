@@ -2,6 +2,8 @@
 
 _As of main @ 0347013 (2026-09-26): this doc was read and corrected against that commit (#610)._
 
+New to skill evals? Start with the one-page [quick start](strategy-skill-evals-quick-start.md).
+
 > Operational runbook for testing this repo's Claude Code Skills: the schema, the safety
 > rules, the exact commands, the runbooks. Every section is authoritative. Design rationale,
 > the module map, and the decision ledger live in
@@ -591,6 +593,7 @@ manual runs — same session, same "does this read right to a human watching it"
 picks `wait+5`, waits another 5, then aborts). Schedule it in the first parallel wave so
 its wait overlaps the rest of the batch rather than adding serially to the total run time.
 
+<a id="what-you-will-be-asked-to-approve"></a>
 **What you will be asked to approve.** A full execution batch asks a human to approve four
 commands, one each for `ship-1`, `ship-3`, `ship-6` and `ship-8`: a `gh pr merge` whose working
 directory is a folder under `skill-eval-sandboxes`. That folder means the command hits the gh
