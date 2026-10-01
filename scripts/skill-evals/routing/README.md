@@ -98,6 +98,26 @@ Flags: `--only <id,id>`, `--reps N` (default 3), `--model <m>` (default
 `DEFAULT_MODEL` in `lib/driver.mjs`, `claude-sonnet-4-5`), `--out <dir>`, `--keep-sandboxes` (debug — skips teardown),
 `--list`.
 
+### Re-grading archived runs
+
+```sh
+node scripts/skill-evals/routing/regrade.mjs --runs <run-1 dir> [<run-2 dir> ...] --query <queryId>
+```
+
+Use it after rewording an assertion, before paying for a new batch
+([`strategy-skill-evals.md`](../../../docs/strategy-skill-evals.md) §6 step 5). It needs archived
+`run-N` folders from an earlier batch and a query id from `routing-plan.mjs`; the query's text is
+read from the working tree, so the reworded assertion is what gets graded. It copies each run under
+the OS temp dir, deletes the old verdict from the copy, grades the copy three times with the stock
+`runGrader`, and writes `tally.json` and `report.md` to `<OS temp>/is-skill-eval-regrade-<stamp>`
+(never inside the repo). The archived runs are only read. Options: `--passes N`, `--model <id>`,
+`--map old:new,...` (when the rewording moved indices), `--unverifiable i,j` (clauses only a live
+sandbox could check), `--out <dir>`, `--keep-copies`, `--ignore-stale-results`; `--help` lists them.
+The tool refuses to start while an earlier re-grade's output is still in the OS temp dir (`runGrader`
+grades from a sibling folder there, so the grader could read it); move or delete it, or pass
+`--ignore-stale-results`. Do not run the test suite while a real re-grade is running: its unit tests write
+fake verdict files under the OS temp dir too.
+
 ## Output
 
 Run artifacts land in the gitignored workspace

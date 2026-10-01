@@ -1,0 +1,19 @@
+{
+  "archivedAt": "2026-09-24T05:29:43.075Z",
+  "sandboxDir": "<home>\\AppData\\Local\\Temp\\skill-eval-sandboxes\\skill-eval-feature-dirty-clean-payload-2026-09-24T05-28-45-806Z-r4U1uy",
+  "destDir": "<home>\\dev\\intentional-society\\is-app\\.claude\\skills\\routing-evals-workspace\\2026-09-24T05-28-45-800Z\\eval-commit-4\\with_skill\\run-1\\outputs",
+  "captured": [
+    "gh-calls.log",
+    "gh-fixture.json",
+    "manifest.json",
+    "sandbox-marker.json",
+    "git-state.txt"
+  ],
+  "legs": {
+    "ghCallLog": true,
+    "gitState": true,
+    "producedDocs": [],
+    "transcript": "authored by the executor to the eval workspace — not a harness artifact"
+  },
+  "note": "Raw evidence triad archived BEFORE teardown (spec II.2e; ruling 3, #511 gate-close). gh-calls.log + git-state.txt are the two OBJECTIVE legs — inspectable independently of any orchestrator narration, so the grade is executor-independent. Merge assertions are corroborated against the transcript's tool-call record: the checked-in `ask` rule on `gh pr merge *` can intercept a merge before the stub logs it, so an empty log is NOT proof no merge was attempted (merge-discrimination rule, docs/strategy-skill-evals.md). `producedDocs` lists whatever the run left in the sandbox repo's .scratch/ (copied to scratch/ here) — for a skill whose deliverable is a document, that copy IS the primary evidence."
+}

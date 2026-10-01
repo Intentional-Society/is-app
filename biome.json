@@ -15,7 +15,8 @@
       "!docs/_temp-*",
       "!drizzle/meta",
       "!public/legacy-check.js",
-      "!tests/functional/server/__data__"
+      "!tests/functional/server/__data__",
+      "!scripts/skill-evals/fixtures/harvest-*/archive"
     ]
   },
   "formatter": {

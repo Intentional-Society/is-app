@@ -1,0 +1,23 @@
+{
+  "fixture": "feature-dirty-clean-payload",
+  "owner": "Intentional-Society",
+  "repo": "is-app",
+  "auth": {
+    "loggedIn": true,
+    "login": "NorsemanSpiff",
+    "host": "github.com"
+  },
+  "self": "NorsemanSpiff",
+  "collaborators": [],
+  "displayNames": {},
+  "issues": {},
+  "prs": {},
+  "branchPr": null,
+  "checks": [],
+  "runs": [],
+  "createPr": null,
+  "sequences": {},
+  "vercelProductionUrl": null,
+  "pullComments": [],
+  "reviewThreads": []
+}
