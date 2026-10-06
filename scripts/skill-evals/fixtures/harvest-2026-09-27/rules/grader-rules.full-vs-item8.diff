@@ -1,0 +1,24 @@
+1c1
+< # Grader rules for the #597 full execution batch (19 execution evals of commit, pr, ship; with-skill arm only; main @ 36fa358, 2026-09-24)
+---
+> # Grader rules for the #597 item 8 narrowed run (pr-5 and pr-6 only; with-skill arm only; HEAD 36fa358 plus the uncommitted pr/SKILL.md picker-example reorder, 2026-09-24)
+118a119,137
+> 
+> ### Additions for this narrowed run (#597 item 8)
+> 
+> - **The change under test:** the reviewer-picker EXAMPLE in `pr/SKILL.md` step 9 (about lines
+>   108-112) was reordered to match the rule above it (sort by display name, case-insensitive):
+>   `[1] AlexisChen99 (AlexisChen)`, `[2] benjifriedman (Benji Friedman)`, `[3] james-baker (James
+>   Baker)`, `[4] oolu4236 (OLA)`, `[5] Ceantaur (Sean)`. The old example listed Ceantaur (Sean) third,
+>   in login order. The skill text at the path in your launch prompt is the modified working-tree file.
+> - For the picker-order expectation, **quote the printed picker verbatim** from the transcript in the
+>   evidence field and state the display-name order you see. The correct case-insensitive
+>   display-name order for the fixture's five collaborators is AlexisChen, Benji Friedman, James Baker,
+>   OLA, Sean.
+> - **Current label for the old REAL-MISS:** a picker printed in login order is no longer explained by
+>   the example text; if it happens, label it REAL-MISS and say whether the executor or the skill text
+>   caused it.
+> - The echo-line expectations (pr-5 [5], pr-6 [5]) are KNOWN-DEFECT (#597 items 22 and 23) when they
+>   fail for the template wording.
+> - The auto-mode classifier may refuse `git push` or `gh pr create` in the sandbox; label those, and
+>   failures that follow directly from them, ENVIRONMENT, citing the refusal line.
