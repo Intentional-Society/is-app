@@ -39,7 +39,7 @@ jobs:
       - if: steps.filter.outputs.code == 'false'
         run: echo "Docs-only PR — lint and functional tests skipped."
 
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@v7.1.0
         if: steps.filter.outputs.code == 'true'
         with:
           node-version: 24
