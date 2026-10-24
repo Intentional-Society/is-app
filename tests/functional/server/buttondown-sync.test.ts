@@ -315,16 +315,79 @@ describe("runButtondownSync (daily reconciler)", () => {
     expect(row.buttondownSubscriberId).toBeNull();
   });
 
-  it("skips profiles without a saved profile (lastUpdatedProfile IS NULL)", async () => {
+  it("skips create for an unsaved profile (lastUpdatedProfile IS NULL) not yet in Buttondown", async () => {
     const profileId = await makeProfile({ email: "isaac@example.com", saved: false });
     const programId = await makeProgram({ buttondownTag: "weekly" });
     await join(profileId, programId);
 
     const client = createFakeButtondownClient({ write: true });
-    await runButtondownSync({ client, runId: "r9", write: true, scopeProfileIds: [profileId] });
+    const { log, events } = collectingLogger();
+    const summary = await runButtondownSync({ client, runId: "r9", write: true, log, scopeProfileIds: [profileId] });
 
     // Isaac's email should never have been touched.
     expect(effectsForEmail(client.effects, "isaac@example.com")).toHaveLength(0);
+    expect(summary.created).toBe(0);
+    expect(summary.skippedUnsavedCreate).toBe(1);
+    expect(events.find((e) => e.action === "skipped-unsaved-create" && e.profileId === profileId)).toBeDefined();
+  });
+
+  // CSV-imported members carry full profile contents and memberships but
+  // a null lastUpdatedProfile until they first save in the app. The
+  // cutover bootstrap linked them to their pre-existing subscribers, so
+  // their tags must keep following their memberships.
+  it("strips a left program's tag from an unsaved profile's existing subscriber", async () => {
+    const profileId = await makeProfile({
+      email: "imported-leaver@example.com",
+      saved: false,
+      buttondownSubscriberId: "sub_imported_leaver",
+    });
+    const programId = await makeProgram({ buttondownTag: "gumball" });
+    await join(profileId, programId);
+    await db.update(profilePrograms).set({ leftAt: new Date() }).where(eq(profilePrograms.profileId, profileId));
+
+    const initial = sampleSubscriber({
+      id: "sub_imported_leaver",
+      email_address: "imported-leaver@example.com",
+      tags: ["gumball", "isweb-member"],
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const summary = await runButtondownSync({
+      client,
+      runId: "r-unsaved-leave",
+      write: true,
+      scopeProfileIds: [profileId],
+    });
+
+    const updated = await client.getSubscriber("sub_imported_leaver");
+    expect(updated?.tags).toEqual(["isweb-member"]);
+    expect(summary.scanned).toBe(1);
+    expect(summary.tagsUpdated).toBe(1);
+  });
+
+  it("adds a joined program's tag to an unsaved profile's subscriber found by email", async () => {
+    const profileId = await makeProfile({ email: "imported-joiner@example.com", saved: false });
+    const programId = await makeProgram({ buttondownTag: "weekly" });
+    await join(profileId, programId);
+
+    const initial = sampleSubscriber({
+      id: "sub_imported_joiner",
+      email_address: "imported-joiner@example.com",
+      tags: ["isweb-member"],
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const summary = await runButtondownSync({
+      client,
+      runId: "r-unsaved-join",
+      write: true,
+      scopeProfileIds: [profileId],
+    });
+
+    const updated = await client.getSubscriber("sub_imported_joiner");
+    expect(updated?.tags.sort()).toEqual(["isweb-member", "weekly"]);
+    expect(summary.tagsUpdated).toBe(1);
+    expect(summary.skippedUnsavedCreate).toBe(0);
   });
 
   it("includes profiles whose only programs have no buttondownTag (catch-up creates with empty managed set)", async () => {

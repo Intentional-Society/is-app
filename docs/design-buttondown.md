@@ -18,7 +18,9 @@ The app's sync **replaced** the Apps Script as the writer of program tags; the c
 
 One sentence the whole integration enforces:
 
-> A member who has saved their profile should exist as a Buttondown subscriber, tagged exactly according to their current memberships in programs that have a `buttondownTag` set, and whose `metadata.name` equals their current display name.
+> A member who has saved their profile should exist as a Buttondown subscriber. Every member with a Buttondown subscriber — saved or not — is tagged exactly according to their current memberships in programs that have a `buttondownTag` set, and their `metadata.name` equals their current display name.
+
+The "saved or not" clause covers CSV-imported members: the importer filled in their profile contents and memberships but left `lastUpdatedProfile` null, and the [bootstrap](#initial-bootstrap-reconciliation-completed-and-deleted-2026-05-25) linked them to their pre-existing subscribers. Until they first save in the app, the sync reconciles their existing subscriber and never creates one.
 
 Every code path below is a route to making that statement true.
 
@@ -59,7 +61,7 @@ Rules:
 - **Only ever write a non-empty name.** An empty or whitespace-only display name never blanks an existing `metadata.name`.
 - **Every write is merge-preserving.** Subscribers carry other metadata keys we don't own, so each name write reads the subscriber first and PATCHes `{ ...existing, name }` — a whole-blob write that keeps the rest. Buttondown **replaces** the whole `metadata` blob on PATCH (it does not merge server-side — confirmed by [Appendix A](#appendix-a-fake-vs-real-comparison-recording-from-a-dedicated-newsletter) probe 20), so sending the full merged blob is exactly what preserves the other keys.
 - **Self-heals like tags.** The daily cron reads `metadata.name` back and repairs drift, so `metadata` is part of the client's subscriber projection.
-- **Hidden / unsubscribed:** same posture as tags — no create for hidden profiles, no write at all for unsubscribed subscribers, but a name reconcile still applies to an already-existing subscriber.
+- **Hidden / unsaved / unsubscribed:** same posture as tags — no create for hidden or unsaved profiles, no write at all for unsubscribed subscribers, but a name reconcile still applies to an already-existing subscriber.
 
 ### Standing tags: `isweb-member`, `new`, `returning`
 
@@ -104,11 +106,12 @@ This path exists only to shorten the new-member time-to-first-email. It is a lat
 
 `GET /api/cron/buttondown-sync`, scheduled daily at **08:00 UTC** via `vercel.json` `crons`, gated by a `CRON_SECRET` bearer check. (Vercel cron invokes endpoints via HTTP GET.) Acquires the [sync concurrency lock](#concurrency-lock) before doing any work and releases it at the end.
 
-For each profile where `lastUpdatedProfile IS NOT NULL`:
+For each profile:
 
 1. Compute the desired managed-tag set from the profile's current memberships.
 2. Look up the Buttondown subscriber. If `profiles.buttondownSubscriberId` is set, GET by id (stable across email changes); otherwise GET by `auth.users.email`.
-   - **Missing**: POST to create with tags = `[…desired, "isweb-member", "new"]`. Store the returned id on `profiles.buttondownSubscriberId`. (This is the catch-up case for a failed inline write.)
+   - **Missing, profile saved and not hidden**: POST to create with tags = `[…desired, "isweb-member", "new"]`. Store the returned id on `profiles.buttondownSubscriberId`. (This is the catch-up case for a failed inline write.)
+   - **Missing, profile unsaved (`lastUpdatedProfile IS NULL`) or hidden**: no create. Counted as `skippedUnsavedCreate` / `skippedHiddenCreate`. An unsaved member's subscriber is created by the inline hook at their first save.
    - **Unsubscribed**: don't write. Raise an [unsubscribe alert](#unsubscribe-handling).
    - **Found by id but email differs from `auth.users.email`**: PATCH the subscriber's `email` field to the current app email. Then continue with tag diffing.
    - **Found by email** (no stored id yet): record the id on `profiles.buttondownSubscriberId` for next time. Then continue with tag diffing.
