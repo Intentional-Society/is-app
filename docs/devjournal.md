@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-24 | James (with Opus 5.5) | Agent instructions live in `AGENTS.md`
+
+`CLAUDE.md` is renamed to `AGENTS.md`, the cross-agent standard; the new `CLAUDE.md` imports it with `@AGENTS.md` and holds only the Claude-specific `## AI Skills` section. Next.js 16.4's `next dev` maintains its agent-rules block in `AGENTS.md`.
+
+---
+
 ## 2026-09-23 | Blake (with Fable 5.1) | `/ship` reads the PR conversation before merging
 
 `/ship` step 10 now reads every PR conversation source right before the merge and stops with `N unanswered since the last push — merge anyway?` when anything is unanswered — any comment, review or inline comment since the last push (by anyone, the PR's author included, since agent sessions post under the maintainer's account), plus every unresolved inline thread; a text-less approval never counts (#580). The cutoff is captured before any rebase. It caught its own review comment on the PR that introduced it (#596).
