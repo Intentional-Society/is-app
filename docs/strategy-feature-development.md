@@ -88,7 +88,7 @@ A feature is done when:
 - It does what its definition and spec describe.
 - Its UX is high quality; see [`strategy-ui.md`](strategy-ui.md) and
   [`strategy-browser-support.md`](strategy-browser-support.md).
-- Its code is high quality and maintainable; see `CLAUDE.md` and the docs it
+- Its code is high quality and maintainable; see `AGENTS.md` and the docs it
   links.
 - A PR to `main` is open.
 

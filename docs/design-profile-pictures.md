@@ -138,7 +138,7 @@ The browser sends the processed image to a new Hono endpoint; the
 
 Rationale — this matches the app's existing architecture:
 
-- "Hono handles all API logic" (CLAUDE.md). DB access already works
+- "Hono handles all API logic" (AGENTS.md). DB access already works
   this way: the server connects as a privileged role and RLS is only a
   backstop. Storage should mirror that.
 - Browser-direct upload would require our **first** Storage RLS

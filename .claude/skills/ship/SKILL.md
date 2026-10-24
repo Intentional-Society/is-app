@@ -57,7 +57,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
    **There is no `proceed` option.** Anything not green blocks the merge.
 
-9. **Docs-only PR handling.** If the PR's diff is confined to `docs/**` and root `CLAUDE.md`:
+9. **Docs-only PR handling.** If the PR's diff is confined to `docs/**` and root `AGENTS.md` / `CLAUDE.md`:
 
    - `ci.yml`'s `dorny/paths-filter` step skips the test steps but still posts `Lint & Functional Tests` green within seconds (satisfies branch protection).
    - Vercel preview is skipped per `vercel.json`'s `ignoreCommand`, so no preview `deployment_status` event fires and preview `e2e.yml` does not run.
@@ -132,6 +132,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 
 ## Depends on
 
+- `AGENTS.md`
 - `CLAUDE.md`
 - `package.json` (for `npm test`; for `npm run prod:db:expand`)
 - `docs/strategy-committing.md` (expand-contract phase rules; AI-trailer subsection)

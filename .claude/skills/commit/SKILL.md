@@ -193,6 +193,7 @@ Do not use `git stash && <command>; git stash pop` to "test against a clean slat
 
 ## Depends on
 
+- `AGENTS.md`
 - `CLAUDE.md`
 - `package.json` (for `npm test`)
 - `docs/strategy-committing.md` (commit format, expand-contract phase rules, AI-trailer subsection, stash-safety note)

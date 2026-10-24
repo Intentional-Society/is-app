@@ -267,6 +267,7 @@ or "PR is up, waiting on review feedback.">
 
 ## Depends on
 
+- `AGENTS.md`
 - `CLAUDE.md`
 - `.gitignore` (the `.scratch/` convention)
 - `gh` CLI (optional — degrades gracefully without it)
