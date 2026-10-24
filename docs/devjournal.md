@@ -10,6 +10,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-16 | James (with Opus 5.5) | Buttondown sync now covers unsaved (CSV-imported) members
+
+The sync used to skip every profile with a null `lastUpdatedProfile`, which silently froze the Buttondown tags of 21 CSV-imported members at their cutover state — one left Gumball Machine on 2026-09-08 and kept the tag. It now reconciles every profile's existing subscriber and gates only *create* on a saved profile (`skippedUnsavedCreate`), the same posture as hidden profiles.
+
+---
+
 ## 2026-09-23 | Blake (with Fable 5.1) | `/ship` reads the PR conversation before merging
 
 `/ship` step 10 now reads every PR conversation source right before the merge and stops with `N unanswered since the last push — merge anyway?` when anything is unanswered — any comment, review or inline comment since the last push (by anyone, the PR's author included, since agent sessions post under the maintainer's account), plus every unresolved inline thread; a text-less approval never counts (#580). The cutoff is captured before any rebase. It caught its own review comment on the PR that introduced it (#596).

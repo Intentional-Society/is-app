@@ -187,8 +187,8 @@ describe("Buttondown sync routes", () => {
         sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous)
             VALUES (${memberId}::uuid, ${`${memberId}@example.com`}, false, false)`,
       );
-      // lastUpdatedProfile is what the sync's loadEligibleProfiles
-      // filters on — without it the resync is a no-op.
+      // A saved profile (lastUpdatedProfile set) — the sync only
+      // creates a subscriber for saved profiles.
       await db.insert(profiles).values({ id: memberId, lastUpdatedProfile: new Date() });
       await db.insert(programs).values({
         id: programId,

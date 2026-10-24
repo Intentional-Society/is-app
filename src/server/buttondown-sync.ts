@@ -13,7 +13,7 @@
 // Both share the underlying client; only this function is what the
 // cron and the admin "Sync now" buttons drive.
 
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import {
   ButtondownApiError,
@@ -205,6 +205,7 @@ export type SyncLogEvent =
   | { action: "skipped-missing-email"; runId: string; profileId: string }
   | { action: "skipped-already-current"; runId: string; profileId: string; subscriberId: string }
   | { action: "skipped-hidden-create"; runId: string; profileId: string }
+  | { action: "skipped-unsaved-create"; runId: string; profileId: string }
   | { action: "skipped-reserved-email"; runId: string; profileId: string; email: string }
   | { action: "error"; runId: string; profileId: string; message: string; errorKind: SyncErrorKind };
 
@@ -234,6 +235,11 @@ export type SyncRunSummary = {
   // sync would otherwise have created. Tag updates still flow for
   // hidden profiles that already have a subscriber row.
   skippedHiddenCreate: number;
+  // Unsaved profiles (lastUpdatedProfile IS NULL — CSV-imported members
+  // who haven't saved in the app yet) with no existing Buttondown
+  // subscriber. Their first save creates one; tag updates still flow
+  // for unsaved profiles that already have a subscriber row.
+  skippedUnsavedCreate: number;
   // Profiles whose email ends in an RFC-reserved TLD (.local, .test,
   // .invalid, .example, .localhost). These can't be real members; the
   // sync drops them before any client call. Should normally be 0 — a
@@ -268,6 +274,9 @@ type ProfileRow = {
   // The sync suppresses CREATE for them (no new Buttondown row), but
   // still reconciles tags if a subscriber already exists.
   hidden: boolean;
+  // lastUpdatedProfile IS NOT NULL. Unsaved profiles get the same
+  // no-create treatment as hidden ones.
+  saved: boolean;
   // Mirrored verbatim into Buttondown's metadata.name; null when unset.
   displayName: string | null;
 };
@@ -324,27 +333,26 @@ const loadCurrentTaggedMemberships = async (scopeProfileIds?: string[]): Promise
     );
 };
 
-// All profiles with a saved profile (lastUpdatedProfile non-null) and
-// the email from auth.users. Members whose profile was created but
-// who haven't saved are out of scope. `scopeProfileIds` narrows the
-// scan; see loadCurrentTaggedMemberships.
+// Every profile with the email from auth.users, saved or not. Unsaved
+// profiles include CSV-imported members whose memberships change in the
+// app before they ever save; the cutover bootstrap linked many of them
+// to existing subscribers, so their tags must keep following. The
+// saved flag gates create only. `scopeProfileIds` narrows the scan; see
+// loadCurrentTaggedMemberships.
 const loadEligibleProfiles = async (scopeProfileIds?: string[]): Promise<ProfileRow[]> => {
-  const conditions = [isNotNull(profiles.lastUpdatedProfile)];
-  if (scopeProfileIds) {
-    if (scopeProfileIds.length === 0) return [];
-    conditions.push(inArray(profiles.id, scopeProfileIds));
-  }
+  if (scopeProfileIds && scopeProfileIds.length === 0) return [];
   return db
     .select({
       profileId: profiles.id,
       email: authUsers.email,
       buttondownSubscriberId: profiles.buttondownSubscriberId,
       hidden: profiles.hidden,
+      saved: sql<boolean>`${profiles.lastUpdatedProfile} IS NOT NULL`,
       displayName: profiles.displayName,
     })
     .from(profiles)
     .innerJoin(authUsers, eq(authUsers.id, profiles.id))
-    .where(and(...conditions));
+    .where(scopeProfileIds ? inArray(profiles.id, scopeProfileIds) : undefined);
 };
 
 // Compute (final tag set, removed-from-managed, added-to-managed)
@@ -465,6 +473,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
     unsubscribeAlerts: 0,
     missingProfileEmail: 0,
     skippedHiddenCreate: 0,
+    skippedUnsavedCreate: 0,
     skippedReservedEmail: 0,
     errors: 0,
     durationMs: 0,
@@ -591,6 +600,13 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
       // ever exists for one, the update branches below still run.
       summary.skippedHiddenCreate++;
       log({ action: "skipped-hidden-create", runId, profileId });
+      return;
+    }
+    if (!profile.saved) {
+      // The inline first-save hook owns creation for these, with the
+      // new/returning marker it alone may write.
+      summary.skippedUnsavedCreate++;
+      log({ action: "skipped-unsaved-create", runId, profileId });
       return;
     }
     // Catch-up create: this is the path that runs when the inline
