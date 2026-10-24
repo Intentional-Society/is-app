@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code when working with code in this repository.
+This file provides guidance to AI coding agents working with code in this repository. Claude Code loads it through `CLAUDE.md`, which adds the Claude-specific instructions.
 
 ## Project Overview
 
@@ -50,9 +50,9 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 ## Workflow
 
 - Trunk-based development: feature branches PR into `main`, which auto-deploys to production
-- Run `npm test` before committing. Keep docs and CLAUDE.md in sync with code changes.
+- Run `npm test` before committing. Keep docs, AGENTS.md and CLAUDE.md in sync with code changes.
 - Schema/API migrations use the **expand-contract pattern** (see `docs/strategy-committing.md`)
-- All pushes trigger Vercel deployment; docs-only changes (`docs/**`, root `CLAUDE.md`) skip automatically (see `docs/strategy-committing.md`)
+- All pushes trigger Vercel deployment; docs-only changes (`docs/**`, root `AGENTS.md` and `CLAUDE.md`) skip automatically (see `docs/strategy-committing.md`)
 - Add `docs/devjournal.md` entries for decisions teammates should know about
 - All first-party code must stick to **Baseline widely available** (`docs/strategy-browser-support.md`)
 
@@ -109,7 +109,7 @@ A fourth skill, Anthropic's upstream `skill-creator` (used to build and eval the
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 

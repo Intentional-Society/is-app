@@ -160,6 +160,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 ## Depends on
 
+- `AGENTS.md`
 - `CLAUDE.md`
 - `package.json` (for `npm test`)
 - `docs/strategy-committing.md` (commit/PR format, AI-trailer subsection)

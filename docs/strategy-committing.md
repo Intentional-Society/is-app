@@ -2,7 +2,7 @@
 
 ## Before committing
 
-If you touch code, have test coverage for it! Make sure you're keeping the docs and CLAUDE.md in sync with the state of the code as well.
+If you touch code, have test coverage for it! Make sure you're keeping the docs, AGENTS.md and CLAUDE.md in sync with the state of the code as well.
 
 If you've done work your teammates should know about, add a `docs/devjournal.md` entry (typically at a higher level than all the commit messages on that branch).
 
@@ -18,13 +18,13 @@ Always commit on a feature branch, never directly to `main`. PRs into `main` req
 
 ## Skipping deploys for docs-only changes
 
-Every push to a branch with an open PR triggers a Vercel preview deploy, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` automatically skips builds whose entire branch diff vs `main` is confined to `docs/` or the root `CLAUDE.md`. Nothing for the author to remember.
+Every push to a branch with an open PR triggers a Vercel preview deploy, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` automatically skips builds whose entire branch diff vs `main` is confined to `docs/` or the root `AGENTS.md` and `CLAUDE.md`. Nothing for the author to remember.
 
 How it works:
 
 1. If the branch is `main`, deploy (production builds always run, including for docs-only merges, so the deploy record exists and migrations get a chance to run).
 2. Otherwise, `git fetch --depth=1 "https://github.com/$VERCEL_GIT_REPO_OWNER/$VERCEL_GIT_REPO_SLUG.git" main` pulls main's tip into `FETCH_HEAD`. The explicit URL is necessary because Vercel's build container has no `origin` remote configured — `git fetch origin main` fails with `fatal: 'origin' does not appear to be a git repository`. The URL is reconstructed from the env vars Vercel exposes. This works without auth because the repo is public; if it ever goes private again, this fetch will need a token.
-3. `git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!CLAUDE.md'` exits 0 if no non-docs files differ between this branch and main's tip, 1 if any do. We diff against `FETCH_HEAD` (rather than a named ref) because the fetch above doesn't create one — `git fetch <url> <branch>` populates only `FETCH_HEAD`.
+3. `git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!AGENTS.md' ':!CLAUDE.md'` exits 0 if no non-docs files differ between this branch and main's tip, 1 if any do. We diff against `FETCH_HEAD` (rather than a named ref) because the fetch above doesn't create one — `git fetch <url> <branch>` populates only `FETCH_HEAD`.
 4. The trailing `|| exit 1` normalises every failure path to exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly. `git fetch` errors are not redirected to `/dev/null` — if the next breakage is also a fetch issue, we want it visible in the Vercel build log.
 
 Comparing against main's tip (rather than `VERCEL_GIT_PREVIOUS_SHA`) makes the skip work on the *first* push of a branch — which matters because trunk-based branches are usually short-lived and most PRs are single-push. It also handles mixed pushes correctly: any non-docs file in the branch's diff vs main triggers a deploy.
@@ -36,7 +36,7 @@ Failure modes all default to deploying (the safe direction):
 
 Playwright e2e skips downstream because it's triggered by Vercel's `deployment_status` event, which only fires on a real deploy.
 
-CI (lint + functional tests) is also skipped on docs-only PRs, but the mechanism differs from Vercel's. Branch protection requires the "Lint & Functional Tests" status check, so `ci.yml` can't simply not run — the check would stay stuck at "expected" and block merge. Instead it always runs, and the job itself decides whether to do any work: a `dorny/paths-filter` step sets a `code` output — true when the PR changes any file outside `docs/` and `CLAUDE.md` — and every subsequent step (Node and Supabase setup, `npm install`, `lint`, `typecheck`, migrations, the functional tests) is gated on `code == 'true'`. A docs-only PR skips them all and still reports success, satisfying branch protection.
+CI (lint + functional tests) is also skipped on docs-only PRs, but the mechanism differs from Vercel's. Branch protection requires the "Lint & Functional Tests" status check, so `ci.yml` can't simply not run — the check would stay stuck at "expected" and block merge. Instead it always runs, and the job itself decides whether to do any work: a `dorny/paths-filter` step sets a `code` output — true when the PR changes any file outside `docs/`, `AGENTS.md` and `CLAUDE.md` — and every subsequent step (Node and Supabase setup, `npm install`, `lint`, `typecheck`, migrations, the functional tests) is gated on `code == 'true'`. A docs-only PR skips them all and still reports success, satisfying branch protection.
 
 ## Schema and data migrations: expand-contract pattern
 

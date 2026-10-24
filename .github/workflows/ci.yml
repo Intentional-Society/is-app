@@ -27,13 +27,14 @@ jobs:
         id: filter
         with:
           # `every`: a file counts toward `code` only if it matches all
-          # three patterns (AND). Without this, paths-filter ORs them and
+          # four patterns (AND). Without this, paths-filter ORs them and
           # every file matches `**`, so `code` is always true.
           predicate-quantifier: 'every'
           filters: |
             code:
               - '**'
               - '!docs/**'
+              - '!AGENTS.md'
               - '!CLAUDE.md'
 
       - if: steps.filter.outputs.code == 'false'
