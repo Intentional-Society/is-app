@@ -2,6 +2,17 @@
 # Add commits that are pure formatting / mechanical reformatting, never logic
 # changes. To honor this locally:
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# Use full 40-character SHAs: git rejects abbreviated ones and blame fails.
 
 # chore: tighten biome scope + baseline format pass (issue #140)
-4c2a6b5
+# Also narrows biome.json's scope, so blame skips those few config lines too.
+4c2a6b56bf2725f1f861ad719df0d9b6e665bdd7
+
+# chore: re-baseline format pass after rebase onto main (#307)
+7e5c20e58a33ff0375333f89687a5a4c0216a18b
+
+# style: format page.tsx to pass biome ci
+d739e3dcc93a2094c0bcfa9a9f19b8e526d4a870
+
+# style: fix biome formatting on category labels
+1cbe07cb25d69c87af6d85da2f78c2c26f05c069
