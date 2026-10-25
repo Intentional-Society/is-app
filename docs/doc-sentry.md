@@ -18,6 +18,15 @@
 
 Auth tokens are generated at Settings → Auth Tokens in the Sentry dashboard.
 
+## SDK Version
+
+`@sentry/nextjs` stays on 10.x; `.github/dependabot.yml` ignores the 11.x line. v11 makes data collection opt-out (cookies, request bodies, user info and DB query data are collected unless `dataCollection` says otherwise) and requires Safari 15, above our Safari 13.1 hard floor (`docs/strategy-browser-support.md`). Sentry has backported fixes to each previous major for about 14 months after its successor shipped (11.0.0 shipped 2026-09-23).
+
+## Monitors
+
+- **Uptime:** `GET https://app.intentionalsociety.org/` every 5 minutes, passing on any 2xx; an issue opens after 2 consecutive failures (~10 minutes of downtime) and resolves after 1 success. The Developer plan includes one uptime monitor.
+- **Alerting:** the project-wide "Send a notification for high priority issues" rule emails suggested assignees (else recently active members), covering both error and uptime issues.
+
 ## How It Works
 
 - **Client errors:** `instrumentation-client.ts` initializes Sentry in the browser with error tracking, performance traces, and opt-in session replay (see below)
