@@ -27,6 +27,13 @@ updates:
       # fresh PR to re-evaluate on.
       - dependency-name: "typescript"
         versions: ["7.0.x"]
+      # We stay on @sentry/nextjs 10.x (docs/doc-sentry.md). v11 collects
+      # cookies, request bodies and DB query data unless `dataCollection` is
+      # set, and requires Safari 15, above our Safari 13.1 hard floor.
+      # Ignoring the 11.x line alone keeps 10.x fixes flowing and turns 12.0
+      # into a fresh PR to re-evaluate on.
+      - dependency-name: "@sentry/nextjs"
+        versions: ["11.x"]
     groups:
       # Batch patch/minor bumps together so Dependabot doesn't open one
       # PR per transitively-related package. Majors still land as their
