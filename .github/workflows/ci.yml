@@ -29,7 +29,7 @@ jobs:
           # `every`: a file counts toward `code` only if it matches all
           # four patterns (AND). Without this, paths-filter ORs them and
           # every file matches `**`, so `code` is always true.
-          predicate-quantifier: 'every'
+          predicate-quantifier: "every"
           filters: |
             code:
               - '**'

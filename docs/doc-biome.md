@@ -30,6 +30,13 @@ recommended rules.
   components we don't hand-edit.
 - **`noNonNullAssertion`** — an error in app code, relaxed to off under `tests/`
   and `scripts/`.
+- **Markdown formatter off** — Biome 2.6 added Markdown formatting, and a trial
+  pass on 2.6.3 changed how 8 docs render on GitHub: whitespace before `**bold**`
+  was dropped in some files containing GFM tables, nested and tight lists were
+  restructured, and fenced TS snippets were reformatted into different code.
+  Markdown linting stays on. To re-check after a Biome bump, run
+  `biome format --write .` with the override removed, then compare the rendered
+  output before and after.
 - **Excluded paths** — the `files.includes` negations skip generated or vendored
   trees Biome shouldn't touch: `.next`, `next-env.d.ts`, Supabase email
   templates, `docs/_temp-*`, `drizzle/meta`, the functional-test
