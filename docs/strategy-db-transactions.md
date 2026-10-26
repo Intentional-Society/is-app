@@ -49,9 +49,9 @@ value with an `updated_at` older than the reset. Production logs (Axiom) also
 showed the *loud* variant: `POST /api/_test/reset` returning 500 with a
 Postgres `25P02` ("current transaction is aborted") error. The reset never
 needed atomicity, so #173 replaced the transaction with two plain autocommit
-statements. The probe's anomaly assertion — still armed in
-`tests/e2e/helpers/session.ts` — has been silent across thousands of resets
-since 2026-05-16.
+statements. The probe's anomaly assertion — kept as the reset tripwire in
+`tests/e2e/helpers/session.ts` when the rest of the probe came out (#486) —
+has been silent across thousands of resets since 2026-05-16.
 
 **Bug 2 — concurrent e2e runs clobbering each other** (every remaining #149
 failure, May–June 2026). The suite drives two fixed seeded accounts in the

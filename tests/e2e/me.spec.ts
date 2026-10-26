@@ -14,7 +14,7 @@ test.beforeEach(async ({ baseURL }) => {
 
 test("tabs switch between profile and settings, and a theme choice persists", async ({ page }) => {
   await signInAs(page, "regular");
-  // Distinct bio per completeWelcome caller — see the #149 probe.
+  // Distinct bio per completeWelcome caller — see the reset tripwire.
   await completeWelcome(page, { bio: "e2e bio · me.spec · tabs-theme" });
 
   await page.goto("/me");
@@ -48,7 +48,7 @@ test("tabs switch between profile and settings, and a theme choice persists", as
 // the settings form re-hydrates from the saved value.
 test("a member can change their profile URL from settings", async ({ page }) => {
   await signInAs(page, "regular");
-  // Distinct bio per completeWelcome caller — see the #149 probe.
+  // Distinct bio per completeWelcome caller — see the reset tripwire.
   await completeWelcome(page, { displayName: "Slug Tester", bio: "e2e bio · me.spec · slug" });
 
   await page.goto("/me#settings");

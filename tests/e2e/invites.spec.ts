@@ -20,7 +20,7 @@ test.describe("invites — authed member flow", () => {
     await resetSeededUsers(baseURL);
     await signInAs(page, "regular");
     // Distinct bio per completeWelcome caller: if a reset leaves this
-    // value behind, the #149 probe names this exact call site.
+    // value behind, the reset tripwire names this exact call site.
     await completeWelcome(page, {
       displayName: "Member Under Test",
       bio: "e2e bio · invites.spec · authed-flow beforeEach",

@@ -5,7 +5,7 @@ test("sign-out button signs the user out and lands on /signin", async ({ page })
   await signInAs(page, "regular");
   // A mid-onboarding member is redirected to /welcome, which renders no
   // menu; finish onboarding (if fresh) so the menu is reachable from /.
-  // Distinct bio per completeWelcome caller — see the #149 probe.
+  // Distinct bio per completeWelcome caller — see the reset tripwire.
   if (new URL(page.url()).pathname.startsWith("/welcome")) {
     await completeWelcome(page, { bio: "e2e bio · signout.spec" });
   }

@@ -68,7 +68,7 @@ export const expectAuthed = async (page: Page): Promise<void> => {
 // into the multi-step welcome flow. This walks all three steps —
 // agreements, profile, programs — and leaves the page on `/`. Tests
 // that just need to get past onboarding call it; the profile-step opts
-// (displayName/bio) still flow through, so the #149 probe keeps its
+// (displayName/bio) still flow through, so the reset tripwire keeps its
 // distinct-bio-per-caller invariant.
 export const completeWelcome = async (page: Page, opts: { displayName?: string; bio?: string } = {}): Promise<void> => {
   // Step 1 — agreements.
@@ -115,18 +115,19 @@ export const resetSeededUsers = async (baseURL: string): Promise<void> => {
     throw new Error(`reset endpoint returned ${res.status}: ${await res.text().catch(() => "")}`);
   }
 
-  // #149 probe: the endpoint reads every seeded profile back after its
-  // reset transaction commits, with physical-tuple (ctid/xmin) and
-  // connection (replica/search_path) diagnostics. A reset is clean when
-  // every existing profile row has bio null. Two things fail loud here
-  // — in beforeEach, instead of 20s later at a /welcome timeout: a row
-  // whose bio survived the reset (the #149 symptom), or duplicate
-  // tuples for one id. A seeded user with no profile row at all (0 rows
-  // — no test has signed in as them yet this run) is fine, not flagged.
-  // The dump shows the surviving bio string (its value names the test
-  // that wrote it, since each completeWelcome caller passes a distinct
-  // bio), the tuple identity, and whether the read ran on a replica.
-  type ResetProbeRow = {
+  // Reset tripwire (kept from the #149 investigation): the endpoint
+  // reads every seeded profile back after its reset writes commit, with
+  // physical-tuple (ctid/xmin) and connection (replica/search_path)
+  // diagnostics. A reset is clean when every existing profile row has
+  // bio null. Two things fail loud here — in beforeEach, instead of 20s
+  // later at a /welcome timeout: a row whose bio survived the reset
+  // (the #149 write-loss/clobber symptom), or duplicate tuples for one
+  // id. A seeded user with no profile row at all (0 rows — no test has
+  // signed in as them yet this run) is fine, not flagged. The dump
+  // shows the surviving bio string (its value names the test that wrote
+  // it, since each completeWelcome caller passes a distinct bio), the
+  // tuple identity, and whether the read ran on a replica.
+  type ResetReadBackRow = {
     ctid: string;
     xmin: string;
     bio: string | null;
@@ -139,7 +140,7 @@ export const resetSeededUsers = async (baseURL: string): Promise<void> => {
   const body = (await res.json()) as {
     reset: number;
     updatedIds: string[];
-    profiles: { id: string; email: string; rows: ResetProbeRow[] }[];
+    profiles: { id: string; email: string; rows: ResetReadBackRow[] }[];
   };
   const anomalies = body.profiles.filter((p) => p.rows.length > 1 || p.rows.some((r) => r.bio !== null));
   if (anomalies.length > 0) {

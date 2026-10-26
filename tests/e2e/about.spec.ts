@@ -13,7 +13,7 @@ test.describe("/about page", () => {
 
   test("the menu link opens /about and the changelog renders", async ({ page }) => {
     await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the #149 probe.
+    // Distinct bio per completeWelcome caller — see the reset tripwire.
     await completeWelcome(page, { bio: "e2e bio · about.spec · changelog" });
 
     // The link lives only in the hamburger menu (no home-page card).
