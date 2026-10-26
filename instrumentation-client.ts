@@ -4,6 +4,7 @@ import {
   replayIntegration as Sentry_replayIntegration,
 } from "@sentry/nextjs";
 
+import { E2E_ENVIRONMENT, isE2eUserAgent } from "@/lib/sentry-environment";
 import { scrubClientEvent } from "@/lib/sentry-scrub";
 
 // Session replay is opt-in for support sessions: load any page with
@@ -29,6 +30,9 @@ Sentry_init({
   // local dev errors are already on the developer's screen.
   // NEXT_PUBLIC_VERCEL_ENV is inlined via the env key in next.config.ts.
   enabled: process.env.NEXT_PUBLIC_VERCEL_ENV === "production",
+  // Spread conditionally: init applies our options over its own defaults,
+  // so an explicit `environment: undefined` would replace vercel-production.
+  ...(isE2eUserAgent(navigator.userAgent) ? { environment: E2E_ENVIRONMENT } : {}),
   tracesSampleRate: 0.1,
   replaysSessionSampleRate: debugReplay ? 1.0 : 0,
   replaysOnErrorSampleRate: debugReplay ? 1.0 : 0,
