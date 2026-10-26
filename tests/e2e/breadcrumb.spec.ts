@@ -21,7 +21,7 @@ test.describe("/me — breadcrumb back link", () => {
 
   test("/myweb → /me renders '← My web' and returns there", async ({ page }) => {
     await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the #149 probe.
+    // Distinct bio per completeWelcome caller — see the reset tripwire.
     await completeWelcome(page, { bio: "e2e bio · breadcrumb.spec · myweb-to-me" });
 
     await page.goto("/myweb");
@@ -40,7 +40,7 @@ test.describe("/me — breadcrumb back link", () => {
 
   test("direct landing on /me falls back to '← Home'", async ({ page }) => {
     await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the #149 probe.
+    // Distinct bio per completeWelcome caller — see the reset tripwire.
     await completeWelcome(page, { bio: "e2e bio · breadcrumb.spec · direct-me" });
 
     // Drop the welcome-flow history so this navigation is the user's

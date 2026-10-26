@@ -28,7 +28,7 @@ test.describe("page titles", () => {
   test("authed pages carry distinct titles, including a dynamic generateMetadata title", async ({ page }) => {
     await signInAs(page, "regular");
     // Onboard so "/" stops redirecting into the welcome flow; the distinct
-    // bio keeps the #149 reset probe happy (one bio per completeWelcome caller).
+    // bio keeps the reset tripwire happy (one bio per completeWelcome caller).
     await completeWelcome(page, { bio: "e2e bio · page-titles.spec · dynamic title" });
 
     // Home keeps the bare brand: it sets no title, so it falls back to

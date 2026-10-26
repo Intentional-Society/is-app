@@ -32,7 +32,6 @@ import {
   deactivateProfile,
   getProfileForMember,
   getProfileForSelf,
-  getProfileForSelfWithProbe,
   isSlugUniqueViolation,
   listCurrentIntentions,
   listHiddenMembers,
@@ -40,8 +39,6 @@ import {
   markAgreementsSigned,
   markProgramsReviewed,
   markWebUpdated,
-  type ProfileForSelf,
-  type ProfileReadProbe,
   parseEditableProfile,
   reactivateProfile,
   removePassword,
@@ -342,46 +339,14 @@ const api = new Hono<{ Variables: ApiVariables }>()
   })
   .get("/me", async (c) => {
     const user = c.get("user");
-    const debug = c.req.header("x-debug-timing") === "1";
 
-    // #149 diagnostic: on debug-flagged requests, the read returns
-    // MVCC + connection metadata in the same statement, logged below
-    // so a failing welcome-flow trace can be cross-referenced with the
-    // backend the read landed on. Production traffic stays on the
-    // plain variant. Remove with the probe code once #149 is closed.
-    const load = async (): Promise<{ profile: ProfileForSelf | null; probe: ProfileReadProbe | null }> => {
-      if (debug) return getProfileForSelfWithProbe(user.id);
-      return { profile: await getProfileForSelf(user.id), probe: null };
-    };
-
-    let { profile, probe } = await load();
-    let stage: "initial" | "after-upsert" = "initial";
+    let profile = await getProfileForSelf(user.id);
     if (!profile) {
       // Self-heal: profiles are normally inserted by /auth/callback
       // during sign-in. If that upsert failed but the session still
       // landed, the next authed request creates the row here.
       await upsertProfile(user);
-      ({ profile, probe } = await load());
-      stage = "after-upsert";
-    }
-
-    if (debug) {
-      // message "probe-149" is the feature label; split on fields.route
-      // to compare the /me read against the /home and /reset probes.
-      log.debug("probe-149", {
-        route: "me",
-        stage,
-        userId: user.id,
-        bio: profile?.bio ?? null,
-        agreements: Boolean(profile?.lastSignedAgreements),
-        profile: Boolean(profile?.lastUpdatedProfile),
-        programs: Boolean(profile?.lastReviewedPrograms),
-        ctid: probe?.ctid ?? null,
-        xmin: probe?.xmin ?? null,
-        inRecovery: probe?.inRecovery ?? null,
-        serverAddr: probe?.serverAddr ?? null,
-        backendPid: probe?.backendPid ?? null,
-      });
+      profile = await getProfileForSelf(user.id);
     }
 
     return c.json({ id: user.id, email: user.email, profile });

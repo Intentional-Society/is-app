@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { log } from "next-axiom";
 
 import { AppWordmark } from "@/components/app-wordmark";
 import { RefreshOnStale } from "@/components/refresh-on-stale";
@@ -157,20 +155,6 @@ export default async function Home() {
   const me = await loadMe();
   if (!me) {
     return <LoggedOutHome />;
-  }
-
-  // Diagnostic for #149: log whether the redirect-to-/welcome gate
-  // sees a profile and what bio is. Gated on x-debug-timing to keep
-  // production logs uncluttered. A Server Component has no request
-  // wrapper to drain next-axiom's buffer, so flush() explicitly. Remove
-  // once #149 is resolved.
-  if ((await headers()).get("x-debug-timing") === "1") {
-    log.debug("probe-149", {
-      route: "home",
-      hasProfile: Boolean(me.profile),
-      bio: me.profile?.bio ?? null,
-    });
-    await log.flush();
   }
 
   // Gate: route members into the multi-step welcome flow until every

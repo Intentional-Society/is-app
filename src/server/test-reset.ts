@@ -1,5 +1,4 @@
 import { inArray, sql } from "drizzle-orm";
-import { log } from "next-axiom";
 
 import { db } from "./db";
 import { invites, profiles } from "./schema";
@@ -13,11 +12,11 @@ export const E2E_EMAILS = ["e2e-regular@testfake.local", "e2e-admin@testfake.loc
 // One physical `profiles` row as it stands immediately after the reset
 // writes. ctid/xmin pin the exact tuple and the txid that
 // last wrote it; inRecovery/serverAddr/searchPath/backendPid describe
-// the connection the read-back ran on. All of this exists to diagnose
-// #149 — a read seeing a stale bio just after the reset commits — by
-// separating a genuine stale read from a duplicate tuple, a replica,
-// or a schema-resolution mismatch.
-export type ResetProbeRow = {
+// the connection the read-back ran on. When the e2e tripwire fires
+// (a bio surviving the reset — the #149 write-loss/clobber shape),
+// these separate a genuine stale read from a duplicate tuple, a
+// replica, or a schema-resolution mismatch.
+export type ResetReadBackRow = {
   ctid: string;
   xmin: string;
   bio: string | null;
@@ -33,11 +32,12 @@ export type ResetProbeRow = {
 // its flag across runs. auth.users is not touched — the password and
 // row stay put so the next run can sign in again.
 //
-// After the writes, it reads every seeded profile back (see #149): the
-// UPDATE's RETURNING reports which rows were touched, and a per-id
-// SELECT of the physical tuple plus connection state lets the caller
-// tell a genuine stale read apart from a duplicate tuple, a replica,
-// or a schema-resolution mismatch.
+// After the writes, it reads every seeded profile back for the e2e
+// tripwire in tests/e2e/helpers/session.ts: the UPDATE's RETURNING
+// reports which rows were touched, and a per-id SELECT of the physical
+// tuple plus connection state lets the caller tell a genuine stale
+// read apart from a duplicate tuple, a replica, or a schema-resolution
+// mismatch.
 export const resetE2EUsers = async (): Promise<{
   reset: number;
   // ids the UPDATE's RETURNING reported — one entry per row touched, so
@@ -47,7 +47,7 @@ export const resetE2EUsers = async (): Promise<{
   // profile row for that id: length 0 means no profile row at all (fine
   // — no test has signed in as them yet this run), length > 1 means
   // duplicate tuples.
-  profiles: { id: string; email: string; rows: ResetProbeRow[] }[];
+  profiles: { id: string; email: string; rows: ResetReadBackRow[] }[];
 }> => {
   const emailList = sql.join(
     E2E_EMAILS.map((e) => sql`${e}`),
@@ -95,7 +95,7 @@ export const resetE2EUsers = async (): Promise<{
   // connection this read happened to land on.
   const profilesAfter = await Promise.all(
     users.map(async ({ id, email }) => {
-      const probe = (await db.execute(sql`
+      const rows = (await db.execute(sql`
         SELECT
           ctid::text AS ctid,
           xmin::text AS xmin,
@@ -107,34 +107,10 @@ export const resetE2EUsers = async (): Promise<{
           pg_backend_pid() AS "backendPid"
         FROM profiles
         WHERE id = ${id}::uuid
-      `)) as unknown as ResetProbeRow[];
-      return { id, email, rows: [...probe] };
+      `)) as unknown as ResetReadBackRow[];
+      return { id, email, rows: [...rows] };
     }),
   );
-
-  // #149 baseline: log the probe data on every successful reset (not
-  // only on the anomaly throw in tests/e2e/helpers/session.ts), so
-  // Axiom accumulates a per-run record of which Supavisor backend the
-  // reset's read-back landed on. Across enough runs we can tell whether
-  // reads scatter across backends or stick, and spot any run where
-  // inRecovery or serverAddr drifts from the steady state. message
-  // "probe-149" matches the /me and /home probes; split on fields.route.
-  log.debug("probe-149", {
-    route: "reset",
-    users: users.length,
-    updatedIds,
-    profiles: profilesAfter.map((p) => ({
-      email: p.email,
-      rows: p.rows.map((r) => ({
-        ctid: r.ctid,
-        xmin: r.xmin,
-        bio: r.bio,
-        inRecovery: r.inRecovery,
-        serverAddr: r.serverAddr,
-        backendPid: r.backendPid,
-      })),
-    })),
-  });
 
   return { reset: users.length, updatedIds, profiles: profilesAfter };
 };
