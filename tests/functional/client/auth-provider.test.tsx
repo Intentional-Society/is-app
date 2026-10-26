@@ -23,6 +23,11 @@ vi.mock("@/lib/supabase/client", () => ({
 const mockUser = { id: "u1", email: "a@b.c" } as unknown as User;
 const otherUser = { id: "u2", email: "x@y.z" } as unknown as User;
 
+function Probe() {
+  const { user } = useAuth();
+  return <div data-testid="email">{user?.email ?? "none"}</div>;
+}
+
 describe("useAuth", () => {
   it("throws when used outside AuthProvider", () => {
     expect(() => renderHook(() => useAuth())).toThrow(/must be used within AuthProvider/);
@@ -38,11 +43,6 @@ describe("useAuth", () => {
 
 describe("AuthProvider", () => {
   it("updates context when onAuthStateChange fires", () => {
-    function Probe() {
-      const { user } = useAuth();
-      return <div data-testid="email">{user?.email ?? "none"}</div>;
-    }
-
     render(
       <AuthProvider initialUser={null}>
         <Probe />

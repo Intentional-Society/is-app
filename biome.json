@@ -42,10 +42,15 @@
       "tailwindDirectives": true
     }
   },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "performance": {
         "noNamespaceImport": "error"
       },

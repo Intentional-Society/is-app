@@ -16,3 +16,6 @@ d739e3dcc93a2094c0bcfa9a9f19b8e526d4a870
 
 # style: fix biome formatting on category labels
 1cbe07cb25d69c87af6d85da2f78c2c26f05c069
+
+# style: apply Biome 2.6 YAML formatting to workflows
+5152338f19a3f1a9c99c1e4f44ffdfb2a095a1f9
