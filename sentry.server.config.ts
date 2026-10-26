@@ -1,5 +1,6 @@
 import { init as Sentry_init } from "@sentry/nextjs";
 
+import { tagE2eServerEvent } from "@/lib/sentry-environment";
 import { scrubServerEvent } from "@/lib/sentry-scrub";
 
 Sentry_init({
@@ -9,5 +10,5 @@ Sentry_init({
   enabled: process.env.VERCEL_ENV === "production",
   tracesSampleRate: 0.1,
   includeLocalVariables: true,
-  beforeSend: scrubServerEvent,
+  beforeSend: (event) => scrubServerEvent(tagE2eServerEvent(event)),
 });

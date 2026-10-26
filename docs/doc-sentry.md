@@ -25,7 +25,7 @@ Auth tokens are generated at Settings → Auth Tokens in the Sentry dashboard.
 ## Monitors
 
 - **Uptime:** `GET https://app.intentionalsociety.org/` every 5 minutes, passing on any 2xx; an issue opens after 2 consecutive failures (~10 minutes of downtime) and resolves after 1 success. The Developer plan includes one uptime monitor.
-- **Alerting:** the project-wide "Send a notification for high priority issues" rule emails suggested assignees (else recently active members), covering both error and uptime issues.
+- **Alerting:** the project-wide "Send a notification for high priority issues" rule emails suggested assignees (else recently active members), covering error and uptime issues in every environment, `e2e` included.
 
 ## How It Works
 
@@ -35,6 +35,7 @@ Auth tokens are generated at Settings → Auth Tokens in the Sentry dashboard.
 - **Source maps:** uploaded automatically during `next build` when `SENTRY_AUTH_TOKEN` is set
 - **Tunnel route:** `/error-handling` proxies all browser-side Sentry traffic (errors, traces, replay) through our domain to avoid ad blockers
 - **Production deploys only:** both init configs set `enabled` on `VERCEL_ENV === "production"` (inlined into the client bundle via the `env` key in `next.config.ts`). Preview deploys and local dev send nothing — preview e2e runs were generating thousands of tunnel POSTs per run, tripping Vercel traffic-spike alerts
+- **E2E environment:** the post-deploy e2e suite runs headless Chromium against production. `src/lib/sentry-environment.ts` reports anything with a `HeadlessChrome` user agent under the `e2e` environment, so `vercel-production` holds member data only. The client sets it at init (errors, traces, sessions, replays); the server sets it per error event in `beforeSend`, since its environment is per process. Server traces from e2e requests still report as `vercel-production`
 
 ## PII Handling
 
@@ -45,7 +46,7 @@ Two `beforeSend` scrubbers in `src/lib/sentry-scrub.ts` provide defense-in-depth
 - **Client** (`scrubClientEvent`): on `/auth/`, `/signin`, and `/signup` URLs, the query string is dropped from `event.request.url` so OAuth tokens like `?code=...` don't ship. The event itself is still sent so genuine errors on these routes remain visible.
 - **Server** (`scrubServerEvent`): deletes `event.request.cookies` and removes the `authorization` and `cookie` headers from every event.
 
-Unit tests for both scrubbers live in `tests/functional/sentry-scrub.test.ts`.
+Unit tests for both scrubbers live in `tests/functional/server/sentry-scrub.test.ts`.
 
 ## Session Replay — opt-in only
 

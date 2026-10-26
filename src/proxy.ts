@@ -7,10 +7,12 @@ export async function proxy(request: NextRequest) {
   return timed(request, "proxy-total", () => updateSession(request));
 }
 
-// The version poll (docs/strategy-deployment.md) is a frequent, public,
-// unauthenticated request — exclude it from the proxy so it skips the
-// per-request Supabase session refresh. (Same reason /api/health was
-// excluded before it was removed.)
+// The version poll (docs/strategy-deployment.md) and the Sentry tunnel
+// (/error-handling, tunnelRoute in next.config.ts) never use the session —
+// exclude them from the proxy so they skip the per-request Supabase session
+// refresh.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/version|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/version|error-handling|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };
