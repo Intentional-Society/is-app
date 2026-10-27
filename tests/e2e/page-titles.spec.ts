@@ -23,6 +23,12 @@ test.describe("page titles", () => {
 
     await page.goto("/forgot-password");
     await expect(page).toHaveTitle("IS Web: Forgot password");
+
+    await page.goto("/terms");
+    await expect(page).toHaveTitle("IS Web: Terms of use");
+
+    await page.goto("/privacy");
+    await expect(page).toHaveTitle("IS Web: Privacy policy");
   });
 
   test("authed pages carry distinct titles, including a dynamic generateMetadata title", async ({ page }) => {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/api-server";
@@ -69,6 +70,21 @@ export default async function AboutPage() {
             devteam@mail.intentionalsociety.org
           </a>
           .
+        </p>
+      </section>
+
+      <section className="w-full max-w-2xl">
+        <h2 className="text-lg font-semibold">Terms and privacy</h2>
+        <p className="mt-2 text-base text-muted-foreground">
+          Read the{" "}
+          <Link href="/terms" className="underline text-muted-foreground hover:text-foreground">
+            terms of use
+          </Link>{" "}
+          and the{" "}
+          <Link href="/privacy" className="underline text-muted-foreground hover:text-foreground">
+            privacy policy
+          </Link>{" "}
+          to see what the app collects, who sees it, and how to leave.
         </p>
       </section>
 

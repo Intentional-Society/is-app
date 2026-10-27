@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -135,6 +136,17 @@ export function SignupForm({ initialCode, intro }: { initialCode: string; intro:
         <Button type="submit" disabled={submitting}>
           {submitting ? "Sending…" : "Verify your email"}
         </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          By signing up, you agree to our{" "}
+          <Link href="/terms" target="_blank" className="underline hover:text-foreground">
+            terms of use
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" target="_blank" className="underline hover:text-foreground">
+            privacy policy
+          </Link>
+          .
+        </p>
         {step.kind === "error" && (
           <p role="alert" className="text-base text-destructive">
             {step.message}
