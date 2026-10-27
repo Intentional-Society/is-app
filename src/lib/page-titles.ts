@@ -35,6 +35,8 @@ export const PAGE_TITLES = {
   "/signup": { title: "Sign up" },
   "/forgot-password": { title: "Forgot password" },
   "/auth/reset-password": { title: "Set new password" },
+  "/terms": { title: "Terms of use" },
+  "/privacy": { title: "Privacy policy" },
   "/welcome/agreements": { title: "Welcome · Agreements" },
   "/welcome/profile": { title: "Welcome · Profile" },
   "/welcome/programs": { title: "Welcome · Programs" },
