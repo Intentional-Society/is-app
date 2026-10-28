@@ -149,13 +149,15 @@ Dependabot has no visibility into `.npmrc`, so `.github/dependabot.yml` carries 
 
 # Dependency scanning
 
-Three GitHub features act on dependency advisories, configured independently. Confusing them is the main hazard.
+Three GitHub features and one workflow act on dependency advisories, configured independently. Confusing them is the main hazard.
 
 **Dependabot alerts** are on, and are the source of truth for what's outstanding.
 
-**Dependabot version updates** are configured in `.github/dependabot.yml`: weekly, with patch and minor bumps batched into one `minor-and-patch` group PR. For npm they bump only direct dependencies (Dependabot doesn't support `dependency-type: indirect` for npm), so a transitive fix lands only when a direct bump re-resolves it. Clear transitive advisories with a lockfile-only `npm audit fix` (see below).
+**Dependabot version updates** are configured in `.github/dependabot.yml`: weekly, with patch and minor bumps batched into one `minor-and-patch` group PR. For npm they bump only direct dependencies (Dependabot doesn't support `dependency-type: indirect` for npm), so a transitive fix lands only when a direct bump re-resolves it. The weekly `npm audit fix` PR clears the rest.
 
-**Dependabot security updates** — the repo-level toggle at `PUT /repos/{owner}/{repo}/automated-security-fixes` — are deliberately **off**. With the toggle on, Dependabot opens a pull request per alert with an available patch, up to 10 open at once regardless of `open-pull-requests-limit`.
+**The weekly `npm audit fix` PR** (`.github/workflows/npm-audit-fix.yml`) runs plain `npm audit fix --package-lock-only --ignore-scripts` on Tuesdays, after Dependabot's Monday run, and keeps one lockfile-only PR open on `chore/npm-audit-fix`. npm resolves through `.npmrc`, so the quarantine above still applies. Review the PR's version table for downgrades: npm can move a deduped package down within its range.
+
+**Dependabot security updates** — the repo-level toggle at `PUT /repos/{owner}/{repo}/automated-security-fixes` — are deliberately **off**. With the toggle on, Dependabot opens a pull request per alert with an available patch, up to 10 open at once regardless of `open-pull-requests-limit`. Grouping them (`groups` with `applies-to: security-updates`) would collapse those into one PR, but `cooldown` doesn't apply to security updates, so they'd skip the three-day quarantine; `npm audit fix` honors it.
 
 ## The critical-alert fast lane
 

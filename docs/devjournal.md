@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-27 | James (with Opus 5.5) | Weekly `npm audit fix` PR
+
+`npm-audit-fix.yml` opens one lockfile-only PR each Tuesday for transitive advisories with in-range fixes, which Dependabot version updates can't reach for npm.
+
+---
+
 ## 2026-10-24 | James (with Opus 5.5) | Agent instructions live in `AGENTS.md`
 
 `CLAUDE.md` is renamed to `AGENTS.md`, the cross-agent standard; the new `CLAUDE.md` imports it with `@AGENTS.md` and holds only the Claude-specific `## AI Skills` section. Next.js 16.4's `next dev` maintains its agent-rules block in `AGENTS.md`.
