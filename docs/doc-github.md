@@ -44,7 +44,18 @@ The `/ship` Skill (`.claude/skills/ship/SKILL.md`) reads the required + visible 
 - `.github/workflows/ci.yml` — lint + functional tests, triggers on `pull_request` to main. Spins up the full local Supabase stack via `supabase/setup-cli@v1` + `supabase start`, then applies Drizzle migrations before running Vitest. Functional tests that hit the DB (e.g. `profiles.test.ts`) run against this stack, matching the dev-box setup exactly.
 - `.github/workflows/e2e.yml` — Playwright against Vercel preview URL, triggers on `deployment_status` (fired by Vercel's GitHub integration when a preview deploy completes). Job-level `if:` filters on `environment` ∈ {`Production`, `Preview`} so unrelated GitHub Deployments (e.g. `prod-db`) don't accidentally invoke Playwright with a github.com URL.
 - `.github/workflows/codeql.yml` — CodeQL static analysis on JS/TS and workflow YAMLs, triggers on PRs + pushes to main + weekly cron. Uses the `security-extended` query pack.
+- `.github/workflows/npm-audit-fix.yml` — weekly cron (Tuesdays) + `workflow_dispatch`. Runs plain `npm audit fix --package-lock-only` and opens or refreshes one PR on `chore/npm-audit-fix`, or closes it once `main` no longer needs it. Needs **Allow GitHub Actions to create and approve pull requests** (see Actions settings below). Its `ci.yml` run waits in an approval-required state, because a PR opened with `GITHUB_TOKEN` doesn't trigger workflows directly: click **Approve workflows to run** on the PR. See `docs/strategy-security.md`.
 - `.github/workflows/forward-migrate-prod-schema-expansion.yml` — `workflow_dispatch`-only. Applies additive (expand) drizzle migrations to the prod DB ahead of opening a PR, so previews can exercise new code paths against the migrated schema. Bound to the `prod-db` environment (see below) for the reviewer gate. Triggered locally via `npm run prod:db:expand` (uses the current branch). Contract migrations do NOT use this workflow — they ride the standard merge-to-main path.
+- `.github/workflows/skill-creator-drift.yml` — monthly cron + `workflow_dispatch`. Checks the vendored `.claude/skills/skill-creator/` against upstream and opens one tracking issue (labels `dependencies` + `skill-creator-drift`) when upstream has moved. Never edits files. See `docs/doc-skill-creator.md`.
+- `.github/workflows/claude-code-review.yml` — Claude code review on every non-bot PR (opened, synchronize, ready_for_review, reopened), posted as a PR comment. Bot-authored PRs (Dependabot, `npm-audit-fix.yml`) skip it, so the check stays neutral. Authenticates with the `CLAUDE_CODE_OAUTH_TOKEN` secret.
+- `.github/workflows/claude.yml` — runs Claude when `@claude` appears in an issue, issue comment, PR review or review comment, and replies in that thread. Same secret.
+
+## Actions settings
+
+Settings → Actions → General → Workflow permissions.
+
+- **Default `GITHUB_TOKEN` permissions:** read. Org-enforced; each workflow declares what it needs in its `permissions:` block.
+- ✓ **Allow GitHub Actions to create and approve pull requests** — needed by `npm-audit-fix.yml`. Enabled 2026-10-28 at the org level (Organization → Settings → Actions → General), which switched it on in every org repo; while the org blocks it, the repo-level API call returns 409. The "approve" half can't satisfy the ruleset: the only required review is code-owner review, and `github-actions[bot]` isn't a code owner. Audit via `gh api repos/Intentional-Society/is-app/actions/permissions/workflow` (`can_approve_pull_request_reviews`).
 
 ## Environments
 

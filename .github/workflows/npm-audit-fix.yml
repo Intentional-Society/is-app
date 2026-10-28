@@ -1,0 +1,122 @@
+name: Weekly npm audit fix
+
+# Weekly sweep for the advisories Dependabot leaves behind: transitive
+# dependencies whose fix is in range of their parent, so only the lockfile is
+# stale. Dependabot version updates bump direct dependencies only (`allow:
+# indirect` is unsupported for npm), and Dependabot security updates are off
+# on purpose (docs/strategy-security.md), so these sit until someone runs
+# `npm audit fix`. This runs it and opens or refreshes ONE PR on a fixed
+# branch; the branch is rebuilt from main each run, so don't push to it.
+#
+# Plain `npm audit fix`, never `--force` (docs/strategy-security.md, "Reading
+# `npm audit`"). It resolves through `.npmrc`, so the min-release-age
+# quarantine still applies, and `--ignore-scripts` + `--package-lock-only`
+# keep package code from executing in a job that holds a write token.
+#
+# A PR opened with GITHUB_TOKEN gets its `pull_request` runs (ci.yml) in an
+# approval-required state: click "Approve workflows to run" on the PR.
+
+on:
+  schedule:
+    - cron: "17 5 * * 2" # 05:17 UTC Tuesdays, after Dependabot's Monday run (:17 dodges the :00 scheduling rush)
+  workflow_dispatch: {} # manual: gh workflow run npm-audit-fix.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: npm-audit-fix
+  cancel-in-progress: false
+
+jobs:
+  audit-fix:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: chore/npm-audit-fix
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+
+      - name: Run npm audit fix
+        run: |
+          npm audit --package-lock-only --json > before.json || true
+
+          # Exits 1 whenever any advisory remains, so the exit code can't tell
+          # success from failure. A completed run carries `.audit.metadata`; a
+          # failed one (registry/network error) carries `.error` instead.
+          npm audit fix --package-lock-only --ignore-scripts --json > fix.json || true
+          if ! jq -e '.audit.metadata.vulnerabilities' fix.json > /dev/null; then
+            cat fix.json
+            echo "::error::npm audit fix did not complete — see output above"
+            exit 1
+          fi
+
+      - name: Open or refresh the PR
+        run: |
+          existing="$(gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number // empty')" || {
+            echo "::error::PR lookup failed — aborting instead of risking a duplicate PR"
+            exit 1
+          }
+
+          if git diff --quiet -- package-lock.json; then
+            echo "npm audit fix changed nothing."
+            if [ -n "$existing" ]; then
+              gh pr close "$existing" --delete-branch \
+                --comment "main no longer needs these lockfile changes; closing. The weekly run will reopen if new in-range fixes appear."
+            fi
+            exit 0
+          fi
+
+          if ! git diff --quiet -- package.json; then
+            echo "::error::npm audit fix changed package.json — expected a lockfile-only change; run it by hand and review"
+            git diff -- package.json
+            exit 1
+          fi
+
+          # counts <file> <jq path to the audit metadata>
+          counts() { jq -r "$2.vulnerabilities"' | "\(.total) total (critical \(.critical), high \(.high), moderate \(.moderate), low \(.low))"' "$1"; }
+          git show HEAD:package-lock.json > lock-before.json
+          {
+            echo "Weekly \`npm audit fix\` (plain, lockfile-only) from \`.github/workflows/npm-audit-fix.yml\`."
+            echo
+            echo "- Before: $(counts before.json .metadata)"
+            echo "- After: $(counts fix.json .audit.metadata)"
+            echo
+            echo "Advisories left over need a major bump or an upstream release; see docs/strategy-security.md (\"Reading \`npm audit\`\")."
+            echo
+            echo "Lockfile version changes (npm can move a deduped package down as well as up; check any downgrade):"
+            echo
+            echo "| Package | From | To |"
+            echo "|---|---|---|"
+            jq -rn --slurpfile a lock-before.json --slurpfile b package-lock.json '
+              ($a[0].packages) as $old | ($b[0].packages) as $new
+              | ([$old, $new] | map(keys) | add | unique)[]
+              | select(. != "" and $old[.].version != $new[.].version)
+              # per-platform binaries (@esbuild/linux-x64 …) just echo their parent
+              | select(($new[.] // $old[.]) | has("cpu") | not)
+              | "| `\(sub("^node_modules/"; ""))` | \($old[.].version // "—") | \($new[.].version // "—") |"'
+            echo
+            echo "CI (\`ci.yml\`) waits for approval on PRs opened by this workflow: click **Approve workflows to run**."
+          } > pr-body.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add package-lock.json
+          git commit -m "fix(deps): apply npm audit fix to the lockfile"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$BRANCH"
+
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --body-file pr-body.md
+          else
+            gh pr create --base main --head "$BRANCH" \
+              --title "fix(deps): apply npm audit fix to the lockfile" \
+              --label dependencies \
+              --body-file pr-body.md
+          fi
