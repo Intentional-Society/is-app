@@ -153,9 +153,9 @@ Three GitHub features act on dependency advisories, configured independently. Co
 
 **Dependabot alerts** are on, and are the source of truth for what's outstanding.
 
-**Dependabot version updates** are configured in `.github/dependabot.yml`: weekly, with patch and minor bumps batched into one `minor-and-patch` group PR. This is what actually clears most advisories, because nearly every npm fix ships as an in-range patch.
+**Dependabot version updates** are configured in `.github/dependabot.yml`: weekly, with patch and minor bumps batched into one `minor-and-patch` group PR. For npm they bump only direct dependencies (Dependabot doesn't support `dependency-type: indirect` for npm), so a transitive fix lands only when a direct bump re-resolves it. Clear transitive advisories with a lockfile-only `npm audit fix` (see below).
 
-**Dependabot security updates** — the repo-level toggle at `PUT /repos/{owner}/{repo}/automated-security-fixes` — are deliberately **off**. With the toggle on, Dependabot opens a pull request for every alert with an available patch, and `open-pull-requests-limit` does not apply to security updates; there is no cap, so a backlog of 27 alerts becomes 27 pull requests. Since the weekly group sweeps every in-range fix within a week anyway, the toggle buys speed on a few advisories at the cost of unbounded PR volume on all of them.
+**Dependabot security updates** — the repo-level toggle at `PUT /repos/{owner}/{repo}/automated-security-fixes` — are deliberately **off**. With the toggle on, Dependabot opens a pull request per alert with an available patch, up to 10 open at once regardless of `open-pull-requests-limit`.
 
 ## The critical-alert fast lane
 
