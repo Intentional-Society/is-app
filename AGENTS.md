@@ -70,6 +70,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - `docs/strategy-deployment.md` — continuous deployment during active sessions: Skew Protection, the tiered update banner, and the home safe-refresh
 - `docs/strategy-db-transactions.md` — writing transactions that survive the Supabase connection pooler
 - `docs/strategy-project-management.md` — GitHub Projects board conventions
+- `docs/strategy-hub-coordination.md` — running a multi-session agent program off one root ticket: the sole-writer "pen", session registration, the child check-in obligation, authority as record-not-source (draft, parked)
 - `docs/strategy-feature-development.md` — end-to-end feature pipeline: idea to quest reward (phases, gates, roles)
 - `docs/strategy-security.md` — HTTP headers, supply-chain quarantine, dependency scanning policy, secret rotation
 - `docs/strategy-browser-support.md` — three browser-support tiers: Baseline-widely-available full fidelity, best-effort down to the hard floor, legacy-check blocker below

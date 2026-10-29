@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-29 | Blake (with Claude Code, cloud session) | Hub coordination pattern written up, parked
+
+`docs/strategy-hub-coordination.md` (draft) captures the working agreement the skill-evals program ran on #507: one root ticket whose Current-state block is the resume authority, one hub session named on it as sole writer ("the pen"), new hub sessions registering by session name in the maintainer's chat before writing anything, every child agent refetching the root and posting only on its own ticket, and authorizations given in chat with the GitHub copy as record-not-source. Reconstructed from #507's hand-off and authorization comments and #621 before the #621 close-out scrubs session names from the body. Committed on `claude/charming-hamilton-rz3em4` without a PR; pick up by reviewing it against the next multi-session program or the "hub-pattern → reusable skill" Someday item on #507.
+
+---
+
 ## 2026-10-28 | James (with Opus 5.5) | e2e-admin is read-only
 
 Limited to the whitelisted tested reads in `E2E_ADMIN_READS`.
