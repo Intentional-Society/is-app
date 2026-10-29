@@ -23,13 +23,13 @@ A review of the repo, code, CI, and deployment. What we already have that's good
 - **`hono` bumped past GHSA-458j-xx4x-4375** — `npm audit` is clean.
 - **Dependabot + CodeQL + secret-scanning push protection** are all configured (`.github/dependabot.yml`, `.github/workflows/codeql.yml`).
 - **`SECURITY.md` + private vulnerability reporting** landed in PR #85.
-- **CODEOWNERS gate on `.github/workflows/`** (`.github/CODEOWNERS`, enforced by the main-branch ruleset's `require_code_owner_review: true`) — workflow changes need an approving review from one of the listed codeowners before they can merge. Narrows the "land a tampered workflow that echoes `E2E_ADMIN_PASSWORD` / `CI_RESET_TOKEN`" path.
+- **CODEOWNERS gate on `.github/workflows/`** (`.github/CODEOWNERS`, enforced by the main-branch ruleset's `require_code_owner_review: true`) — workflow changes need an approving review from one of the listed codeowners before they can merge. Narrows the "land a tampered workflow that echoes `E2E_ADMIN_PASSWORD` / `CI_RESET_TOKEN`" path. It guards `main` only: a workflow run from a pushed branch, including `e2e.yml` on that branch's preview deploy, receives the repository secrets without review.
 
 ---
 
 ## Worth knowing, not blocking
 
-- **`E2E_ADMIN_PASSWORD` controls a real `is_admin=true` prod account.** Blast radius from a leak is bounded — admin can revoke any invite and create/delete relation hints (`src/server/api.ts`), nothing more. Can't elevate other accounts (`parseEditableProfile` allowlist), can't read PII beyond `/members`, can't drop tables. External fork PRs can't pull the secret. Realistic vectors are: malicious npm dep exfilling env from any CI step (applies to every CI secret, not just admin), or a maintainer-account compromise. CODEOWNERS on `.github/workflows/` handles the "tampered workflow" path; the rest is accepted risk for an invite-only audience.
+- **`E2E_ADMIN_PASSWORD` is a prod admin login exposed to unreviewed code.** `e2e.yml` runs each deployed branch's code, Dependabot's included, with the secret in its environment. `requireAdmin` limits e2e accounts, identified by `app_metadata.e2e_account`, to the reads in `E2E_ADMIN_READS`. A separate Supabase project for previews would remove the credential.
 - **Main is protected by ruleset `15374115` ("main branch protection"), not classic protection** — `gh api .../branches/main/protection` returns 404; rulesets live at `/repos/.../rulesets`. Managed in code at `scripts/update-main-branch-protection.mjs`, applied via `npm run update_main_branch_protection`.
 - **`/api/_test/reset` is registered in prod.** Intentional. Token-gated, destructive scope hard-coded to the two seeded test users (`E2E_EMAILS` in `src/server/test-reset.ts`). Preview and prod share the same Supabase, so an env-gate here would be theatre against a token that already mutates prod data on preview runs.
 - **`parseEditableProfile` accepts arbitrary-length strings.** Vercel caps body at ~4.5MB so total payload is bounded; a member can still spam ~4MB strings. Quality-of-service, not security. Add `MAX_BIO=10000`, `MAX_DISPLAY_NAME=100`, etc. when convenient.

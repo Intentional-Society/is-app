@@ -10,7 +10,7 @@ import { isRelationValue } from "@/lib/relation-value";
 import { toSlug } from "@/lib/slug";
 
 import { getAppSettings } from "./app-settings";
-import { type ApiVariables, isAdmin, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
+import { type ApiVariables, isAdmin, isE2EAccount, isUuid, requireAdmin, requireAuth } from "./auth-middleware";
 import { clearAvatar, encodeAvatar, MAX_AVATAR_UPLOAD_BYTES, replaceAvatar } from "./avatars";
 import {
   runButtondownSyncForServer,
@@ -606,7 +606,8 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .post("/invites/:code/revoke", async (c) => {
     const user = c.get("user");
     const code = c.req.param("code");
-    const adminFlag = await isAdmin(user.id);
+    // e2e-admin revokes only its own invites (see isE2EAccount).
+    const adminFlag = !isE2EAccount(user) && (await isAdmin(user.id));
 
     const result = await revokeInvite({ code, userId: user.id, isAdmin: adminFlag });
     if ("error" in result) {

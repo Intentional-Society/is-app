@@ -25,6 +25,9 @@ const USERS = [
   },
 ];
 
+// Marks the account for isE2EAccount (src/server/auth-middleware.ts).
+const E2E_APP_METADATA = { e2e_account: true };
+
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secret = process.env.SUPABASE_SECRET_KEY;
 const dbUrl = process.env.DATABASE_URL;
@@ -42,6 +45,25 @@ if (!url || !secret || !regularPw || !adminPw) {
 if (!dbUrl) {
   process.stderr.write("seed-e2e-users: DATABASE_URL is required\n");
   process.exit(1);
+}
+
+// Local-only. The Admin API calls below reset both users' passwords and
+// the INSERT forces is_admin, so a remote target would overwrite prod's
+// hand-seeded e2e accounts. Prints the host only: the URLs carry creds.
+for (const [name, value] of [
+  ["NEXT_PUBLIC_SUPABASE_URL", url],
+  ["DATABASE_URL", dbUrl],
+]) {
+  let host;
+  try {
+    host = new URL(value).hostname;
+  } catch {
+    host = "(unparseable)";
+  }
+  if (host !== "127.0.0.1" && host !== "localhost") {
+    process.stderr.write(`seed-e2e-users: ${name} points at ${host}; refusing to seed a non-local Supabase\n`);
+    process.exit(1);
+  }
 }
 
 const admin = createClient(url, secret, { auth: { persistSession: false } });
@@ -63,6 +85,7 @@ try {
       const { error } = await admin.auth.admin.updateUserById(existing.id, {
         password,
         email_confirm: true,
+        app_metadata: E2E_APP_METADATA,
       });
       if (error) throw new Error(`update ${user.email}: ${error.message}`);
       userId = existing.id;
@@ -71,6 +94,7 @@ try {
         email: user.email,
         password,
         email_confirm: true,
+        app_metadata: E2E_APP_METADATA,
       });
       if (error || !data.user) {
         throw new Error(`create ${user.email}: ${error?.message ?? "no user"}`);

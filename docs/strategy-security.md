@@ -205,7 +205,7 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 
 ## `E2E_REGULAR_PASSWORD` / `E2E_ADMIN_PASSWORD`
 
-**Impact if leaked:** An attacker can sign in as one of two fake e2e accounts (`e2e-regular@testfake.local` / `e2e-admin@testfake.local`). These accounts contain no real member data.
+**Impact if leaked:** An attacker can sign in as one of two fake e2e accounts (`e2e-regular@testfake.local` / `e2e-admin@testfake.local`). Either one sees what any member sees. `e2e-admin` is a prod admin whose admin access is capped to the reads in `E2E_ADMIN_READS` (`src/server/auth-middleware.ts`): app settings, pending relation hints, hidden members, and the program list.
 
 **To rotate:**
 1. Change the password in the Supabase dashboard → Authentication → Users (production project)
