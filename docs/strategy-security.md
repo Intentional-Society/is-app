@@ -147,6 +147,14 @@ Requires npm ≥11 — older npm warns and ignores the setting, so this is silen
 
 Dependabot has no visibility into `.npmrc`, so `.github/dependabot.yml` carries a matching `cooldown.default-days: 3` for the npm ecosystem. Keep the two values in sync — otherwise Dependabot opens PRs bumping to versions the `.npmrc` quarantine would still reject.
 
+## Dependency install scripts
+
+`allowScripts` in `package.json` denies every dependency install script in the tree: `lefthook`, `esbuild` and `@sentry/cli`. None of them needs its script. `esbuild` and `@sentry/cli` get their binaries from per-platform optional dependencies, and `npm run setup` runs `lefthook install` itself, so a fresh clone gets its git hooks from setup, never from `npm install`. npm 11.19 already honors explicit `false` entries.
+
+`.npmrc` sets `strict-allow-scripts=true`, so a dependency with install scripts that `allowScripts` doesn't list fails the install (`ESTRICTALLOWSCRIPTS`) — locally, in CI and on Vercel. Without it, npm 11 warns and runs the script, and npm 12 skips it with a warning. This is the case that matters: a compromised release that adds a `postinstall` to a package that never had one, or a new transitive dependency that arrives with one. Expect it as red CI on the Dependabot PR that introduced the script.
+
+When an install fails with `ESTRICTALLOWSCRIPTS`, decide whether the package needs them and record the answer with `npm install-scripts deny <pkg>` or `npm install-scripts approve <pkg>`. Deny and name-only entries survive version bumps; `approve` pins `pkg@version` unless given `--no-allow-scripts-pin`. On npm 11.19.1, `--dry-run` on these subcommands still writes `package.json`.
+
 # Dependency scanning
 
 Three GitHub features and one workflow act on dependency advisories, configured independently. Confusing them is the main hazard.

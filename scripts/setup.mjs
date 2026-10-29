@@ -13,9 +13,10 @@ const repoRoot = resolve(import.meta.dirname, "..");
 
 function ensureLefthookInstalled() {
   // Wires lefthook's binary into .git/hooks. Re-running is a no-op.
-  // Note: lefthook's own postinstall already does this during `npm install`
-  // (skipped only when CI=true). Calling it here too is deliberate
-  // defense-in-depth: missing hooks are a silent local quality failure.
+  // This is the only place hooks get installed: `allowScripts` in package.json
+  // denies lefthook's own postinstall (docs/strategy-security.md), so a plain
+  // `npm install` leaves .git/hooks alone. Missing hooks are a silent local
+  // quality failure.
   const result = spawnSync("npx", ["lefthook", "install"], {
     cwd: repoRoot,
     stdio: "inherit",

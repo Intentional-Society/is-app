@@ -89,5 +89,10 @@
   },
   "optionalDependencies": {
     "@tailwindcss/oxide-darwin-arm64": "^4.2.2"
+  },
+  "allowScripts": {
+    "lefthook": false,
+    "esbuild": false,
+    "@sentry/cli": false
   }
 }
