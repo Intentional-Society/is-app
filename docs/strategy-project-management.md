@@ -2,7 +2,7 @@
 
 ## Current approach: single GitHub Projects board
 
-All work lives on the [`is-app dev`](https://github.com/orgs/Intentional-Society/projects/2) GitHub Project. Issues in the `is-app` repo are auto-added to the board via the built-in "auto-add from repository" workflow.
+All work lives on the [`is-app project`](https://github.com/orgs/Intentional-Society/projects/2) GitHub Project. Issues in the `is-app` repo are auto-added to the board via the built-in "auto-add from repository" workflow.
 
 One board, one source of truth. We're small enough that splitting work across multiple projects, milestones, or external trackers would cost more than it saves.
 
@@ -20,19 +20,20 @@ The split between No Status and Backlog is deliberate: Backlog is supposed to me
 
 To move an item back to No Status, click its current Status chip and toggle it off — the UI hides this behind the same control that sets a status.
 
-## Views
+## Priority
 
-Two main views:
+Priority ranks work against the rest of this board. It is a single-select project field with four levels:
+
+- **P0** — hair on fire: production outage, data or security breach.
+- **P1** — needed within two weeks.
+- **P2** — slightly elevated urgency.
+- **P3** — the default: low priority.
+
+## Views
 
 - **All items** (table) — full list, sortable, bulk-edit friendly. The default working view.
 - **Kanban** (board) — kanban columns by Status. Useful for seeing what's moving and what's stuck.
-
-Two quest views (see [Quests](#quests)):
-
-- **Quests** — `label:quest`. Every quest, open and closed.
-- **Rewards** — `has:reward-status`. Quests whose reward the PO has set: awaiting payment, paid, or declined.
-
-(We deleted the default Priority and Roadmap views. Priority will come back if/when we start using the Priority field seriously. Roadmap needs Start/Target dates per item, which only matters if we're scheduling releases.)
+- **Quests** — `label:quest`. Every quest, open and closed (see [Quests](#quests)).
 
 ## Automations
 
@@ -58,13 +59,17 @@ The rest of GitHub's built-in automations are off.
 
 ## Quests
 
-A quest is a feature posted with a reward; see [`strategy-feature-development.md`](strategy-feature-development.md). The board is public, so anyone can see each quest's reward and reward status. Quests move through the same statuses as other work. Three additions track them:
+A quest is a feature posted with a reward; see [`strategy-feature-development.md`](strategy-feature-development.md). The board is public, so anyone can see each quest's base reward and reward status. Quests move through the same statuses as other work. Three additions track them:
 
 - **`quest` label** — marks an issue as a quest.
-- **Reward ($USD)** — a number field: the base reward until payout, then the final reward.
-- **Reward status** — a single-select: **Awaiting Payment** once the PO has set the final reward, **Paid** once paid, **Declined** when no reward will be paid. Blank means not a quest, or not yet merged.
+- **Reward ($USD)** — a number field: the base reward. Final rewards are recorded off-board.
+- **Reward status** — a single-select. Blank means not a quest.
+  - **Not yet set** — a quest awaiting its base reward from the PO.
+  - **Set** — the PO has set the base reward.
+  - **Paid** — the reward has been paid.
+  - **Declined** — no reward will be paid.
 
-Done means merged, for quests as for all other work: merging closes the issue, and the built-in automations set Done. Reward status tracks payment on its own, which needs no custom automation. A closed quest whose Reward status is blank or Awaiting Payment has its reward due.
+Done means merged, for quests as for all other work: merging closes the issue, and the built-in automations set Done. Reward status tracks payment on its own, which needs no custom automation. A closed quest whose Reward status is Set has its reward due.
 
 ## Issue conventions
 
