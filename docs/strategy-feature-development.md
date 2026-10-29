@@ -24,10 +24,10 @@ work.
 | 3. Ready | GitHub issue + `docs/spec-<feature-name>.md` | Ready | It's a GitHub issue with reward |
 | 4. Implementation | Branch + PR | In progress | There's enough spec to start building |
 | 5. Acceptance and deployment | PR, then production | In progress, then Done on merge | A PR to `main` is open |
-| 6. Reward | | Done; Reward status: Awaiting Payment, then Paid | Its PR is merged |
+| 6. Reward | | Done; Reward status: Set, then Paid or Declined | Its PR is merged |
 
-Quest issues carry the `quest` label. The public board's **Quests** and **Rewards**
-views track them; see
+Quest issues carry the `quest` label. The public board's **Quests** view tracks
+them; see
 [`strategy-project-management.md`](strategy-project-management.md#quests).
 
 ## 1. Ideation
@@ -61,7 +61,8 @@ An issue is ready to spec and implement when:
 
 - It's defined well enough that someone can take it on and write its spec.
 - A GitHub issue containing the definition sits in the board's **Ready** column.
-- The PO has approved it, set its base reward, and labeled it `quest`.
+- The PO has approved it, set its base reward (Reward status **Set**), and
+  labeled it `quest`.
 
 To write the spec for a Ready issue, assign yourself. Write the spec at
 `docs/spec-<feature-name>.md`, expanding the definition into a buildable
@@ -99,10 +100,8 @@ issue, which moves it to **Done**.
 ## 6. Reward
 
 Once a quest's PR is merged, the PO sets the final reward by scaling the base
-reward for the quality of the work. The PO records it in the issue's
-**Reward ($USD)** field, replacing the base reward, and sets **Reward status**
-to **Awaiting Payment**. When multiple people worked on a quest (say, a spec author
-and a developer), the PO splits the reward by who did what. Contact the PO to
-arrange payment; method, invoicing, and timing are handled case by case. Once
-paid, the PO sets Reward status to **Paid**, or to **Declined** if no reward
-will be paid.
+reward for the quality of the work. Final rewards are recorded off-board and
+the issue's **Reward ($USD)** field keeps the base reward. When multiple people
+worked on a quest (say, a spec author and a developer), the PO splits the
+reward by who did what. Contact the PO to arrange payment. Once paid, the PO
+sets Reward status to **Paid**, or to **Declined** if no reward will be paid.
