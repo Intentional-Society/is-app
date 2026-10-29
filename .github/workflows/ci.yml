@@ -47,8 +47,7 @@ jobs:
           cache: npm
 
       # The `supabase` devDependency is the same native binary that
-      # supabase/setup-cli would download — its postinstall fetches it
-      # from supabase/cli releases. Running it via npm keeps the CLI
+      # supabase/setup-cli would download. Running it via npm keeps the CLI
       # version locked in package-lock.json (and tracked by Dependabot)
       # rather than floating behind `version: latest`, and removes one
       # third-party Action from the supply chain.
