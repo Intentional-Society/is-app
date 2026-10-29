@@ -8,6 +8,7 @@ import { decodeUser, SUPABASE_USER_HEADER } from "@/lib/supabase/server-user";
 
 import { db } from "./db";
 import { profiles } from "./schema";
+import { E2E_EMAILS } from "./test-reset";
 
 export type ApiVariables = { user: User };
 
@@ -28,12 +29,36 @@ export const isAdmin = async (userId: string): Promise<boolean> => {
   return row?.isAdmin ?? false;
 };
 
+// The seeded e2e accounts (E2E_EMAILS) sign in with passwords held as
+// GitHub Actions secrets, and e2e.yml runs unreviewed branch code
+// (Dependabot bumps, feature-branch previews) with those secrets in its
+// environment. e2e-admin is a real prod admin, so its admin powers are
+// capped to the reads tests/e2e/admin.spec.ts loads; every other admin
+// route answers it as it would a non-admin.
+export const E2E_ADMIN_READS: readonly string[] = [
+  "/api/admin/appsettings",
+  "/api/admin/hints",
+  "/api/admin/profiles/hidden",
+  "/api/admin/programs",
+];
+
+// Keyed on the `e2e_account` app_metadata flag, which only the service
+// role can write. The email match alone is bypassable: with "Confirm
+// email" off, Supabase commits an email change on the new address's
+// click alone, so a password holder can move the account off its
+// testfake.local email. The email match covers an account not yet flagged.
+export const isE2EAccount = (user: User): boolean =>
+  user.app_metadata?.e2e_account === true || (E2E_EMAILS as readonly string[]).includes(user.email ?? "");
+
 // Admin-only gate for the /api/admin/* sub-router. Runs after
 // requireAuth, so c.get("user") is always populated. Returns 404
 // rather than 403 so the surface isn't advertised to non-admins —
 // matches the /admin page's notFound() behavior.
 export const requireAdmin: MiddlewareHandler<{ Variables: ApiVariables }> = async (c, next) => {
   const user = c.get("user");
+  if (isE2EAccount(user) && !(c.req.method === "GET" && E2E_ADMIN_READS.includes(c.req.path))) {
+    return c.json({ error: "not_found" }, 404);
+  }
   if (!(await isAdmin(user.id))) {
     return c.json({ error: "not_found" }, 404);
   }

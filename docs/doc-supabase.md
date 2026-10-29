@@ -40,6 +40,15 @@ The Playwright e2e suite signs in as two long-lived users instead of admin-provi
 
 Both users should be created with "Auto Confirm User" checked so they can sign in with a password immediately.
 
+Both users also carry `app_metadata.e2e_account = true`, which `isE2EAccount` (`src/server/auth-middleware.ts`) reads to limit them to the reads in `E2E_ADMIN_READS`. Only the service role can write `app_metadata`, so set it in the SQL editor:
+
+```sql
+UPDATE auth.users
+SET raw_app_meta_data = raw_app_meta_data || '{"e2e_account": true}'::jsonb
+WHERE email IN ('e2e-regular@testfake.local', 'e2e-admin@testfake.local')
+RETURNING email, raw_app_meta_data;
+```
+
 **Secrets (set in GitHub Actions → Settings → Secrets → Actions, and as a Vercel env var across all environments for `CI_RESET_TOKEN`):**
 
 - `E2E_REGULAR_PASSWORD` — the password for `e2e-regular@testfake.local`. GH Actions only.
@@ -48,7 +57,7 @@ Both users should be created with "Auto Confirm User" checked so they can sign i
 
 **Blast radius if leaked:**
 
-- Passwords: attacker can sign in as one of two fake accounts. Regular sees its own profile + up to 10 self-created invites. Admin additionally sees the admin surface (app settings, relation hints, program administration). Rotate by changing the password in the Supabase dashboard.
+- Passwords: attacker can sign in as one of two fake accounts. Regular sees its own profile + up to 10 self-created invites. Admin additionally sees the reads in `E2E_ADMIN_READS`: app settings, relation hints, hidden members, and the program list. Rotate by changing the password in the Supabase dashboard.
 - Reset token: attacker can wipe the profile fields + delete invites for those two accounts, on any environment (preview and prod share the same Supabase). Rotate by generating a new string and updating both the GH secret and Vercel env var.
 
 **Reset endpoint:** `POST /api/_test/reset`, token-gated. Defined in `src/server/test-reset.ts`; the Playwright setup project (`tests/e2e/reset.setup.ts`) calls it once at the top of every run. The token is the sole gate — preview and prod share one Supabase, so an environment gate would be theatre against a token that already mutates prod data either way. The destructive scope is fixed at the seeded e2e users, not arbitrary rows.

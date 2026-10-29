@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-28 | James (with Opus 5.5) | e2e-admin is read-only
+
+Limited to the whitelisted tested reads in `E2E_ADMIN_READS`.
+
+---
+
 ## 2026-10-28 | James (with Opus 5.5) | Dependency install scripts are denied
 
 `package.json` `allowScripts` denies the `lefthook`, `esbuild` and `@sentry/cli` install scripts, so `npm install` no longer installs git hooks; a fresh clone gets them from `npm run setup`. `.npmrc` sets `strict-allow-scripts=true`, so a new unlisted install script fails the install with `ESTRICTALLOWSCRIPTS` until someone runs `npm install-scripts deny|approve <pkg>`.
