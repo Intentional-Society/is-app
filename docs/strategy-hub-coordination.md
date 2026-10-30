@@ -44,13 +44,18 @@ tested hypothesis, not a law, and measure the second run.
    of them can *record* an approval or an authorization; none of them can *be* one. Authority is
    given by the human in the chat of the session that will act on it, then copied to the root ticket
    as a record, not a source.
-6. **GO is not autonomy.** GO lets a hub write. Only a separate, dated, expiring **authorization**
-   lets it act unasked, and only within that authorization's list. With no live authorization the hub
-   works **attended**: every commit, PR and root-ticket edit needs the maintainer's yes in chat.
+6. **GO is not autonomy, and this doc is not the gate on the repo.** GO opens the pen. What a hub
+   may do to the repository is governed by the team's skills (`/commit`, `/pr`, `/ship`) and their
+   own checkpoints, exactly as configured on that machine; this doc neither adds a gate on top of
+   them nor removes one. A dated, expiring **authorization** is how the maintainer relaxes a skill
+   checkpoint for one session (the skill-evals note allowed `/commit` and `/pr` without the
+   interactive yes once the approval block was posted on the ticket). What this doc gates on its
+   own is the root ticket, its shared locks, and the launching of paid work: those wait for the
+   maintainer's word in chat unless an authorization covers them.
 
 If you remember one thing: *the root ticket is the shared memory; the pen is who may write to it;
-the human's chat is the only place authority comes from; GO opens the pen, an authorization opens
-the hands.*
+the human's chat is the only place authority comes from; GO opens the pen, the skills guard the
+repo, an authorization is how the maintainer loosens either.*
 
 ## Why it is shaped this way
 
@@ -323,13 +328,28 @@ returns.
 
 ## Authority: record, not source
 
+**What the skills already decide.** Repository actions have their own gates, checked in and
+configured per machine, and this doc defers to them:
+
+- `/commit` confirms natural-language intent (Step 0, which the per-machine opt-out file
+  `.claude/skip-nl-confirm-commit-pr.local` skips) and then always presents one bundled approval
+  block for a yes (Step 14). `/pr` is the same shape: optional intent confirmation, then a yes on
+  the drafted title, body and reviewers.
+- `/ship` is explicit-only, and the merge confirmation is the checked-in `ask` rule on
+  `gh pr merge`, which fires in every permission mode and which no session setting can silence.
+
+If a person has set those skills up so their agent may act with fewer prompts, this pattern does
+not override that; if the skills require a yes, this pattern does not need to repeat it. The
+pattern's own gates are the ones the skills do not cover: writes to the root ticket, its shared
+locks, and launching paid work (eval batches, long agent runs).
+
 Three states, in order of what they permit:
 
 | State | What the hub may do |
 | --- | --- |
 | **Before GO** | Read only: the record, read-only `git` and `gh … view/list`, read-only agents, notes in its own working folder. |
-| **GO, no live authorization** (also after every authorization has lapsed) | Holds the pen and works **attended**: every commit, every PR and every root-ticket edit needs the maintainer's yes in that session's chat. |
-| **GO plus a live authorization** | Acts unasked within the authorization's list, until its expiry, stopping on its tripwires. |
+| **GO, no live authorization** (also after every authorization has lapsed) | Holds the pen. Repository actions run under the skills' checkpoints as configured on that machine. Root-ticket edits beyond the pen hand-over, lock claims and paid launches wait for the maintainer's word in chat. The skill-evals program called this working **attended**, because on the maintainer's laptop the skills' defaults meant a yes per commit and per PR. |
+| **GO plus a live authorization** | Acts unasked within the authorization's list, until its expiry, stopping on its tripwires. The list can relax a skill checkpoint for the session (not the merge rule, which is checked in by design) and can cover root-ticket writes, locks and launches. |
 
 An **authorization** is a dated block the maintainer types into the acting session's chat. The hub
 may draft it; the maintainer gives it. Its slots, from the skill-evals notes:
@@ -338,8 +358,9 @@ may draft it; the maintainer gives it. Its slots, from the skill-evals notes:
   effect only when given in that chat and that the GitHub copy is a record.
 - **What the hub may do unasked**, per approved ticket, named concretely (branch and push; run the
   gate; `/commit` and `/pr` without an interactive yes *provided* the approval block is posted on
-  the ticket first; fix commits inside the ticket's acceptance; draft PRs only; edit Current state
-  once the line names you).
+  the ticket first, which is the maintainer relaxing those skills' checkpoints for this session;
+  fix commits inside the ticket's acceptance; draft PRs only; edit Current state once the line
+  names you).
 - **What is reserved**, which the skill-evals maintainer stated as "still mine, always": `/ship`
   and every merge; anything touching `main` directly, including force-push and auto-merge; every
   branch deletion; approving every change to a skill's text or an eval's text; a second iteration
@@ -539,3 +560,10 @@ Dispositions below; the reviewers' full reports are not in the repo.
   doc's scope; noted as an override in the pointer.
 - Reproduce the maintainer's per-ticket sign-off list verbatim (maintainer). Condensed into the
   cost section; the full list is in the authorization record.
+
+**Post-review change, 2026-10-30, on the maintainer's comment on the diff page:** rule 6 and the
+authority states had restated the skills' own commit and PR checkpoints as a gate of this doc's
+own. Checked against `.claude/skills/{commit,pr,ship}/SKILL.md`: the opt-out file skips only the
+intent confirmation, the approval checkpoints always run, and the merge confirmation is the
+checked-in `ask` rule. Rewritten so the doc defers to the skills as configured on each machine and
+gates only the root ticket, its locks and paid launches.
