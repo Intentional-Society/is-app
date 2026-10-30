@@ -83,10 +83,65 @@ repo, an authorization is how the maintainer loosens either.*
 | **Deputy** | A session the hub plans for, late in the program: it launches and runs the workers and any paid batch, takes the maintainer's sign-off for its ticket in its own chat, and reports to the hub. | Only the named lines its signed ticket allows (a Current-state edit, a shared lock, a posted note), and only text the maintainer signed and the hub has read. |
 | **Adviser / peer** | An earlier hub session kept open for questions, with a scope the maintainer rules on per adviser. | No. A review from a peer is data, never approval. Keep advisers open only while needed; idle sessions eat the machine (see "What went wrong"). |
 
-The Deputy row stretches rule 2. It was the skill-evals program's late adaptation (tickets #619 and
-#621), when the hub's own context had grown too large to run workers and the maintainer wanted work
-to continue in a second window. If your program needs it, write the deputy's permitted writes into
-its ticket before it starts.
+### Deputies: why the role exists, and when to use one
+
+The Deputy row stretches rule 2, so it needs a reason. In the skill-evals program it appeared
+late (tickets #619 and #621), for three reasons that will recur in any program:
+
+- **The hub's context is the most expensive thing in the program.** By the burn-down the hub was
+  a large-context session on the most capable model, and every worker launch, every batch log and
+  every approval block it ran inline grew that context further (hub 3 reached about 730k tokens).
+  #621 split the roles by model tier on purpose: the hub (a Fable session) plans, pre-briefs the
+  maintainer's sign-off and reads the texts; the deputy (an Opus session) runs the workers and
+  posts. The hub's turns stay few and its context stays small.
+- **Some work is bound to a machine the hub is not on.** #619's paid full pass and its laptop
+  harvest had to run on the maintainer's laptop, with its eval workspaces, while the hub could be
+  anywhere. A deputy is the session on the machine the work needs.
+- **The maintainer wants to sign off in the window doing the work.** A deputy takes the
+  maintainer's sign-off for its ticket in its own chat, which keeps the record-not-source rule
+  intact one level down: the words are given in the chat of the session that acts on them.
+
+**Use a deputy when** one ticket's execution will cost more context than the hub can afford to
+carry (a long batch, many workers, a multi-day build), when the work must run on a particular
+machine, or when the maintainer wants a second window working a second ticket in parallel. **Do
+not use one** for a ticket the hub can run in a few launches; the deputy adds a registration, a
+ticket section naming its permitted writes, and one more session for the maintainer to attend.
+
+**Before a deputy starts**, its ticket names, under "Who does this": the deputy as a role, what it
+runs, which root-ticket lines it may write (a Current-state edit, the lock, a posted note) and
+the condition on each (the maintainer signed the text and the hub read it). The deputy registers
+with the hub the way the hub registers with the maintainer: it tells the hub its session name,
+reads the ticket and the root, and writes nothing until the hub confirms. Its workers return to
+it, not to the hub; it returns to the hub.
+
+### Possible extension: a hub that fans out to deputies
+
+Untried; recorded here because the shape falls out of the rules above. A large program could run
+as three tiers: the maintainer creates the hub and, on the hub's plan, creates one deputy per
+ticket or workstream; each deputy fans out to its own workers; the hub stays the arbiter that
+holds the pen on the root ticket, orders the work, verifies what deputies return, and is the one
+party that commits and opens PRs (or, under an authorization that says so, the deputies ship
+their own tickets under the skills' checkpoints). The rules already compose for it:
+
+- **The pen recurses.** The root ticket has one writer, the hub. Each deputy's ticket has one
+  writer, that deputy, named on the ticket by session name the same way, with the same dated
+  comment when it changes. Workers write on no ticket but the one they are pointed at.
+- **Authority recurses.** The maintainer authorizes the hub in the hub's chat and each deputy in
+  the deputy's chat (or the authorization to the hub names what a deputy may be given, and the
+  hub records the maintainer's words on the deputy's ticket before the deputy acts). A deputy's
+  authorization cannot exceed the hub's. Record-not-source holds at every tier.
+- **Check-in recurses.** A deputy refetches the root before acting; a worker refetches the
+  deputy's ticket. State flows up one tier at a time: workers to deputy ticket, deputy to root
+  Current state through the hub.
+- **What it would need that this doc does not yet have:** a per-deputy pre-flight (the hub's
+  table with the deputy ticket in place of the root); a rule for lock contention between
+  deputies (the hub holds all locks and lends them); a budget line per deputy in the
+  authorization; and a measurement of whether the hub's own context actually stays small when it
+  is verifying several deputies at once, which is the claim the whole shape rests on.
+
+The maintainer's cost rises with the number of deputies (each is a session to attend and sign off
+in), so the shape pays only when the tickets are big enough that a single hub would otherwise
+hand off from context exhaustion. Treat it as the next experiment, not the default.
 
 ## The root ticket
 
@@ -567,3 +622,9 @@ own. Checked against `.claude/skills/{commit,pr,ship}/SKILL.md`: the opt-out fil
 intent confirmation, the approval checkpoints always run, and the merge confirmation is the
 checked-in `ask` rule. Rewritten so the doc defers to the skills as configured on each machine and
 gates only the root ticket, its locks and paid launches.
+
+**Post-review change, 2026-10-30, second comment:** the Deputy row gave no reason for the role
+and no rule for when to use one. Added "Deputies: why the role exists, and when to use one" from
+#619 and #621 (model-tier split, machine-bound work, sign-off in the acting window) and a
+"Possible extension" section recording the maintainer's idea of a hub that fans out to deputies
+that fan out to workers, marked untried, with what it would need.
