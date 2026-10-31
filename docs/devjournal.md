@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-30 | James (with Opus 5.5) | Program features design
+
+Program-specific functionality attaches to programs through a `program_features` table and is gated to current participants of unarchived programs. Design: `docs/design-programs.md`.
+
+---
+
 ## 2026-10-30 | James (with Opus 5.5) | Server-side Sentry events are flushed
 
 Sentry captures made inside API handlers appear to have been lost when the Vercel instance froze, like next-axiom's logs in June. Server entry points now call `flushSentry()`, and `api.onError` reports thrown API errors.
