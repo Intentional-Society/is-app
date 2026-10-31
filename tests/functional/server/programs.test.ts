@@ -12,6 +12,7 @@ vi.mock("@supabase/ssr", () => ({
 // missing-program test assert on calls to captureException.
 vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
+  flush: vi.fn().mockResolvedValue(true),
 }));
 
 import { captureException as Sentry_captureException } from "@sentry/nextjs";

@@ -3,6 +3,7 @@ import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { log } from "next-axiom";
 
+import { flushSentry } from "@/lib/sentry-flush";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/server/db";
 import { upsertProfile } from "@/server/profiles";
@@ -105,6 +106,16 @@ export function GET(request: NextRequest): NextResponse {
 // scanner's prefetch. Redirects use 303 so the browser follows them with
 // a GET rather than re-POSTing to the destination.
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    return await verifyAndRedirect(request);
+  } finally {
+    // This route sits outside the Hono app's flushing middleware, so it
+    // delivers its own Sentry captures (see src/lib/sentry-flush.ts).
+    flushSentry();
+  }
+}
+
+async function verifyAndRedirect(request: NextRequest): Promise<NextResponse> {
   const form = await request.formData();
   const tokenHashRaw = form.get("token_hash");
   const typeRaw = form.get("type");

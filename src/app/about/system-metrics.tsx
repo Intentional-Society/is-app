@@ -1,6 +1,7 @@
 import { captureException as Sentry_captureException } from "@sentry/nextjs";
 
 import { serverApiClient } from "@/lib/api-server";
+import { flushSentry } from "@/lib/sentry-flush";
 
 import { RedeemedNamesHint } from "./redeemed-names-hint";
 
@@ -118,6 +119,7 @@ export async function SystemMetrics() {
     );
   } catch (err) {
     Sentry_captureException(err);
+    flushSentry();
     return <p className="text-sm text-muted-foreground">System metrics unavailable.</p>;
   }
 }
