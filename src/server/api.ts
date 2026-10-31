@@ -1,12 +1,15 @@
+import { captureException as Sentry_captureException } from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { waitUntil } from "@vercel/functions";
 import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
 import { appVersion, urgentReleasedAt } from "@/lib/changelog";
 import { isRelationValue } from "@/lib/relation-value";
+import { flushSentry } from "@/lib/sentry-flush";
 import { toSlug } from "@/lib/slug";
 
 import { getAppSettings } from "./app-settings";
@@ -325,6 +328,9 @@ const api = new Hono<{ Variables: ApiVariables }>()
     // batch is delivered without delaying the response. Outside Vercel
     // it no-ops and the long-lived process delivers on the throttle.
     waitUntil(log.flush());
+    // Sentry queues the same way; this delivers anything a handler (or
+    // api.onError below) captured during the request.
+    flushSentry();
   })
   .use("*", requireAuth)
   .get("/hello", (c) => {
@@ -883,6 +889,21 @@ api.get("/cron/buttondown-sync", async (c) => {
     return c.json(result, 500);
   }
   return c.json(result);
+});
+
+// Hono's default error handler logs to the console and answers 500
+// itself, so a thrown API error never reaches Next's onRequestError hook
+// or Sentry. Report it here; the request middleware above runs after
+// this handler and flushes the event. HTTPException responses pass
+// through untouched, as in Hono's default.
+api.onError((err, c) => {
+  if (err instanceof HTTPException) return err.getResponse();
+  Sentry_captureException(err, {
+    tags: { feature: "api" },
+    extra: { method: c.req.method, path: c.req.path },
+  });
+  log.error("api error", { method: c.req.method, path: c.req.path, error: err.message });
+  return c.text("Internal Server Error", 500);
 });
 
 export type ApiRoutes = typeof api;

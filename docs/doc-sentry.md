@@ -31,6 +31,7 @@ Auth tokens are generated at Settings → Auth Tokens in the Sentry dashboard.
 
 - **Client errors:** `instrumentation-client.ts` initializes Sentry in the browser with error tracking, performance traces, and opt-in session replay (see below)
 - **Server errors:** `sentry.server.config.ts` loaded via `instrumentation.ts` at server startup
+- **Server event delivery:** a server capture only queues the event, and Vercel can freeze the function before it is sent. The SDK flushes only in route handlers it wraps, and Turbopack builds wrap none, so we call `flushSentry()` (`src/lib/sentry-flush.ts`): the API middleware on every request, and the auth callback and About page metrics directly. `api.onError` reports thrown API errors, which Hono's default handler would answer itself.
 - **React crashes:** `src/app/global-error.tsx` catches uncaught errors and reports to Sentry
 - **Source maps:** uploaded automatically during `next build` when `SENTRY_AUTH_TOKEN` is set
 - **Tunnel route:** `/error-handling` proxies all browser-side Sentry traffic (errors, traces, replay) through our domain to avoid ad blockers

@@ -21,6 +21,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
+  flush: vi.fn().mockResolvedValue(true),
 }));
 
 // Stub the Buttondown runner so the inline hooks PUT /me fires are

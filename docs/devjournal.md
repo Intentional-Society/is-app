@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-30 | James (with Opus 5.5) | Server-side Sentry events are flushed
+
+Sentry captures made inside API handlers appear to have been lost when the Vercel instance froze, like next-axiom's logs in June. Server entry points now call `flushSentry()`, and `api.onError` reports thrown API errors.
+
+---
+
 ## 2026-10-28 | James (with Opus 5.5) | e2e-admin is read-only
 
 Limited to the whitelisted tested reads in `E2E_ADMIN_READS`.
