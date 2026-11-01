@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-10-31 | James (with Opus 5.5) | Docs-only merges skip the production deploy
+
+`vercel.json`'s `ignoreCommand` now diffs `main` against the last production deploy, so a docs-only merge no longer rebuilds production, runs production e2e, or shows open tabs an update banner. To force a build, redeploy from the dashboard with the Ignore Build Step box unchecked.
+
+---
+
 ## 2026-10-30 | James (with Opus 5.5) | Program features design
 
 Program-specific functionality attaches to programs through a `program_features` table and is gated to current participants of unarchived programs. Design: `docs/design-programs.md`.

@@ -18,23 +18,26 @@ Always commit on a feature branch, never directly to `main`. PRs into `main` req
 
 ## Skipping deploys for docs-only changes
 
-Every push to a branch with an open PR triggers a Vercel preview deploy, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` automatically skips builds whose entire branch diff vs `main` is confined to `docs/` or the root `AGENTS.md` and `CLAUDE.md`. Nothing for the author to remember.
+Every push triggers a Vercel build, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` runs `scripts/vercel-ignore-build.mjs`, which skips the build when the only changes are in `docs/` or the root `AGENTS.md` and `CLAUDE.md` — for branch previews and for production merges to `main`. Nothing for the author to remember. The logic lives in a script because Vercel rejects an `ignoreCommand` longer than 256 characters (schema validation fails the deploy). The script runs before `npm install`, so it uses Node built-ins only.
 
 How it works:
 
-1. If the branch is `main`, deploy (production builds always run, including for docs-only merges, so the deploy record exists and migrations get a chance to run).
-2. Otherwise, `git fetch --depth=1 "https://github.com/$VERCEL_GIT_REPO_OWNER/$VERCEL_GIT_REPO_SLUG.git" main` pulls main's tip into `FETCH_HEAD`. The explicit URL is necessary because Vercel's build container has no `origin` remote configured — `git fetch origin main` fails with `fatal: 'origin' does not appear to be a git repository`. The URL is reconstructed from the env vars Vercel exposes. This works without auth because the repo is public; if it ever goes private again, this fetch will need a token.
-3. `git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!AGENTS.md' ':!CLAUDE.md'` exits 0 if no non-docs files differ between this branch and main's tip, 1 if any do. We diff against `FETCH_HEAD` (rather than a named ref) because the fetch above doesn't create one — `git fetch <url> <branch>` populates only `FETCH_HEAD`.
-4. The trailing `|| exit 1` normalises every failure path to exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly. `git fetch` errors are not redirected to `/dev/null` — if the next breakage is also a fetch issue, we want it visible in the Vercel build log.
+1. Pick the comparison base. On `main` it is `VERCEL_GIT_PREVIOUS_SHA`, the last commit that successfully deployed to production. On any other branch it is `main`'s tip.
+2. Deploy if the base is empty or equals `VERCEL_GIT_COMMIT_SHA`. The first covers a branch's first deploy (Vercel leaves the variable empty then); the second keeps a same-commit dashboard Redeploy (for example, to pick up a changed environment variable) from being skipped.
+3. `git fetch --depth=1 "https://github.com/$VERCEL_GIT_REPO_OWNER/$VERCEL_GIT_REPO_SLUG.git" "$base"` pulls the base into `FETCH_HEAD`. The explicit URL is necessary because Vercel's build container has no `origin` remote configured — `git fetch origin main` fails with `fatal: 'origin' does not appear to be a git repository`. The URL is reconstructed from the env vars Vercel exposes. This works without auth because the repo is public; if it ever goes private again, this fetch will need a token. GitHub serves a full commit SHA as a fetchable ref, so the same command works for both bases.
+4. `git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!AGENTS.md' ':!CLAUDE.md'` exits 0 (skip) if no non-docs files differ from the base, 1 (deploy) if any do. We diff against `FETCH_HEAD` (rather than a named ref) because the fetch above doesn't create one.
+5. The script turns every failure path into exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly. `git fetch` errors still go to stderr — if the next breakage is also a fetch issue, we want it visible in the Vercel build log.
 
-Comparing against main's tip (rather than `VERCEL_GIT_PREVIOUS_SHA`) makes the skip work on the *first* push of a branch — which matters because trunk-based branches are usually short-lived and most PRs are single-push. It also handles mixed pushes correctly: any non-docs file in the branch's diff vs main triggers a deploy.
+Branches compare against main's tip because `VERCEL_GIT_PREVIOUS_SHA` is per-branch and empty on a branch's first push, and most trunk-based PRs are a single push. `main` always has a previous production deploy, so it compares against that: a skipped build never becomes the "last successful deployment", so a run of docs-only merges is measured against the last commit that actually deployed, and the first code merge after them deploys everything since.
 
 Failure modes all default to deploying (the safe direction):
 
-- `git fetch origin main` fails (network, missing ref) — deploy runs.
+- `git fetch` fails (network, missing ref) — deploy runs.
 - Anything unexpected — deploy runs.
 
-Playwright e2e skips downstream because it's triggered by Vercel's `deployment_status` event, which only fires on a real deploy.
+To force a build of a skipped commit, redeploy it from the Vercel dashboard with **Use project's Ignore Build Step** unchecked.
+
+Playwright e2e skips downstream because it's triggered by Vercel's `deployment_status` event, which only fires on a real deploy. A skipped production build also leaves the deployment ID unchanged, so open tabs see no update banner (`docs/strategy-deployment.md`).
 
 CI (lint + functional tests) is also skipped on docs-only PRs, but the mechanism differs from Vercel's. Branch protection requires the "Lint & Functional Tests" status check, so `ci.yml` can't simply not run — the check would stay stuck at "expected" and block merge. Instead it always runs, and the job itself decides whether to do any work: a `dorny/paths-filter` step sets a `code` output — true when the PR changes any file outside `docs/`, `AGENTS.md` and `CLAUDE.md` — and every subsequent step (Node and Supabase setup, `npm install`, `lint`, `typecheck`, migrations, the functional tests) is gated on `code == 'true'`. A docs-only PR skips them all and still reports success, satisfying branch protection.
 
