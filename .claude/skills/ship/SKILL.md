@@ -142,7 +142,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `docs/doc-github.md` (PR settings: merge-commit-only; `merge_commit_title`/`merge_commit_message`; `delete_branch_on_merge: true`; `prod-db` environment + required-reviewers gate; docs-only check semantics)
 - `docs/strategy-project-management.md` (PR-merged → board "Done" automation)
 - `.claude/settings.json` (checked-in `ask` rule on `gh pr merge` — the harness merge confirmation)
-- `vercel.json` (`ignoreCommand` for docs-only PRs and docs-only merges to `main`; `drizzle-kit migrate` ahead of `next build` on production deploys)
+- `vercel.json` (`ignoreCommand` → `scripts/vercel-ignore-build.mjs` for docs-only PRs and docs-only merges to `main`; `drizzle-kit migrate` ahead of `next build` on production deploys)
 - `scripts/update-main-branch-protection.mjs` (required check name `Lint & Functional Tests`; `strict_required_status_checks_policy: true`)
 - `.github/workflows/ci.yml` (required check; `dorny/paths-filter` docs-only handling)
 - `.github/workflows/e2e.yml` (post-deploy advisory; gated on `deployment_status.environment` ∈ {Preview, Production})

@@ -18,7 +18,7 @@ Always commit on a feature branch, never directly to `main`. PRs into `main` req
 
 ## Skipping deploys for docs-only changes
 
-Every push triggers a Vercel build, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` skips the build when the only changes are in `docs/` or the root `AGENTS.md` and `CLAUDE.md` — for branch previews and for production merges to `main`. Nothing for the author to remember.
+Every push triggers a Vercel build, which eats build minutes. Vercel's `ignoreCommand` in `vercel.json` runs `scripts/vercel-ignore-build.mjs`, which skips the build when the only changes are in `docs/` or the root `AGENTS.md` and `CLAUDE.md` — for branch previews and for production merges to `main`. Nothing for the author to remember. The logic lives in a script because Vercel rejects an `ignoreCommand` longer than 256 characters (schema validation fails the deploy). The script runs before `npm install`, so it uses Node built-ins only.
 
 How it works:
 
@@ -26,7 +26,7 @@ How it works:
 2. Deploy if the base is empty or equals `VERCEL_GIT_COMMIT_SHA`. The first covers a branch's first deploy (Vercel leaves the variable empty then); the second keeps a same-commit dashboard Redeploy (for example, to pick up a changed environment variable) from being skipped.
 3. `git fetch --depth=1 "https://github.com/$VERCEL_GIT_REPO_OWNER/$VERCEL_GIT_REPO_SLUG.git" "$base"` pulls the base into `FETCH_HEAD`. The explicit URL is necessary because Vercel's build container has no `origin` remote configured — `git fetch origin main` fails with `fatal: 'origin' does not appear to be a git repository`. The URL is reconstructed from the env vars Vercel exposes. This works without auth because the repo is public; if it ever goes private again, this fetch will need a token. GitHub serves a full commit SHA as a fetchable ref, so the same command works for both bases.
 4. `git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!AGENTS.md' ':!CLAUDE.md'` exits 0 (skip) if no non-docs files differ from the base, 1 (deploy) if any do. We diff against `FETCH_HEAD` (rather than a named ref) because the fetch above doesn't create one.
-5. The trailing `|| exit 1` normalises every failure path to exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly. `git fetch` errors are not redirected to `/dev/null` — if the next breakage is also a fetch issue, we want it visible in the Vercel build log.
+5. The script turns every failure path into exit 1 (deploy). Vercel's `ignoreCommand` only accepts exit codes 0 (skip) and 1 (deploy); anything else (e.g., `git fetch` exiting 128) is treated as a deployment failure, so we have to trap explicitly. `git fetch` errors still go to stderr — if the next breakage is also a fetch issue, we want it visible in the Vercel build log.
 
 Branches compare against main's tip because `VERCEL_GIT_PREVIOUS_SHA` is per-branch and empty on a branch's first push, and most trunk-based PRs are a single push. `main` always has a previous production deploy, so it compares against that: a skipped build never becomes the "last successful deployment", so a run of docs-only merges is measured against the last commit that actually deployed, and the first code merge after them deploys everything since.
 
