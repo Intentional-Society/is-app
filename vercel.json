@@ -1,6 +1,6 @@
 {
   "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then node scripts/migrate.mjs; fi && next build",
-  "ignoreCommand": "{ [ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ] && git fetch --depth=1 \"https://github.com/$VERCEL_GIT_REPO_OWNER/$VERCEL_GIT_REPO_SLUG.git\" main && git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!AGENTS.md' ':!CLAUDE.md' ; } || exit 1",
+  "ignoreCommand": "{ if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ]; then base=\"$VERCEL_GIT_PREVIOUS_SHA\"; else base=main; fi; [ -n \"$base\" ] && [ \"$base\" != \"$VERCEL_GIT_COMMIT_SHA\" ] && git fetch --depth=1 \"https://github.com/$VERCEL_GIT_REPO_OWNER/$VERCEL_GIT_REPO_SLUG.git\" \"$base\" && git diff --quiet FETCH_HEAD HEAD -- . ':!docs/' ':!AGENTS.md' ':!CLAUDE.md' ; } || exit 1",
   "crons": [
     {
       "path": "/api/cron/buttondown-sync",
