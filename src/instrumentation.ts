@@ -2,7 +2,7 @@ import { captureRequestError as Sentry_captureRequestError } from "@sentry/nextj
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("./sentry.server.config");
+    await import("../sentry.server.config");
   }
 }
 

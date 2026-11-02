@@ -28,7 +28,7 @@ const authAs = (userId: string) => {
 };
 
 // Runs against the real, unmocked Sentry SDK. Tests never load
-// instrumentation.ts, so no client exists: the same state the probe is
+// src/instrumentation.ts, so no client exists: the same state the probe is
 // built to detect in production.
 describe("GET /api/admin/sentry-check", () => {
   let adminId: string;

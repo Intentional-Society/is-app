@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-11-01 | James (with Opus 5.5) | Server-side Sentry now reports from production
+
+`instrumentation.ts` moved to `src/`. At the repo root, Next compiled it but left it out of the deployed function, so the server SDK had never started in production and every server-side capture was dropped. Server entry points also call `flushSentry()` so queued events survive the Vercel freeze, and `api.onError` reports thrown API errors.
+
+---
+
 ## 2026-10-31 | James (with Opus 5.5) | Docs-only merges skip the production deploy
 
 `vercel.json`'s `ignoreCommand` now diffs `main` against the last production deploy, so a docs-only merge no longer rebuilds production, runs production e2e, or shows open tabs an update banner. To force a build, redeploy from the dashboard with the Ignore Build Step box unchecked.
@@ -13,12 +19,6 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 ## 2026-10-30 | James (with Opus 5.5) | Program features design
 
 Program-specific functionality attaches to programs through a `program_features` table and is gated to current participants of unarchived programs. Design: `docs/design-programs.md`.
-
----
-
-## 2026-10-30 | James (with Opus 5.5) | Server-side Sentry events are flushed
-
-Sentry captures made inside API handlers appear to have been lost when the Vercel instance froze, like next-axiom's logs in June. Server entry points now call `flushSentry()`, and `api.onError` reports thrown API errors.
 
 ---
 
