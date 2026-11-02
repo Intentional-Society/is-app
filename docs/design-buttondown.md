@@ -133,10 +133,10 @@ When the cron or the inline path encounters a Buttondown subscriber that is unsu
 
 1. **No write to Buttondown.** Their unsubscribe is sacred — we do not re-tag, re-subscribe, or alter their record.
 2. **No automatic change to the app side.** We do not call `leaveProgram` on their behalf — that's a human decision.
-3. **Alert.** `Sentry.captureException(new Error('buttondown.unsubscribed_member'), { extra: { profileId, email, currentPrograms, unsubscribedAt } })`. Captured as an exception (error level) so Sentry's project alert rules send an email notification to the dev team. Configure the alert rule once in the Sentry UI to fire on this fingerprint.
-4. **Idempotency.** The alert fires once per cron run per unsubscribed member; that's acceptable noise (low cardinality, daily). If we want truly once-and-done semantics later, a `profiles.buttondownUnsubscribeAlertedAt` column is the natural next step.
+3. **Alert, only while the member holds a `buttondownTag` program.** `captureUnsubscribeAlert` in `buttondown-runner.ts` raises an error-level `buttondown.unsubscribed_member` exception with `profileId`, `email`, `programSlugsHeld` and `buttondownTagsOnSubscriber` as extras. Sentry marks a new error-level issue high priority, which triggers the project's "high priority issues" alert rule and emails the team (see [doc-sentry.md](doc-sentry.md)). A member who holds no tagged program is a resolved case: no alert, counted as `unsubscribedResolved` in the run summary.
+4. **Idempotency.** The fingerprint `['buttondown.unsubscribed_member', profileId]` gives each member one Sentry issue. The event fires once per cron run per unresolved member and lands on that issue, so the email goes out once, when the issue is created.
 
-Until a human resolves the case (typically by calling `leaveProgram` on each `buttondownTag`-bearing program, or by removing the IS Web membership entirely), the daily cron continues to skip the subscriber and re-fire the alert. That's by design — the unresolved state is itself a problem worth flagging.
+Until a human resolves the case (typically by calling `leaveProgram` on each `buttondownTag`-bearing program, or by removing the IS Web membership entirely), the daily cron continues to skip the subscriber and add an event to their issue. Once they hold no tagged program, the events stop; resolve the Sentry issue by hand.
 
 ## Concurrency lock
 
@@ -252,7 +252,6 @@ A one-shot script reconciled the app's CSV-imported memberships against Buttondo
 ## Future work
 
 - **Custom unsubscribe links.** Route Buttondown's unsubscribe through our app so the unsubscribe page can offer "leave just this program" vs "leave the network entirely" affordances. Would replace the human-review loop in [Unsubscribe handling](#unsubscribe-handling) with a structured user action.
-- **Once-and-done unsubscribe alerts.** Add `profiles.buttondownUnsubscribeAlertedAt` so the cron raises one Sentry alert per unsubscribed member rather than re-firing daily. Defer until the daily noise becomes annoying — at our scale, "one daily reminder per pending case" is also a useful nag.
 - **Tag rename safety.** If an admin changes a program's `buttondownTag` from `foo` to `bar`, subscribers tagged `foo` become stranded — `foo` is no longer in the managed universe so the sweep can't see it. Either keep a tag-history table or document the operational rule "rename ≠ change in place; do it via add-new + retire-old."
 - **Per-program ad-hoc emails from the app.** If we ever want to compose and send from `/admin`, the natural surface is `POST /v1/emails` to Buttondown segmented by the tag this design already maintains. The sync side is the foundation either way.
 

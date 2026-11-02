@@ -48,6 +48,21 @@ export type RunResult =
 
 const isSyncLogEvent = (event: SyncLogEvent): event is SyncLogEvent => event !== undefined;
 
+// The fingerprint gives each member their own issue; Sentry's default
+// grouping (message + stack) would merge every member into one.
+export const captureUnsubscribeAlert = (alert: UnsubscribeAlert, tags: Record<string, string>): void => {
+  Sentry_captureException(new Error("buttondown.unsubscribed_member"), {
+    fingerprint: ["buttondown.unsubscribed_member", alert.profileId],
+    extra: {
+      profileId: alert.profileId,
+      email: alert.email,
+      programSlugsHeld: alert.programSlugsHeld,
+      buttondownTagsOnSubscriber: alert.buttondownTagsOnSubscriber,
+    },
+    tags: { feature: "buttondown-sync", ...tags },
+  });
+};
+
 export const runButtondownSyncForServer = async (options: RunButtondownSyncOptions): Promise<RunResult> => {
   const runId = options.acquiredBy;
 
@@ -139,18 +154,7 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
         }
       },
       raiseUnsubscribeAlert: (alert: UnsubscribeAlert) => {
-        // Captured as an exception so Sentry's email-on-error alerting
-        // fires; the fingerprint stays stable across runs so an admin
-        // sees one issue per affected member rather than per cron.
-        Sentry_captureException(new Error("buttondown.unsubscribed_member"), {
-          extra: {
-            profileId: alert.profileId,
-            email: alert.email,
-            programSlugsHeld: alert.programSlugsHeld,
-            buttondownTagsOnSubscriber: alert.buttondownTagsOnSubscriber,
-          },
-          tags: { feature: "buttondown-sync", runId, acquiredBy: runId },
-        });
+        captureUnsubscribeAlert(alert, { runId, acquiredBy: runId });
       },
     });
 
@@ -186,15 +190,7 @@ export const runFirstProfileSaveForServer = async (params: {
       email: params.email,
       client,
       raiseUnsubscribeAlert: (alert: UnsubscribeAlert) => {
-        Sentry_captureException(new Error("buttondown.unsubscribed_member"), {
-          extra: {
-            profileId: alert.profileId,
-            email: alert.email,
-            programSlugsHeld: alert.programSlugsHeld,
-            buttondownTagsOnSubscriber: alert.buttondownTagsOnSubscriber,
-          },
-          tags: { feature: "buttondown-sync", path: "first-profile-save", runId },
-        });
+        captureUnsubscribeAlert(alert, { path: "first-profile-save", runId });
       },
     });
     log.info("buttondown sync", {
