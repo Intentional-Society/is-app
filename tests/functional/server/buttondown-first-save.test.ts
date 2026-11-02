@@ -239,6 +239,34 @@ describe("runFirstProfileSaveSync (inline hook)", () => {
     });
   });
 
+  it("raises no alert for an unsubscribed subscriber when the member holds no tagged program", async () => {
+    const profileId = await makeProfile({ email: "fs-dan-left@example.com" });
+
+    const initial: ButtondownSubscriber = {
+      id: "sub_dan_left",
+      email_address: "fs-dan-left@example.com",
+      type: "unsubscribed",
+      tags: ["weekly", "isweb-member"],
+    };
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+
+    const alerts: UnsubscribeAlert[] = [];
+    await runFirstProfileSaveSync({
+      profileId,
+      email: "fs-dan-left@example.com",
+      client,
+      raiseUnsubscribeAlert: (a) => alerts.push(a),
+    });
+
+    // Recorded just before the unsubscribed branch: proves the run got there.
+    const [row] = await db
+      .select({ buttondownSubscriberId: profiles.buttondownSubscriberId })
+      .from(profiles)
+      .where(eq(profiles.id, profileId));
+    expect(row.buttondownSubscriberId).toBe("sub_dan_left");
+    expect(alerts).toHaveLength(0);
+  });
+
   it("dry-run records the create effect without persisting subscriber id on the profile", async () => {
     const profileId = await makeProfile({ email: "fs-eve@example.com" });
     const programId = await makeProgram({ buttondownTag: "weekly" });

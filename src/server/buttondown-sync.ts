@@ -125,6 +125,8 @@ export const runFirstProfileSaveSync = async (params: {
   await db.update(profiles).set({ buttondownSubscriberId: subscriber.id }).where(eq(profiles.id, profileId));
 
   if (subscriber.type === "unsubscribed") {
+    // No tagged program held: a resolved case, nothing to alert on.
+    if (slugs.length === 0) return;
     params.raiseUnsubscribeAlert?.({
       profileId,
       email,
@@ -202,6 +204,7 @@ export type SyncLogEvent =
       dryRun: boolean;
     }
   | { action: "unsubscribe-alert"; runId: string; profileId: string; email: string; programSlugsHeld: string[] }
+  | { action: "skipped-unsubscribed-resolved"; runId: string; profileId: string }
   | { action: "skipped-missing-email"; runId: string; profileId: string }
   | { action: "skipped-already-current"; runId: string; profileId: string; subscriberId: string }
   | { action: "skipped-hidden-create"; runId: string; profileId: string }
@@ -230,6 +233,8 @@ export type SyncRunSummary = {
   nameUpdated: number;
   unchanged: number;
   unsubscribeAlerts: number;
+  // Unsubscribed, but holding no tagged program: resolved, no alert.
+  unsubscribedResolved: number;
   missingProfileEmail: number;
   // Hidden profiles with no existing Buttondown subscriber that the
   // sync would otherwise have created. Tag updates still flow for
@@ -471,6 +476,7 @@ export const runButtondownSync = async (deps: SyncDeps): Promise<SyncRunSummary>
     nameUpdated: 0,
     unchanged: 0,
     unsubscribeAlerts: 0,
+    unsubscribedResolved: 0,
     missingProfileEmail: 0,
     skippedHiddenCreate: 0,
     skippedUnsavedCreate: 0,
@@ -637,6 +643,11 @@ const syncOneProfile = async (args: SyncOneProfileArgs): Promise<void> => {
   }
 
   if (subscriber.type === "unsubscribed") {
+    if (desired.slugs.length === 0) {
+      summary.unsubscribedResolved++;
+      log({ action: "skipped-unsubscribed-resolved", runId, profileId });
+      return;
+    }
     summary.unsubscribeAlerts++;
     raise({
       profileId,

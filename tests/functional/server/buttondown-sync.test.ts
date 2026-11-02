@@ -253,6 +253,33 @@ describe("runButtondownSync (daily reconciler)", () => {
     });
   });
 
+  it("raises no alert for an unsubscribed subscriber whose member holds no tagged program", async () => {
+    const profileId = await makeProfile({
+      email: "eve-left@example.com",
+      buttondownSubscriberId: "sub_eve_left",
+    });
+
+    const initial = sampleSubscriber({
+      id: "sub_eve_left",
+      email_address: "eve-left@example.com",
+      type: "unsubscribed",
+      tags: ["weekly", "isweb-member"],
+    });
+    const client = createFakeButtondownClient({ write: true, initialSubscribers: [initial] });
+    const { alerts, raise } = collectingAlerts();
+
+    const summary = await runButtondownSync({
+      client,
+      runId: "r5b",
+      write: true,
+      raiseUnsubscribeAlert: raise,
+      scopeProfileIds: [profileId],
+    });
+
+    expect(alerts.filter((a) => a.profileId === profileId)).toHaveLength(0);
+    expect(summary.unsubscribedResolved).toBe(1);
+  });
+
   it("PATCHes email when the stored subscriber id resolves but the email has changed", async () => {
     const profileId = await makeProfile({
       email: "frank-new@example.com",
