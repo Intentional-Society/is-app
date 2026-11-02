@@ -1,4 +1,9 @@
-import { captureException as Sentry_captureException } from "@sentry/nextjs";
+import {
+  captureException as Sentry_captureException,
+  captureMessage as Sentry_captureMessage,
+  flush as Sentry_flush,
+  getClient as Sentry_getClient,
+} from "@sentry/nextjs";
 import type { User } from "@supabase/supabase-js";
 import { waitUntil } from "@vercel/functions";
 import { eq, sql } from "drizzle-orm";
@@ -214,6 +219,30 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       return c.json({ ok: true });
     },
   )
+  // Server-side Sentry health probe. Reports what the running function's
+  // SDK was initialized with; ?send=1 also captures a test event and
+  // awaits its delivery, separately from the request-end flush. The DSN
+  // itself never leaves the server (its host is already public in the
+  // browser bundle). GET so an admin can open it in the browser.
+  .get("/sentry-check", async (c) => {
+    const client = Sentry_getClient();
+    const rawDsn = process.env.SENTRY_DSN;
+    const report = {
+      clientInitialized: client !== undefined,
+      enabled: client?.getOptions().enabled ?? null,
+      dsnHost: client?.getDsn()?.host ?? null,
+      vercelEnv: process.env.VERCEL_ENV ?? null,
+      sentryDsnSet: Boolean(rawDsn),
+      sentryDsnHasWhitespace: rawDsn !== undefined && rawDsn !== rawDsn.trim(),
+    };
+    if (c.req.query("send") !== "1") return c.json(report);
+    const eventId = Sentry_captureMessage("sentry-check test event", {
+      level: "info",
+      tags: { feature: "sentry-check" },
+    });
+    const flushed = await Sentry_flush(5000);
+    return c.json({ ...report, test: { eventId, flushed } });
+  })
   // Two admin-triggered Buttondown sync routes. The dry-run button
   // fires immediately and is safe to press anytime; the write button
   // is wrapped in a confirm step on the UI side. Both call the same
