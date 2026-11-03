@@ -4,6 +4,12 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ---
 
+## 2026-11-04 | James (with Opus 5.5) | Biome now formats Markdown files
+
+See `docs/doc-biome.md`.
+
+---
+
 ## 2026-11-03 | Benji (with Kiro) | `npm install` on macOS failed on `fsevents`
 
 `strict-allow-scripts` (added 2026-10-28) fails the install when a dependency has an install script that `allowScripts` doesn't list. `fsevents` is a macOS-only optional dependency, so Linux CI and Vercel never saw it, but every Mac install failed with `ESTRICTALLOWSCRIPTS`. It is now denied in `allowScripts` like the other three. Upgrading to npm 11.19.1 doesn't change this.

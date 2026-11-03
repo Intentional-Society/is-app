@@ -329,7 +329,7 @@ Each P0 row references the §4 step(s) or section(s) that satisfy it and the PR 
 | P0.16 | `/ship` never merges through red, missing, or pending checks; no Proceed option | §4.3 Steps, §4.3 Failure modes | `3211516014`, `3211549081` |
 | P0.17 | `/ship` confirms only when it opened the PR this run; merge mode is repo-policy-driven merge-commit-only (no `--squash` flag) | §4.3 Invocation, §4.3 Steps | `3211534869`, `3211537639` |
 | P0.18 | `/ship` post-merge watch on `main` for up to 5 minutes; alerts immediately on red | §4.3 Steps | `3211544467` |
-| P0.19 | `/ship` accepts `[PR#|URL]` and switches branches safely; `/pr` refuses to switch | §4.3 Invocation, §4.3 Steps; §4.2 Steps | `3211510381` |
+| P0.19 | `/ship` accepts `[PR#\|URL]` and switches branches safely; `/pr` refuses to switch | §4.3 Invocation, §4.3 Steps; §4.2 Steps | `3211510381` |
 | P0.20 | `/ship` uses no shallow-fetch shortcuts for freshness checks; does not pass `--merge-title` or `--body` flags to `gh pr merge` | §4.3 Steps, §4.3 Failure modes | PR #236, PR #254 |
 | P0.21 | Skills are built via the `skill-creator` workflow; each Skill passes its own eval set; description-optimized | §3 Skill-builder workflow | `3211328311`, `issuecomment-4465701122` |
 | P0.22 | Complexity / scope-creep is the organizing principle; v1 has one clear path | §1, §3, §4 | `pullrequestreview-4249527087`, `3211556445` |
