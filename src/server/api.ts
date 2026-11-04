@@ -40,11 +40,11 @@ import { deleteMemberAccount, listActiveMemberEmails, listMembersAdmin, setAdmin
 import {
   createMessage,
   deleteMessage,
-  getVisibility,
+  getSettings,
   listMessages,
   parseMessageBody,
-  parseVisibilityUpdate,
-  setVisibility,
+  parseSettingsUpdate,
+  updateSettings,
 } from "./message-box";
 import {
   deactivateProfile,
@@ -224,17 +224,17 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/programs/:id/message-box", async (c) => {
     const programId = c.req.param("id");
     if (!isUuid(programId)) return c.json({ error: "not_found" }, 404);
-    return c.json({ visibility: await getVisibility(programId) });
+    return c.json(await getSettings(programId));
   })
   .patch(
     "/programs/:id/message-box",
     validator("json", (body, c) => {
-      const parsed = parseVisibilityUpdate(body);
+      const parsed = parseSettingsUpdate(body);
       if ("error" in parsed) return c.json({ error: parsed.error }, 400);
       return parsed;
     }),
     async (c) => {
-      const result = await setVisibility(c.req.param("id"), c.req.valid("json").visibility);
+      const result = await updateSettings(c.req.param("id"), c.req.valid("json"));
       if ("error" in result) return c.json({ error: result.error }, 404);
       return c.json({ ok: true });
     },
@@ -402,12 +402,14 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
     // secrets used by unreviewed branch code, so its admin powers are capped
     // (E2E_ADMIN_READS in auth-middleware.ts). Treat it as a plain member here:
     // no admins-only messages, no hidden or deactivated authors, no delete.
-    const [visibility, adminFlag] = await Promise.all([getVisibility(programId), isAdmin(user.id)]);
+    const [settings, adminFlag] = await Promise.all([getSettings(programId), isAdmin(user.id)]);
+    const { visibility, prompt } = settings;
     const admin = adminFlag && !isE2EAccount(user);
     const canRead = visibility === "members" || admin;
     const messages = canRead ? await listMessages(programId, admin) : [];
     return c.json({
       visibility,
+      prompt,
       canRead,
       canPost: c.get("featureParticipant"),
       canModerate: admin,

@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { LocalTime } from "@/components/local-time";
+import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +60,7 @@ export function MessageBox({ programId }: { programId: string }) {
 function MessageBoxBody({ programId, data }: { programId: string; data: MessageBoxResponse }) {
   return (
     <>
+      {data.prompt && <Markdown>{data.prompt}</Markdown>}
       {data.canPost ? (
         <MessageForm programId={programId} />
       ) : (

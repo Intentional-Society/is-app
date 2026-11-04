@@ -25,3 +25,4 @@ export const isProgramFeatureKey = (key: unknown): key is string =>
 export const MESSAGE_BOX_VISIBILITIES = ["members", "admins"] as const;
 export type MessageBoxVisibility = (typeof MESSAGE_BOX_VISIBILITIES)[number];
 export const MESSAGE_BOX_MAX_LENGTH = 1000;
+export const MESSAGE_BOX_MAX_PROMPT_LENGTH = 2000;

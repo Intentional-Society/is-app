@@ -1,11 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api";
 import type { AdminProgramFeature } from "@/lib/api-types";
-import { MESSAGE_BOX_FEATURE, MESSAGE_BOX_VISIBILITIES, type MessageBoxVisibility } from "@/lib/program-features";
+import {
+  MESSAGE_BOX_FEATURE,
+  MESSAGE_BOX_MAX_PROMPT_LENGTH,
+  MESSAGE_BOX_VISIBILITIES,
+  type MessageBoxVisibility,
+} from "@/lib/program-features";
 
 const featuresQueryKey = (programId: string) => ["admin", "programs", programId, "features"] as const;
 const messageBoxSettingsQueryKey = (programId: string) =>
@@ -22,10 +30,12 @@ const fetchFeatures = async (programId: string): Promise<AdminProgramFeature[]> 
   return (await res.json()).features;
 };
 
-const fetchVisibility = async (programId: string): Promise<MessageBoxVisibility> => {
+type Settings = { visibility: MessageBoxVisibility; prompt: string | null };
+
+const fetchSettings = async (programId: string): Promise<Settings> => {
   const res = await apiClient.api.admin.programs[":id"]["message-box"].$get({ param: { id: programId } });
   if (!res.ok) throw new Error(`admin/programs/${programId}/message-box: ${res.status}`);
-  return (await res.json()).visibility;
+  return res.json();
 };
 
 // Admin toggles for the program features in the code registry
@@ -93,19 +103,38 @@ export function ProgramFeaturesPanel({ programId }: { programId: string }) {
 }
 
 function MessageBoxSettings({ programId }: { programId: string }) {
-  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: messageBoxSettingsQueryKey(programId),
-    queryFn: () => fetchVisibility(programId),
+    queryFn: () => fetchSettings(programId),
   });
 
-  const visibilityMutation = useMutation({
-    mutationFn: async (visibility: MessageBoxVisibility) => {
+  // The editor seeds from the loaded prompt once; remounting on a new key
+  // would drop in-progress edits, so it waits for the load instead.
+  if (query.isPending) return <p className="text-sm text-muted-foreground">Loading settings…</p>;
+  if (query.isError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        Couldn't load the message box settings.
+      </p>
+    );
+  }
+  return <MessageBoxSettingsForm programId={programId} settings={query.data} />;
+}
+
+function MessageBoxSettingsForm({ programId, settings }: { programId: string; settings: Settings }) {
+  const queryClient = useQueryClient();
+  const [prompt, setPrompt] = useState(settings.prompt ?? "");
+
+  const saveMutation = useMutation({
+    mutationFn: async (update: { visibility?: MessageBoxVisibility; prompt?: string | null }) => {
       const res = await apiClient.api.admin.programs[":id"]["message-box"].$patch({
         param: { id: programId },
-        json: { visibility },
+        json: update,
       });
-      if (!res.ok) throw new Error("Failed to update who can read messages.");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "Failed to save the message box settings.");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -115,36 +144,71 @@ function MessageBoxSettings({ programId }: { programId: string }) {
   });
 
   // Show the pending choice right away instead of waiting for the refetch.
-  const shown = visibilityMutation.isPending ? visibilityMutation.variables : query.data;
+  const shownVisibility =
+    saveMutation.isPending && saveMutation.variables?.visibility
+      ? saveMutation.variables.visibility
+      : settings.visibility;
+  const promptDirty = prompt.trim() !== (settings.prompt ?? "");
 
   return (
-    <fieldset className="flex flex-col gap-1.5 rounded border border-border p-2" disabled={query.isPending}>
-      <legend className="px-1 text-xs font-medium text-muted-foreground">Who can read messages</legend>
-      {MESSAGE_BOX_VISIBILITIES.map((value) => (
-        <label key={value} className="flex items-start gap-2">
-          <input
-            type="radio"
-            name={`message-box-visibility-${programId}`}
-            value={value}
-            checked={shown === value}
-            disabled={visibilityMutation.isPending}
-            onChange={() => visibilityMutation.mutate(value)}
-            className="mt-1"
-          />
-          <span>
-            <span className="font-medium">{VISIBILITY_LABELS[value].label}</span>{" "}
-            <span className="text-muted-foreground">— {VISIBILITY_LABELS[value].hint}</span>
-          </span>
-        </label>
-      ))}
-      <p className="text-xs text-muted-foreground">
-        Admins can always read and delete messages. Posting is for participants.
-      </p>
-      {(query.isError || visibilityMutation.isError) && (
+    <div className="flex flex-col gap-3">
+      <fieldset className="flex flex-col gap-1.5 rounded border border-border p-2">
+        <legend className="px-1 text-xs font-medium text-muted-foreground">Who can read messages</legend>
+        {MESSAGE_BOX_VISIBILITIES.map((value) => (
+          <label key={value} className="flex items-start gap-2">
+            <input
+              type="radio"
+              name={`message-box-visibility-${programId}`}
+              value={value}
+              checked={shownVisibility === value}
+              disabled={saveMutation.isPending}
+              onChange={() => saveMutation.mutate({ visibility: value })}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium">{VISIBILITY_LABELS[value].label}</span>{" "}
+              <span className="text-muted-foreground">— {VISIBILITY_LABELS[value].hint}</span>
+            </span>
+          </label>
+        ))}
+        <p className="text-xs text-muted-foreground">
+          Admins can always read and delete messages. Posting is for participants.
+        </p>
+      </fieldset>
+
+      <div className="flex flex-col gap-1.5">
+        {/* The editor renders a contenteditable div (no labelable control), so the
+            field name rides on the editor's ariaLabel rather than htmlFor. */}
+        <Label>Prompt</Label>
+        <MarkdownEditor
+          variant="full"
+          ariaLabel="Message box prompt"
+          value={prompt}
+          onChange={setPrompt}
+          disabled={saveMutation.isPending}
+          placeholder="e.g. Won't be there at the next call? Send a short message of connection."
+        />
+        <p className="text-xs text-muted-foreground">
+          Shown above the message box on the program page. Leave blank for none. Max {MESSAGE_BOX_MAX_PROMPT_LENGTH}{" "}
+          characters.
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          size="xs"
+          className="self-start"
+          disabled={saveMutation.isPending || !promptDirty}
+          onClick={() => saveMutation.mutate({ prompt: prompt.trim() || null })}
+        >
+          {saveMutation.isPending && saveMutation.variables?.prompt !== undefined ? "Saving…" : "Save prompt"}
+        </Button>
+      </div>
+
+      {saveMutation.isError && (
         <p role="alert" className="text-sm text-destructive">
-          {visibilityMutation.error?.message ?? "Couldn't load this setting."}
+          {saveMutation.error.message}
         </p>
       )}
-    </fieldset>
+    </div>
   );
 }

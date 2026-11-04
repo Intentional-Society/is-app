@@ -33,6 +33,7 @@ const $delete = vi.mocked(apiClient.api.admin.programs[":id"]["message-box"].mes
 
 const box = (overrides: Partial<MessageBoxResponse> = {}): MessageBoxResponse => ({
   visibility: "members",
+  prompt: null,
   canRead: true,
   canPost: true,
   canModerate: false,
@@ -87,6 +88,20 @@ describe("MessageBox", () => {
     renderBox();
     expect(await screen.findByText("Messages sent here are read by the program's admins.")).toBeVisible();
     expect(screen.getByLabelText("Leave a message")).toBeVisible();
+  });
+
+  it("shows the program's prompt above the form", async () => {
+    mockBox(box({ prompt: "Won't be there at the next call? **Send a note.**" }));
+    renderBox();
+    expect(await screen.findByText(/Won't be there at the next call\?/)).toBeVisible();
+    expect(screen.getByText("Send a note.").tagName).toBe("STRONG");
+  });
+
+  it("shows no prompt block when none is set", async () => {
+    mockBox(box());
+    renderBox();
+    await screen.findByText("Sending love from afar");
+    expect(screen.queryByText(/next call/)).not.toBeInTheDocument();
   });
 
   it("says so when there are no messages yet", async () => {

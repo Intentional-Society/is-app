@@ -224,8 +224,10 @@ export const programFeatures = pgTable(
 ).enableRLS();
 
 // Per-program settings for the message-box feature. A missing row means the
-// default, 'admins': messages stay admin-only until an admin opens them to
-// all members. Rows are written on first change, not on attach.
+// defaults: visibility 'admins' (messages stay admin-only until an admin opens
+// them to all members) and no prompt. `prompt` is markdown shown above the
+// textarea, e.g. "Won't be there at the next call?". Rows are written on first
+// change, not on attach.
 export const messageBoxSettings = pgTable(
   "message_box_settings",
   {
@@ -233,6 +235,7 @@ export const messageBoxSettings = pgTable(
       .primaryKey()
       .references(() => programs.id, { onDelete: "cascade" }),
     visibility: text("visibility").notNull().default("admins"),
+    prompt: text("prompt"),
   },
   (table) => [check("message_box_settings_visibility", sql`${table.visibility} IN ('members', 'admins')`)],
 ).enableRLS();

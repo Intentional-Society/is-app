@@ -1,6 +1,11 @@
 import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
 
-import { MESSAGE_BOX_MAX_LENGTH, MESSAGE_BOX_VISIBILITIES, type MessageBoxVisibility } from "@/lib/program-features";
+import {
+  MESSAGE_BOX_MAX_LENGTH,
+  MESSAGE_BOX_MAX_PROMPT_LENGTH,
+  MESSAGE_BOX_VISIBILITIES,
+  type MessageBoxVisibility,
+} from "@/lib/program-features";
 
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
@@ -46,26 +51,55 @@ export const parseMessageBody = (body: unknown): { body: string } | { error: str
   return { body: trimmed };
 };
 
-export const parseVisibilityUpdate = (body: unknown): { visibility: MessageBoxVisibility } | { error: string } => {
+export type MessageBoxSettings = {
+  visibility: MessageBoxVisibility;
+  // Markdown shown above the textarea; null = none set.
+  prompt: string | null;
+};
+
+export type MessageBoxSettingsUpdate = Partial<MessageBoxSettings>;
+
+// Parses an admin settings update. Every key is optional but at least one must
+// be present. A blank prompt clears it (null).
+export const parseSettingsUpdate = (body: unknown): MessageBoxSettingsUpdate | { error: string } => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "body must be a JSON object" };
   }
-  const visibility = (body as Record<string, unknown>).visibility;
-  if (!isVisibility(visibility)) return { error: 'visibility must be "members" or "admins"' };
-  return { visibility };
+  const obj = body as Record<string, unknown>;
+  const update: MessageBoxSettingsUpdate = {};
+
+  if ("visibility" in obj) {
+    if (!isVisibility(obj.visibility)) return { error: 'visibility must be "members" or "admins"' };
+    update.visibility = obj.visibility;
+  }
+  if ("prompt" in obj) {
+    if (obj.prompt !== null && typeof obj.prompt !== "string") return { error: "prompt must be a string or null" };
+    const prompt = typeof obj.prompt === "string" ? obj.prompt.trim() : "";
+    if (prompt.length > MESSAGE_BOX_MAX_PROMPT_LENGTH) {
+      return { error: `prompt is too long (max ${MESSAGE_BOX_MAX_PROMPT_LENGTH} characters)` };
+    }
+    update.prompt = prompt || null;
+  }
+  if (Object.keys(update).length === 0) return { error: "nothing to update" };
+  return update;
 };
 
-export const getVisibility = async (programId: string): Promise<MessageBoxVisibility> => {
+export const getSettings = async (programId: string): Promise<MessageBoxSettings> => {
   const [row] = await db
-    .select({ visibility: messageBoxSettings.visibility })
+    .select({ visibility: messageBoxSettings.visibility, prompt: messageBoxSettings.prompt })
     .from(messageBoxSettings)
     .where(eq(messageBoxSettings.programId, programId));
-  return row && isVisibility(row.visibility) ? row.visibility : DEFAULT_VISIBILITY;
+  return {
+    visibility: row && isVisibility(row.visibility) ? row.visibility : DEFAULT_VISIBILITY,
+    prompt: row?.prompt ?? null,
+  };
 };
 
-export const setVisibility = async (
+// Upserts only the keys present, so changing the prompt leaves visibility alone
+// (and the reverse). The insert side fills the rest with column defaults.
+export const updateSettings = async (
   programId: string,
-  visibility: MessageBoxVisibility,
+  update: MessageBoxSettingsUpdate,
 ): Promise<{ ok: true } | { error: "not_found" }> => {
   if (!isUuid(programId)) return { error: "not_found" };
   const [program] = await db.select({ id: programs.id }).from(programs).where(eq(programs.id, programId));
@@ -73,8 +107,8 @@ export const setVisibility = async (
 
   await db
     .insert(messageBoxSettings)
-    .values({ programId, visibility })
-    .onConflictDoUpdate({ target: messageBoxSettings.programId, set: { visibility } });
+    .values({ programId, ...update })
+    .onConflictDoUpdate({ target: messageBoxSettings.programId, set: update });
   return { ok: true };
 };
 

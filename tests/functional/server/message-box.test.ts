@@ -9,7 +9,7 @@ vi.mock("@supabase/ssr", () => ({
 
 import { createServerClient } from "@supabase/ssr";
 
-import { MESSAGE_BOX_FEATURE, MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
+import { MESSAGE_BOX_FEATURE, MESSAGE_BOX_MAX_LENGTH, MESSAGE_BOX_MAX_PROMPT_LENGTH } from "@/lib/program-features";
 import app from "@/server/api";
 import { db } from "@/server/db";
 import { deleteProgram } from "@/server/programs";
@@ -91,6 +91,7 @@ const deleteUserAndProfile = async (id: string) => {
 
 type Box = {
   visibility: "members" | "admins";
+  prompt: string | null;
   canRead: boolean;
   canPost: boolean;
   canModerate: boolean;
@@ -363,14 +364,14 @@ describe("Message box program feature", () => {
     it("reads the default visibility as admins", async () => {
       authAs(admin);
       const res = await app.request(adminBox());
-      expect(await res.json()).toEqual({ visibility: "admins" });
+      expect(await res.json()).toEqual({ visibility: "admins", prompt: null });
     });
 
     it("sets visibility, which then governs who can read", async () => {
       authAs(admin);
       const patch = await app.request(adminBox(), jsonInit("PATCH", { visibility: "members" }));
       expect(patch.status).toBe(200);
-      expect(await (await app.request(adminBox())).json()).toEqual({ visibility: "members" });
+      expect(await (await app.request(adminBox())).json()).toEqual({ visibility: "members", prompt: null });
 
       await seedMessage(participant, "now public");
       authAs(outsider);
@@ -380,6 +381,60 @@ describe("Message box program feature", () => {
       await app.request(adminBox(), jsonInit("PATCH", { visibility: "admins" }));
       authAs(outsider);
       expect(await getBox()).toMatchObject({ canRead: false, messages: [] });
+    });
+
+    describe("prompt", () => {
+      const patch = (body: unknown) => app.request(adminBox(), jsonInit("PATCH", body));
+
+      it("saves a trimmed prompt and shows it to every member, even one who can't read the messages", async () => {
+        authAs(admin);
+        expect((await patch({ prompt: "  Won't be there at the next call?  " })).status).toBe(200);
+        expect(await (await app.request(adminBox())).json()).toEqual({
+          visibility: "admins",
+          prompt: "Won't be there at the next call?",
+        });
+
+        for (const viewer of [participant, outsider]) {
+          authAs(viewer);
+          expect(await getBox()).toMatchObject({ canRead: false, prompt: "Won't be there at the next call?" });
+        }
+      });
+
+      it("changes the prompt without touching visibility, and the reverse", async () => {
+        authAs(admin);
+        await patch({ visibility: "members" });
+        await patch({ prompt: "Hello" });
+        expect(await (await app.request(adminBox())).json()).toEqual({ visibility: "members", prompt: "Hello" });
+        await patch({ visibility: "admins" });
+        expect(await (await app.request(adminBox())).json()).toEqual({ visibility: "admins", prompt: "Hello" });
+      });
+
+      it("clears the prompt when set to blank or null", async () => {
+        authAs(admin);
+        await patch({ prompt: "Hello" });
+        await patch({ prompt: "   " });
+        expect((await getBox()).prompt).toBeNull();
+        await patch({ prompt: "Again" });
+        await patch({ prompt: null });
+        expect((await getBox()).prompt).toBeNull();
+      });
+
+      it("accepts a prompt at the length limit and rejects one over it", async () => {
+        authAs(admin);
+        expect((await patch({ prompt: "x".repeat(MESSAGE_BOX_MAX_PROMPT_LENGTH) })).status).toBe(200);
+        expect((await patch({ prompt: "x".repeat(MESSAGE_BOX_MAX_PROMPT_LENGTH + 1) })).status).toBe(400);
+      });
+
+      it("rejects a non-string prompt and an empty update with 400", async () => {
+        authAs(admin);
+        expect((await patch({ prompt: 5 })).status).toBe(400);
+        expect((await patch({})).status).toBe(400);
+      });
+
+      it("404s a prompt change from a non-admin", async () => {
+        authAs(participant);
+        expect((await patch({ prompt: "nope" })).status).toBe(404);
+      });
     });
 
     it("rejects an unknown visibility with 400", async () => {
