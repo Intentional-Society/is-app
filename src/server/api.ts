@@ -13,6 +13,7 @@ import { validator } from "hono/validator";
 import { log } from "next-axiom";
 
 import { appVersion, urgentReleasedAt } from "@/lib/changelog";
+import { MESSAGE_BOX_FEATURE } from "@/lib/program-features";
 import { isRelationValue } from "@/lib/relation-value";
 import { flushSentry } from "@/lib/sentry-flush";
 import { toSlug } from "@/lib/slug";
@@ -37,6 +38,15 @@ import {
 } from "./invites";
 import { deleteMemberAccount, listActiveMemberEmails, listMembersAdmin, setAdminStatus } from "./members-admin";
 import {
+  createMessage,
+  deleteMessage,
+  getVisibility,
+  listMessages,
+  parseMessageBody,
+  parseVisibilityUpdate,
+  setVisibility,
+} from "./message-box";
+import {
   deactivateProfile,
   getProfileForMember,
   getProfileForSelf,
@@ -56,6 +66,12 @@ import {
   upsertProfile,
   withSlugPermutation,
 } from "./profiles";
+import {
+  type FeatureVariables,
+  listFeaturesForAdmin,
+  requireProgramFeature,
+  setFeatureAttached,
+} from "./program-features";
 import {
   addParticipant,
   createProgram,
@@ -189,6 +205,44 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/programs/:id/participant-emails", async (c) => {
     const emails = await listProgramParticipantEmails(c.req.param("id"));
     return c.json({ emails });
+  })
+  .get("/programs/:id/features", async (c) => {
+    const result = await listFeaturesForAdmin(c.req.param("id"));
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ features: result.features });
+  })
+  .put("/programs/:id/features/:key", async (c) => {
+    const result = await setFeatureAttached(c.req.param("id"), c.req.param("key"), true);
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ ok: true });
+  })
+  .delete("/programs/:id/features/:key", async (c) => {
+    const result = await setFeatureAttached(c.req.param("id"), c.req.param("key"), false);
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ ok: true });
+  })
+  .get("/programs/:id/message-box", async (c) => {
+    const programId = c.req.param("id");
+    if (!isUuid(programId)) return c.json({ error: "not_found" }, 404);
+    return c.json({ visibility: await getVisibility(programId) });
+  })
+  .patch(
+    "/programs/:id/message-box",
+    validator("json", (body, c) => {
+      const parsed = parseVisibilityUpdate(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      const result = await setVisibility(c.req.param("id"), c.req.valid("json").visibility);
+      if ("error" in result) return c.json({ error: result.error }, 404);
+      return c.json({ ok: true });
+    },
+  )
+  .delete("/programs/:id/message-box/messages/:messageId", async (c) => {
+    const result = await deleteMessage(c.req.param("id"), c.req.param("messageId"));
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ ok: true });
   })
   .get("/profiles/hidden", async (c) => {
     const members = await listHiddenMembers();
@@ -332,6 +386,48 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
     if ("error" in result) return c.json({ error: "not_found" }, 404);
     return c.json({ ok: true });
   });
+
+// Message-box routes, mounted at /api/programs/:id/message-box. The shared
+// middleware answers 404 for a program that is archived or doesn't have the
+// feature attached (docs/design-programs.md, "Access rule"). Any signed-in
+// member may read when the program's visibility is "members"; admins may
+// always read; only active participants may post. Moderation (delete) is in
+// the admin routes.
+const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
+  .use("*", requireProgramFeature(MESSAGE_BOX_FEATURE))
+  .get("/", async (c) => {
+    const user = c.get("user");
+    const programId = c.req.param("id") ?? "";
+    const [visibility, admin] = await Promise.all([getVisibility(programId), isAdmin(user.id)]);
+    const canRead = visibility === "members" || admin;
+    const messages = canRead ? await listMessages(programId, admin) : [];
+    return c.json({
+      visibility,
+      canRead,
+      canPost: c.get("featureParticipant"),
+      // The e2e admin is capped to a few admin reads (E2E_ADMIN_READS), so it
+      // gets no moderation controls that would only 404.
+      canModerate: admin && !isE2EAccount(user),
+      messages,
+    });
+  })
+  .post(
+    "/",
+    validator("json", (body, c) => {
+      const parsed = parseMessageBody(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      if (!c.get("featureParticipant")) return c.json({ error: "not_participant" }, 403);
+      const result = await createMessage({
+        programId: c.req.param("id") ?? "",
+        authorId: c.get("user").id,
+        body: c.req.valid("json").body,
+      });
+      return c.json({ id: result.id }, 201);
+    },
+  );
 
 const api = new Hono<{ Variables: ApiVariables }>()
   .basePath("/api")
@@ -869,6 +965,7 @@ const api = new Hono<{ Variables: ApiVariables }>()
       urgentReleasedAt,
     });
   })
+  .route("/programs/:id/message-box", messageBoxRoutes)
   .route("/admin", adminRoutes);
 
 // CI-only reset for the two seeded e2e users. Token header is the only

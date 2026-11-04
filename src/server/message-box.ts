@@ -1,0 +1,136 @@
+import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
+
+import { MESSAGE_BOX_MAX_LENGTH, MESSAGE_BOX_VISIBILITIES, type MessageBoxVisibility } from "@/lib/program-features";
+
+import { isUuid } from "./auth-middleware";
+import { attachAvatarUrls } from "./avatars";
+import { db } from "./db";
+import { messageBoxMessages, messageBoxSettings, profiles, programs } from "./schema";
+
+// Message box: a program-specific feature where participants leave short
+// messages (docs/design-programs.md). Access checks live in
+// program-features.ts; this module is the data layer.
+
+// Newest first, capped. The box is read aloud and skimmed, not archived;
+// pagination can come if a program ever needs it.
+const MESSAGE_LIMIT = 100;
+
+export const DEFAULT_VISIBILITY: MessageBoxVisibility = "admins";
+
+export type MessageBoxMessage = {
+  id: string;
+  body: string;
+  createdAt: string;
+  author: {
+    id: string;
+    slug: string | null;
+    displayName: string | null;
+    avatarUrl: string | null;
+  };
+};
+
+export const isVisibility = (v: unknown): v is MessageBoxVisibility =>
+  typeof v === "string" && (MESSAGE_BOX_VISIBILITIES as readonly string[]).includes(v);
+
+export const parseMessageBody = (body: unknown): { body: string } | { error: string } => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { error: "body must be a JSON object" };
+  }
+  const text = (body as Record<string, unknown>).body;
+  if (typeof text !== "string") return { error: "body must be a string" };
+  const trimmed = text.trim();
+  if (!trimmed) return { error: "message is empty" };
+  if (trimmed.length > MESSAGE_BOX_MAX_LENGTH) {
+    return { error: `message is too long (max ${MESSAGE_BOX_MAX_LENGTH} characters)` };
+  }
+  return { body: trimmed };
+};
+
+export const parseVisibilityUpdate = (body: unknown): { visibility: MessageBoxVisibility } | { error: string } => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { error: "body must be a JSON object" };
+  }
+  const visibility = (body as Record<string, unknown>).visibility;
+  if (!isVisibility(visibility)) return { error: 'visibility must be "members" or "admins"' };
+  return { visibility };
+};
+
+export const getVisibility = async (programId: string): Promise<MessageBoxVisibility> => {
+  const [row] = await db
+    .select({ visibility: messageBoxSettings.visibility })
+    .from(messageBoxSettings)
+    .where(eq(messageBoxSettings.programId, programId));
+  return row && isVisibility(row.visibility) ? row.visibility : DEFAULT_VISIBILITY;
+};
+
+export const setVisibility = async (
+  programId: string,
+  visibility: MessageBoxVisibility,
+): Promise<{ ok: true } | { error: "not_found" }> => {
+  if (!isUuid(programId)) return { error: "not_found" };
+  const [program] = await db.select({ id: programs.id }).from(programs).where(eq(programs.id, programId));
+  if (!program) return { error: "not_found" };
+
+  await db
+    .insert(messageBoxSettings)
+    .values({ programId, visibility })
+    .onConflictDoUpdate({ target: messageBoxSettings.programId, set: { visibility } });
+  return { ok: true };
+};
+
+// Newest messages with their authors. Non-admin viewers don't see messages
+// from deactivated or hidden profiles (both are invisible to members
+// everywhere else); admins see everything, so moderation can reach it.
+export const listMessages = async (programId: string, viewerIsAdmin: boolean): Promise<MessageBoxMessage[]> => {
+  const conditions: SQL[] = [eq(messageBoxMessages.programId, programId)];
+  if (!viewerIsAdmin) {
+    conditions.push(isNull(profiles.deactivatedAt), eq(profiles.hidden, false));
+  }
+
+  const rows = await db
+    .select({
+      id: messageBoxMessages.id,
+      body: messageBoxMessages.body,
+      createdAt: messageBoxMessages.createdAt,
+      authorId: profiles.id,
+      authorSlug: profiles.slug,
+      authorDisplayName: profiles.displayName,
+      avatarPath: profiles.avatarPath,
+    })
+    .from(messageBoxMessages)
+    .innerJoin(profiles, eq(profiles.id, messageBoxMessages.authorId))
+    .where(and(...conditions))
+    .orderBy(desc(messageBoxMessages.createdAt))
+    .limit(MESSAGE_LIMIT);
+
+  const withUrls = await attachAvatarUrls(rows);
+  return withUrls.map((r) => ({
+    id: r.id,
+    body: r.body,
+    createdAt: r.createdAt.toISOString(),
+    author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
+  }));
+};
+
+export const createMessage = async (input: {
+  programId: string;
+  authorId: string;
+  body: string;
+}): Promise<{ id: string }> => {
+  const [row] = await db.insert(messageBoxMessages).values(input).returning({ id: messageBoxMessages.id });
+  return { id: row.id };
+};
+
+// Admin moderation. Scoped to the program so an id from another program's
+// box can't be removed through this one.
+export const deleteMessage = async (
+  programId: string,
+  messageId: string,
+): Promise<{ ok: true } | { error: "not_found" }> => {
+  if (!isUuid(programId) || !isUuid(messageId)) return { error: "not_found" };
+  const deleted = await db
+    .delete(messageBoxMessages)
+    .where(and(eq(messageBoxMessages.id, messageId), eq(messageBoxMessages.programId, programId)))
+    .returning({ id: messageBoxMessages.id });
+  return deleted.length > 0 ? { ok: true } : { error: "not_found" };
+};

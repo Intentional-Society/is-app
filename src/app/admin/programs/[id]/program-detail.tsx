@@ -15,6 +15,7 @@ import type { AdminProgramDetail } from "@/lib/api-types";
 import { formatDate } from "@/lib/format-date";
 
 import { ProgramEmailsPanel } from "./program-emails-panel";
+import { ProgramFeaturesPanel } from "./program-features-panel";
 
 const programQueryKey = (id: string) => ["admin", "programs", id] as const;
 
@@ -322,6 +323,8 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
           </div>
         </div>
       </section>
+
+      <ProgramFeaturesPanel programId={program.id} />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground">

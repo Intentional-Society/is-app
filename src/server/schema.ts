@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  index,
   integer,
   pgSchema,
   pgTable,
@@ -203,4 +204,53 @@ export const inviteHints = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.inviteId, table.relateeId] })],
+).enableRLS();
+
+// Which program features are attached to which programs. A row means
+// attached; detaching deletes the row and leaves the feature's own data in
+// place, so reattaching restores it. Rows whose feature_key is missing from
+// the code registry (src/lib/program-features.ts) are ignored. See
+// docs/design-programs.md.
+export const programFeatures = pgTable(
+  "program_features",
+  {
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    featureKey: text("feature_key").notNull(),
+    attachedAt: timestamp("attached_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.programId, table.featureKey] })],
+).enableRLS();
+
+// Per-program settings for the message-box feature. A missing row means the
+// default, 'admins': messages stay admin-only until an admin opens them to
+// all members. Rows are written on first change, not on attach.
+export const messageBoxSettings = pgTable(
+  "message_box_settings",
+  {
+    programId: uuid("program_id")
+      .primaryKey()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    visibility: text("visibility").notNull().default("admins"),
+  },
+  (table) => [check("message_box_settings_visibility", sql`${table.visibility} IN ('members', 'admins')`)],
+).enableRLS();
+
+// Messages left in a program's message box. Both FKs cascade: deleting a
+// program or a member's account removes their messages with it.
+export const messageBoxMessages = pgTable(
+  "message_box_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("message_box_messages_program_created_idx").on(table.programId, table.createdAt)],
 ).enableRLS();

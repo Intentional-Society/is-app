@@ -37,6 +37,12 @@ export type ChangelogEntry = {
 // ordering; a functional test asserts it stays sorted.
 export const changelog: ChangelogEntry[] = [
   {
+    date: "2026-11-03",
+    title: "Message box for programs",
+    description:
+      "A program can now have a message box on its page, where participants leave short messages. Community Calls will use it so you can send a note when you can't make a call.",
+  },
+  {
     date: "2026-07-05",
     title: "Browser support",
     description: "Browser support policy (30 months full, 6 years functional) now listed on the About page.",

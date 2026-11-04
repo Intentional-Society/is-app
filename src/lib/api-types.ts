@@ -61,3 +61,12 @@ export type AdminInvite = AdminInvitesResponse["invites"][number];
 export type AdminSigninsResponse = InferResponseType<(typeof apiClient.api.admin.signins)["$get"], 200>;
 
 export type AdminSignin = AdminSigninsResponse["signins"][number];
+
+export type MessageBoxResponse = InferResponseType<(typeof apiClient.api.programs)[":id"]["message-box"]["$get"], 200>;
+
+export type MessageBoxMessage = MessageBoxResponse["messages"][number];
+
+export type AdminProgramFeature = InferResponseType<
+  (typeof apiClient.api.admin.programs)[":id"]["features"]["$get"],
+  200
+>["features"][number];

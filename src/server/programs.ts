@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray, isNull, ne, notExists, sql } from "drizzle
 import { isUuid } from "./auth-middleware";
 import { attachAvatarUrls } from "./avatars";
 import { db } from "./db";
+import { listAttachedFeatureKeys } from "./program-features";
 import { profilePrograms, profiles, programs } from "./schema";
 import { E2E_EMAILS } from "./test-reset";
 
@@ -267,6 +268,9 @@ export type ProgramDetailForMember = {
   joined: boolean;
   joinedAt: string | null;
   members: ProgramMember[];
+  // Keys of the program features attached to this program (docs/design-programs.md).
+  // The page renders a section per key; each feature's own routes decide who may use it.
+  features: string[];
 };
 
 export const getProgramBySlug = async (
@@ -290,18 +294,21 @@ export const getProgramBySlug = async (
 
   // Current participants only. Left rows live on for the stable
   // assignedAt but aren't part of the public roster.
-  const memberRows = await db
-    .select({
-      id: profiles.id,
-      slug: profiles.slug,
-      displayName: profiles.displayName,
-      avatarPath: profiles.avatarPath,
-      assignedAt: profilePrograms.assignedAt,
-    })
-    .from(profilePrograms)
-    .innerJoin(profiles, eq(profiles.id, profilePrograms.profileId))
-    .where(and(eq(profilePrograms.programId, program.id), isNull(profilePrograms.leftAt)))
-    .orderBy(asc(profiles.displayName));
+  const [memberRows, features] = await Promise.all([
+    db
+      .select({
+        id: profiles.id,
+        slug: profiles.slug,
+        displayName: profiles.displayName,
+        avatarPath: profiles.avatarPath,
+        assignedAt: profilePrograms.assignedAt,
+      })
+      .from(profilePrograms)
+      .innerJoin(profiles, eq(profiles.id, profilePrograms.profileId))
+      .where(and(eq(profilePrograms.programId, program.id), isNull(profilePrograms.leftAt)))
+      .orderBy(asc(profiles.displayName)),
+    listAttachedFeatureKeys(program.id),
+  ]);
 
   const withUrls = await attachAvatarUrls(memberRows);
   const members: ProgramMember[] = withUrls.map((m) => ({
@@ -326,6 +333,7 @@ export const getProgramBySlug = async (
       joined: viewer !== null,
       joinedAt: viewer?.joinedAt ?? null,
       members,
+      features,
     },
   };
 };
