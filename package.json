@@ -93,6 +93,7 @@
   "allowScripts": {
     "lefthook": false,
     "esbuild": false,
-    "@sentry/cli": false
+    "@sentry/cli": false,
+    "fsevents": false
   }
 }

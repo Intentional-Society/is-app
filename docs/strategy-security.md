@@ -149,7 +149,7 @@ Dependabot has no visibility into `.npmrc`, so `.github/dependabot.yml` carries 
 
 ## Dependency install scripts
 
-`allowScripts` in `package.json` denies every dependency install script in the tree: `lefthook`, `esbuild` and `@sentry/cli`. None of them needs its script. `esbuild` and `@sentry/cli` get their binaries from per-platform optional dependencies, and `npm run setup` runs `lefthook install` itself, so a fresh clone gets its git hooks from setup, never from `npm install`. npm 11.19 already honors explicit `false` entries.
+`allowScripts` in `package.json` denies every dependency install script in the tree: `lefthook`, `esbuild`, `@sentry/cli` and `fsevents`. None of them needs its script. `esbuild` and `@sentry/cli` get their binaries from per-platform optional dependencies, and `npm run setup` runs `lefthook install` itself, so a fresh clone gets its git hooks from setup, never from `npm install`. `fsevents` is a macOS-only optional dependency that ships its prebuilt `fsevents.node`; npm counts its `binding.gyp` as an install script, so only macOS installs hit the check (Linux CI and Vercel never install it). npm 11.19 already honors explicit `false` entries.
 
 `.npmrc` sets `strict-allow-scripts=true`, so a dependency with install scripts that `allowScripts` doesn't list fails the install (`ESTRICTALLOWSCRIPTS`) — locally, in CI and on Vercel. Without it, npm 11 warns and runs the script, and npm 12 skips it with a warning. This is the case that matters: a compromised release that adds a `postinstall` to a package that never had one, or a new transitive dependency that arrives with one. Expect it as red CI on the Dependabot PR that introduced the script.
 
