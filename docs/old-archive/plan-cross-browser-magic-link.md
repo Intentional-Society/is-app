@@ -5,7 +5,7 @@
 ## Goal
 
 A user clicks a sign-in or password-reset link from their email client
-and lands in a browser that *isn't* the one they used to request it.
+and lands in a browser that _isn't_ the one they used to request it.
 Today that fails with `error=exchange_failed`; the email template even
 warns "Open the link in the browser where you requested it." After this
 change, the link works regardless of which browser opens it.
@@ -28,9 +28,9 @@ clients
 
 The original issue's "Consider PKCE" hypothesis is inverted: PKCE is the
 cause. The Supabase-documented fix for this scenario is the **token-hash
-+ `verifyOtp`** flow (server-only, browser-agnostic). `flowType` stays
-on PKCE — that still governs session cookies and refresh rotation, which
-we want. We swap out only the *email-verification* step.
+- `verifyOtp`** flow (server-only, browser-agnostic). `flowType` stays
+  on PKCE — that still governs session cookies and refresh rotation, which
+  we want. We swap out only the _email-verification_ step.
 
 ## The fix
 
@@ -131,7 +131,7 @@ session.
    stop being needed but cost nothing to leave.
 2. Merge PR → Vercel auto-deploys. The rewritten `/auth/callback`
    recognizes `?token_hash=…` and no longer handles `?code=…`. Email
-   templates *in prod* are still the old `{{ .ConfirmationURL }}`
+   templates _in prod_ are still the old `{{ .ConfirmationURL }}`
    ones until step 3, so emails sent in this window arrive as
    `/auth/callback?code=…` and now hit `error=missing_token`. Users
    click "Resend" on the SentView to get a working link.
@@ -168,7 +168,7 @@ session.
 
 - **Pre-send warning + better error page** (the issue's options 1 and
   2): treats the symptom, leaves the cross-browser case fundamentally
-  broken. We can ship those *in addition*, but they aren't a
+  broken. We can ship those _in addition_, but they aren't a
   substitute for the protocol fix.
 - **Switch the client to `flowType: 'implicit'`**: implicit flow puts
   the token in the URL hash fragment (`#access_token=…`), which never

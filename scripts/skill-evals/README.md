@@ -49,7 +49,7 @@ Sandboxes live under the OS temp dir by default (`skill-eval-sandboxes/`). Overr
 `SKILL_EVAL_SANDBOX_ROOT` or `--root <dir>` — the harness **refuses** any location inside
 the real repo.
 
-To *enter* a sandbox, source the activation script `make-sandbox` prints. It prepends the
+To _enter_ a sandbox, source the activation script `make-sandbox` prints. It prepends the
 sandbox `bin/` to `PATH` (so the stub `gh` is the `gh` you get), unsets
 `GH_TOKEN`/`GITHUB_TOKEN`, points `GH_CONFIG_DIR` inside the sandbox, and `cd`s you into the
 repo.
@@ -84,19 +84,19 @@ refuses entirely if the sandbox marker is missing ("no marker, no run").
 
 Stubbed surface (traced from `.claude/skills/{commit,pr,ship}/SKILL.md`):
 
-| Subcommand | Used by | Notes |
-|---|---|---|
-| `auth status` | all three | success/failure from fixture `auth` |
-| `issue view <N>` | commit, pr, ship | open issues from fixture `issues` |
-| `pr view [N]` / `pr list` | pr, ship | branch-PR detection (both are pure reads) |
-| `pr create` | pr | returns a PR URL; **per-call sequenced** for pr-7 (error→success) |
-| `pr checks <N> [--watch]` | ship | exit 0 pass / 8 pending / 1 fail, from fixture `checks` |
-| `pr merge <N> --merge --delete-branch` | ship | simulated; logged + a durable record in `gh-stub-state.json` (never a real merge; never mutates the sandbox git tree) |
-| `pr comment <N> --body …` | pr | existing-PR comment |
-| `run list` / `run watch <id>` | ship | post-merge run discovery/watch |
-| `api user` / `api users/<login>` / `api repos/.../collaborators` | pr | reviewer team cache; emulates the `--jq` filters the skill uses |
-| `api repos/.../pulls/<N>/comments` / `api graphql` (`reviewThreads` query only) | ship | step 10's pre-merge conversation read (#580), from fixture `pullComments` / `reviewThreads` (empty by default); any other GraphQL query is default-denied |
-| `api repos/.../issues/<N>/comments` | ship | step 10's poster-identity read (#601): top-level comments in the REST shape (`user.type`, `[bot]` logins, `performed_via_github_app.slug`), from fixture `issueComments` (empty by default); GET only — a POST is default-denied |
+| Subcommand                                                                      | Used by          | Notes                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth status`                                                                   | all three        | success/failure from fixture `auth`                                                                                                                                                                                              |
+| `issue view <N>`                                                                | commit, pr, ship | open issues from fixture `issues`                                                                                                                                                                                                |
+| `pr view [N]` / `pr list`                                                       | pr, ship         | branch-PR detection (both are pure reads)                                                                                                                                                                                        |
+| `pr create`                                                                     | pr               | returns a PR URL; **per-call sequenced** for pr-7 (error→success)                                                                                                                                                                |
+| `pr checks <N> [--watch]`                                                       | ship             | exit 0 pass / 8 pending / 1 fail, from fixture `checks`                                                                                                                                                                          |
+| `pr merge <N> --merge --delete-branch`                                          | ship             | simulated; logged + a durable record in `gh-stub-state.json` (never a real merge; never mutates the sandbox git tree)                                                                                                            |
+| `pr comment <N> --body …`                                                       | pr               | existing-PR comment                                                                                                                                                                                                              |
+| `run list` / `run watch <id>`                                                   | ship             | post-merge run discovery/watch                                                                                                                                                                                                   |
+| `api user` / `api users/<login>` / `api repos/.../collaborators`                | pr               | reviewer team cache; emulates the `--jq` filters the skill uses                                                                                                                                                                  |
+| `api repos/.../pulls/<N>/comments` / `api graphql` (`reviewThreads` query only) | ship             | step 10's pre-merge conversation read (#580), from fixture `pullComments` / `reviewThreads` (empty by default); any other GraphQL query is default-denied                                                                        |
+| `api repos/.../issues/<N>/comments`                                             | ship             | step 10's poster-identity read (#601): top-level comments in the REST shape (`user.type`, `[bot]` logins, `performed_via_github_app.slug`), from fixture `issueComments` (empty by default); GET only — a POST is default-denied |
 
 This is a **superset** of the original design's illustrative list
 ([`design-skill-evals-harness.md`](../../docs/design-skill-evals-harness.md) §4.3) — it adds `pr comment`, `run list`,

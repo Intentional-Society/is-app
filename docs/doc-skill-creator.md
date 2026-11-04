@@ -48,7 +48,7 @@ human-at-the-keyboard authoring prerequisite only.
 
 skill-creator is the **front door** for every skill task in this repo — creating, editing,
 eval-running, and description-tuning a skill all start by invoking it (slash or natural
-language). How the team actually *tests* those skills — the per-skill eval schema, the
+language). How the team actually _tests_ those skills — the per-skill eval schema, the
 disposable sandbox harness that executes mutating-skill evals safely, the one testing rule, and
 platform routing — lives in
 [`docs/strategy-skill-evals.md`](strategy-skill-evals.md) (with the as-built design and rationale in

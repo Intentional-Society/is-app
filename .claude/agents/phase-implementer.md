@@ -1,4 +1,5 @@
 ---
+
 name: phase-implementer
 description: Implements exactly one phase of the skill-evals baseline program from its sub-issue delegation packet. Launched by the program hub with the phase's embedded startup prompt plus the subagent addendum from issue #507's Hub operating rules.
 model: sonnet

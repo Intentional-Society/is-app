@@ -11,8 +11,8 @@ JSON itself can't carry.
 validation tracks whatever version is installed — bumping `@biomejs/biome`
 (e.g. via Dependabot) needs no edit to `biome.json`. This is deliberate: a
 pinned `schemas/<version>/schema.json` URL silently drifts whenever the package
-bumps but the URL doesn't, which CI flags as *"configuration schema version
-does not match"*.
+bumps but the URL doesn't, which CI flags as _"configuration schema version
+does not match"_.
 
 After a bump, run `npm run lint` once to surface any renamed or newly
 recommended rules.

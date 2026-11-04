@@ -29,11 +29,11 @@ The data model is open — any member can read any relation. The cozy feeling co
 
 ### Personal subgraph as primary view
 
-The MVP visualization is *you, and 1–2 hops out*. Whole-network views are boring at low edge density and overwhelming once dense; 2-hop subgraphs deliver the "that's neat" hit at any density and ground the experience in the member's perspective.
+The MVP visualization is _you, and 1–2 hops out_. Whole-network views are boring at low edge density and overwhelming once dense; 2-hop subgraphs deliver the "that's neat" hit at any density and ground the experience in the member's perspective.
 
 ### One dimension at MVP
 
-A single value from a small set captures both "visible trust" and resonance, with room to add dimensions later. At heart it's a 1–4 **depth (of relationship) scale** — how deep the bond runs, whether that depth comes through closeness or through shared work (rungs 3–4 admit both). The descriptions exist to calibrate it: they're phrased *relative to the member's own relationships* ("like others I'm lucky to have", "more than most of my friends", "the rare few") so people with different objective social distributions still map sensibly, while the implied shape — many friends, fewer close, rare kin — gently discourages normalising one's whole web onto the top of the scale:
+A single value from a small set captures both "visible trust" and resonance, with room to add dimensions later. At heart it's a 1–4 **depth (of relationship) scale** — how deep the bond runs, whether that depth comes through closeness or through shared work (rungs 3–4 admit both). The descriptions exist to calibrate it: they're phrased _relative to the member's own relationships_ ("like others I'm lucky to have", "more than most of my friends", "the rare few") so people with different objective social distributions still map sensibly, while the implied shape — many friends, fewer close, rare kin — gently discourages normalising one's whole web onto the top of the scale:
 
 - `1` — **Acquaintance**: I'm glad we've met and wish them well.
 - `2` — **Friend**: A genuine friend whom I enjoy and make time for, like others I'm lucky to have.
@@ -156,10 +156,10 @@ The redemption Hono handler performs both materializations (the `relationValue` 
 
 ### Hint sources
 
-| Where | Becomes a row in | Constructed by |
-| --- | --- | --- |
-| Inviter, at invite-code creation | `invite_hints`, then `relations` on redemption | The inviter, optionally, when generating the code |
-| Superconnector, post-signup | `relations` directly | Admin tooling — separate surface, gated by `profiles.is_admin` |
+| Where                            | Becomes a row in                               | Constructed by                                                 |
+| -------------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
+| Inviter, at invite-code creation | `invite_hints`, then `relations` on redemption | The inviter, optionally, when generating the code              |
+| Superconnector, post-signup      | `relations` directly                           | Admin tooling — separate surface, gated by `profiles.is_admin` |
 
 The two paths converge into the same row shape; downstream queries don't need to distinguish them beyond `hintedBy`.
 
@@ -247,24 +247,24 @@ The design assumes a cold start from current IS Web signups. Limicon data is not
 
 These are choices made during the design interview. Each is reversible but reflects current thinking.
 
-| Decision | Rationale |
-| --- | --- |
-| One dimension, 4 values (1..4) | Capture visible-trust and resonance with the smallest possible model. Add dimensions later if needed. |
-| No explicit `0` value | Considered and dropped. Un-rated suggestions re-surface in the feed; the only state distinction is "have row, value 1..4" vs "no row." Simpler dialog, simpler check constraints, fewer affordances to design. (A later `0 — No Relationship` control deletes the row entirely — see below — but still stores no `0`.) |
-| `0 — No Relationship` removes a mistaken relation (#352) | Members need to undo a wrong relationship. Done as a row delete, not a stored `0` — keeps "absence = no row" and the check constraints intact. Surfaces only when a confirmed relationship exists; pending hints stay non-removable by the relator. |
-| Doubly unidirectional, no symmetrization | Asymmetry is information, and people can see it. |
-| Open data model, cozy UX layer | Members can see all relations in principle; the app's defaults make exploration deliberate. |
-| Sparse state, no `suggestion_state` table | No row = no interaction. Trade-off: no "deferred / ask me later" — re-surface un-rated suggestions each visit. |
-| Hints are just hypothesized relations (`isHint`, `hintedBy`) | One table, one shape, two row states. Avoids a parallel `hints` table. |
-| Invite-creation hints (separate `invite_hints` table, materialized at redemption) | Inviter pre-seeds the new member's suggestion feed at the moment of code generation; new members land on a populated, warm web rather than just one inviter edge. |
-| Inviter rates the invitee at invite creation (`invites.relationValue`) | Materialized as a confirmed `relations` row at redemption — the inviter is the new member's warmest first suggestion via "people who've rated me." Doubles as a soft invite-quality gate; the <2 warn nudges members toward inviting people they actually have a relation with. |
-| Hint activation is asymmetric | One row per hint (new member → existing member); the other side picks up via "people who rated me" once the new member rates. |
-| Personal subgraph (≤2 hops) is the primary view | Whole-network is boring sparse and overwhelming dense; 2-hop subgraphs deliver the "that's neat" hit at any density. |
-| `last_updated_web` bumped on explicit Done click | Captures intent rather than real-time activity. Quiet edits stay quiet. |
-| Real-time persistence, not batched | Done captures intent only; data is saved as edits happen. |
-| Quarterly Convening refresh out of scope here | Will fit into a future events table; not modeled in the relations design. |
-| Tour library: `react-joyride` | Next.js-friendly, handles keyboard/a11y, saves us rolling our own. |
-| No Limicon data import | Cold start from IS Web signups. |
+| Decision                                                                          | Rationale                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One dimension, 4 values (1..4)                                                    | Capture visible-trust and resonance with the smallest possible model. Add dimensions later if needed.                                                                                                                                                                                                                  |
+| No explicit `0` value                                                             | Considered and dropped. Un-rated suggestions re-surface in the feed; the only state distinction is "have row, value 1..4" vs "no row." Simpler dialog, simpler check constraints, fewer affordances to design. (A later `0 — No Relationship` control deletes the row entirely — see below — but still stores no `0`.) |
+| `0 — No Relationship` removes a mistaken relation (#352)                          | Members need to undo a wrong relationship. Done as a row delete, not a stored `0` — keeps "absence = no row" and the check constraints intact. Surfaces only when a confirmed relationship exists; pending hints stay non-removable by the relator.                                                                    |
+| Doubly unidirectional, no symmetrization                                          | Asymmetry is information, and people can see it.                                                                                                                                                                                                                                                                       |
+| Open data model, cozy UX layer                                                    | Members can see all relations in principle; the app's defaults make exploration deliberate.                                                                                                                                                                                                                            |
+| Sparse state, no `suggestion_state` table                                         | No row = no interaction. Trade-off: no "deferred / ask me later" — re-surface un-rated suggestions each visit.                                                                                                                                                                                                         |
+| Hints are just hypothesized relations (`isHint`, `hintedBy`)                      | One table, one shape, two row states. Avoids a parallel `hints` table.                                                                                                                                                                                                                                                 |
+| Invite-creation hints (separate `invite_hints` table, materialized at redemption) | Inviter pre-seeds the new member's suggestion feed at the moment of code generation; new members land on a populated, warm web rather than just one inviter edge.                                                                                                                                                      |
+| Inviter rates the invitee at invite creation (`invites.relationValue`)            | Materialized as a confirmed `relations` row at redemption — the inviter is the new member's warmest first suggestion via "people who've rated me." Doubles as a soft invite-quality gate; the <2 warn nudges members toward inviting people they actually have a relation with.                                        |
+| Hint activation is asymmetric                                                     | One row per hint (new member → existing member); the other side picks up via "people who rated me" once the new member rates.                                                                                                                                                                                          |
+| Personal subgraph (≤2 hops) is the primary view                                   | Whole-network is boring sparse and overwhelming dense; 2-hop subgraphs deliver the "that's neat" hit at any density.                                                                                                                                                                                                   |
+| `last_updated_web` bumped on explicit Done click                                  | Captures intent rather than real-time activity. Quiet edits stay quiet.                                                                                                                                                                                                                                                |
+| Real-time persistence, not batched                                                | Done captures intent only; data is saved as edits happen.                                                                                                                                                                                                                                                              |
+| Quarterly Convening refresh out of scope here                                     | Will fit into a future events table; not modeled in the relations design.                                                                                                                                                                                                                                              |
+| Tour library: `react-joyride`                                                     | Next.js-friendly, handles keyboard/a11y, saves us rolling our own.                                                                                                                                                                                                                                                     |
+| No Limicon data import                                                            | Cold start from IS Web signups.                                                                                                                                                                                                                                                                                        |
 
 ## Deferred / future
 

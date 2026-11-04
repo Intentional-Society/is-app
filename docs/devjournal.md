@@ -60,7 +60,7 @@ Limited to the whitelisted tested reads in `E2E_ADMIN_READS`.
 
 ## 2026-10-16 | James (with Opus 5.5) | Buttondown sync now covers unsaved (CSV-imported) members
 
-The sync used to skip every profile with a null `lastUpdatedProfile`, which silently froze the Buttondown tags of 21 CSV-imported members at their cutover state — one left Gumball Machine on 2026-09-08 and kept the tag. It now reconciles every profile's existing subscriber and gates only *create* on a saved profile (`skippedUnsavedCreate`), the same posture as hidden profiles.
+The sync used to skip every profile with a null `lastUpdatedProfile`, which silently froze the Buttondown tags of 21 CSV-imported members at their cutover state — one left Gumball Machine on 2026-09-08 and kept the tag. It now reconciles every profile's existing subscriber and gates only _create_ on a saved profile (`skippedUnsavedCreate`), the same posture as hidden profiles.
 
 ---
 
@@ -72,7 +72,7 @@ The sync used to skip every profile with a null `lastUpdatedProfile`, which sile
 
 ## 2026-09-21 | Blake (with Opus 5) | `/handoff`'s evals moved into the sandbox harness
 
-`/handoff` was the one committed team skill outside both skill gates: the contract test pinned its skill list to `commit`/`pr`/`ship`, and `handoff/evals/evals.json` predated the harness (bare integer ids, `assertions`, prose `fixture`). Its ten evals are now `kind: execution` entries in the schema in `docs/strategy-skill-evals.md` §3 (`handoff-1`…`handoff-10`), `handoff` is in `SKILLS`/`EXPLICIT_ONLY`/`EXPECTED_EXECUTION_IDS` and in `selfcheck.mjs`'s fixture-completeness sweep, and four fixture profiles were built — the other six evals name one of those and record in their own `notes` exactly what that world is missing, so a reader is never misled about what a green run would prove. Two harness changes came with it: `buildSandbox` only switches branches when a profile names one (a profile may now stay on `main`), and `archiveEvidence` copies the sandbox repo's `.scratch/` into the evidence archive — for a skill whose deliverable is a *file*, the two objective legs hold nothing, so the grader has to be handed the document itself. Still open, both on #507: three of the ten evals are not gradeable until profiles of their own exist, no `/handoff` eval has ever been executed or graded, and the documented full batch still scopes itself to three skills. (#585)
+`/handoff` was the one committed team skill outside both skill gates: the contract test pinned its skill list to `commit`/`pr`/`ship`, and `handoff/evals/evals.json` predated the harness (bare integer ids, `assertions`, prose `fixture`). Its ten evals are now `kind: execution` entries in the schema in `docs/strategy-skill-evals.md` §3 (`handoff-1`…`handoff-10`), `handoff` is in `SKILLS`/`EXPLICIT_ONLY`/`EXPECTED_EXECUTION_IDS` and in `selfcheck.mjs`'s fixture-completeness sweep, and four fixture profiles were built — the other six evals name one of those and record in their own `notes` exactly what that world is missing, so a reader is never misled about what a green run would prove. Two harness changes came with it: `buildSandbox` only switches branches when a profile names one (a profile may now stay on `main`), and `archiveEvidence` copies the sandbox repo's `.scratch/` into the evidence archive — for a skill whose deliverable is a _file_, the two objective legs hold nothing, so the grader has to be handed the document itself. Still open, both on #507: three of the ten evals are not gradeable until profiles of their own exist, no `/handoff` eval has ever been executed or graded, and the documented full batch still scopes itself to three skills. (#585)
 
 ---
 
@@ -118,7 +118,7 @@ component with ghost/primary variants and the lucide-react LayoutGrid + List ico
 
 ## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 8 — the nine routing evals now run automated
 
-Phase 8 (#516) automates the nine `kind: routing` evals (commit-4/5/6/7/8, pr-8/9, ship-4/5) — routing is *whether* a skill fires in a live session, so a sandboxed subagent can't test it. `scripts/skill-evals/routing/` holds a Windows-native Node runner that copies the three `SKILL.md` files, CLAUDE.md's "AI Skills" section, and `settings.json` into a sandbox so a fresh `claude -p` discovers the skills naturally, then grades the last turn and reports trigger rates over N=3. The "assistant offers, human affirms" cases work — the driver seeds a synthetic prior offer via `--input-format stream-json`. Two headless limits are graded by observable proxy: `AskUserQuestion` doesn't exist headless, and the `gh pr merge` ask rule can't prompt (R8). The §6 manual runbook stays as the fallback for eyeballing live UX.
+Phase 8 (#516) automates the nine `kind: routing` evals (commit-4/5/6/7/8, pr-8/9, ship-4/5) — routing is _whether_ a skill fires in a live session, so a sandboxed subagent can't test it. `scripts/skill-evals/routing/` holds a Windows-native Node runner that copies the three `SKILL.md` files, CLAUDE.md's "AI Skills" section, and `settings.json` into a sandbox so a fresh `claude -p` discovers the skills naturally, then grades the last turn and reports trigger rates over N=3. The "assistant offers, human affirms" cases work — the driver seeds a synthetic prior offer via `--input-format stream-json`. Two headless limits are graded by observable proxy: `AskUserQuestion` doesn't exist headless, and the `gh pr merge` ask rule can't prompt (R8). The §6 manual runbook stays as the fallback for eyeballing live UX.
 
 ---
 
@@ -144,7 +144,7 @@ The team skills' acceptance evals moved from `evals/evals.json` to `.claude/skil
 
 ## 2026-07-19 | Blake (with Fable) | Skill-evals baseline program spec landed
 
-Landed the skill-evals baseline program spec (`docs/spec-skill-evals-baseline.md`, with its conversion manifest and strategy-doc outline): sandboxed, /skill-creator-centered eval infrastructure for the three team Skills, delivered in phases via GitHub-tracked delegation packets. *(Superseded 2026-09-18: that spec is archived at `docs/old-archive/spec-skill-evals-baseline.md` and replaced by `docs/design-skill-evals-harness.md`.)*
+Landed the skill-evals baseline program spec (`docs/spec-skill-evals-baseline.md`, with its conversion manifest and strategy-doc outline): sandboxed, /skill-creator-centered eval infrastructure for the three team Skills, delivered in phases via GitHub-tracked delegation packets. _(Superseded 2026-09-18: that spec is archived at `docs/old-archive/spec-skill-evals-baseline.md` and replaced by `docs/design-skill-evals-harness.md`.)_
 
 ## 2026-07-05 | James | Browser support policy: Baseline widely available
 
@@ -188,7 +188,7 @@ e2e mocks `/_next/image` except the avatar canary, to stop CI driving prod Stora
 
 ## 2026-06-26 | Blake | /commit and /pr announce "Using /…" on NL runs and catch bare-"yes" affirmations
 
-Every natural-language `/commit` / `/pr` run now prints `Using /commit` / `Using /pr` as its first line, and a bare "yes"/"go ahead" to the assistant's *own* commit/PR offer is treated as a trigger that routes through the Skill rather than an ad-hoc git/gh sequence. The announcement is unconditional on the NL path — the opt-out file and delegation marker still silence only Step 0's confirmation, never the announcement (Thread 16; follow-on to the 2026-06-17 NL-invocation entry). **Superseded (2026-07-02, same PR #484):** the "never the announcement" clause holds for the opt-out file but **not** for delegation — the delegation marker now suppresses the *child's* self-announcement, with the parent announcing the handoff instead. See the 2026-07-02 entry.
+Every natural-language `/commit` / `/pr` run now prints `Using /commit` / `Using /pr` as its first line, and a bare "yes"/"go ahead" to the assistant's _own_ commit/PR offer is treated as a trigger that routes through the Skill rather than an ad-hoc git/gh sequence. The announcement is unconditional on the NL path — the opt-out file and delegation marker still silence only Step 0's confirmation, never the announcement (Thread 16; follow-on to the 2026-06-17 NL-invocation entry). **Superseded (2026-07-02, same PR #484):** the "never the announcement" clause holds for the opt-out file but **not** for delegation — the delegation marker now suppresses the _child's_ self-announcement, with the parent announcing the handoff instead. See the 2026-07-02 entry.
 
 ## 2026-06-25 | Ola | Admins can delete a member account
 
@@ -224,11 +224,11 @@ A directory browse prefetched every member card, and each prefetch render made s
 
 ## 2026-06-17 | Blake | /commit and /pr go natural-language; /ship stays slash-only with a harness merge gate
 
-The `/commit` and `/pr` Skills no longer set `disable-model-invocation` — saying "commit this" or "open a PR" now routes through the Skill, which confirms intent once (Step 0) unless you create the gitignored `.claude/skip-nl-confirm-commit-pr.local` (the prompt's "don't ask again" option makes it; delete it to re-enable). The **`/ship` Skill** is deliberately unchanged on that axis — it stays explicit-only (type `/ship`; it is *not* natural-language-invocable), now prints a required pre-merge narration line, and routes its merge through a new checked-in `.claude/settings.json` `ask` rule, so every `gh pr merge` (including the one `/ship` runs) prompts a human regardless of local `allow`/bypass settings. (#353; design in docs/plan-skill-nl-invocation.md)
+The `/commit` and `/pr` Skills no longer set `disable-model-invocation` — saying "commit this" or "open a PR" now routes through the Skill, which confirms intent once (Step 0) unless you create the gitignored `.claude/skip-nl-confirm-commit-pr.local` (the prompt's "don't ask again" option makes it; delete it to re-enable). The **`/ship` Skill** is deliberately unchanged on that axis — it stays explicit-only (type `/ship`; it is _not_ natural-language-invocable), now prints a required pre-merge narration line, and routes its merge through a new checked-in `.claude/settings.json` `ask` rule, so every `gh pr merge` (including the one `/ship` runs) prompts a human regardless of local `allow`/bypass settings. (#353; design in docs/plan-skill-nl-invocation.md)
 
 ## 2026-06-16 | James | Update handling for active sessions
 
-The home page auto-reloads a stale tab, everywhere else a persistent bottom banner offers a member-initiated reload. Deploys now fall into one of three tiers: patch (default, notif held until the running build is 6h old, then once per 8h), feature (held until build is 2h old, then once per 8h, dismissible — whenever a changelog is added), urgent (immediate, non-dismissible — gated by `urgentReleasedAt` marker in code).  Full rationale: docs/strategy-deployment.md.
+The home page auto-reloads a stale tab, everywhere else a persistent bottom banner offers a member-initiated reload. Deploys now fall into one of three tiers: patch (default, notif held until the running build is 6h old, then once per 8h), feature (held until build is 2h old, then once per 8h, dismissible — whenever a changelog is added), urgent (immediate, non-dismissible — gated by `urgentReleasedAt` marker in code). Full rationale: docs/strategy-deployment.md.
 
 ## 2026-06-14 | Ola | Remove password option (#212)
 

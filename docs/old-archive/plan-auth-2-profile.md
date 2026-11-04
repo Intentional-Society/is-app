@@ -26,13 +26,13 @@ Phase 1 deferred the `programs` / `profilePrograms` tables to "a dedicated micro
 
 This phase lands as a single PR built from five sequential commits. Each commit keeps the app in a working state.
 
-| Commit | Scope | Key changes |
-|--------|-------|-------------|
-| **2a** | Schema expand + migration | `schema.ts` (alter profiles, add programs + profilePrograms), generated SQL |
-| **2b** | Serialization layer + `/api/me` swap | `profiles.ts` (`getProfileForSelf` + stubs), `api.ts` swap, shape-guard tests |
-| **2c** | `PUT /api/me` | `api.ts` endpoint, zod validation, functional tests |
-| **2d** | `/welcome` page + incomplete-profile redirect | `welcome/page.tsx`, `page.tsx` redirect, e2e |
-| **2e** | Login dual-mode (email + optional password) | `login-form.tsx`, e2e |
+| Commit | Scope                                         | Key changes                                                                   |
+| ------ | --------------------------------------------- | ----------------------------------------------------------------------------- |
+| **2a** | Schema expand + migration                     | `schema.ts` (alter profiles, add programs + profilePrograms), generated SQL   |
+| **2b** | Serialization layer + `/api/me` swap          | `profiles.ts` (`getProfileForSelf` + stubs), `api.ts` swap, shape-guard tests |
+| **2c** | `PUT /api/me`                                 | `api.ts` endpoint, zod validation, functional tests                           |
+| **2d** | `/welcome` page + incomplete-profile redirect | `welcome/page.tsx`, `page.tsx` redirect, e2e                                  |
+| **2e** | Login dual-mode (email + optional password)   | `login-form.tsx`, e2e                                                         |
 
 ## Schema changes (`src/server/schema.ts`)
 

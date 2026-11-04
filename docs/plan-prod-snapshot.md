@@ -34,4 +34,3 @@ A script that copies production data into a developer's local Supabase Postgres,
 - gonymizer installed (Go binary) or run via Docker
 - Local Supabase running (`npm run dev:db`)
 - Access to prod `DATABASE_URL`
-

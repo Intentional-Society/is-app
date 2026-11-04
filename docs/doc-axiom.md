@@ -90,13 +90,13 @@ The dashboard is four thematic columns — **Members**, **Totals**, **Requests**
 
 ### Members
 
-- **Active Members (DAU):** Timeseries — true daily active members, one bucket per UTC day. Pinned to `bin(_time, 1d)` because a distinct count doesn't sum across buckets, so the bucket width *is* the metric's definition; `bin_auto` would silently turn this into hourly-active over a multi-day range.
+- **Active Members (DAU):** Timeseries — true daily active members, one bucket per UTC day. Pinned to `bin(_time, 1d)` because a distinct count doesn't sum across buckets, so the bucket width _is_ the metric's definition; `bin_auto` would silently turn this into hourly-active over a multi-day range.
 
 ```
 ["vercel"] | where message == "api request" and isnotnull(['fields.userId']) and ['fields.path'] !startswith "/api/_test" | summarize members = dcount(['fields.userId']) by bin(_time, 1d)
 ```
 
-- **Active Members (bin_auto):** Timeseries — distinct members per auto-sized bucket. Shows activity *rhythm* within the selected range (buckets shrink toward hourly at a 7–15d range), so read it as "how busy, and when," not as a daily headcount.
+- **Active Members (bin_auto):** Timeseries — distinct members per auto-sized bucket. Shows activity _rhythm_ within the selected range (buckets shrink toward hourly at a 7–15d range), so read it as "how busy, and when," not as a daily headcount.
 
 ```
 ["vercel"] | where message == "api request" and isnotnull(['fields.userId']) and ['fields.path'] !startswith "/api/_test" | summarize members = dcount(['fields.userId']) by bin_auto(_time)
@@ -111,7 +111,7 @@ The dashboard is four thematic columns — **Members**, **Totals**, **Requests**
 ["vercel"] | where message == "api request" and isnotnull(['fields.userId']) and ['fields.path'] !startswith "/api/_test" | summarize members = dcount(['fields.userId'])
 ```
 
-- **Top API Requests:** Table — API paths ranked by request count. `topk` ranks *inside* the `summarize`, so nothing follows it: Axiom's Simple chart editor allows only `take`/`limit` after `summarize`, and `take` alone would return arbitrary rows, not the busiest. (`summarize count() by path | top 25 by count_` is equivalent but needs the chart's APL mode.)
+- **Top API Requests:** Table — API paths ranked by request count. `topk` ranks _inside_ the `summarize`, so nothing follows it: Axiom's Simple chart editor allows only `take`/`limit` after `summarize`, and `take` alone would return arbitrary rows, not the busiest. (`summarize count() by path | top 25 by count_` is equivalent but needs the chart's APL mode.)
 
 ```
 ["vercel"] | where message == "api request" and ['fields.path'] !startswith "/api/_test" | summarize topk(['fields.path'], 25)
@@ -135,7 +135,7 @@ The dashboard is four thematic columns — **Members**, **Totals**, **Requests**
 
 ### Performance
 
-- **Latency percentiles (ms):** multi-line Timeseries — p50/p95/p99 of request `duration`, in milliseconds; the three aggregations render as separate charts by default — tick **Merge Charts** to overlay them as three lines on one graph. Don't use *stacked* bars: percentiles nest (p99 ≥ p95 ≥ p50), so a stack sums to a meaningless total (grouped bars would be fine, lines are clearer). Axiom's y-axis carries no unit, so a `1.5K` tick means 1,500 ms (1.5 s); the `_ms` series aliases and the panel title keep the unit visible. Bucketed at a fixed `bin(_time, 12h)` (not `bin_auto`) for a steady resolution across ranges, on a **log y-axis** since latency spans orders of magnitude (p50 in tens of ms, p99 up to seconds).
+- **Latency percentiles (ms):** multi-line Timeseries — p50/p95/p99 of request `duration`, in milliseconds; the three aggregations render as separate charts by default — tick **Merge Charts** to overlay them as three lines on one graph. Don't use _stacked_ bars: percentiles nest (p99 ≥ p95 ≥ p50), so a stack sums to a meaningless total (grouped bars would be fine, lines are clearer). Axiom's y-axis carries no unit, so a `1.5K` tick means 1,500 ms (1.5 s); the `_ms` series aliases and the panel title keep the unit visible. Bucketed at a fixed `bin(_time, 12h)` (not `bin_auto`) for a steady resolution across ranges, on a **log y-axis** since latency spans orders of magnitude (p50 in tens of ms, p99 up to seconds).
 
 ```
 ["vercel"] | where message == "api request" and ['fields.path'] !startswith "/api/_test" | summarize p50_ms = percentile(['fields.duration'], 50), p95_ms = percentile(['fields.duration'], 95), p99_ms = percentile(['fields.duration'], 99) by bin(_time, 12h)

@@ -7,16 +7,16 @@ Supersedes `docs/old-archive/spec-skill-evals-baseline.md`.
 Code skills (`/commit`, `/pr`, `/ship`): how it is built, why it is built that way, and what is
 known to be missing.** This is **not** the front door to the skills work as a whole. If you are
 new, start at the "Which doc do I want?" table at the top of
-[`strategy-skill-evals.md`](strategy-skill-evals.md). If you only need to *run* evals, read that
+[`strategy-skill-evals.md`](strategy-skill-evals.md). If you only need to _run_ evals, read that
 runbook instead.
 
 After reading this you should be able to find the module that owns any harness behavior, explain
 why an eval run cannot reach real GitHub, and tell whether a given piece of work is settled, open,
 or deliberately not built.
 
-*As-built* means this doc describes the harness that exists, not the harness that was planned; the
+_As-built_ means this doc describes the harness that exists, not the harness that was planned; the
 plan is the archived predecessor named above. It sits below `strategy-skill-evals.md` (which tells
-you how to *run* the harness) and above the code. The program that built it is finished except for
+you how to _run_ the harness) and above the code. The program that built it is finished except for
 two items, both listed in §10. The 2026-09-18 scope decisions behind this rewrite are recorded as
 comments on issue #507. Blake is the repo's maintainer and the author of the three skills; until
 this program he was the only person who could verify a skill change.
@@ -27,86 +27,86 @@ Primary reader: an AI agent picking up harness work cold. A human who just needs
 §1, §2, §5 and §6 and stop — §5 is what lets you trust running an eval at all, and §6 is the
 judgment you need to review someone's eval change. §4's two flow diagrams show the machinery; §10
 and §11 are for auditing state and evidence. (The runbook carries no rationale, so §5 and §6 are the
-only account of *why* anywhere.)
+only account of _why_ anywhere.)
 
 ### What is in each section
 
-| § | Answers |
-|---|---|
-| 1 | Why this exists, and what "done" was supposed to mean |
-| 2 | How it got here — four stages of work, and the one inherited fact that shaped everything |
-| 3 | The organizing rule, and the fourteen constraints the design had to work around |
-| 4 | What the code is: every file, what calls it, and the two end-to-end flows |
-| 5 | What keeps an eval run away from the real repo — and what does not |
-| 6 | Why it is shaped this way, including the rules for writing an assertion worth keeping |
-| 7 | Three worked scenarios: new skill, changed skill, a teammate arriving cold |
-| 8 | The one thing designed but deliberately not built |
-| 9 | The decision ledger and the live risk register |
-| 10 | What is broken, thin or unfinished — and what to update here when each lands |
-| 11 | The measured evidence, re-derived from the raw run artifacts |
-| 12 | How to decode an id you found in an old comment |
+| §   | Answers                                                                                  |
+| --- | ---------------------------------------------------------------------------------------- |
+| 1   | Why this exists, and what "done" was supposed to mean                                    |
+| 2   | How it got here — four stages of work, and the one inherited fact that shaped everything |
+| 3   | The organizing rule, and the fourteen constraints the design had to work around          |
+| 4   | What the code is: every file, what calls it, and the two end-to-end flows                |
+| 5   | What keeps an eval run away from the real repo — and what does not                       |
+| 6   | Why it is shaped this way, including the rules for writing an assertion worth keeping    |
+| 7   | Three worked scenarios: new skill, changed skill, a teammate arriving cold               |
+| 8   | The one thing designed but deliberately not built                                        |
+| 9   | The decision ledger and the live risk register                                           |
+| 10  | What is broken, thin or unfinished — and what to update here when each lands             |
+| 11  | The measured evidence, re-derived from the raw run artifacts                             |
+| 12  | How to decode an id you found in an old comment                                          |
 
 ### Notation
 
-**`§`** means "section". **`§4`** is section 4 of *this* document. **`strategy §6`** or
+**`§`** means "section". **`§4`** is section 4 of _this_ document. **`strategy §6`** or
 **`strategy-skill-evals.md` §6** is section 6 of that document; where a cross-document reference
 matters, the section's title is given too, because these links land at the top of the file and you
 would otherwise hunt.
 
 The doc uses several id schemes. This is the key; §12 resolves each one in full.
 
-| Scheme | What it numbers | Defined in |
-|---|---|---|
-| `C1`–`C14` | **Constraints** — facts the design had to work around | §3 |
-| `R1`–`R8` | **Risks**, each with its status today | §9 |
-| `DP1`–`DP4` | **Design points** — the program's numbered architecture decisions | §9 |
-| `E1`–`E4` | **Escalations** — the four questions the 2026-07-19 peer review put to the maintainer | §9 |
-| `F-A`, `F-B` | **Findings** from the audit at the end of Phase 3 | §12 |
-| `II.2c`, `IV.1`, … | Section numbers of the **archived predecessor spec**, still cited in code comments | §12 |
-| "ruling N" | A numbered **maintainer decision** from a review session, cited in code comments | §12 |
-| Phase 0–8 | The nine **stages of the program** that built this, tracked as issues #508–#516 | §12 |
-| `G1` / `G2` | Two generations of the **routing grader** (§11's counts table) | §11, §12 |
-| `A1`–`A4` | This doc's shorthand for an eval's **expectations in file order** — a display convention, not ids, so an A-number is only meaningful against the current text of that eval | §10, §12 |
-| `commit-5a`, `pr-7`, `ship-2a` | **Eval ids**: skill name + number; a letter suffix marks a sub-scenario of one original eval | the roster in §4 |
-| `#nnn` | A **GitHub issue or PR** in this repo | §12 |
-| `7b8f157` | A **git commit** in this repo, cited to pin a claim to a point in history | — |
+| Scheme                         | What it numbers                                                                                                                                                            | Defined in       |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `C1`–`C14`                     | **Constraints** — facts the design had to work around                                                                                                                      | §3               |
+| `R1`–`R8`                      | **Risks**, each with its status today                                                                                                                                      | §9               |
+| `DP1`–`DP4`                    | **Design points** — the program's numbered architecture decisions                                                                                                          | §9               |
+| `E1`–`E4`                      | **Escalations** — the four questions the 2026-07-19 peer review put to the maintainer                                                                                      | §9               |
+| `F-A`, `F-B`                   | **Findings** from the audit at the end of Phase 3                                                                                                                          | §12              |
+| `II.2c`, `IV.1`, …             | Section numbers of the **archived predecessor spec**, still cited in code comments                                                                                         | §12              |
+| "ruling N"                     | A numbered **maintainer decision** from a review session, cited in code comments                                                                                           | §12              |
+| Phase 0–8                      | The nine **stages of the program** that built this, tracked as issues #508–#516                                                                                            | §12              |
+| `G1` / `G2`                    | Two generations of the **routing grader** (§11's counts table)                                                                                                             | §11, §12         |
+| `A1`–`A4`                      | This doc's shorthand for an eval's **expectations in file order** — a display convention, not ids, so an A-number is only meaningful against the current text of that eval | §10, §12         |
+| `commit-5a`, `pr-7`, `ship-2a` | **Eval ids**: skill name + number; a letter suffix marks a sub-scenario of one original eval                                                                               | the roster in §4 |
+| `#nnn`                         | A **GitHub issue or PR** in this repo                                                                                                                                      | §12              |
+| `7b8f157`                      | A **git commit** in this repo, cited to pin a claim to a point in history                                                                                                  | —                |
 
 **Bold ids in tables** mark the ones cited by bare number somewhere outside this doc — in code
 comments, tests, or a sibling doc. Unbolded ids are referenced only from inside this document.
 
 ### Task → where to go
 
-| Your task | Read |
-|---|---|
-| Run the eval suite; add an eval; look up the schema | [`strategy-skill-evals.md`](strategy-skill-evals.md) §3, §6 — not this doc |
-| Understand *why* the harness is shaped this way | §6 here |
-| Fix a harness bug; find which module owns a behavior | §4 here, then [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md) |
-| Understand what stops an eval run reaching the real repo | §5 here, then `strategy-skill-evals.md` §4 |
-| Add a fixture profile | §4's fixture entry here, then `../scripts/skill-evals/lib/fixtures.mjs` |
-| Write or retire an assertion | §6's assertion-design rules here |
-| A routing eval is flaky | §6's assertion-design rules here — "sort variance by locus" and the #527/#528 worked example — then §11 for the measured counts, and §10's "No procedure for changing a routing assertion" for what was open and how it closed |
-| The `gh` stub rejected a command | §4.3's subcommand table here (default-deny is deliberate), then [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md)'s gh-stub surface table |
-| Is this eval able to fail at all? | §11's red controls, then §6's assertion-design rules |
-| Find out what the evals actually test | the **eval roster** at the head of §4 — all 25, one line each |
-| Find out what is known-broken or unfinished | §10 here |
-| Find a number (pass rates, run counts) | §11 here |
-| Decode an id you found in a comment | the **Notation** key above, then §12 for the full resolution |
-| Change a skill's *behavior* | [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) §4 |
+| Your task                                                | Read                                                                                                                                                                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Run the eval suite; add an eval; look up the schema      | [`strategy-skill-evals.md`](strategy-skill-evals.md) §3, §6 — not this doc                                                                                                                                                     |
+| Understand _why_ the harness is shaped this way          | §6 here                                                                                                                                                                                                                        |
+| Fix a harness bug; find which module owns a behavior     | §4 here, then [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md)                                                                                                                                           |
+| Understand what stops an eval run reaching the real repo | §5 here, then `strategy-skill-evals.md` §4                                                                                                                                                                                     |
+| Add a fixture profile                                    | §4's fixture entry here, then `../scripts/skill-evals/lib/fixtures.mjs`                                                                                                                                                        |
+| Write or retire an assertion                             | §6's assertion-design rules here                                                                                                                                                                                               |
+| A routing eval is flaky                                  | §6's assertion-design rules here — "sort variance by locus" and the #527/#528 worked example — then §11 for the measured counts, and §10's "No procedure for changing a routing assertion" for what was open and how it closed |
+| The `gh` stub rejected a command                         | §4.3's subcommand table here (default-deny is deliberate), then [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md)'s gh-stub surface table                                                                 |
+| Is this eval able to fail at all?                        | §11's red controls, then §6's assertion-design rules                                                                                                                                                                           |
+| Find out what the evals actually test                    | the **eval roster** at the head of §4 — all 25, one line each                                                                                                                                                                  |
+| Find out what is known-broken or unfinished              | §10 here                                                                                                                                                                                                                       |
+| Find a number (pass rates, run counts)                   | §11 here                                                                                                                                                                                                                       |
+| Decode an id you found in a comment                      | the **Notation** key above, then §12 for the full resolution                                                                                                                                                                   |
+| Change a skill's _behavior_                              | [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) §4                                                                                                                                                          |
 
 ### The siblings, one line each
 
-| Doc | Owns |
-|---|---|
-| [`strategy-skill-evals.md`](strategy-skill-evals.md) | The operational runbook: what it calls "the one rule" (the safety rule), the eval schema, the exact run commands, the merge-discrimination rule, the manual routing runbook, maintenance rules. Highest fan-in of the family. |
-| [`spec-skill-evals-manifest.md`](spec-skill-evals-manifest.md) | The pinned, id-by-id mapping from the 23 original acceptance evals to today's 25 entries. Enforced by the contract test. |
-| [`doc-skill-creator.md`](doc-skill-creator.md) | Operating the vendored `/skill-creator` copy: the pin, the refresh command, the Python prerequisite, the `quick_validate.py` divergence. |
-| [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) | What `/commit`, `/pr`, `/ship` each *do*, step by step. The behavior the evals test. |
-| [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md) | The natural-language invocation mechanism: Step 0, the delegation hand-off file and its 30s lease, the announcement contract. |
-| [`plan-skill-creator-vendoring.md`](plan-skill-creator-vendoring.md) | Why the skill-creator copy is vendored rather than submoduled, and the PR sequence that delivered it. |
-| [`strategy-security.md`](strategy-security.md) | The checked-in `ask` rule on `gh pr merge` — its precedence and its stated limits. |
-| [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md) | Harness CLI surface, sandbox directory layout, the gh-stub surface table, the selfcheck item list. |
-| [`../scripts/skill-evals/routing/README.md`](../scripts/skill-evals/routing/README.md) | The routing runner's CLI, its workspace tree, the headless adaptations. |
-| [`devjournal.md`](devjournal.md) | Chronology and issue numbers. |
+| Doc                                                                                    | Owns                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`strategy-skill-evals.md`](strategy-skill-evals.md)                                   | The operational runbook: what it calls "the one rule" (the safety rule), the eval schema, the exact run commands, the merge-discrimination rule, the manual routing runbook, maintenance rules. Highest fan-in of the family. |
+| [`spec-skill-evals-manifest.md`](spec-skill-evals-manifest.md)                         | The pinned, id-by-id mapping from the 23 original acceptance evals to today's 25 entries. Enforced by the contract test.                                                                                                      |
+| [`doc-skill-creator.md`](doc-skill-creator.md)                                         | Operating the vendored `/skill-creator` copy: the pin, the refresh command, the Python prerequisite, the `quick_validate.py` divergence.                                                                                      |
+| [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md)                     | What `/commit`, `/pr`, `/ship` each _do_, step by step. The behavior the evals test.                                                                                                                                          |
+| [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md)                           | The natural-language invocation mechanism: Step 0, the delegation hand-off file and its 30s lease, the announcement contract.                                                                                                 |
+| [`plan-skill-creator-vendoring.md`](plan-skill-creator-vendoring.md)                   | Why the skill-creator copy is vendored rather than submoduled, and the PR sequence that delivered it.                                                                                                                         |
+| [`strategy-security.md`](strategy-security.md)                                         | The checked-in `ask` rule on `gh pr merge` — its precedence and its stated limits.                                                                                                                                            |
+| [`../scripts/skill-evals/README.md`](../scripts/skill-evals/README.md)                 | Harness CLI surface, sandbox directory layout, the gh-stub surface table, the selfcheck item list.                                                                                                                            |
+| [`../scripts/skill-evals/routing/README.md`](../scripts/skill-evals/routing/README.md) | The routing runner's CLI, its workspace tree, the headless adaptations.                                                                                                                                                       |
+| [`devjournal.md`](devjournal.md)                                                       | Chronology and issue numbers.                                                                                                                                                                                                 |
 
 ### Terminology — one term per concept, held throughout
 
@@ -133,13 +133,13 @@ file for the full rules.
   contract test pins exactly that (§4.8).
 - **Step 0** — the intent-confirmation step `/commit` and `/pr` run when they were invoked by
   natural language rather than by a typed slash. It asks, in `/commit`'s own words, "Run `/commit`
-  with: *[detected context]*?" before touching git. Three things skip it: a typed slash, a fresh
+  with: _[detected context]_?" before touching git. Three things skip it: a typed slash, a fresh
   delegation hand-off file, and the opt-out file `.claude/skip-nl-confirm-commit-pr.local`
   (`.claude/skills/commit/SKILL.md` Step 0).
 - **The announcement** — the line a skill prints as it routes, `Using /commit` or `Using /pr`, so
-  the human can see which skill fired. The opt-out file suppresses the Step-0 *confirmation* but
+  the human can see which skill fired. The opt-out file suppresses the Step-0 _confirmation_ but
   never the announcement; only delegation does (CLAUDE.md, "AI Skills").
-- **Affirmation** — the human saying "yes" or "go ahead" to the assistant's *own* offer to commit or
+- **Affirmation** — the human saying "yes" or "go ahead" to the assistant's _own_ offer to commit or
   open a PR. That counts as invoking the skill. A "yes" to an unrelated offer does not — which is
   what the over-trigger controls check (CLAUDE.md, "AI Skills").
 - **Delegation, and the delegation hand-off file** — `/ship` calls `/pr`, which calls `/commit`.
@@ -150,7 +150,7 @@ file for the full rules.
   and the child suppresses its own announcement (`.claude/skills/ship/SKILL.md` step 3).
 - **Permission rule (`allow` / `ask` / `deny`)** — an entry in `.claude/settings.json` classifying a
   command pattern. Precedence is **deny → ask → allow, first match**, evaluated by Claude Code
-  *before* the command runs — so above anything a sandbox controls. This repo checks in one `ask`
+  _before_ the command runs — so above anything a sandbox controls. This repo checks in one `ask`
   rule, on `Bash(gh pr merge *)` and the PowerShell equivalent
   ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
 - **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
@@ -165,7 +165,7 @@ file for the full rules.
   can veto it: exit 0 allows, exit 2 blocks and feeds stderr back to the model. The harness has
   none; §8 is the design for one that was deliberately not built.
 - **`claude -p` / headless** — running Claude Code non-interactively: a prompt in, a transcript out,
-  nobody at the keyboard. This doc calls that *headless*. The consequence is that such a session can
+  nobody at the keyboard. This doc calls that _headless_. The consequence is that such a session can
   never be asked a question, which is why evals use scripted answers and why the routing grader
   needs the adaptations in §4.6.
 - **`AskUserQuestion`** — the tool a skill uses to put a question to the human. It does not exist
@@ -184,7 +184,7 @@ file for the full rules.
   does while one is still pending (`.claude/skills/ship/SKILL.md` step 8).
 - **Must / Should / Could** — priority labels (the "MoSCoW" scheme) the program put on requirements
   and that this doc uses for assertions. A failing **Must** blocks; a **Should** is tracked but does
-  not. Layer C is a *Should*, which is why §10's second open item does not block on its own.
+  not. Layer C is a _Should_, which is why §10's second open item does not block on its own.
 
 #### This harness's own vocabulary
 
@@ -194,7 +194,7 @@ file for the full rules.
   are relative to that directory. Every other path in this doc is relative to the repo root.
 - **Sandbox** — one disposable directory tree built by `buildSandbox()`, containing a throwaway git
   repo, a local bare origin, the stub `gh`, and the sandbox marker. Torn down after every run.
-- **Workspace** — `.claude/skills/<skill>-workspace/`, the *vendored* machinery's own output tree
+- **Workspace** — `.claude/skills/<skill>-workspace/`, the _vendored_ machinery's own output tree
   (`iteration-N/eval-X/` holding `eval_metadata.json`, `grading.json` and the rest — see §2's
   enabling insight). Gitignored, and it persists across runs. Not a sandbox: a sandbox is
   disposable git and `gh` state, a workspace is the durable-on-disk evidence a run leaves behind.
@@ -203,9 +203,9 @@ file for the full rules.
   above — different file, different job.
 - **Fixture / fixture profile** — a named starting-state entry in `lib/fixtures.mjs`. Plain data.
 - **Execution eval** — `kind: execution`. The prompt makes the skill do its work. Runs in a sandbox.
-- **Routing eval** — `kind: routing`. Tests *whether or how* the skill fires. Runs through the
+- **Routing eval** — `kind: routing`. Tests _whether or how_ the skill fires. Runs through the
   routing runner.
-- **Trigger eval** — a *different* thing, in a different file. `trigger-evals.json` holds short
+- **Trigger eval** — a _different_ thing, in a different file. `trigger-evals.json` holds short
   query/`should_trigger` pairs in the vendored machinery's own format; they are the training and
   test data for the Layer-C description-optimization loop. They are never run by the routing runner
   and never run together with routing evals (`strategy-skill-evals.md` §8).
@@ -213,12 +213,12 @@ file for the full rules.
   one-to-one, plus `commit-5`'s three.
 - **Seed / seeded turns / turn** — a short fabricated conversation, written to `input.jsonl` and fed
   to a fresh headless session as if it had really happened. A **turn** is one message in it; some
-  turns are attributed to the assistant. The session's *next* turn is the one graded. §11's "Seed"
+  turns are attributed to the assistant. The session's _next_ turn is the one graded. §11's "Seed"
   column counts turns.
 - **Polarity** — what a correct run looks like for a routing query: **should-fire**,
   **should-NOT-fire** (an over-trigger control the skill must stay out of), or
   **should-fire-inline** (the skill runs, but because the human typed the slash the CLI expands it
-  directly, so a correct run makes *no* `Skill` tool call).
+  directly, so a correct run makes _no_ `Skill` tool call).
 - **Expectation / assertion** — one entry in an eval's `expectations` array. The schema field is
   `expectations`; this doc and its siblings call one entry an "assertion" in prose. Same thing.
 - **`human_script`** — the pre-written replies an eval gives at the skill's human-approval
@@ -294,7 +294,7 @@ Carried forward from the baseline program that built this (§2, stage 4) and sti
   issue #507's body checklist, evidence on issue #513.
 - Structural validation (Layer A — the three test layers are defined in §2) recorded for the four
   skills in the contract and vendored sets — `/commit`, `/pr`, `/ship`, `/skill-creator`.
-  (`/handoff`, the fourth *team* skill, joined the same contract test in #585 — §10; the Layer-A
+  (`/handoff`, the fourth _team_ skill, joined the same contract test in #585 — §10; the Layer-A
   record above predates it.)
 - Every execution eval runnable end to end in a sandbox, graded by the native grader, aggregated by
   `aggregate_benchmark.py` (which rolls per-run grades into one `benchmark.json`), reviewed through
@@ -345,7 +345,7 @@ NL-invocable behind a Step-0 intent gate; `/ship` stayed explicit-only, backstop
 and affirmation routing.
 
 > **What the routing evals are testing, in plain words.** A human can invoke `/commit` and `/pr` by
-> typing the slash command *or* by just asking ("commit this"). On the natural-language path the
+> typing the slash command _or_ by just asking ("commit this"). On the natural-language path the
 > skill first confirms intent — that confirmation is **Step 0** — and prints a line **announcing**
 > which skill fired (`Using /commit`), so the human can see it. A human saying "yes" to the
 > assistant's own offer to commit is an **affirmation**, and counts as invoking it too. Three
@@ -355,7 +355,7 @@ and affirmation routing.
 > [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md).
 
 **That `ask` rule matters to everything after it.** It fires at the Claude Code permission layer —
-*above* the sandbox, *before* the stub `gh` ever runs. So in an eval session a `gh pr merge` is
+_above_ the sandbox, _before_ the stub `gh` ever runs. So in an eval session a `gh pr merge` is
 frequently intercepted and never logged. A `/ship` that wrongly merges leaves the same empty call
 log as a correct abort. Every merge-adjacent grading decision in this system is shaped by that one
 fact; it is why §5's trust boundary has a layer above the stub, why §6 says observables corroborate
@@ -375,14 +375,14 @@ corrected the grading of the `commit-5a` and `commit-5b` routing queries.
 ### The three test layers
 
 The vendored machinery tests a skill in three layers. In every one, the pattern is the same: **the
-vendored machinery does the work; our additions supply what it needs.** Paths in the *Vendored
-machinery* column are relative to `.claude/skills/skill-creator/`.
+vendored machinery does the work; our additions supply what it needs.** Paths in the _Vendored
+machinery_ column are relative to `.claude/skills/skill-creator/`.
 
-| Layer | Question | Vendored machinery | What the harness adds |
-|---|---|---|---|
-| **A — structural** | Is the skill well-formed? | `scripts/quick_validate.py` (reference only) | `tests/functional/skills/skill-contract.test.ts` — the actual CI gate, and it also covers the eval-file shape |
-| **B — behavior** | Does the skill do the right things? | the SKILL.md eval workflow, `agents/grader.md`, `scripts/aggregate_benchmark.py`, `eval-viewer/generate_review.py` | runnable eval definitions plus the sandbox harness |
-| **C — triggering** | Does the right wording fire the skill? | `scripts/run_eval.py`, `scripts/run_loop.py`, `scripts/improve_description.py` | committed trigger sets plus platform routing (Windows → cloud/Cowork) |
+| Layer              | Question                               | Vendored machinery                                                                                                 | What the harness adds                                                                                         |
+| ------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **A — structural** | Is the skill well-formed?              | `scripts/quick_validate.py` (reference only)                                                                       | `tests/functional/skills/skill-contract.test.ts` — the actual CI gate, and it also covers the eval-file shape |
+| **B — behavior**   | Does the skill do the right things?    | the SKILL.md eval workflow, `agents/grader.md`, `scripts/aggregate_benchmark.py`, `eval-viewer/generate_review.py` | runnable eval definitions plus the sandbox harness                                                            |
+| **C — triggering** | Does the right wording fire the skill? | `scripts/run_eval.py`, `scripts/run_loop.py`, `scripts/improve_description.py`                                     | committed trigger sets plus platform routing (Windows → cloud/Cowork)                                         |
 
 Layer A's `/ship` divergence is expected and permanent: upstream's validator carries a strict
 frontmatter key allowlist that predates `disable-model-invocation`. `doc-skill-creator.md` and
@@ -390,8 +390,8 @@ frontmatter key allowlist that predates `disable-model-invocation`. `doc-skill-c
 
 ### The enabling insight
 
-**No vendored script reads `evals/evals.json`.** The Python machinery operates on *workspace
-artifacts* Claude writes during a run — `<skill>-workspace/iteration-N/eval-X/` holding
+**No vendored script reads `evals/evals.json`.** The Python machinery operates on _workspace
+artifacts_ Claude writes during a run — `<skill>-workspace/iteration-N/eval-X/` holding
 `eval_metadata.json`, run outputs, `timing.json`, `grading.json`, then `benchmark.json` via
 `aggregate_benchmark.py`. Verified again at the Status date: no file under
 `.claude/skills/skill-creator/scripts/` mentions `evals.json` or the `evals/` path at all.
@@ -430,22 +430,22 @@ and their evals. Everything else in the repo follows the normal dev workflow.
 Ids are load-bearing — code comments, tests and the strategy doc cite several by bare number. Each
 row says whether it **holds** as written or has **changed**.
 
-| # | Constraint | Status today |
-|---|---|---|
-| **C1** | The vendored `.claude/skills/skill-creator/` directory stays verbatim upstream; only `UPSTREAM.md` is local. The refresh script clobbers anything else placed there — which is why `evals/skill-creator.evals.json` stays at the repo root. | **Holds.** `skill-contract.test.ts` asserts the root file's `skill_path` resolves and that each entry carries ≥3 evals. |
-| **C2** | `run_eval.py` calls `select.select()` on a subprocess pipe — Unix-only; it raises `OSError [WinError 10093]` on native Windows, and `run_loop.py` imports it, so all of Layer C is Unix-only. | **Holds.** The routing runner sidesteps it entirely: `runExecutor()` and `runGrader()` in `routing/lib/driver.mjs` consume child stdout through Node stream events, never a `select()` equivalent. |
-| C3 | Layer C scripts are needed only for description optimization; Layers A and B are plain file processing and run fine on native Windows. | Holds. |
-| C4 | Cowork — the other environment upstream's skill-creator supports (§0) — can run the Layer C scripts. | Holds, still per upstream's own Cowork section — not independently verified. |
-| C5 | Cloud Claude Code sessions are Linux; a nested `claude -p` (Claude Code driven non-interactively from inside another session — §0) in a cloud sandbox needs a one-time smoke test. | **Unverified in a genuine cloud session.** Nested `claude -p` is confirmed working on the native Windows host, which is not the case C5 is about. Tracked on #512. |
-| C6 | The skills are interactive; subagents cannot use `AskUserQuestion`, so eval runs use scripted human replies, valid only inside a marker-bearing sandbox. | **Holds, and extended.** Headless `claude -p` has no `AskUserQuestion` either, so the routing grader grades an observable proxy — `runGrader()` in `routing/lib/driver.mjs` injects that adaptation into every grader prompt. |
-| **C7** | Upstream `quick_validate.py` rejects `/ship`'s `disable-model-invocation` key. Accepted divergence; the repo's gate is the Vitest contract test. | **Holds.** |
-| **C8** | The agent-guidance layers (CLAUDE.md, eval-file notices, the sandbox-marker rule) are prompt-level, not hard enforcement. The skills' human-approval checkpoints are also prompt-level in the eval context, since an agent holding a `human_script` can satisfy a checkpoint from the script instead of stalling. The only gate that fires regardless is the checked-in `ask` rule on `gh pr merge` — and it guards merges, not pushes or PR creation. | **Holds.** See §5 for what is structural and what is not. |
-| C9 | `spec-portable-ai-procedures.md` §3 needs a clarification that `evals/` is upstream skill anatomy, not an auxiliary doc. | **Delivered.** That §3 now says so explicitly and links the strategy doc. |
-| C10 | Python 3 + PyYAML is an authoring-time prerequisite; nothing in CI or the app runs the Python. | Holds. |
-| **C11** | The `/ship` eval that exercises a *pending advisory check* — a CI check that is reported but not required to pass — takes ≥5 real minutes by design; it stays in the single execution batch, scheduled in the first parallel wave so its wait overlaps the others. | **Changed in naming only.** The eval is `ship-2a`; the scripted human answers it runs through are *wait*, *wait 5 more minutes* (`wait+5` is the literal menu choice `/ship` offers), *wait*, *abort* — about 10 minutes in all. `ship-2c` was removed in the Phase-7 right-sizing pass (§9). The scheduling rule is unchanged and is stated in `prompts/batch-prompt.md`. |
-| **C12** | Real-repo testing is exception-only and gated: automated runs never touch the real repo, full stop; the sole allowed touch is an occasional human-run, AI-guided end-to-end smoke, gated by a recorded justification and a cleanup-owed runbook. | **Holds.** The runbook is `strategy-skill-evals.md` §10. |
-| **C13** | Dead simple beats clever — usable and maintainable by 4–5 volunteer engineers at varying experience levels. The recorded tie-breaker: fixtures as data not a DSL; the stub as a lookup not a simulator; the tracker as an issue not a board; harness scripts in Node, not shell. | **Holds, and visible in the code.** `scripts/skill-evals/package.json` declares zero runtime dependencies; `lib/fixtures.mjs` is a plain object literal; only the three `gh` wrappers are shell. |
-| **C14** | One cohesive testing story: the existing Vitest contract gate keeps working; the harness may enhance it but never interfere. The SKILL.md-structural assertions pass unchanged; the eval-artifact assertions were rewritten for the per-skill layout, and root `evals/evals.json` was deleted. | **Holds, and grew.** CI now runs two skill test files: `skill-contract.test.ts` and `routing-harness.test.ts`. Both sit in the same `functional-skills` Vitest project inside the required `Lint & Functional Tests` check — no new workflow, no new config. |
+| #       | Constraint                                                                                                                                                                                                                                                                                                                                                                                                                                             | Status today                                                                                                                                                                                                                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C1**  | The vendored `.claude/skills/skill-creator/` directory stays verbatim upstream; only `UPSTREAM.md` is local. The refresh script clobbers anything else placed there — which is why `evals/skill-creator.evals.json` stays at the repo root.                                                                                                                                                                                                            | **Holds.** `skill-contract.test.ts` asserts the root file's `skill_path` resolves and that each entry carries ≥3 evals.                                                                                                                                                                                                                                                    |
+| **C2**  | `run_eval.py` calls `select.select()` on a subprocess pipe — Unix-only; it raises `OSError [WinError 10093]` on native Windows, and `run_loop.py` imports it, so all of Layer C is Unix-only.                                                                                                                                                                                                                                                          | **Holds.** The routing runner sidesteps it entirely: `runExecutor()` and `runGrader()` in `routing/lib/driver.mjs` consume child stdout through Node stream events, never a `select()` equivalent.                                                                                                                                                                         |
+| C3      | Layer C scripts are needed only for description optimization; Layers A and B are plain file processing and run fine on native Windows.                                                                                                                                                                                                                                                                                                                 | Holds.                                                                                                                                                                                                                                                                                                                                                                     |
+| C4      | Cowork — the other environment upstream's skill-creator supports (§0) — can run the Layer C scripts.                                                                                                                                                                                                                                                                                                                                                   | Holds, still per upstream's own Cowork section — not independently verified.                                                                                                                                                                                                                                                                                               |
+| C5      | Cloud Claude Code sessions are Linux; a nested `claude -p` (Claude Code driven non-interactively from inside another session — §0) in a cloud sandbox needs a one-time smoke test.                                                                                                                                                                                                                                                                     | **Unverified in a genuine cloud session.** Nested `claude -p` is confirmed working on the native Windows host, which is not the case C5 is about. Tracked on #512.                                                                                                                                                                                                         |
+| C6      | The skills are interactive; subagents cannot use `AskUserQuestion`, so eval runs use scripted human replies, valid only inside a marker-bearing sandbox.                                                                                                                                                                                                                                                                                               | **Holds, and extended.** Headless `claude -p` has no `AskUserQuestion` either, so the routing grader grades an observable proxy — `runGrader()` in `routing/lib/driver.mjs` injects that adaptation into every grader prompt.                                                                                                                                              |
+| **C7**  | Upstream `quick_validate.py` rejects `/ship`'s `disable-model-invocation` key. Accepted divergence; the repo's gate is the Vitest contract test.                                                                                                                                                                                                                                                                                                       | **Holds.**                                                                                                                                                                                                                                                                                                                                                                 |
+| **C8**  | The agent-guidance layers (CLAUDE.md, eval-file notices, the sandbox-marker rule) are prompt-level, not hard enforcement. The skills' human-approval checkpoints are also prompt-level in the eval context, since an agent holding a `human_script` can satisfy a checkpoint from the script instead of stalling. The only gate that fires regardless is the checked-in `ask` rule on `gh pr merge` — and it guards merges, not pushes or PR creation. | **Holds.** See §5 for what is structural and what is not.                                                                                                                                                                                                                                                                                                                  |
+| C9      | `spec-portable-ai-procedures.md` §3 needs a clarification that `evals/` is upstream skill anatomy, not an auxiliary doc.                                                                                                                                                                                                                                                                                                                               | **Delivered.** That §3 now says so explicitly and links the strategy doc.                                                                                                                                                                                                                                                                                                  |
+| C10     | Python 3 + PyYAML is an authoring-time prerequisite; nothing in CI or the app runs the Python.                                                                                                                                                                                                                                                                                                                                                         | Holds.                                                                                                                                                                                                                                                                                                                                                                     |
+| **C11** | The `/ship` eval that exercises a _pending advisory check_ — a CI check that is reported but not required to pass — takes ≥5 real minutes by design; it stays in the single execution batch, scheduled in the first parallel wave so its wait overlaps the others.                                                                                                                                                                                     | **Changed in naming only.** The eval is `ship-2a`; the scripted human answers it runs through are _wait_, _wait 5 more minutes_ (`wait+5` is the literal menu choice `/ship` offers), _wait_, _abort_ — about 10 minutes in all. `ship-2c` was removed in the Phase-7 right-sizing pass (§9). The scheduling rule is unchanged and is stated in `prompts/batch-prompt.md`. |
+| **C12** | Real-repo testing is exception-only and gated: automated runs never touch the real repo, full stop; the sole allowed touch is an occasional human-run, AI-guided end-to-end smoke, gated by a recorded justification and a cleanup-owed runbook.                                                                                                                                                                                                       | **Holds.** The runbook is `strategy-skill-evals.md` §10.                                                                                                                                                                                                                                                                                                                   |
+| **C13** | Dead simple beats clever — usable and maintainable by 4–5 volunteer engineers at varying experience levels. The recorded tie-breaker: fixtures as data not a DSL; the stub as a lookup not a simulator; the tracker as an issue not a board; harness scripts in Node, not shell.                                                                                                                                                                       | **Holds, and visible in the code.** `scripts/skill-evals/package.json` declares zero runtime dependencies; `lib/fixtures.mjs` is a plain object literal; only the three `gh` wrappers are shell.                                                                                                                                                                           |
+| **C14** | One cohesive testing story: the existing Vitest contract gate keeps working; the harness may enhance it but never interfere. The SKILL.md-structural assertions pass unchanged; the eval-artifact assertions were rewritten for the per-skill layout, and root `evals/evals.json` was deleted.                                                                                                                                                         | **Holds, and grew.** CI now runs two skill test files: `skill-contract.test.ts` and `routing-harness.test.ts`. Both sit in the same `functional-skills` Vitest project inside the required `Lint & Functional Tests` check — no new workflow, no new config.                                                                                                               |
 
 ## 4. Module map and data flow
 
@@ -462,51 +462,51 @@ argues about them by id, so here they are.
 
 **Id scheme:** `<skill>-<n>` — the skill's name, then a number, scoped per skill. A letter suffix
 (`commit-3a`, `ship-2a`) marks one sub-scenario of a single original eval that was split. Routing
-*queries* may add a word (`commit-5a-slash`); those are §4.4's, not eval ids.
+_queries_ may add a word (`commit-5a-slash`); those are §4.4's, not eval ids.
 
 The first four columns are generated; the last is written by hand from each eval's own
 `eval_name`.
 
-| Id | Kind | Skill | Fixture | What it proves |
-|---|---|---|---|---|
-| `commit-1` | execution | commit | `feature-dirty-clean-payload` | Happy path: a dirty feature branch commits with a Conventional Commit subject |
-| `commit-2` | execution | commit | `feature-dirty-with-env-local` | It refuses to stage a suspicious file (`.env.local`) that is sitting in the payload |
-| `commit-3a` | execution | commit | `feature-schema-expand-only` | An expand-only schema change surfaces the post-PR deploy-dispatch note |
-| `commit-3b` | execution | commit | `feature-schema-expand-plus-contract` | A combined expand-and-contract schema change is refused outright |
-| `commit-4` | routing | commit | — | Natural-language commit intent routes through the Skill tool, with Step 0 |
-| `commit-5` | routing | commit | — | Step 0 is skipped on exactly three paths: typed slash, delegation, opt-out file |
-| `commit-6` | routing | commit | — | The assistant offers, the human says "yes": that affirmation routes through the skill and announces |
-| `commit-7` | routing | commit | — | Over-trigger control: a bare "yes" to an offer to *explain* `/commit` must not run it |
-| `commit-8` | routing | commit | — | Over-trigger control: "commit" as the topic of a question must not run it |
-| `pr-1` | execution | pr | `feature-open-pr-two-new-commits` | Happy path: a PR already exists, so it comments on the newly pushed commits |
-| `pr-2` | execution | pr | `feature-x-with-pr-on-feature-y` | It refuses when the named PR belongs to a different branch |
-| `pr-3` | execution | pr | `feature-dirty-no-pr` | Dirty tree with no PR: it delegates to `/commit`, then creates the PR |
-| `pr-4` | execution | pr | `feature-breaking-change-no-pr` | A new PR gets a Conventional Commit title and the breaking-change flag |
-| `pr-5` | execution | pr | `feature-no-pr-cold-reviewer-cache` | Cold reviewer cache: the picker lists collaborators and takes a numeric pick |
-| `pr-6` | execution | pr | `feature-no-pr-warm-reviewer-cache` | Warm cache: a reviewer named in plain language resolves without any `gh api` call |
-| `pr-7` | execution | pr | `feature-no-pr-stale-reviewer-cache` | A stale cache makes `gh` reject a reviewer; it refreshes the cache and re-asks |
-| `pr-8` | routing | pr | — | Natural-language PR intent routes through the Skill tool, with Step 0 |
-| `pr-9` | routing | pr | — | The assistant offers, the human says "yes": that routes through `/pr` and announces |
-| `ship-1` | execution | ship | `feature-open-pr-all-green` | Happy path: a pre-existing PR, all checks green, merges and watches |
-| `ship-2a` | execution | ship | `feature-open-pr-advisory-pending` | A pending advisory check: it waits, offers `wait+5`, waits again, then aborts |
-| `ship-2b` | execution | ship | `feature-open-pr-advisory-pending` | Same world, the human picks `troubleshoot` instead of waiting |
-| `ship-3` | execution | ship | `docs-only-open-pr` | A docs-only PR: absent advisory checks are expected, so it merges on required-green |
-| `ship-4` | routing | ship | — | Session control: "ship it" must *not* fire `/ship`, and must not simulate the merge |
-| `ship-5` | routing | ship | — | Over-trigger control: "remind me what /ship does" explains, it does not ship |
-| `ship-6` | execution | ship | `feature-dirty-no-pr` | The `/ship` → `/pr` → `/commit` cascade announces each hop exactly once |
-| `ship-7` | execution | ship | `feature-open-pr-unanswered-comment` | A comment posted after the last push: it lists it, asks `1 unanswered since the last push — merge anyway?`, and does not merge on `no` |
-| `ship-8` | execution | ship | `feature-open-pr-bot-cards-only` | Only a Vercel card, a clean Claude review and its own `/pr` note follow the push: all three are excluded, so it merges |
-| `ship-9` | execution | ship | `feature-open-pr-review-with-findings` | A Claude review that reports issues after the push still counts: it lists it, asks, and does not merge on `no` |
-| `handoff-1` | execution | handoff | `feature-uncommitted-fix-no-pr` | It reports the fix as uncommitted, contradicting the human's belief that it landed |
-| `handoff-2` | execution | handoff | `feature-one-commit-clean-no-pr` | An existing hand-off doc is updated in place, with the old state kept under `Historical` |
-| `handoff-3` | execution | handoff | `feature-one-commit-clean-no-pr` | Nothing in flight: it asks what the hand-off is for instead of inventing work |
-| `handoff-4` | execution | handoff | `feature-one-commit-clean-no-pr` | `--mode minimal` contracts the doc, and the slug comes from the argument, not the flag |
-| `handoff-5` | execution | handoff | `feature-migration-open-pr-teammate-wip` | `--mode full` produces the decision log, split validation and gated resume plan |
-| `handoff-6` | execution | handoff | `feature-uncommitted-fix-no-pr` | Minimal depth selected from natural language alone, with no clarifying question |
-| `handoff-7` | execution | handoff | `feature-two-commits-dirty-open-issue` | An explicit "compact" beats the complexity that would otherwise escalate to full |
-| `handoff-8` | execution | handoff | `feature-migration-open-pr-teammate-wip` | Unprompted escalation to full when the recovery risk justifies it |
-| `handoff-9` | execution | handoff | `feature-migration-open-pr-teammate-wip` | Compact overall, but the working-tree section expands for a file nobody owns |
-| `handoff-10` | execution | handoff | `feature-migration-open-pr-teammate-wip` | Full depth from natural language, on the same world as the slash-full twin |
+| Id           | Kind      | Skill   | Fixture                                  | What it proves                                                                                                                         |
+| ------------ | --------- | ------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `commit-1`   | execution | commit  | `feature-dirty-clean-payload`            | Happy path: a dirty feature branch commits with a Conventional Commit subject                                                          |
+| `commit-2`   | execution | commit  | `feature-dirty-with-env-local`           | It refuses to stage a suspicious file (`.env.local`) that is sitting in the payload                                                    |
+| `commit-3a`  | execution | commit  | `feature-schema-expand-only`             | An expand-only schema change surfaces the post-PR deploy-dispatch note                                                                 |
+| `commit-3b`  | execution | commit  | `feature-schema-expand-plus-contract`    | A combined expand-and-contract schema change is refused outright                                                                       |
+| `commit-4`   | routing   | commit  | —                                        | Natural-language commit intent routes through the Skill tool, with Step 0                                                              |
+| `commit-5`   | routing   | commit  | —                                        | Step 0 is skipped on exactly three paths: typed slash, delegation, opt-out file                                                        |
+| `commit-6`   | routing   | commit  | —                                        | The assistant offers, the human says "yes": that affirmation routes through the skill and announces                                    |
+| `commit-7`   | routing   | commit  | —                                        | Over-trigger control: a bare "yes" to an offer to _explain_ `/commit` must not run it                                                  |
+| `commit-8`   | routing   | commit  | —                                        | Over-trigger control: "commit" as the topic of a question must not run it                                                              |
+| `pr-1`       | execution | pr      | `feature-open-pr-two-new-commits`        | Happy path: a PR already exists, so it comments on the newly pushed commits                                                            |
+| `pr-2`       | execution | pr      | `feature-x-with-pr-on-feature-y`         | It refuses when the named PR belongs to a different branch                                                                             |
+| `pr-3`       | execution | pr      | `feature-dirty-no-pr`                    | Dirty tree with no PR: it delegates to `/commit`, then creates the PR                                                                  |
+| `pr-4`       | execution | pr      | `feature-breaking-change-no-pr`          | A new PR gets a Conventional Commit title and the breaking-change flag                                                                 |
+| `pr-5`       | execution | pr      | `feature-no-pr-cold-reviewer-cache`      | Cold reviewer cache: the picker lists collaborators and takes a numeric pick                                                           |
+| `pr-6`       | execution | pr      | `feature-no-pr-warm-reviewer-cache`      | Warm cache: a reviewer named in plain language resolves without any `gh api` call                                                      |
+| `pr-7`       | execution | pr      | `feature-no-pr-stale-reviewer-cache`     | A stale cache makes `gh` reject a reviewer; it refreshes the cache and re-asks                                                         |
+| `pr-8`       | routing   | pr      | —                                        | Natural-language PR intent routes through the Skill tool, with Step 0                                                                  |
+| `pr-9`       | routing   | pr      | —                                        | The assistant offers, the human says "yes": that routes through `/pr` and announces                                                    |
+| `ship-1`     | execution | ship    | `feature-open-pr-all-green`              | Happy path: a pre-existing PR, all checks green, merges and watches                                                                    |
+| `ship-2a`    | execution | ship    | `feature-open-pr-advisory-pending`       | A pending advisory check: it waits, offers `wait+5`, waits again, then aborts                                                          |
+| `ship-2b`    | execution | ship    | `feature-open-pr-advisory-pending`       | Same world, the human picks `troubleshoot` instead of waiting                                                                          |
+| `ship-3`     | execution | ship    | `docs-only-open-pr`                      | A docs-only PR: absent advisory checks are expected, so it merges on required-green                                                    |
+| `ship-4`     | routing   | ship    | —                                        | Session control: "ship it" must _not_ fire `/ship`, and must not simulate the merge                                                    |
+| `ship-5`     | routing   | ship    | —                                        | Over-trigger control: "remind me what /ship does" explains, it does not ship                                                           |
+| `ship-6`     | execution | ship    | `feature-dirty-no-pr`                    | The `/ship` → `/pr` → `/commit` cascade announces each hop exactly once                                                                |
+| `ship-7`     | execution | ship    | `feature-open-pr-unanswered-comment`     | A comment posted after the last push: it lists it, asks `1 unanswered since the last push — merge anyway?`, and does not merge on `no` |
+| `ship-8`     | execution | ship    | `feature-open-pr-bot-cards-only`         | Only a Vercel card, a clean Claude review and its own `/pr` note follow the push: all three are excluded, so it merges                 |
+| `ship-9`     | execution | ship    | `feature-open-pr-review-with-findings`   | A Claude review that reports issues after the push still counts: it lists it, asks, and does not merge on `no`                         |
+| `handoff-1`  | execution | handoff | `feature-uncommitted-fix-no-pr`          | It reports the fix as uncommitted, contradicting the human's belief that it landed                                                     |
+| `handoff-2`  | execution | handoff | `feature-one-commit-clean-no-pr`         | An existing hand-off doc is updated in place, with the old state kept under `Historical`                                               |
+| `handoff-3`  | execution | handoff | `feature-one-commit-clean-no-pr`         | Nothing in flight: it asks what the hand-off is for instead of inventing work                                                          |
+| `handoff-4`  | execution | handoff | `feature-one-commit-clean-no-pr`         | `--mode minimal` contracts the doc, and the slug comes from the argument, not the flag                                                 |
+| `handoff-5`  | execution | handoff | `feature-migration-open-pr-teammate-wip` | `--mode full` produces the decision log, split validation and gated resume plan                                                        |
+| `handoff-6`  | execution | handoff | `feature-uncommitted-fix-no-pr`          | Minimal depth selected from natural language alone, with no clarifying question                                                        |
+| `handoff-7`  | execution | handoff | `feature-two-commits-dirty-open-issue`   | An explicit "compact" beats the complexity that would otherwise escalate to full                                                       |
+| `handoff-8`  | execution | handoff | `feature-migration-open-pr-teammate-wip` | Unprompted escalation to full when the recovery risk justifies it                                                                      |
+| `handoff-9`  | execution | handoff | `feature-migration-open-pr-teammate-wip` | Compact overall, but the working-tree section expands for a file nobody owns                                                           |
+| `handoff-10` | execution | handoff | `feature-migration-open-pr-teammate-wip` | Full depth from natural language, on the same world as the slash-full twin                                                             |
 
 **The `/handoff` block is the one place a `Fixture` cell does not mean "a world built for this
 eval".** Four profiles were built (`handoff-1`, `-4`, `-7`, `-8`); the other six name the nearest
@@ -549,14 +549,14 @@ This is `commit-2`, trimmed:
 
 ### 4.1 Entry points
 
-| File | Job | Key symbols | Called by |
-|---|---|---|---|
-| `make-sandbox.mjs` | Build one sandbox for a named fixture and print either the human activation block or the raw manifest. | argument helpers `has`/`value`/`firstPositional`/`printHelp`; delegates to `listFixtures()` and `buildSandbox()` | humans, the batch prompt, the routing runner (indirectly, via `buildSandbox()`) |
-| `teardown-sandbox.mjs` | Remove one sandbox or sweep all of them; `--archive <destDir>` captures evidence first, so archive-then-teardown is one operation. | delegates to `archiveEvidence()`, `teardownSandbox()`, `teardownAll()` | humans, the batch prompt |
-| `archive-evidence.mjs` | Copy the harness-owned raw evidence legs into an eval's `outputs/` directory before teardown. | delegates to `archiveEvidence()` | the batch prompt, the executor prompt |
-| `selfcheck.mjs` | Run the whole safety checklist and exit non-zero if anything fails. | `checkFixtureCompleteness`, `checkStubBehaviors`, `checkEnvScrub`, `checkTeardown`, `checkWrapperOnPath`, `checkGitBashActivation`, `checkEvidenceArchive`, `checkMainUpstream`, `checkZeroMutation`, plus `runStub`, `findPosixShell`, `repoState`, `referencedFixtureNames`, `report` | humans, after any harness change |
-| `fake-test.mjs` | The sandbox's `npm test`. Passes instantly; exits non-zero if a `.skill-eval-fail-test` sentinel exists in the working directory. | — | copied into each sandbox as `.skill-eval-fake-test.mjs` by `buildSandbox()` |
-| `routing/run-routing-evals.mjs` | Drive the eleven routing queries as graded trigger rates. | `loadExpectations`, `buildInputJsonl`, `applySetupFiles`; top-level loop | humans |
+| File                            | Job                                                                                                                                | Key symbols                                                                                                                                                                                                                                                                             | Called by                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `make-sandbox.mjs`              | Build one sandbox for a named fixture and print either the human activation block or the raw manifest.                             | argument helpers `has`/`value`/`firstPositional`/`printHelp`; delegates to `listFixtures()` and `buildSandbox()`                                                                                                                                                                        | humans, the batch prompt, the routing runner (indirectly, via `buildSandbox()`) |
+| `teardown-sandbox.mjs`          | Remove one sandbox or sweep all of them; `--archive <destDir>` captures evidence first, so archive-then-teardown is one operation. | delegates to `archiveEvidence()`, `teardownSandbox()`, `teardownAll()`                                                                                                                                                                                                                  | humans, the batch prompt                                                        |
+| `archive-evidence.mjs`          | Copy the harness-owned raw evidence legs into an eval's `outputs/` directory before teardown.                                      | delegates to `archiveEvidence()`                                                                                                                                                                                                                                                        | the batch prompt, the executor prompt                                           |
+| `selfcheck.mjs`                 | Run the whole safety checklist and exit non-zero if anything fails.                                                                | `checkFixtureCompleteness`, `checkStubBehaviors`, `checkEnvScrub`, `checkTeardown`, `checkWrapperOnPath`, `checkGitBashActivation`, `checkEvidenceArchive`, `checkMainUpstream`, `checkZeroMutation`, plus `runStub`, `findPosixShell`, `repoState`, `referencedFixtureNames`, `report` | humans, after any harness change                                                |
+| `fake-test.mjs`                 | The sandbox's `npm test`. Passes instantly; exits non-zero if a `.skill-eval-fail-test` sentinel exists in the working directory.  | —                                                                                                                                                                                                                                                                                       | copied into each sandbox as `.skill-eval-fake-test.mjs` by `buildSandbox()`     |
+| `routing/run-routing-evals.mjs` | Drive the eleven routing queries as graded trigger rates.                                                                          | `loadExpectations`, `buildInputJsonl`, `applySetupFiles`; top-level loop                                                                                                                                                                                                                | humans                                                                          |
 
 `selfcheck.mjs` declares fourteen named checks and emits twenty-four result rows. Several checks
 contribute more than one row — `default-deny`, for example, yields `exit`, `logged` and
@@ -565,28 +565,28 @@ contribute more than one row — `default-deny`, for example, yields `exit`, `lo
 
 ### 4.2 The library
 
-| File | Job | Key exports |
-|---|---|---|
-| `lib/paths.mjs` | Path resolution and the load-bearing location guard. | `HARNESS_DIR`, `REPO_ROOT`, `MARKER_FILENAME` (`.skill-eval-sandbox`), `SANDBOX_PREFIX` (`skill-eval-`), `sandboxRoot(override)`, `assertOutsideRepo(target)`, `isSandbox(dir)` |
-| `lib/engine.mjs` | Node floor, enforced at runtime. | `NODE_ENGINE_FLOOR`, `assertNodeEngine()` |
-| `lib/fixtures.mjs` | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Twenty-one profiles (as of #601) — a count that moves whenever an eval is added, in lockstep with the file's own `// The 21 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF` |
-| `lib/gh-fixture.mjs` | Turn a profile's `gh` block into the `gh-fixture.json` the stub answers from, deriving the reviewer display-name map. | `buildGhFixture(profile)` |
-| `lib/sandbox.mjs` | Build, tear down and archive. The biggest module. | `buildSandbox({fixture, root, note})`, `teardownSandbox(dir)`, `teardownAll(root)`, `archiveEvidence(sandboxDir, destDir)`; internal helpers `git`, `gitSafe`, `forceRemove`, `clearReadOnly`, `setLocalConfig`, `writeFiles`, `writeTeamCache`, `writeMarker`, `installGhStub`, `writeActivateScripts`; the constant `SCRUB_UNSET` |
+| File                 | Job                                                                                                                                                                                                                                              | Key exports                                                                                                                                                                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/paths.mjs`      | Path resolution and the load-bearing location guard.                                                                                                                                                                                             | `HARNESS_DIR`, `REPO_ROOT`, `MARKER_FILENAME` (`.skill-eval-sandbox`), `SANDBOX_PREFIX` (`skill-eval-`), `sandboxRoot(override)`, `assertOutsideRepo(target)`, `isSandbox(dir)`                                                                                                                                                     |
+| `lib/engine.mjs`     | Node floor, enforced at runtime.                                                                                                                                                                                                                 | `NODE_ENGINE_FLOOR`, `assertNodeEngine()`                                                                                                                                                                                                                                                                                           |
+| `lib/fixtures.mjs`   | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Twenty-one profiles (as of #601) — a count that moves whenever an eval is added, in lockstep with the file's own `// The 21 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF`                                                                                                                                                     |
+| `lib/gh-fixture.mjs` | Turn a profile's `gh` block into the `gh-fixture.json` the stub answers from, deriving the reviewer display-name map.                                                                                                                            | `buildGhFixture(profile)`                                                                                                                                                                                                                                                                                                           |
+| `lib/sandbox.mjs`    | Build, tear down and archive. The biggest module.                                                                                                                                                                                                | `buildSandbox({fixture, root, note})`, `teardownSandbox(dir)`, `teardownAll(root)`, `archiveEvidence(sandboxDir, destDir)`; internal helpers `git`, `gitSafe`, `forceRemove`, `clearReadOnly`, `setLocalConfig`, `writeFiles`, `writeTeamCache`, `writeMarker`, `installGhStub`, `writeActivateScripts`; the constant `SCRUB_UNSET` |
 
 A fixture profile is a plain object. `getFixture()` returns it with a `name` key added; the fields
 a profile itself declares are:
 
-| Field | What it does |
-|---|---|
-| `summary` | One-line human description. Not read by the builder beyond being copied into the manifest. |
-| `branch` | The feature branch the sandbox checks out after the seed commit on `main`. |
-| `baseFilesExtra` | Extra files committed alongside `BASE_FILES` in the seed commit on `main`. |
-| `branchCommits` | Ordered commits replayed on the feature branch; each is `{message, write, delete}`. |
-| `pushedBranchCommits` | Push the branch to the bare origin **after** the Nth of those commits, leaving the rest unpushed. Omit it and nothing is pushed unless `openPr` is set. |
-| `openPr` | `true` pushes the whole feature branch to the bare origin when `pushedBranchCommits` is absent. Set it whenever `gh.branchPr` claims a PR exists — a PR's head has to exist on origin, and a profile that sets `branchPr` without pushing builds a sandbox whose git state silently contradicts its own `preconditions`. |
-| `working` | Uncommitted working-tree changes applied last: `{write, delete}`. This is what makes a fixture "dirty". |
-| `teamCache` | Preseeds `/pr`'s reviewer cache: `{refreshedAtDaysAgo, collaborators, extraDisplayNames}`. Omit for a cold cache. |
-| `gh` | The data the stub answers from: `owner`, `repo`, `auth`, `self`, `collaborators`, `issues`, `prs`, `branchPr`, `checks`, `runs`, `createPr`, `sequences`, `vercelProductionUrl`. |
+| Field                 | What it does                                                                                                                                                                                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `summary`             | One-line human description. Not read by the builder beyond being copied into the manifest.                                                                                                                                                                                                                               |
+| `branch`              | The feature branch the sandbox checks out after the seed commit on `main`.                                                                                                                                                                                                                                               |
+| `baseFilesExtra`      | Extra files committed alongside `BASE_FILES` in the seed commit on `main`.                                                                                                                                                                                                                                               |
+| `branchCommits`       | Ordered commits replayed on the feature branch; each is `{message, write, delete}`.                                                                                                                                                                                                                                      |
+| `pushedBranchCommits` | Push the branch to the bare origin **after** the Nth of those commits, leaving the rest unpushed. Omit it and nothing is pushed unless `openPr` is set.                                                                                                                                                                  |
+| `openPr`              | `true` pushes the whole feature branch to the bare origin when `pushedBranchCommits` is absent. Set it whenever `gh.branchPr` claims a PR exists — a PR's head has to exist on origin, and a profile that sets `branchPr` without pushing builds a sandbox whose git state silently contradicts its own `preconditions`. |
+| `working`             | Uncommitted working-tree changes applied last: `{write, delete}`. This is what makes a fixture "dirty".                                                                                                                                                                                                                  |
+| `teamCache`           | Preseeds `/pr`'s reviewer cache: `{refreshedAtDaysAgo, collaborators, extraDisplayNames}`. Omit for a cold cache.                                                                                                                                                                                                        |
+| `gh`                  | The data the stub answers from: `owner`, `repo`, `auth`, `self`, `collaborators`, `issues`, `prs`, `branchPr`, `checks`, `runs`, `createPr`, `sequences`, `vercelProductionUrl`.                                                                                                                                         |
 
 `buildSandbox()` interprets most of these directly; the `gh` block goes through `buildGhFixture()`
 and `teamCache` through `writeTeamCache()`. Profiles are written in house style using the
@@ -625,21 +625,21 @@ which records `ts`, `argv`, `cwd`, `sub`, `credsPresent` (whether `GH_TOKEN`/`GI
 set), `ghConfigDir`, a `decision` of `answered` / `denied` / `no-marker` / `error`, the `exitCode`,
 and per-handler extras.
 
-| Subcommand | Handler | Behavior |
-|---|---|---|
-| `auth status` | `handleAuthStatus` | Writes to **stderr**, like real `gh`, and includes the literal `(SANDBOX gh stub)` — the string the executor prompt's stub-liveness gate greps for. Exit 0 logged in, 1 not. |
-| `issue view <N>` | `handleIssueView` | Emits the fixture's issue JSON, or exit 1 if it is not `OPEN`. |
-| `pr view [N]` | `handlePrView` | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. Every fixture PR carries `comments`, `reviews` and `commits[].committedDate` for `/ship` step 10 (#580). One `--jq` special case (#597 item 1): `--json commits --jq '.commits[-1].committedDate'` (dotless spelling accepted) prints the head commit's date as a bare string, the way real `gh` does; every other form, including any other `--jq`, still prints the full object. |
-| `pr list` | `handlePrList` | The read-only branch-PR-detection alias: emits `[branchPr]` or `[]`. |
-| `pr create` | `handlePrCreate` | Consults the per-call sequence `sequences["pr create"]` **first**; only if the profile has none does it fall back to `createPr`'s URL. (`pr-7`'s error-then-success run depends on that precedence.) Logs the `--reviewer` and `--assignee` values. |
-| `pr checks <N> [--watch]` | `handlePrChecks` | Prints one tab-separated line per fixture check. Exit **0** all pass, **8** any pending, **1** any fail — real `gh`'s codes. |
-| `pr merge <N>` | `handlePrMerge` | Prints a simulated success, calls `recordMerge()` to append a durable record to `gh-stub-state.json`, and logs the `--merge` / `--delete-branch` / `--squash` flags. It never mutates the sandbox git tree, so the skill's own `git branch -d` still behaves. |
-| `pr comment <N>` | `handlePrComment` | Returns a synthetic comment URL; logs whether a body was supplied. |
-| `run list` / `run watch <id>` | `handleRunList` / `handleRunWatch` | Post-merge run discovery and watch, from the fixture's `runs`. |
-| `api user` / `api users/<login>` / `api repos/<o>/<r>/collaborators` | `handleApi` | Emulates exactly the `--jq` filters `/pr` uses (`.login`, `.name // .login`, `.[].login`). Any other endpoint falls through to default-deny. |
-| `api repos/<o>/<r>/pulls/<N>/comments` / `api graphql` | `handleApi` | `/ship` step 10's conversation read (#580): the fixture's `pullComments`, and — only for a query naming `reviewThreads` — the fixture's `reviewThreads` as one page (`hasNextPage: false`). Both empty by default; any other GraphQL query is default-denied. |
-| `api repos/<o>/<r>/issues/<N>/comments` | `handleApi` | `/ship` step 10's poster-identity read (#601): the fixture's `issueComments` — top-level comments in GitHub's REST shape (`user.login` with `[bot]` for a bot, `user.type`, `performed_via_github_app.slug`), which `gh pr view` cannot show. Empty by default. GET only (`--paginate` accepted); `-X POST` / `--method POST` falls through to default-deny. |
-| anything else | `dispatch` default branch | **Default-deny.** |
+| Subcommand                                                           | Handler                            | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth status`                                                        | `handleAuthStatus`                 | Writes to **stderr**, like real `gh`, and includes the literal `(SANDBOX gh stub)` — the string the executor prompt's stub-liveness gate greps for. Exit 0 logged in, 1 not.                                                                                                                                                                                                                                                                                                     |
+| `issue view <N>`                                                     | `handleIssueView`                  | Emits the fixture's issue JSON, or exit 1 if it is not `OPEN`.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `pr view [N]`                                                        | `handlePrView`                     | With a number, the fixture's `prs[N]` or `branchPr`; without, `branchPr`. Exit 1 when absent. Every fixture PR carries `comments`, `reviews` and `commits[].committedDate` for `/ship` step 10 (#580). One `--jq` special case (#597 item 1): `--json commits --jq '.commits[-1].committedDate'` (dotless spelling accepted) prints the head commit's date as a bare string, the way real `gh` does; every other form, including any other `--jq`, still prints the full object. |
+| `pr list`                                                            | `handlePrList`                     | The read-only branch-PR-detection alias: emits `[branchPr]` or `[]`.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `pr create`                                                          | `handlePrCreate`                   | Consults the per-call sequence `sequences["pr create"]` **first**; only if the profile has none does it fall back to `createPr`'s URL. (`pr-7`'s error-then-success run depends on that precedence.) Logs the `--reviewer` and `--assignee` values.                                                                                                                                                                                                                              |
+| `pr checks <N> [--watch]`                                            | `handlePrChecks`                   | Prints one tab-separated line per fixture check. Exit **0** all pass, **8** any pending, **1** any fail — real `gh`'s codes.                                                                                                                                                                                                                                                                                                                                                     |
+| `pr merge <N>`                                                       | `handlePrMerge`                    | Prints a simulated success, calls `recordMerge()` to append a durable record to `gh-stub-state.json`, and logs the `--merge` / `--delete-branch` / `--squash` flags. It never mutates the sandbox git tree, so the skill's own `git branch -d` still behaves.                                                                                                                                                                                                                    |
+| `pr comment <N>`                                                     | `handlePrComment`                  | Returns a synthetic comment URL; logs whether a body was supplied.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `run list` / `run watch <id>`                                        | `handleRunList` / `handleRunWatch` | Post-merge run discovery and watch, from the fixture's `runs`.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `api user` / `api users/<login>` / `api repos/<o>/<r>/collaborators` | `handleApi`                        | Emulates exactly the `--jq` filters `/pr` uses (`.login`, `.name // .login`, `.[].login`). Any other endpoint falls through to default-deny.                                                                                                                                                                                                                                                                                                                                     |
+| `api repos/<o>/<r>/pulls/<N>/comments` / `api graphql`               | `handleApi`                        | `/ship` step 10's conversation read (#580): the fixture's `pullComments`, and — only for a query naming `reviewThreads` — the fixture's `reviewThreads` as one page (`hasNextPage: false`). Both empty by default; any other GraphQL query is default-denied.                                                                                                                                                                                                                    |
+| `api repos/<o>/<r>/issues/<N>/comments`                              | `handleApi`                        | `/ship` step 10's poster-identity read (#601): the fixture's `issueComments` — top-level comments in GitHub's REST shape (`user.login` with `[bot]` for a bot, `user.type`, `performed_via_github_app.slug`), which `gh pr view` cannot show. Empty by default. GET only (`--paginate` accepted); `-X POST` / `--method POST` falls through to default-deny.                                                                                                                     |
+| anything else                                                        | `dispatch` default branch          | **Default-deny.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 Exit codes: **64** un-stubbed subcommand (default-deny), **66** sandbox marker missing, **70**
 internal stub error. The stub never passes a call through to the real `gh`. Argument parsing is
@@ -658,20 +658,20 @@ original design's illustrative list because `pr-1` and the ship evals genuinely 
 **How a routing eval works.** We want to know whether a skill fires in a given conversational
 situation, so we fabricate that situation: a short scripted exchange — some turns from the human,
 sometimes a turn attributed to the assistant — is written to `input.jsonl` and fed into a fresh
-headless session as if it had really happened. The session's *next* turn is the one we grade.
+headless session as if it had really happened. The session's _next_ turn is the one we grade.
 Because the model is not deterministic, each query runs N times and the result is reported as a
 rate, not a verdict.
 
-| File | Job | Key exports |
-|---|---|---|
-| `routing/routing-plan.mjs` | The driver plan: one entry per **query**, carrying the seeded turns, the fixture, setup files, an optional `expectationsOverride` (replaces the eval's committed `expectations` for one sub-scenario — §6), and a `graderHint` (freeform scenario context appended to the grader's prompt — §6). | `ROUTING_QUERIES`, `FRESH_DELEGATION` |
-| `routing/run-routing-evals.mjs` | Orchestrates build → context → setup → drive → archive → observe → render → grade → tear down, per query per repetition; then aggregates. | **Nothing** — the script executes on import, so `loadExpectations`, `buildInputJsonl` and `applySetupFiles` are module-local and cannot be pulled into a test. That is why `lib/summary.mjs` was extracted. |
-| `routing/lib/context.mjs` | Copy the real repo's routing context into a sandbox so a fresh session *discovers* the skills. | `REPO_ROOT`, `extractAiSkillsSection(repoRoot)`, `populateRoutingContext(repoDir, repoRoot)` |
-| `routing/lib/driver.mjs` | Shell out to `claude -p` twice — once as executor, once as grader — and recover the grader's JSON. | `sandboxEnv(manifest)`, `runExecutor(...)`, `graderSpawnSpec({...})` (pure: the grader's temp-dir cwd and argv, #584), `runGrader(...)` (resolves `{grading, numTurns, envelopeParsed, raw, stderr}`), `extractJsonObject(text)`; internal `isInside`, `repairEscapes`, `parseOrRepair`, and the constants `GRADER_MD_REL`, `GRADER_ALLOWED_TOOLS` |
-| `routing/lib/grading.mjs` | Decide what a grader's answer is worth. A seam: the runner script cannot be imported, so the void rule lives here, pure and testable. | `interpretGraderEnvelope(raw)`, `graderPersistenceDecision({...})`; internal `voidReason`. It imports `extractJsonObject` from `driver.mjs`, which imports `interpretGraderEnvelope` back — a deliberate cycle, safe because both are hoisted function declarations used only at call time. |
-| `routing/lib/transcript.mjs` | Turn the stream-json output into a graded transcript, render the fed input turns as ground truth, and compute observables. | `renderInputTurns(path)`, `parseEvents(outFile)`, `splitTurns(events)`, `turnItems(turn)`, `renderTurnMarkdown(turn, heading)`, `routingObservables(events, {skill, ghCallLog})` |
-| `routing/lib/summary.mjs` | Per-eval aggregation, extracted from the runner script so it is unit-testable. | `NEGATIVE_CONTROLS`, `INLINE_FIRE`, `polarityFor(queryId)`, `summarizeEval({...})`, `formatSummaryLine(e)` |
-| `routing/regrade.mjs` | Re-grade archived routing runs with the unchanged `runGrader` (strategy §6 step 5): copy each run under the OS temp dir, strip the old verdict, grade N passes, apply the #583 void rule, flag each index against the archived verdict. Archives are hashed and only read; nothing is written in the repo (#608). | `regrade({...})` (grader injected for tests), `parseArgs`, `stripCopy`, `proveClean`, `hashTree`, `tallyPasses`, `flagFor`, `renderReport`, `findStaleResults`, `verifyArchive`, `makeWriteGuard`, `isDirectRun`, `main` |
+| File                            | Job                                                                                                                                                                                                                                                                                                               | Key exports                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routing/routing-plan.mjs`      | The driver plan: one entry per **query**, carrying the seeded turns, the fixture, setup files, an optional `expectationsOverride` (replaces the eval's committed `expectations` for one sub-scenario — §6), and a `graderHint` (freeform scenario context appended to the grader's prompt — §6).                  | `ROUTING_QUERIES`, `FRESH_DELEGATION`                                                                                                                                                                                                                                                                                                              |
+| `routing/run-routing-evals.mjs` | Orchestrates build → context → setup → drive → archive → observe → render → grade → tear down, per query per repetition; then aggregates.                                                                                                                                                                         | **Nothing** — the script executes on import, so `loadExpectations`, `buildInputJsonl` and `applySetupFiles` are module-local and cannot be pulled into a test. That is why `lib/summary.mjs` was extracted.                                                                                                                                        |
+| `routing/lib/context.mjs`       | Copy the real repo's routing context into a sandbox so a fresh session _discovers_ the skills.                                                                                                                                                                                                                    | `REPO_ROOT`, `extractAiSkillsSection(repoRoot)`, `populateRoutingContext(repoDir, repoRoot)`                                                                                                                                                                                                                                                       |
+| `routing/lib/driver.mjs`        | Shell out to `claude -p` twice — once as executor, once as grader — and recover the grader's JSON.                                                                                                                                                                                                                | `sandboxEnv(manifest)`, `runExecutor(...)`, `graderSpawnSpec({...})` (pure: the grader's temp-dir cwd and argv, #584), `runGrader(...)` (resolves `{grading, numTurns, envelopeParsed, raw, stderr}`), `extractJsonObject(text)`; internal `isInside`, `repairEscapes`, `parseOrRepair`, and the constants `GRADER_MD_REL`, `GRADER_ALLOWED_TOOLS` |
+| `routing/lib/grading.mjs`       | Decide what a grader's answer is worth. A seam: the runner script cannot be imported, so the void rule lives here, pure and testable.                                                                                                                                                                             | `interpretGraderEnvelope(raw)`, `graderPersistenceDecision({...})`; internal `voidReason`. It imports `extractJsonObject` from `driver.mjs`, which imports `interpretGraderEnvelope` back — a deliberate cycle, safe because both are hoisted function declarations used only at call time.                                                        |
+| `routing/lib/transcript.mjs`    | Turn the stream-json output into a graded transcript, render the fed input turns as ground truth, and compute observables.                                                                                                                                                                                        | `renderInputTurns(path)`, `parseEvents(outFile)`, `splitTurns(events)`, `turnItems(turn)`, `renderTurnMarkdown(turn, heading)`, `routingObservables(events, {skill, ghCallLog})`                                                                                                                                                                   |
+| `routing/lib/summary.mjs`       | Per-eval aggregation, extracted from the runner script so it is unit-testable.                                                                                                                                                                                                                                    | `NEGATIVE_CONTROLS`, `INLINE_FIRE`, `polarityFor(queryId)`, `summarizeEval({...})`, `formatSummaryLine(e)`                                                                                                                                                                                                                                         |
+| `routing/regrade.mjs`           | Re-grade archived routing runs with the unchanged `runGrader` (strategy §6 step 5): copy each run under the OS temp dir, strip the old verdict, grade N passes, apply the #583 void rule, flag each index against the archived verdict. Archives are hashed and only read; nothing is written in the repo (#608). | `regrade({...})` (grader injected for tests), `parseArgs`, `stripCopy`, `proveClean`, `hashTree`, `tallyPasses`, `flagFor`, `renderReport`, `findStaleResults`, `verifyArchive`, `makeWriteGuard`, `isDirectRun`, `main`                                                                                                                           |
 
 `populateRoutingContext()` copies the three team `SKILL.md` files, `.claude/settings.json` (so the
 `ask` rule is present exactly as in real life), and a sandbox `CLAUDE.md` whose body is the real
@@ -699,23 +699,23 @@ original run directory.
 **The eleven queries.** Nine routing evals, eleven queries, because `commit-5` fans out
 (§6 explains why):
 
-| Query | Source eval | Skill | Polarity |
-|---|---|---|---|
-| `commit-4` | `commit-4` | commit | should-fire |
-| `commit-5a-slash` | `commit-5` | commit | should-fire-inline |
-| `commit-5b-delegation` | `commit-5` | commit | should-fire |
-| `commit-5c-optout` | `commit-5` | commit | should-fire |
-| `commit-6` | `commit-6` | commit | should-fire |
-| `commit-7` | `commit-7` | commit | should-NOT-fire |
-| `commit-8` | `commit-8` | commit | should-NOT-fire |
-| `pr-8` | `pr-8` | pr | should-fire |
-| `pr-9` | `pr-9` | pr | should-fire |
-| `ship-4` | `ship-4` | ship | should-NOT-fire |
-| `ship-5` | `ship-5` | ship | should-NOT-fire |
+| Query                  | Source eval | Skill  | Polarity           |
+| ---------------------- | ----------- | ------ | ------------------ |
+| `commit-4`             | `commit-4`  | commit | should-fire        |
+| `commit-5a-slash`      | `commit-5`  | commit | should-fire-inline |
+| `commit-5b-delegation` | `commit-5`  | commit | should-fire        |
+| `commit-5c-optout`     | `commit-5`  | commit | should-fire        |
+| `commit-6`             | `commit-6`  | commit | should-fire        |
+| `commit-7`             | `commit-7`  | commit | should-NOT-fire    |
+| `commit-8`             | `commit-8`  | commit | should-NOT-fire    |
+| `pr-8`                 | `pr-8`      | pr     | should-fire        |
+| `pr-9`                 | `pr-9`      | pr     | should-fire        |
+| `ship-4`               | `ship-4`    | ship   | should-NOT-fire    |
+| `ship-5`               | `ship-5`    | ship   | should-NOT-fire    |
 
-***Polarity* = what a correct run looks like.** **should-fire**: the skill runs. **should-NOT-fire**:
+**_Polarity_ = what a correct run looks like.** **should-fire**: the skill runs. **should-NOT-fire**:
 the skill must stay out of it — an over-trigger control. **should-fire-inline**: the skill runs, but
-because the human typed the slash command the CLI expands it directly, so a correct run makes *no*
+because the human typed the slash command the CLI expands it directly, so a correct run makes _no_
 `Skill` tool call (§6 explains why that is not a failure).
 
 Polarity comes from `polarityFor()`: `NEGATIVE_CONTROLS` holds the four over-trigger controls,
@@ -768,7 +768,7 @@ log.
 ### 4.6 Flow — one routing eval
 
 **What the diagram shows:** the runner does by script what the execution flow does by prompt —
-build a sandbox, make the skills *discoverable* in it, drive one fresh headless session, grade the
+build a sandbox, make the skills _discoverable_ in it, drive one fresh headless session, grade the
 last turn, tear down — repeated N times so the result is a rate.
 
 ```mermaid
@@ -804,7 +804,7 @@ Four details in that flow matter and are easy to get wrong:
 1. **The grader is handed the fed input turns as ground truth.** `runGrader()` inlines
    `renderInputTurns(input.jsonl)` into the prompt and states a **seed-presence rule**: any claim
    about whether a prior turn was present must be answered from that rendering, never inferred from
-   `transcript.md` (only the final graded turn) or `raw.jsonl` (the executor's *output* stream,
+   `transcript.md` (only the final graded turn) or `raw.jsonl` (the executor's _output_ stream,
    which structurally never carries the fed turns as history). `renderInputTurns()` distinguishes a
    legitimate single-turn eval — "Seeded prior turns: NONE" — from a missing, empty or unparseable
    file, which it reports as unverifiable rather than asserting a negative.
@@ -819,7 +819,7 @@ Four details in that flow matter and are easy to get wrong:
    runs only — you cannot average a result you do not have — but the count sits beside it so a
    batch cannot quietly shed failing reps and report a flattering number.
 4. **A grading that gathered no evidence is void.** The runner saves the grader's raw envelope to
-   `grader-envelope.json` for *every* grading, before deciding anything, so how a verdict was
+   `grader-envelope.json` for _every_ grading, before deciding anything, so how a verdict was
    reached is always on disk. `graderPersistenceDecision()` in `lib/grading.mjs` then voids the
    grading when the envelope reports `num_turns <= 1` — a grader that answered in one turn opened
    no file — or when the turn count is unknowable (stdout was not an envelope, or the envelope
@@ -896,20 +896,20 @@ normal human-approved workflows change state.
 
 The mechanisms, named to where they live:
 
-| # | Mechanism | Where |
-|---|---|---|
-| 1 | **The sandbox can never be inside the repo.** Every resolved path is run through a guard that refuses the repo root or anything under it. | `assertOutsideRepo()` in `lib/paths.mjs`, called by `buildSandbox()`, `teardownSandbox()`, `teardownAll()` and `archiveEvidence()` in `lib/sandbox.mjs` |
-| 2 | **Each sandbox is a unique, private, exclusively-created directory.** The root is created `0700`; the per-sandbox directory uses `fs.mkdtempSync`, so nothing lands in a fixed, pre-creatable path. | `buildSandbox()` in `lib/sandbox.mjs` |
-| 3 | **No marker, no run.** Two markers are written: `writeMarker()` writes the `repo/` one (the payload the stub and the executor check), and `buildSandbox()` writes a leaner root-level one inline so an audit or sweep can still identify the directory if `repo/` is gone. The stub refuses without the `repo/` marker; the routing context installer refuses without it; teardown refuses a directory that has neither marker nor a manifest. | `writeMarker()` and `buildSandbox()`'s root-marker write, both in `lib/sandbox.mjs`; `main()` in `gh-stub/gh-stub.mjs` (exit 66); `populateRoutingContext()` in `routing/lib/context.mjs`; `teardownSandbox()` in `lib/sandbox.mjs` |
-| 4 | **Default-deny `gh`.** Anything outside the traced surface hard-fails and is logged; it never passes through to the real `gh`. Unknown `api` endpoints deny too. | the default branch of `dispatch()` and of `handleApi()` in `gh-stub/gh-stub.mjs` (exit 64) |
-| 5 | **Credentials are scrubbed and `gh` config is isolated.** `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` and `GITHUB_ENTERPRISE_TOKEN` are unset and `GH_CONFIG_DIR` is pointed inside the sandbox — declared in `env.json`, applied by both activation scripts, and applied in-process for the routing runner. | `SCRUB_UNSET` and `writeActivateScripts()` in `lib/sandbox.mjs`; `sandboxEnv()` in `routing/lib/driver.mjs` |
-| 6 | **There is no real GitHub to reach.** `origin` is a local bare repository addressed by a `file://` URL, so a push lands on disk. | `buildSandbox()` in `lib/sandbox.mjs` |
-| 7 | **The sandbox repo runs no hooks and signs nothing.** `core.hooksPath` points at a directory that does not exist; `commit.gpgsign` and `tag.gpgsign` are false; `gc.auto` is 0. | `setLocalConfig()` in `lib/sandbox.mjs` |
-| 8 | **Every call is evidence.** Answered and denied calls alike are appended to `gh-calls.log`, with whether credentials were present at call time. | `logCall()` in `gh-stub/gh-stub.mjs` |
-| 9 | **Liveness before any negative.** A "the log contains no X" claim is trusted only when the log is non-empty — and a merge-negative is stricter still: the log never PASSes a merge-negative on its own, empty or not (`strategy-skill-evals.md` §6). | `ghLog.live` from `routingObservables()` in `routing/lib/transcript.mjs`; stated to the grader by `runGrader()` in `routing/lib/driver.mjs`; stated to humans in `prompts/executor-prompt.md` |
-| 10 | **Fixtures can never depend on case-distinct filenames**, because macOS's default filesystem is case-insensitive. | `assertNoCaseCollisions()` in `lib/fixtures.mjs`, called from `getFixture()` |
-| 11 | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of thirteen of the eighteen distinct fixture branch names is additionally checked by name, belt-and-braces. | `checkZeroMutation()` in `selfcheck.mjs` |
-| 12 | **The whole checklist is executable.** Fourteen named checks, twenty-four rows, exit 0 only if every row passes; among them a genuine POSIX-shell activation check that sources `activate.sh` and runs a bare `gh`. | `selfcheck.mjs`, especially `checkGitBashActivation()` and `findPosixShell()` |
+| #   | Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                                      | Where                                                                                                                                                                                                                               |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **The sandbox can never be inside the repo.** Every resolved path is run through a guard that refuses the repo root or anything under it.                                                                                                                                                                                                                                                                                                      | `assertOutsideRepo()` in `lib/paths.mjs`, called by `buildSandbox()`, `teardownSandbox()`, `teardownAll()` and `archiveEvidence()` in `lib/sandbox.mjs`                                                                             |
+| 2   | **Each sandbox is a unique, private, exclusively-created directory.** The root is created `0700`; the per-sandbox directory uses `fs.mkdtempSync`, so nothing lands in a fixed, pre-creatable path.                                                                                                                                                                                                                                            | `buildSandbox()` in `lib/sandbox.mjs`                                                                                                                                                                                               |
+| 3   | **No marker, no run.** Two markers are written: `writeMarker()` writes the `repo/` one (the payload the stub and the executor check), and `buildSandbox()` writes a leaner root-level one inline so an audit or sweep can still identify the directory if `repo/` is gone. The stub refuses without the `repo/` marker; the routing context installer refuses without it; teardown refuses a directory that has neither marker nor a manifest. | `writeMarker()` and `buildSandbox()`'s root-marker write, both in `lib/sandbox.mjs`; `main()` in `gh-stub/gh-stub.mjs` (exit 66); `populateRoutingContext()` in `routing/lib/context.mjs`; `teardownSandbox()` in `lib/sandbox.mjs` |
+| 4   | **Default-deny `gh`.** Anything outside the traced surface hard-fails and is logged; it never passes through to the real `gh`. Unknown `api` endpoints deny too.                                                                                                                                                                                                                                                                               | the default branch of `dispatch()` and of `handleApi()` in `gh-stub/gh-stub.mjs` (exit 64)                                                                                                                                          |
+| 5   | **Credentials are scrubbed and `gh` config is isolated.** `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` and `GITHUB_ENTERPRISE_TOKEN` are unset and `GH_CONFIG_DIR` is pointed inside the sandbox — declared in `env.json`, applied by both activation scripts, and applied in-process for the routing runner.                                                                                                                             | `SCRUB_UNSET` and `writeActivateScripts()` in `lib/sandbox.mjs`; `sandboxEnv()` in `routing/lib/driver.mjs`                                                                                                                         |
+| 6   | **There is no real GitHub to reach.** `origin` is a local bare repository addressed by a `file://` URL, so a push lands on disk.                                                                                                                                                                                                                                                                                                               | `buildSandbox()` in `lib/sandbox.mjs`                                                                                                                                                                                               |
+| 7   | **The sandbox repo runs no hooks and signs nothing.** `core.hooksPath` points at a directory that does not exist; `commit.gpgsign` and `tag.gpgsign` are false; `gc.auto` is 0.                                                                                                                                                                                                                                                                | `setLocalConfig()` in `lib/sandbox.mjs`                                                                                                                                                                                             |
+| 8   | **Every call is evidence.** Answered and denied calls alike are appended to `gh-calls.log`, with whether credentials were present at call time.                                                                                                                                                                                                                                                                                                | `logCall()` in `gh-stub/gh-stub.mjs`                                                                                                                                                                                                |
+| 9   | **Liveness before any negative.** A "the log contains no X" claim is trusted only when the log is non-empty — and a merge-negative is stricter still: the log never PASSes a merge-negative on its own, empty or not (`strategy-skill-evals.md` §6).                                                                                                                                                                                           | `ghLog.live` from `routingObservables()` in `routing/lib/transcript.mjs`; stated to the grader by `runGrader()` in `routing/lib/driver.mjs`; stated to humans in `prompts/executor-prompt.md`                                       |
+| 10  | **Fixtures can never depend on case-distinct filenames**, because macOS's default filesystem is case-insensitive.                                                                                                                                                                                                                                                                                                                              | `assertNoCaseCollisions()` in `lib/fixtures.mjs`, called from `getFixture()`                                                                                                                                                        |
+| 11  | **The real repo is audited after a selfcheck run** — HEAD, the full `git branch --list` output and `git status` must all be byte-identical before and after, which catches any leaked branch. A hardcoded list of thirteen of the eighteen distinct fixture branch names is additionally checked by name, belt-and-braces.                                                                                                                     | `checkZeroMutation()` in `selfcheck.mjs`                                                                                                                                                                                            |
+| 12  | **The whole checklist is executable.** Fourteen named checks, twenty-four rows, exit 0 only if every row passes; among them a genuine POSIX-shell activation check that sources `activate.sh` and runs a bare `gh`.                                                                                                                                                                                                                            | `selfcheck.mjs`, especially `checkGitBashActivation()` and `findPosixShell()`                                                                                                                                                       |
 
 ### Above the stub
 
@@ -949,7 +949,7 @@ its home.
   `$comment` notices and the sandbox-marker rule, while holding a `human_script`, can satisfy an approval
   checkpoint from the script rather than stalling. The backstop stack — structural isolation, the
   default-deny stub, the `ask` rule, the CI shape gate, and plain git recoverability — means a
-  missed layer degrades to *recoverable and loud*, never *silent damage*. That is the honest scope
+  missed layer degrades to _recoverable and loud_, never _silent damage_. That is the honest scope
   of the safety guarantee: structural against accidental mutation, prompt-level against deliberate
   deviation.
 
@@ -961,8 +961,8 @@ keeping.
 
 ### Per-skill eval layout (DP1)
 
-*(DP = design point. DP1–DP4 are the program's numbered architecture decisions, distinct from the
-C-numbered constraints in §3 and the R-numbered risks in §9. All four are in §9's ledger.)*
+_(DP = design point. DP1–DP4 are the program's numbered architecture decisions, distinct from the
+C-numbered constraints in §3 and the R-numbered risks in §9. All four are in §9's ledger.)_
 
 Evals live at `.claude/skills/<skill>/evals/evals.json` — upstream's own documented location —
 rather than in one repo-root file. The decision was reversed from "convert the root file in place"
@@ -970,7 +970,7 @@ on a single named criterion: **upstream instructions must work verbatim**. Under
 option the bridging pointer would have lived in CLAUDE.md, itself a local translation layer, and
 every future upstream refresh would have had to be re-reconciled against it. A **cascade eval** —
 one that tests a skill delegating onward, as `ship-6` tests `/ship` → `/pr` → `/commit` — is filed
-under whichever skill the eval's *prompt* invokes, so `ship-6` lives with `/ship`. `evals/skill-creator.evals.json` stays at the
+under whichever skill the eval's _prompt_ invokes, so `ship-6` lives with `/ship`. `evals/skill-creator.evals.json` stays at the
 repo root because of C1 — the refresh script clobbers anything else placed in the vendored
 directory. The cost of the layout is risk R2: deleting and recreating a skill folder takes its
 evals with it.
@@ -997,7 +997,7 @@ GitHub simulator, and a GitHub issue over a project board as the tracker.
 
 There is no `run-execution-evals.mjs`. The batch is `prompts/batch-prompt.md` handed to an
 orchestrating session, which fans `prompts/executor-prompt.md` across the evals. That is deliberate:
-the executor *is* an LLM following a skill faithfully, including its approval checkpoints, so the
+the executor _is_ an LLM following a skill faithfully, including its approval checkpoints, so the
 orchestration layer is prompt-shaped all the way down. Scripting it would mean scripting the part
 that has to be judgment. The routing runner is a script precisely because its executor is a fresh
 `claude -p` session with no judgment to supply — the harness only has to launch it and read what
@@ -1016,7 +1016,7 @@ reason, visible to reviewers.
 ### The `commit-5` fan-out and `expectationsOverride`
 
 `commit-5` is **one** routing eval in the committed eval file, because the conversion manifest only
-splits *execution* evals into separate entries — that splitting rule
+splits _execution_ evals into separate entries — that splitting rule
 applies to execution evals only. But it has three sub-scenarios — typed slash, delegation, opt-out
 — that cannot be driven by one query. `routing-plan.mjs` is the de-multiplexer: three entries
 (`commit-5a-slash`, `commit-5b-delegation`, `commit-5c-optout`) all carry `evalId: "commit-5"` and
@@ -1028,7 +1028,7 @@ the source of truth for every ordinary query, and the override exists for exactl
 say something true of a sub-scenario that is not true of its parent eval. The clearest case is
 `commit-5a-slash`, whose override states that a typed `/commit` is expanded by the CLI's own slash
 parser and injected directly — it never routes through the `Skill` tool, so `invokedThisSkill:
-false` is *correct*, and grading it as a failure is the bug.
+false` is _correct_, and grading it as a failure is the bug.
 
 `graderHint` is the third input to grading, alongside the expectations and the transcript.
 `runGrader()` appends it under an "Eval-specific grader note" heading after the two headless
@@ -1042,7 +1042,7 @@ rule the assertion contradicts, is a defect: it makes graders enforce requiremen
 `routingObservables()` computes facts a script can check — was the announcement the first line, was
 a `Skill` tool call made, were mutating git commands run, does the call log contain `pr merge`, is
 the log live. None of them is a verdict. The comments in `transcript.mjs` say so explicitly about
-the ad-hoc-bypass flag: git commands that run *after* the skill was invoked are the skill's own
+the ad-hoc-bypass flag: git commands that run _after_ the skill was invoked are the skill's own
 steps, not a bypass, and only the LLM grader can tell the difference. Observables exist so the
 grader can be corroborated against ground truth rather than trusted on narration, and so a human
 auditing the run has numbers to check.
@@ -1052,7 +1052,7 @@ auditing the run has numbers to check.
 A typical full batch runs roughly 60–90 minutes and about 2M tokens. Those are documented reference
 points, not gates — nothing could enforce them, because batch runs are human-triggered. **Pass rate
 has no numeric floor, by design.** The gate stays what it always was: every Must-level assertion —
-a *Must* is one whose failure blocks, a *Should* is tracked but does not (§0) — passes, or a human
+a _Must_ is one whose failure blocks, a _Should_ is tracked but does not (§0) — passes, or a human
 explicitly decides in writing to accept the failure. A "95% is fine" bar would let a fixed slice
 of real regressions through unexamined, which defeats the point of a regression suite. Routing is
 separately probabilistic (R5) and is reported as rates over repetitions, never as a binary verdict.
@@ -1082,9 +1082,9 @@ threshold.
 **When an eval is flaky, presume the test before the skill.** The three skills are battle-tested in
 daily use; a suite that disagrees with them is far more likely to be wrong than they are.
 
-**Sort variance by locus before touching the eval.** There are four: the *grader* (prompt, model,
-parse), the *headless environment* (no `AskUserQuestion`, `.claude/` write-protection, the `ask`
-rule), the *harness* (seed shape, setup-file timing, escape handling), and the *tested agent*. Only
+**Sort variance by locus before touching the eval.** There are four: the _grader_ (prompt, model,
+parse), the _headless environment_ (no `AskUserQuestion`, `.claude/` write-protection, the `ask`
+rule), the _harness_ (seed shape, setup-file timing, escape handling), and the _tested agent_. Only
 the last one justifies changing a skill, and only the first and third usually justify changing an
 eval.
 
@@ -1092,18 +1092,18 @@ eval.
 probabilistic eval is how you end up over-fitting the test to one batch.
 
 **Worked example: the #527/#528 investigation.** `commit-5b`'s delegation eval was reported at
-roughly a 0.35 pass rate. (§11 discusses a *different* ≈0.35, belonging to `commit-5a` — two
+roughly a 0.35 pass rate. (§11 discusses a _different_ ≈0.35, belonging to `commit-5a` — two
 coincidentally similar numbers for two different queries, which is itself part of why §11 exists.)
 Sorting by locus found three distinct causes, and not one of them was the skill.
 
-- *Harness.* The original seed made the human's first turn `commit this`, which is a second,
+- _Harness._ The original seed made the human's first turn `commit this`, which is a second,
   competing routing signal — a real `/pr` → `/commit` delegation never begins that way. The seed was
   rewritten so the entire delegation signal comes from the seeded assistant turn plus the on-disk
   hand-off file, and the human's turns are a neutral statement and a bare "go ahead".
-- *Headless environment.* The eval bundled a clear-on-read clause asserting the hand-off file was
+- _Headless environment._ The eval bundled a clear-on-read clause asserting the hand-off file was
   deleted — impossible headless, because `.claude/` deletion is refused with no prompter to approve
   it. That clause was removed from the automated eval and moved to the manual runbook.
-- *Grader.* `commit-5a` was being failed for not making a `Skill` tool call on a typed slash, which
+- _Grader._ `commit-5a` was being failed for not making a `Skill` tool call on a typed slash, which
   is the correct behavior; `summary.mjs` gained `INLINE_FIRE` and a three-way `polarityFor()` so the
   summary stops reading "0%, broken" for correct behavior, and the runner gained
   `expectationsOverride` text saying so. Two further grader-locus defects surfaced in the same
@@ -1162,9 +1162,9 @@ and decision E4 in §9 makes the role any maintainer with repo write access rath
 Then the batch, run per the full-batch rule in [`strategy-skill-evals.md`](strategy-skill-evals.md) §6 —
 which owns the command sequence. Per that rule this is the **full batch across all three skills**,
 not just the edited one, because the three delegate into each other. The parts specific to an
-*update* are: a second, old-skill control arm per eval, run against a sandbox carrying the old snapshot of
+_update_ are: a second, old-skill control arm per eval, run against a sandbox carrying the old snapshot of
 the skill; and archiving the raw evidence for **both** arms before teardown. (Baseline semantics
-are upstream's: for a skill *update* the baseline is the snapshot of the old skill; for a *new*
+are upstream's: for a skill _update_ the baseline is the snapshot of the old skill; for a _new_
 skill the baseline is no skill at all.) `ship-2a` goes in the first parallel wave so its
 ~10-minute wait overlaps the rest. Then `aggregate_benchmark.py` and the viewer, human feedback,
 iterate.
@@ -1176,7 +1176,7 @@ run. (Both were described the other way round in the archived predecessor spec.)
 
 ### Scenario C — a teammate verifies a skill by natural language
 
-A teammate says: *"I tweaked /commit's devjournal triggers — make sure it still passes its evals."*
+A teammate says: _"I tweaked /commit's devjournal triggers — make sure it still passes its evals."_
 No slash command, no prior context. Three guidance layers catch it, each redundant with the next:
 
 1. **CLAUDE.md**, always in context including natural-language entries, states the safety rule and
@@ -1222,7 +1222,7 @@ veto that call. The design:
 - Exit 0 allows; exit 2 blocks and feeds stderr back to the model.
 - Logic: if there is no `.skill-eval-sandbox` marker in cwd or any parent directory, exit 0
   immediately — the overwhelmingly common case, so the hook is cheap outside sandboxes. If a marker
-  *is* present, block three things: a `gh` that does not resolve to the sandbox stub, a `git push`
+  _is_ present, block three things: a `gh` that does not resolve to the sandbox stub, a `git push`
   to a remote that is not a local path, and destructive commands with absolute paths escaping the
   sandbox tree.
 
@@ -1264,55 +1264,55 @@ not scatter.
 Grouped by topic, not sorted by date — read down for related choices, not for chronology. `(inherited)`
 in the Date column means the decision predates this program.
 
-| Date | Decision | Chosen | Rejected — and why |
-|---|---|---|---|
-| (inherited) | CI gate; hook posture; vendored sync | The Vitest contract test is the only CI gate; NL-invocation guardrails are prompt-level; the vendored directory is never hand-edited and the drift workflow owns sync | Inherited context this design builds on |
-| 2026-07-17 | Schema documentation home | `strategy-skill-evals.md`, plus a `$comment` pointer in each eval file and a machine-checkable shape in the contract test | `$comment`-only, or deferring the doc — the schema must be documented the moment the fields exist |
-| 2026-07-17 | **DP2** — workspace location | Upstream's default `.claude/skills/<name>-workspace/` plus one gitignore line | `evals/workspaces/` — a standing deviation from vendored instructions, versus a one-time gitignore line |
-| 2026-07-17 | **DP4** — routing evals at baseline | Classify them and write manual runbooks; automate later | Build the runner first — it depends on the harness anyway, and the behaviors were already proven by hand. *Superseded 2026-07-20: the runner shipped.* |
-| 2026-07-17→18 | **DP1** — eval file layout | **Option B**: per-skill `evals/evals.json` inside each skill directory, upstream's documented layout | Option A, converting the repo-root file in place — reversed on "upstream instructions must work verbatim"; the bridging pointer would have lived in CLAUDE.md, a local translation layer |
-| 2026-07-18 | **DP3** — Layer C runtime | Platform-conditional routing: direct on macOS/Linux, cloud or Cowork from Windows | WSL-Ubuntu (setup burden, demoted to optional); hand-patching vendored scripts (prohibited by C1); deferring Layer C entirely (kept as the fallback) |
-| 2026-07-18 | Preconditions prose retained alongside `fixture` | The profile is executable truth; the prose is the human-readable contract. If they disagree, the profile is the bug | Dropping the prose — loses the reviewable contract |
-| 2026-07-18 | Harness language | Node, not shell — identical on every OS, and this is a Node repo; only the three `gh` wrappers stay shell | Shell scripts — per-OS divergence, and a much larger macOS verification surface |
-| 2026-07-19 | Harness directory | `scripts/skill-evals/` | `evals/harness/` — muddles eval data with executable code; `scripts/` is the repo convention |
-| 2026-07-18 | The PreToolUse hook | Structural-in-harness is the baseline; the hook is designed and shovel-ready, not installed (§8) | Installing it from the start — a per-shell-call tax on every session to guard rare events; and the real-repo half is not deterministically guardable at all |
-| 2026-07-18 | Tracker lives in GitHub | The parent issue body is the state snapshot; comments are the append-only log | A committed tracker file (churns state as commits); a `.scratch` file (gitignored, so it does not travel) |
-| 2026-07-18 | The full-batch rule | One batch, human-triggered, never CI; no lighter documented variant; a PR-template box records whether it ran | Per-skill quick modes — people reach for the lighter one and the suite stops catching regressions |
-| 2026-07-18 | macOS gate | The macOS smoke blocks *baseline completion*, never a harness PR | Hard-blocking the harness PR on Mac hardware availability |
-| 2026-07-19 | **E1** — scope of the safety Must | Honest scoping: structural against accidental mutation, prompt-level against deliberate deviation (C8) | Keeping the unscoped "structurally, not just by instruction" claim — overpromised for the adversarial case |
-| 2026-07-19 | **E2** — the hook stays deferred, conditioned | Deferral conditioned on the safety checklist delivering the in-harness hardenings; a checklist failure or any near-miss promotes it (§8) | Installing at harness time — the buildable half mostly duplicates prevention that is already structural |
-| 2026-07-19 | **E3** — adversarial hardening rejected at baseline | The accepted subset (credential scrub, default-deny stub, liveness) plus E1's honest wording covers the accident threat model | OS egress blocking, path jails and adversarial escape tests — standing platform-specific machinery for a rarely-exercised path; the threat model is accident, not malice, and risk spend must match skill-change frequency |
-| 2026-07-19 | **E4** — the maintainer reviewer is a role, not a person | Any maintainer with repo write access may fill every human checkpoint; Blake is the default | Blake-only sign-off — re-creates the single point of failure this program exists to remove; named-person lists rot |
-| 2026-07-19 | Team-skill scope boundary | Obligations attach at commit to `.claude/skills/`, any origin; personal and local-only skills are supported but not governed | Governing external and personal installs — unenforceable, and nothing depends on it |
-| 2026-07-19 | Conversion manifest as a separate pinned file | An id-by-id table, maintainer-approved, enforced by the contract test's pinned id set | Folding the mapping into prose — its value is being short and diffable |
-| 2026-07-20 | Advisory ranges, no pass-rate floor | ~60–90 minutes and ~2M tokens documented as reference points; **pass rate gets no numeric threshold** | A numeric pass-rate floor — lets a fixed slice of real regressions through unexamined |
-| 2026-07-20 | Evidence archiving is harness behavior | `archiveEvidence()` runs before teardown on every run; the grader reads raw files, never orchestrator prose | Leaving archiving to prompt guidance — the first graded iteration archived nothing, so its CLEAN verdicts could not be independently corroborated |
-| 2026-07-20 | Merge assertions are graded from the transcript | The transcript's tool-call record is authoritative; the log and `gh-stub-state.json` corroborate where the call reached the stub | Grading from the call log alone — proven to pass vacuously against a mutant that did attempt the merge |
-| 2026-07-20 | `ship-2c` removed (right-sizing) | It shared `ship-2a`'s fixture and asserted a strict subset, at the cost of a ~5-minute run | Keeping it for symmetry — no validated coverage was lost |
-| 2026-07-18 | Post-baseline order | Eval gap-fill → right-sizing → routing runner — improve the suite you have before building new runner machinery | Building the runner first; the only hard dependency is gap-fill → right-sizing, so nothing else forced an order |
-| 2026-07-17 (check) → 2026-07-18 (DP3) | WSL demoted to optional for Layer C | Cloud or Cowork is the Windows route (DP3) | WSL-Ubuntu — checked 2026-07-17 and rejected on evidence: the host carries only a `docker-desktop` distro, so adopting WSL would mean a new distro install per developer |
-| 2026-07-18 | The CRUD/discovery safety model | Layered guidance (CLAUDE.md → the eval files' `$comment` → the turnkey `make-sandbox` path) plus the sandbox-marker invariant and the `human_script` scoping rule | — |
-| 2026-07-19 | `ship-2` stays in the one batch | Scheduled into the first parallel wave so its ~10-minute wait overlaps the rest (C11) | A `slow` tag plus an on-demand mode — that is a second documented way to run the tests, which the full-batch rule exists to prevent |
-| 2026-09-16 | Routing-harness pure functions get unit tests (#530) | `routing-harness.test.ts` in the existing `functional-skills` project — no config, no workflow change | A separate ticket for a clean agent later — the deferral overhead exceeded the work, and the `turns.length` versus `seeded.length` trap would have stayed unguarded |
-| 2026-09-16 | `commit-5b`'s clear-on-read assertion removed from the automated eval (#527) | Covered by the manual runbook instead; a failed deletion headless is never a skill defect | Keeping it and excusing failures in the grader — an assertion that can never pass is not an assertion |
-| 2026-09-16 | `commit-5a` is inline-fire, not a should-fire failure (#528) | `INLINE_FIRE` plus a three-way `polarityFor()`; `invocation_trigger_rate` reports `null` rather than a meaningless 0 | Leaving it labelled should-fire — the summary read "0%, broken" for correct behavior |
-| 2026-09-18 | Routing assertions considered and left unchanged (`commit-6`, `commit-7`, `commit-8`, `pr-9`, `commit-5a`, `commit-5b`) | Record the ruling in each eval's `notes`, in the manifest's third list and in strategy §6's procedure | Leaving them alone silently — the #527/#528 churn only stopped once `routing-plan.mjs` carried a do-not-remove-this-branch comment |
-| 2026-09-24 | #597 option (b): classifier refusals graded as ENVIRONMENT, outside the pass rate; raw rate kept in `benchmark.json` | Every FAIL gets one label: ENVIRONMENT, KNOWN-DEFECT or REAL-MISS (defined in `strategy-skill-evals.md` §6, "Miss labels"). Labels live in the batch report, per eval and in the totals. The report shows the raw rate and the rate excluding ENVIRONMENT | Option (a), a harness-owned permission profile: a permission change, kept by the ticket as a later step if prompts keep reaching humans. Recording labels in `observables.json`: only routing runs write it. Rewriting `benchmark.json`'s rate: the vendored aggregator computes it |
+| Date                                  | Decision                                                                                                                | Chosen                                                                                                                                                                                                                                                    | Rejected — and why                                                                                                                                                                                                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (inherited)                           | CI gate; hook posture; vendored sync                                                                                    | The Vitest contract test is the only CI gate; NL-invocation guardrails are prompt-level; the vendored directory is never hand-edited and the drift workflow owns sync                                                                                     | Inherited context this design builds on                                                                                                                                                                                                                                             |
+| 2026-07-17                            | Schema documentation home                                                                                               | `strategy-skill-evals.md`, plus a `$comment` pointer in each eval file and a machine-checkable shape in the contract test                                                                                                                                 | `$comment`-only, or deferring the doc — the schema must be documented the moment the fields exist                                                                                                                                                                                   |
+| 2026-07-17                            | **DP2** — workspace location                                                                                            | Upstream's default `.claude/skills/<name>-workspace/` plus one gitignore line                                                                                                                                                                             | `evals/workspaces/` — a standing deviation from vendored instructions, versus a one-time gitignore line                                                                                                                                                                             |
+| 2026-07-17                            | **DP4** — routing evals at baseline                                                                                     | Classify them and write manual runbooks; automate later                                                                                                                                                                                                   | Build the runner first — it depends on the harness anyway, and the behaviors were already proven by hand. _Superseded 2026-07-20: the runner shipped._                                                                                                                              |
+| 2026-07-17→18                         | **DP1** — eval file layout                                                                                              | **Option B**: per-skill `evals/evals.json` inside each skill directory, upstream's documented layout                                                                                                                                                      | Option A, converting the repo-root file in place — reversed on "upstream instructions must work verbatim"; the bridging pointer would have lived in CLAUDE.md, a local translation layer                                                                                            |
+| 2026-07-18                            | **DP3** — Layer C runtime                                                                                               | Platform-conditional routing: direct on macOS/Linux, cloud or Cowork from Windows                                                                                                                                                                         | WSL-Ubuntu (setup burden, demoted to optional); hand-patching vendored scripts (prohibited by C1); deferring Layer C entirely (kept as the fallback)                                                                                                                                |
+| 2026-07-18                            | Preconditions prose retained alongside `fixture`                                                                        | The profile is executable truth; the prose is the human-readable contract. If they disagree, the profile is the bug                                                                                                                                       | Dropping the prose — loses the reviewable contract                                                                                                                                                                                                                                  |
+| 2026-07-18                            | Harness language                                                                                                        | Node, not shell — identical on every OS, and this is a Node repo; only the three `gh` wrappers stay shell                                                                                                                                                 | Shell scripts — per-OS divergence, and a much larger macOS verification surface                                                                                                                                                                                                     |
+| 2026-07-19                            | Harness directory                                                                                                       | `scripts/skill-evals/`                                                                                                                                                                                                                                    | `evals/harness/` — muddles eval data with executable code; `scripts/` is the repo convention                                                                                                                                                                                        |
+| 2026-07-18                            | The PreToolUse hook                                                                                                     | Structural-in-harness is the baseline; the hook is designed and shovel-ready, not installed (§8)                                                                                                                                                          | Installing it from the start — a per-shell-call tax on every session to guard rare events; and the real-repo half is not deterministically guardable at all                                                                                                                         |
+| 2026-07-18                            | Tracker lives in GitHub                                                                                                 | The parent issue body is the state snapshot; comments are the append-only log                                                                                                                                                                             | A committed tracker file (churns state as commits); a `.scratch` file (gitignored, so it does not travel)                                                                                                                                                                           |
+| 2026-07-18                            | The full-batch rule                                                                                                     | One batch, human-triggered, never CI; no lighter documented variant; a PR-template box records whether it ran                                                                                                                                             | Per-skill quick modes — people reach for the lighter one and the suite stops catching regressions                                                                                                                                                                                   |
+| 2026-07-18                            | macOS gate                                                                                                              | The macOS smoke blocks _baseline completion_, never a harness PR                                                                                                                                                                                          | Hard-blocking the harness PR on Mac hardware availability                                                                                                                                                                                                                           |
+| 2026-07-19                            | **E1** — scope of the safety Must                                                                                       | Honest scoping: structural against accidental mutation, prompt-level against deliberate deviation (C8)                                                                                                                                                    | Keeping the unscoped "structurally, not just by instruction" claim — overpromised for the adversarial case                                                                                                                                                                          |
+| 2026-07-19                            | **E2** — the hook stays deferred, conditioned                                                                           | Deferral conditioned on the safety checklist delivering the in-harness hardenings; a checklist failure or any near-miss promotes it (§8)                                                                                                                  | Installing at harness time — the buildable half mostly duplicates prevention that is already structural                                                                                                                                                                             |
+| 2026-07-19                            | **E3** — adversarial hardening rejected at baseline                                                                     | The accepted subset (credential scrub, default-deny stub, liveness) plus E1's honest wording covers the accident threat model                                                                                                                             | OS egress blocking, path jails and adversarial escape tests — standing platform-specific machinery for a rarely-exercised path; the threat model is accident, not malice, and risk spend must match skill-change frequency                                                          |
+| 2026-07-19                            | **E4** — the maintainer reviewer is a role, not a person                                                                | Any maintainer with repo write access may fill every human checkpoint; Blake is the default                                                                                                                                                               | Blake-only sign-off — re-creates the single point of failure this program exists to remove; named-person lists rot                                                                                                                                                                  |
+| 2026-07-19                            | Team-skill scope boundary                                                                                               | Obligations attach at commit to `.claude/skills/`, any origin; personal and local-only skills are supported but not governed                                                                                                                              | Governing external and personal installs — unenforceable, and nothing depends on it                                                                                                                                                                                                 |
+| 2026-07-19                            | Conversion manifest as a separate pinned file                                                                           | An id-by-id table, maintainer-approved, enforced by the contract test's pinned id set                                                                                                                                                                     | Folding the mapping into prose — its value is being short and diffable                                                                                                                                                                                                              |
+| 2026-07-20                            | Advisory ranges, no pass-rate floor                                                                                     | ~60–90 minutes and ~2M tokens documented as reference points; **pass rate gets no numeric threshold**                                                                                                                                                     | A numeric pass-rate floor — lets a fixed slice of real regressions through unexamined                                                                                                                                                                                               |
+| 2026-07-20                            | Evidence archiving is harness behavior                                                                                  | `archiveEvidence()` runs before teardown on every run; the grader reads raw files, never orchestrator prose                                                                                                                                               | Leaving archiving to prompt guidance — the first graded iteration archived nothing, so its CLEAN verdicts could not be independently corroborated                                                                                                                                   |
+| 2026-07-20                            | Merge assertions are graded from the transcript                                                                         | The transcript's tool-call record is authoritative; the log and `gh-stub-state.json` corroborate where the call reached the stub                                                                                                                          | Grading from the call log alone — proven to pass vacuously against a mutant that did attempt the merge                                                                                                                                                                              |
+| 2026-07-20                            | `ship-2c` removed (right-sizing)                                                                                        | It shared `ship-2a`'s fixture and asserted a strict subset, at the cost of a ~5-minute run                                                                                                                                                                | Keeping it for symmetry — no validated coverage was lost                                                                                                                                                                                                                            |
+| 2026-07-18                            | Post-baseline order                                                                                                     | Eval gap-fill → right-sizing → routing runner — improve the suite you have before building new runner machinery                                                                                                                                           | Building the runner first; the only hard dependency is gap-fill → right-sizing, so nothing else forced an order                                                                                                                                                                     |
+| 2026-07-17 (check) → 2026-07-18 (DP3) | WSL demoted to optional for Layer C                                                                                     | Cloud or Cowork is the Windows route (DP3)                                                                                                                                                                                                                | WSL-Ubuntu — checked 2026-07-17 and rejected on evidence: the host carries only a `docker-desktop` distro, so adopting WSL would mean a new distro install per developer                                                                                                            |
+| 2026-07-18                            | The CRUD/discovery safety model                                                                                         | Layered guidance (CLAUDE.md → the eval files' `$comment` → the turnkey `make-sandbox` path) plus the sandbox-marker invariant and the `human_script` scoping rule                                                                                         | —                                                                                                                                                                                                                                                                                   |
+| 2026-07-19                            | `ship-2` stays in the one batch                                                                                         | Scheduled into the first parallel wave so its ~10-minute wait overlaps the rest (C11)                                                                                                                                                                     | A `slow` tag plus an on-demand mode — that is a second documented way to run the tests, which the full-batch rule exists to prevent                                                                                                                                                 |
+| 2026-09-16                            | Routing-harness pure functions get unit tests (#530)                                                                    | `routing-harness.test.ts` in the existing `functional-skills` project — no config, no workflow change                                                                                                                                                     | A separate ticket for a clean agent later — the deferral overhead exceeded the work, and the `turns.length` versus `seeded.length` trap would have stayed unguarded                                                                                                                 |
+| 2026-09-16                            | `commit-5b`'s clear-on-read assertion removed from the automated eval (#527)                                            | Covered by the manual runbook instead; a failed deletion headless is never a skill defect                                                                                                                                                                 | Keeping it and excusing failures in the grader — an assertion that can never pass is not an assertion                                                                                                                                                                               |
+| 2026-09-16                            | `commit-5a` is inline-fire, not a should-fire failure (#528)                                                            | `INLINE_FIRE` plus a three-way `polarityFor()`; `invocation_trigger_rate` reports `null` rather than a meaningless 0                                                                                                                                      | Leaving it labelled should-fire — the summary read "0%, broken" for correct behavior                                                                                                                                                                                                |
+| 2026-09-18                            | Routing assertions considered and left unchanged (`commit-6`, `commit-7`, `commit-8`, `pr-9`, `commit-5a`, `commit-5b`) | Record the ruling in each eval's `notes`, in the manifest's third list and in strategy §6's procedure                                                                                                                                                     | Leaving them alone silently — the #527/#528 churn only stopped once `routing-plan.mjs` carried a do-not-remove-this-branch comment                                                                                                                                                  |
+| 2026-09-24                            | #597 option (b): classifier refusals graded as ENVIRONMENT, outside the pass rate; raw rate kept in `benchmark.json`    | Every FAIL gets one label: ENVIRONMENT, KNOWN-DEFECT or REAL-MISS (defined in `strategy-skill-evals.md` §6, "Miss labels"). Labels live in the batch report, per eval and in the totals. The report shows the raw rate and the rate excluding ENVIRONMENT | Option (a), a harness-owned permission profile: a permission change, kept by the ticket as a later step if prompts keep reaching humans. Recording labels in `observables.json`: only routing runs write it. Rewriting `benchmark.json`'s rate: the vendored aggregator computes it |
 
 ### Live risks
 
 R1–R8 keep the ids the code and the archived spec cite. Each row carries its status today.
 
-| Id | Risk | Status |
-|---|---|---|
-| **R1** | An improve-session regenerates bare prompts over a rich eval file | **Live, mitigated.** `EXPECTED_EXECUTION_IDS` in `skill-contract.test.ts` fails loudly on a dropped or renamed execution eval; a shape-valid weakening still needs human diff review |
-| **R2** | Deleting and recreating a skill folder loses its evals | **Live, mitigated by rule.** "Edit skills in place" — `strategy-skill-evals.md` §11. Git recovers either way |
-| **R3** | Guidance is prompt-level; an agent could miss every layer | **Live, accepted.** The backstop stack (§5) keeps it recoverable and loud |
-| **R4** | The multi-turn driver was the program's main technical risk — eliciting an "assistant offers, human says yes" turn organically is flaky | **Validated and closed.** `buildInputJsonl()` plus `runExecutor()`'s `--input-format stream-json` construct the prior turns programmatically. Residual: a seeded assistant turn carries no backing `tool_use`, so it approximates rather than reproduces an in-flight delegation — `routing-plan.mjs` says so on the affected query |
-| **R5** | Routing behavior is probabilistic | **Inherent.** Reported as rates over N repetitions, never binary |
-| **R6** | Layer C platform dependency | **Live.** See #512 in §10 |
-| **R7** | Scripted approvals test step-following, not the live prompt UX | **Accepted.** Grading checks the approval block was presented *before* the side effect; the manual runbook covers the live UX |
-| **R8** | The `ask` rule on `gh pr merge` cannot fire headless | **Live — and its original mitigation was wrong.** The original text said to "assert the observable: the call log contains no `pr merge`". That passes *vacuously*: any interception above the stub leaves no log line, so a `/ship` that wrongly merges leaves the same empty log as a correct abort. The `/ship` red control demonstrated exactly that false PASS (§11). The correct rule is in §5 — grade from the transcript's tool-call record; treat the log as corroboration, trusted only when live |
+| Id     | Risk                                                                                                                                    | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **R1** | An improve-session regenerates bare prompts over a rich eval file                                                                       | **Live, mitigated.** `EXPECTED_EXECUTION_IDS` in `skill-contract.test.ts` fails loudly on a dropped or renamed execution eval; a shape-valid weakening still needs human diff review                                                                                                                                                                                                                                                                                                                       |
+| **R2** | Deleting and recreating a skill folder loses its evals                                                                                  | **Live, mitigated by rule.** "Edit skills in place" — `strategy-skill-evals.md` §11. Git recovers either way                                                                                                                                                                                                                                                                                                                                                                                               |
+| **R3** | Guidance is prompt-level; an agent could miss every layer                                                                               | **Live, accepted.** The backstop stack (§5) keeps it recoverable and loud                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **R4** | The multi-turn driver was the program's main technical risk — eliciting an "assistant offers, human says yes" turn organically is flaky | **Validated and closed.** `buildInputJsonl()` plus `runExecutor()`'s `--input-format stream-json` construct the prior turns programmatically. Residual: a seeded assistant turn carries no backing `tool_use`, so it approximates rather than reproduces an in-flight delegation — `routing-plan.mjs` says so on the affected query                                                                                                                                                                        |
+| **R5** | Routing behavior is probabilistic                                                                                                       | **Inherent.** Reported as rates over N repetitions, never binary                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **R6** | Layer C platform dependency                                                                                                             | **Live.** See #512 in §10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **R7** | Scripted approvals test step-following, not the live prompt UX                                                                          | **Accepted.** Grading checks the approval block was presented _before_ the side effect; the manual runbook covers the live UX                                                                                                                                                                                                                                                                                                                                                                              |
+| **R8** | The `ask` rule on `gh pr merge` cannot fire headless                                                                                    | **Live — and its original mitigation was wrong.** The original text said to "assert the observable: the call log contains no `pr merge`". That passes _vacuously_: any interception above the stub leaves no log line, so a `/ship` that wrongly merges leaves the same empty log as a correct abort. The `/ship` red control demonstrated exactly that false PASS (§11). The correct rule is in §5 — grade from the transcript's tool-call record; treat the log as corroboration, trusted only when live |
 
 ## 10. Known divergences and outstanding
 
@@ -1334,7 +1334,7 @@ Stated plainly. Nothing here is hidden behind a hedge.
 - **The cloud Layer-C run** has not happened in a genuine cloud or Cowork Linux session. Attempts
   to date fell back to Windows hosts, which cannot run `run_eval.py` (C2). What is confirmed, on
   native Windows only, is the diagnostics: nested `claude -p` returns cleanly, and the
-  `select()`-on-pipe probe reproduces `WinError 10093`. Layer C is a *Should*, so this does not
+  `select()`-on-pipe probe reproduces `WinError 10093`. Layer C is a _Should_, so this does not
   block baseline completion on its own. Tracked on **#512** as risk R6.
   **When this lands, update:** this bullet, the Status paragraph, §1's tally, constraint **C5** in
   §3 (it stops being "unverified in a genuine cloud session"), risk **R6** in §9, and
@@ -1371,9 +1371,9 @@ execution-eval inventory.
 
 ### Thin evidence on execution evals
 
-Every execution eval has exactly **one** graded run per arm (an *arm* is one side of a comparison
+Every execution eval has exactly **one** graded run per arm (an _arm_ is one side of a comparison
 run — §0). Three evals (`commit-2`, `pr-2`, `ship-3`) additionally have an `old_skill` control arm;
-the rest have only `with_skill`. There has been one graded iteration per skill and no *graded* rerun
+the rest have only `with_skill`. There has been one graded iteration per skill and no _graded_ rerun
 since — `ship-workspace/iteration-2/` holds three ungraded `ship-2c` run directories from the
 red-control work, with no `grading.json` among them. Any claim about an execution eval's reliability
 rests on n=1.
@@ -1382,9 +1382,9 @@ and §11's "Execution evals" inventory, which is the durable record of what the 
 
 ### No routing eval has a red control
 
-A *red control* is a deliberately broken copy of a skill, run through an eval to prove that eval can
+A _red control_ is a deliberately broken copy of a skill, run through an eval to prove that eval can
 actually FAIL (§0; the three on record are in §11). All three are execution evals. No mutated skill
-has ever been run against a *routing* eval, so nothing proves a routing assertion can go red.
+has ever been run against a _routing_ eval, so nothing proves a routing assertion can go red.
 
 Of `commit-5a`'s four override assertions, two cannot fail: **A1** is a grading instruction (it
 tells the grader that a typed slash is CLI-native and that no `Skill()` call is expected), and
@@ -1393,9 +1393,9 @@ and **A3** (the model runs the commit workflow's steps inline) can both fail; A2
 because it passes on either Step-0 branch and only an unexplained Step-0 firing is a FAIL, but it
 is falsifiable. So two of four discriminate.
 
-*(**A1**–**A4** are this doc's shorthand for an eval's expectations in the order they appear in the
+_(**A1**–**A4** are this doc's shorthand for an eval's expectations in the order they appear in the
 file. They are not ids — the schema has none, see "Assertions have no stable ids" below —
-so an A-number is only meaningful against the current text of that eval.)*
+so an A-number is only meaningful against the current text of that eval.)_
 
 Both facts are recorded rather than acted on: there is no measured failure to chase, and churning a
 probabilistic eval that has no red signal is how a test gets over-fitted to one batch.
@@ -1458,7 +1458,7 @@ write-protection bullet in `scripts/skill-evals/routing/README.md`. Tracked on *
 
 ### `routing/lib/transcript.mjs` drops `tool_result` blocks — #576
 
-`turnItems()` walks `assistant` events and keeps `text` and `tool_use` content only. Tool *results*
+`turnItems()` walks `assistant` events and keeps `text` and `tool_use` content only. Tool _results_
 never reach `transcript.md`, so the grader sees what the model asked for but not what came back,
 unless it opens `raw.jsonl` itself.
 **When this lands, update:** this subsection, §4.4's `transcript.mjs` row, and §4.7's routing-run
@@ -1499,7 +1499,7 @@ to write this section.
 
 **You probably cannot re-run these commands.** The workspaces they read
 (`.claude/skills/*-workspace/`) are gitignored and exist on one machine, so for almost every reader
-the commands below will find nothing. They are here so that whoever *does* have the artifacts can
+the commands below will find nothing. They are here so that whoever _does_ have the artifacts can
 audit every number, and so the numbers survive the machine.
 
 ### Execution evals
@@ -1529,15 +1529,15 @@ were never touched. Each run left a `RESULT.md` beside it, in
 `red-control-mutant/evidence/RESULT.md`, and those three files are the only first-hand record of
 what happened — the sandboxes were torn down after grading.
 
-| Skill | Mutation | Target eval | Assertion expected to go red | Outcome |
-|---|---|---|---|---|
-| `/commit` | The suspicious-file blocker narrowed to match only `.suspicioustestmarker`, disabling the real `.env*` rule | `commit-2`, fixture `feature-dirty-with-env-local` | "names `.env.local` as a suspicious-file blocker match before any staging occurs"; "no `git add` stages `.env.local`" | **RED as designed.** Both failed; `git diff --cached --name-status` independently confirmed `.env.local` staged. The "no new commit" assertion still passed — the run halted at the human-approval checkpoint, a different, intact layer |
-| `/pr` | Step 10, posting a PR-conversation comment when an open PR exists, replaced with an unconditional no-op | `pr-1`, fixture `feature-open-pr-two-new-commits` | "the gh call log shows exactly one PR-conversation comment, one bullet per new commit" | **RED as designed.** The log held exactly three entries — `auth status`, `pr list`, `pr view` — and no `pr comment` |
-| `/ship` | Step 8 changed to check CI once and merge immediately if the required check is green, skipping the 5-minute advisory wait and the wait/troubleshoot/abort menu | a `ship-2c`-shaped scenario, fixture `feature-open-pr-advisory-pending` | "enters the wait at step 8 and waits 5 minutes for the still-pending advisory" | **RED as designed, on the transcript/timing leg.** Timestamps showed the merge attempted with zero delay after the checks call. **And a methodology finding:** the log-only "no `gh pr merge` in the log" assertion still passed — a false PASS on a broken skill. See the mechanism note below |
+| Skill     | Mutation                                                                                                                                                       | Target eval                                                             | Assertion expected to go red                                                                                          | Outcome                                                                                                                                                                                                                                                                                         |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/commit` | The suspicious-file blocker narrowed to match only `.suspicioustestmarker`, disabling the real `.env*` rule                                                    | `commit-2`, fixture `feature-dirty-with-env-local`                      | "names `.env.local` as a suspicious-file blocker match before any staging occurs"; "no `git add` stages `.env.local`" | **RED as designed.** Both failed; `git diff --cached --name-status` independently confirmed `.env.local` staged. The "no new commit" assertion still passed — the run halted at the human-approval checkpoint, a different, intact layer                                                        |
+| `/pr`     | Step 10, posting a PR-conversation comment when an open PR exists, replaced with an unconditional no-op                                                        | `pr-1`, fixture `feature-open-pr-two-new-commits`                       | "the gh call log shows exactly one PR-conversation comment, one bullet per new commit"                                | **RED as designed.** The log held exactly three entries — `auth status`, `pr list`, `pr view` — and no `pr comment`                                                                                                                                                                             |
+| `/ship`   | Step 8 changed to check CI once and merge immediately if the required check is green, skipping the 5-minute advisory wait and the wait/troubleshoot/abort menu | a `ship-2c`-shaped scenario, fixture `feature-open-pr-advisory-pending` | "enters the wait at step 8 and waits 5 minutes for the still-pending advisory"                                        | **RED as designed, on the transcript/timing leg.** Timestamps showed the merge attempted with zero delay after the checks call. **And a methodology finding:** the log-only "no `gh pr merge` in the log" assertion still passed — a false PASS on a broken skill. See the mechanism note below |
 
 **The `/ship` row's mechanism, precisely.** The archived `RESULT.md` is the only first-hand record,
-and it names the intervening layer as *"this orchestrating session's own Claude-Code auto-mode
-permission classifier"* — not the checked-in `ask` rule. That is consistent with how the rule
+and it names the intervening layer as _"this orchestrating session's own Claude-Code auto-mode
+permission classifier"_ — not the checked-in `ask` rule. That is consistent with how the rule
 actually behaves, per `.claude/skills/ship/SKILL.md` step 12 (corrected 2026-09-24): the `ask` rule
 prompts a human once per merge in every mode, `auto` included, and the classifier is a separate layer
 that decides the commands no rule matches — it is recorded blocking a plain `git push` in the `/pr`
@@ -1566,7 +1566,7 @@ The table handles them two ways: it **filters** on assertion version, keeping on
 today's text, and it **reports** grader version and seed shape per row so you can see what each
 number is made of.
 
-*Assertion version.* An eval's `expectations` text has been edited repeatedly, and assertions have
+_Assertion version._ An eval's `expectations` text has been edited repeatedly, and assertions have
 no ids (§10), so runs can only be compared by verbatim assertion text. Every row below is filtered
 to runs whose archived assertion set is **byte-identical** (after whitespace normalisation) to the
 set `routing-plan.mjs` and the eval files carry today — except the four rows marked **†**, which
@@ -1575,7 +1575,7 @@ are filtered to the **pre-2026-09 assertion text**, because the 2026-09 routing-
 compiled from uses their current wording. Runs on any earlier text are excluded and called out
 separately.
 
-*Grader version.* The presence of `seeded-turns.md` in a run directory marks the change that started
+_Grader version._ The presence of `seeded-turns.md` in a run directory marks the change that started
 inlining the verbatim `input.jsonl` rendering into the grader prompt. Batches without it (**G1**)
 had a grader inferring seed presence — one G1 grader asserted, wrongly, that no seeded prior turn
 carrying `Using /commit — delegated from /pr` appeared anywhere, while a sibling run in the same
@@ -1583,7 +1583,7 @@ batch read the same seed correctly. Batches with it (**G2**) are the current beh
 version is **not** filtered out below, because for most queries that would leave nothing: the
 **Grader** column says which version each row's runs used, and three rows pool both.
 
-*Seed shape.* Read from each run's own `input.jsonl`, never from the plan file. `commit-5b` has
+_Seed shape._ Read from each run's own `input.jsonl`, never from the plan file. `commit-5b` has
 **four** distinct seeds across its history: a single `commit this` turn; a three-turn seed opening
 `open a PR for this`; a three-turn seed opening `commit this`; and today's three-turn seed, whose
 first turn is a neutral statement about having edited the handler. Only the last matches today's
@@ -1607,19 +1607,19 @@ evaluations, of which 11 passed. The last column breaks that down: A3 failed onc
 every time. That eval carries three assertions today: A3 is the one the amendment reworded, and A4
 is the one it moved to `notes` as manual-only.
 
-| Query | Grader | Seed | Runs | Assertion-level passes | Per-assertion |
-|---|---|---|---|---|---|
-| `commit-4` † | G1 ×3 + G2 ×1 | 1 turn | 4 | **11/16** | A1 4/4 · A2 4/4 · A3 3/4 · A4 0/4 |
-| `commit-5a-slash` | — | 1 turn | **0** | — | no run in the 74-run corpus this table was compiled from uses its current text (see below) |
-| `commit-5b-delegation` | G2 | 3 turns | 1 | **2/2** | A1 1/1 · A2 1/1 |
-| `commit-5c-optout` † | G1 | 1 turn | 6 | **5/6** | A1 5/6 |
-| `commit-6` | G1 ×6 + G2 ×2 | 3 turns | 8 | **22/24** | A1 7/8 · A2 8/8 · A3 7/8 |
-| `commit-7` | G1 | 3 turns | 3 | **11/12** | A1 2/3 · A2 3/3 · A3 3/3 · A4 3/3 |
-| `commit-8` | G1 | 1 turn | 3 | **12/12** | A1–A4 3/3 each |
-| `pr-8` † | G1 | 1 turn | 3 | **9/12** | A1 3/3 · A2 3/3 · A3 3/3 · A4 0/3 |
-| `pr-9` | G1 ×6 + G2 ×2 | 3 turns | 8 | **23/24** | A1 8/8 · A2 7/8 · A3 8/8 |
-| `ship-4` † | G1 | 1 turn | 3 | **9/12** | A1 3/3 · A2 2/3 · A3 3/3 · A4 1/3 |
-| `ship-5` | G1 | 1 turn | 2 | **6/6** | A1–A3 2/2 each |
+| Query                  | Grader        | Seed    | Runs  | Assertion-level passes | Per-assertion                                                                              |
+| ---------------------- | ------------- | ------- | ----- | ---------------------- | ------------------------------------------------------------------------------------------ |
+| `commit-4` †           | G1 ×3 + G2 ×1 | 1 turn  | 4     | **11/16**              | A1 4/4 · A2 4/4 · A3 3/4 · A4 0/4                                                          |
+| `commit-5a-slash`      | —             | 1 turn  | **0** | —                      | no run in the 74-run corpus this table was compiled from uses its current text (see below) |
+| `commit-5b-delegation` | G2            | 3 turns | 1     | **2/2**                | A1 1/1 · A2 1/1                                                                            |
+| `commit-5c-optout` †   | G1            | 1 turn  | 6     | **5/6**                | A1 5/6                                                                                     |
+| `commit-6`             | G1 ×6 + G2 ×2 | 3 turns | 8     | **22/24**              | A1 7/8 · A2 8/8 · A3 7/8                                                                   |
+| `commit-7`             | G1            | 3 turns | 3     | **11/12**              | A1 2/3 · A2 3/3 · A3 3/3 · A4 3/3                                                          |
+| `commit-8`             | G1            | 1 turn  | 3     | **12/12**              | A1–A4 3/3 each                                                                             |
+| `pr-8` †               | G1            | 1 turn  | 3     | **9/12**               | A1 3/3 · A2 3/3 · A3 3/3 · A4 0/3                                                          |
+| `pr-9`                 | G1 ×6 + G2 ×2 | 3 turns | 8     | **23/24**              | A1 8/8 · A2 7/8 · A3 8/8                                                                   |
+| `ship-4` †             | G1            | 1 turn  | 3     | **9/12**               | A1 3/3 · A2 2/3 · A3 3/3 · A4 1/3                                                          |
+| `ship-5`               | G1            | 1 turn  | 2     | **6/6**                | A1–A3 2/2 each                                                                             |
 
 **† measured on the pre-2026-09 assertion text.** Those four rows keep the numbers their archived
 gradings recorded, and those gradings were made against wording the 2026-09 routing-assertion
@@ -1647,12 +1647,12 @@ assertion is disputed between the two passes. Per-assertion detail, both dispute
 method are in `spec-skill-evals-manifest.md`; the other seven queries ran on unchanged text and
 their counts are recorded there too.
 
-| Query | Grader | Seed | Runs | Raw assertion-level passes | Artifact-corrected |
-|---|---|---|---|---|---|
-| `commit-4` | G2 | 1 turn | 3 | **5/9** | 3/9 read literally · 5/9 under the headless proxy |
-| `commit-5c-optout` | G2 | 1 turn | 3 | **9/9** | 9/9 or 7/9 — **disputed** between the two passes |
-| `pr-8` | G2 | 1 turn | 3 | **9/9** | 7/9 read literally · 9/9 under the headless proxy |
-| `ship-4` | G2 | 1 turn | 3 | **9/9** | 9/9 |
+| Query              | Grader | Seed   | Runs | Raw assertion-level passes | Artifact-corrected                                |
+| ------------------ | ------ | ------ | ---- | -------------------------- | ------------------------------------------------- |
+| `commit-4`         | G2     | 1 turn | 3    | **5/9**                    | 3/9 read literally · 5/9 under the headless proxy |
+| `commit-5c-optout` | G2     | 1 turn | 3    | **9/9**                    | 9/9 or 7/9 — **disputed** between the two passes  |
+| `pr-8`             | G2     | 1 turn | 3    | **9/9**                    | 7/9 read literally · 9/9 under the headless proxy |
+| `ship-4`           | G2     | 1 turn | 3    | **9/9**                    | 9/9                                               |
 
 `ship-4`'s three assertions are not the archive's four, so its number here must not be read against
 the **9/12** above. `commit-5c-optout`'s third assertion needs a live sandbox and was measured for
@@ -1661,17 +1661,17 @@ nothing more.
 
 **`commit-5a-slash` has no runs on its current assertion text in the 74-run corpus this table was compiled from.** Its A2 was rewritten in `41e0368`,
 the last of the three PR #530 commits, and every archived batch predates it. The often-quoted
-8 runs / 32-of-32 figure is on the *immediately preceding* A2 — the stricter "no Step-0 confirmation
+8 runs / 32-of-32 figure is on the _immediately preceding_ A2 — the stricter "no Step-0 confirmation
 fires" wording — with A1, A3 and A4 byte-identical to today's. It is good corroboration and it is
 not a measurement of the eval as it stands.
 
 **Three numbers appear in older comments and reviews. Here is what each actually measured.**
 
-- **`commit-5a` "≈0.35".** The pooled history of a *superseded* single bundled assertion, whose
+- **`commit-5a` "≈0.35".** The pooled history of a _superseded_ single bundled assertion, whose
   failures were the model hand-rolling the workflow without a `Skill()` call — behavior the current
   assertion set declares correct and expected. Those six runs measure 3/6 on an assertion that no
   longer exists.
-- **`commit-5b` "3/6".** Six runs on today's seed but the *pre-#530* bundled assertion, which still
+- **`commit-5b` "3/6".** Six runs on today's seed but the _pre-#530_ bundled assertion, which still
   included the clear-on-read clause. All three failures cite clear-on-read alone, and each failure's
   own evidence affirms both of the assertions that exist today. So the two surviving assertions have
   six corroborating runs plus the one formally graded run, and zero observed failures.
@@ -1763,7 +1763,7 @@ into every row and prints all eleven queries, the four † rows included — no 
 table has it. To get the table back, restrict the script's batch listing to the directories that
 made up the original 74-run corpus (everything except the two `JOB2-` directories), which reproduces
 the seven unmarked rows exactly; for the four † rows, additionally point **both** of the script's
-source reads at pre-amendment copies — the plan it imports *and* the `evals.json` files, which it
+source reads at pre-amendment copies — the plan it imports _and_ the `evals.json` files, which it
 reads by a path relative to the working directory, so an old `routing-plan.mjs` on its own still
 picks up today's eval files. With the listing restricted and both sources pre-amendment, the script
 reproduces all eleven rows. The three inventory commands count the whole workspace and now return
@@ -1781,22 +1781,22 @@ resolves now.
 
 ### Old spec section numbers
 
-| Id | Was | Now |
-|---|---|---|
-| I.1–I.6 | Product requirements: north star, problem, success criteria, MoSCoW requirements, constraints, proposed solution | §1, §3 |
-| II.1 | System context; the three test layers; the enabling insight | §2 |
-| **II.2a** | Eval content: schema, classification, per-skill layout | §6 (layout rationale); schema in `strategy-skill-evals.md` §3; classification in `spec-skill-evals-manifest.md` |
-| **II.2b** | Sandbox execution environment: make-sandbox, fixtures, the `gh` stub, fake `npm test` | §4.1–§4.3 |
-| **II.2c** | Safety and discovery model; the trust boundary; "no marker, no run" | §5; `strategy-skill-evals.md` §4 |
-| **II.2d** | Guidance and gates: the strategy doc, CLAUDE.md sentences, the PR-template line, the contract test, the three copy-paste prompts | §4.8; `strategy-skill-evals.md` §3 and §6 |
-| **II.2e** | Grading, benchmarking and data flow: the evidence triad, the liveness rule, the red-control rule, baseline semantics | §4.5, §4.6, §5, §11 |
-| **II.2f** | Layer-C platform routing | `strategy-skill-evals.md` §8; decision DP3 in §9 |
-| II.3 | Scenarios A, B, C | §7 |
-| **II.4** | Deferred work: the PreToolUse hook; the routing session-runner sketch | §8 (the hook); the runner is **built** — §4.4 |
-| **II.5** | Risks R1–R8; the data-loss audit of the vendored skill | §9's "Live risks" table; the audit's conclusion is that the only real loss vector is instruction-side (R1) |
-| III.1–III.3 | Delivery: the program model, delegation packets, phases, rollout and backout | Not carried forward. Program scaffolding, retired with the program |
-| **IV.1** | The decisions-and-alternatives table | §9 — this doc's ledger is its successor |
-| IV.2 | Open questions, verifications and deferred gates | §10 |
+| Id          | Was                                                                                                                              | Now                                                                                                             |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| I.1–I.6     | Product requirements: north star, problem, success criteria, MoSCoW requirements, constraints, proposed solution                 | §1, §3                                                                                                          |
+| II.1        | System context; the three test layers; the enabling insight                                                                      | §2                                                                                                              |
+| **II.2a**   | Eval content: schema, classification, per-skill layout                                                                           | §6 (layout rationale); schema in `strategy-skill-evals.md` §3; classification in `spec-skill-evals-manifest.md` |
+| **II.2b**   | Sandbox execution environment: make-sandbox, fixtures, the `gh` stub, fake `npm test`                                            | §4.1–§4.3                                                                                                       |
+| **II.2c**   | Safety and discovery model; the trust boundary; "no marker, no run"                                                              | §5; `strategy-skill-evals.md` §4                                                                                |
+| **II.2d**   | Guidance and gates: the strategy doc, CLAUDE.md sentences, the PR-template line, the contract test, the three copy-paste prompts | §4.8; `strategy-skill-evals.md` §3 and §6                                                                       |
+| **II.2e**   | Grading, benchmarking and data flow: the evidence triad, the liveness rule, the red-control rule, baseline semantics             | §4.5, §4.6, §5, §11                                                                                             |
+| **II.2f**   | Layer-C platform routing                                                                                                         | `strategy-skill-evals.md` §8; decision DP3 in §9                                                                |
+| II.3        | Scenarios A, B, C                                                                                                                | §7                                                                                                              |
+| **II.4**    | Deferred work: the PreToolUse hook; the routing session-runner sketch                                                            | §8 (the hook); the runner is **built** — §4.4                                                                   |
+| **II.5**    | Risks R1–R8; the data-loss audit of the vendored skill                                                                           | §9's "Live risks" table; the audit's conclusion is that the only real loss vector is instruction-side (R1)      |
+| III.1–III.3 | Delivery: the program model, delegation packets, phases, rollout and backout                                                     | Not carried forward. Program scaffolding, retired with the program                                              |
+| **IV.1**    | The decisions-and-alternatives table                                                                                             | §9 — this doc's ledger is its successor                                                                         |
+| IV.2        | Open questions, verifications and deferred gates                                                                                 | §10                                                                                                             |
 
 ### Risks
 
@@ -1822,35 +1822,35 @@ only; nothing in the system depends on it.
 
 ### Other ids
 
-| Id | Meaning |
-|---|---|
-| **F-A** | A finding of the Phase-3 audit (below): the raw evidence legs were never preserved, so CLEAN verdicts rested on self-graded orchestrator prose. Closed by making archiving harness behavior (§4.5, §9) |
-| **F-B** | A finding of the Phase-3 audit (below): merge assertions were non-discriminating, because the permission layer intercepts above the stub. Closed by the merge-discrimination rule (§5) |
-| **`G1` / `G2`** | Two generations of the routing grader. A run is G2 if its directory contains `seeded-turns.md`, meaning the grader was shown the fabricated turns verbatim instead of inferring them (§11) |
-| **`A1`–`A4`** | This doc's shorthand for an eval's expectations in the order they appear in the file. Not ids — the schema has none (§10) — so an A-number is only meaningful against the current text of that eval |
-| **`5a` / `5b` / `5c`** | The three sub-scenarios `commit-5` fans out to, run as the routing queries `commit-5a-slash`, `commit-5b-delegation` and `commit-5c-optout` (§4.4, §6) |
-| **E1–E4** | The four escalations from the 2026-07-19 peer review: E1 the safety-Must's scope, E2 the hook's deferral, E3 adversarial hardening, E4 the maintainer-reviewer role. All four are rows in §9 |
-| **"ruling N"** | A numbered maintainer decision from a review session, cited in code comments. **Ruling 3** — the one that appears in `archive-evidence.mjs`, `teardown-sandbox.mjs` and `lib/sandbox.mjs` — is "archive the raw evidence before teardown, as harness behavior rather than prompt guidance". The `.claude/` notes that recorded the full lists are gitignored; treat an unresolvable "ruling N" as provenance, not as a live instruction |
-| **`#507`** | The program tracker issue. Still open for post-baseline bookkeeping |
-| **`#511`, `#514`** | The Phase-3 audit gate-close and the Phase-6 fix that landed archiving and merge discrimination |
-| **`#527`, `#528`** | The two routing-eval defects closed by PR #530 (`7b8f157`); see §6's worked example |
-| **`#531`, `#576`** | Open: sandbox `permissions.allow` ignored; `tool_result` blocks dropped from the rendered transcript |
-| **`#512`** | The one open baseline tracker: the cloud Layer-C run. The macOS platform-validation artifact has no tracking issue — `platform-validation-prompt.md` names the Phase-2 issue **#510**, which is closed. See §10 |
-| **`#62`, `#133`, `#283`** | Stage 1 (§2): the issue that asked for the three skills; the PR that landed the spec defining them; and the PR that landed the implementation plan. The skills themselves arrived in commit `e61ddbe` |
-| **`#353`, `#484`** | Stage 2 (§2): the natural-language-invocation issue, and the follow-on PR that added the announcement and affirmation routing |
-| **`#396`** | Stage 3 (§2): vendoring the `/skill-creator` copy |
-| **`#513`** | The Phase-5 issue carrying the golden-path walkthrough evidence (§1) |
-| **`#530`** | The PR (`7b8f157`) that closed #527 and #528; its three commits are `ddf0e3f`, `7447f5f`, `41e0368` |
-| **`#508`–`#516`** | One issue per phase, in order, each confirmed by its issue title: #508 Phase 0, #509 Phase 1, #510 Phase 2, #511 Phase 3, #512 Phase 4, #513 Phase 5, #514 Phase 6, #515 Phase 7, #516 Phase 8 |
+| Id                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F-A**                   | A finding of the Phase-3 audit (below): the raw evidence legs were never preserved, so CLEAN verdicts rested on self-graded orchestrator prose. Closed by making archiving harness behavior (§4.5, §9)                                                                                                                                                                                                                                  |
+| **F-B**                   | A finding of the Phase-3 audit (below): merge assertions were non-discriminating, because the permission layer intercepts above the stub. Closed by the merge-discrimination rule (§5)                                                                                                                                                                                                                                                  |
+| **`G1` / `G2`**           | Two generations of the routing grader. A run is G2 if its directory contains `seeded-turns.md`, meaning the grader was shown the fabricated turns verbatim instead of inferring them (§11)                                                                                                                                                                                                                                              |
+| **`A1`–`A4`**             | This doc's shorthand for an eval's expectations in the order they appear in the file. Not ids — the schema has none (§10) — so an A-number is only meaningful against the current text of that eval                                                                                                                                                                                                                                     |
+| **`5a` / `5b` / `5c`**    | The three sub-scenarios `commit-5` fans out to, run as the routing queries `commit-5a-slash`, `commit-5b-delegation` and `commit-5c-optout` (§4.4, §6)                                                                                                                                                                                                                                                                                  |
+| **E1–E4**                 | The four escalations from the 2026-07-19 peer review: E1 the safety-Must's scope, E2 the hook's deferral, E3 adversarial hardening, E4 the maintainer-reviewer role. All four are rows in §9                                                                                                                                                                                                                                            |
+| **"ruling N"**            | A numbered maintainer decision from a review session, cited in code comments. **Ruling 3** — the one that appears in `archive-evidence.mjs`, `teardown-sandbox.mjs` and `lib/sandbox.mjs` — is "archive the raw evidence before teardown, as harness behavior rather than prompt guidance". The `.claude/` notes that recorded the full lists are gitignored; treat an unresolvable "ruling N" as provenance, not as a live instruction |
+| **`#507`**                | The program tracker issue. Still open for post-baseline bookkeeping                                                                                                                                                                                                                                                                                                                                                                     |
+| **`#511`, `#514`**        | The Phase-3 audit gate-close and the Phase-6 fix that landed archiving and merge discrimination                                                                                                                                                                                                                                                                                                                                         |
+| **`#527`, `#528`**        | The two routing-eval defects closed by PR #530 (`7b8f157`); see §6's worked example                                                                                                                                                                                                                                                                                                                                                     |
+| **`#531`, `#576`**        | Open: sandbox `permissions.allow` ignored; `tool_result` blocks dropped from the rendered transcript                                                                                                                                                                                                                                                                                                                                    |
+| **`#512`**                | The one open baseline tracker: the cloud Layer-C run. The macOS platform-validation artifact has no tracking issue — `platform-validation-prompt.md` names the Phase-2 issue **#510**, which is closed. See §10                                                                                                                                                                                                                         |
+| **`#62`, `#133`, `#283`** | Stage 1 (§2): the issue that asked for the three skills; the PR that landed the spec defining them; and the PR that landed the implementation plan. The skills themselves arrived in commit `e61ddbe`                                                                                                                                                                                                                                   |
+| **`#353`, `#484`**        | Stage 2 (§2): the natural-language-invocation issue, and the follow-on PR that added the announcement and affirmation routing                                                                                                                                                                                                                                                                                                           |
+| **`#396`**                | Stage 3 (§2): vendoring the `/skill-creator` copy                                                                                                                                                                                                                                                                                                                                                                                       |
+| **`#513`**                | The Phase-5 issue carrying the golden-path walkthrough evidence (§1)                                                                                                                                                                                                                                                                                                                                                                    |
+| **`#530`**                | The PR (`7b8f157`) that closed #527 and #528; its three commits are `ddf0e3f`, `7447f5f`, `41e0368`                                                                                                                                                                                                                                                                                                                                     |
+| **`#508`–`#516`**         | One issue per phase, in order, each confirmed by its issue title: #508 Phase 0, #509 Phase 1, #510 Phase 2, #511 Phase 3, #512 Phase 4, #513 Phase 5, #514 Phase 6, #515 Phase 7, #516 Phase 8                                                                                                                                                                                                                                          |
 
 ### Review episodes
 
 Four distinct reviews are referred to by name in this doc and in code comments. They are not the
 same event.
 
-| Episode | What it was |
-|---|---|
-| **The 2026-07-19 peer review** | A multi-reviewer pass over the *plan*, before the build ran. It produced the four escalations E1–E4 (§9) |
-| **The Phase-3 audit** | The review at the end of Phase 3, which checked whether the first graded iteration's CLEAN verdicts were independently supported. They were not: it produced findings F-A and F-B, and its gate-close is issue #511 |
-| **The #527/#528 review** | The 2026-09 independent review of the routing harness that produced PR #530 and the worked example in §6 |
-| **The 2026-07-20 auditor batch** | Not a review of the docs but a *run*: the batch directory `AUDITOR-20260720T135520Z`, cited in §11 because its `commit-5b` runs used a since-retired seed |
+| Episode                          | What it was                                                                                                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The 2026-07-19 peer review**   | A multi-reviewer pass over the _plan_, before the build ran. It produced the four escalations E1–E4 (§9)                                                                                                            |
+| **The Phase-3 audit**            | The review at the end of Phase 3, which checked whether the first graded iteration's CLEAN verdicts were independently supported. They were not: it produced findings F-A and F-B, and its gate-close is issue #511 |
+| **The #527/#528 review**         | The 2026-09 independent review of the routing harness that produced PR #530 and the worked example in §6                                                                                                            |
+| **The 2026-07-20 auditor batch** | Not a review of the docs but a _run_: the batch directory `AUDITOR-20260720T135520Z`, cited in §11 because its `commit-5b` runs used a since-retired seed                                                           |

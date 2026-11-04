@@ -6,7 +6,7 @@ This is a design doc — concrete decisions, schema, and flows for one feature, 
 
 ## Purpose
 
-Some IS programs *are* a newsletter — most obviously `weekly-web-updates`, where the program description will read as "join this and receive a weekly email." Buttondown is where those emails are composed and sent. This document describes how the app keeps the relevant Buttondown subscriber tags in step with current program membership, without members ever needing to know Buttondown exists.
+Some IS programs _are_ a newsletter — most obviously `weekly-web-updates`, where the program description will read as "join this and receive a weekly email." Buttondown is where those emails are composed and sent. This document describes how the app keeps the relevant Buttondown subscriber tags in step with current program membership, without members ever needing to know Buttondown exists.
 
 ## Context: the Apps Script flow this replaced
 
@@ -32,7 +32,7 @@ Every code path below is a route to making that statement true.
 
 ## Consent posture
 
-Program-driven emails are treated as **transactional**, not marketing. A program whose entire description is "receive a weekly email" makes consent explicit by the act of joining; leaving the program is the unsubscribe. Members do not need to know Buttondown is the delivery vehicle, and we deliberately avoid a separate "newsletter opt-in" checkbox — it would imply joining a "weekly email" program is *not* itself consent, which would be confusing.
+Program-driven emails are treated as **transactional**, not marketing. A program whose entire description is "receive a weekly email" makes consent explicit by the act of joining; leaving the program is the unsubscribe. Members do not need to know Buttondown is the delivery vehicle, and we deliberately avoid a separate "newsletter opt-in" checkbox — it would imply joining a "weekly email" program is _not_ itself consent, which would be confusing.
 
 What this implies in code:
 
@@ -87,7 +87,7 @@ The inline first-profile-save path is the **one moment** the app does an authori
 
 ### 1. Inline hook on first profile save
 
-When a member saves their profile and `profiles.lastUpdatedProfile IS NULL` *before* the update:
+When a member saves their profile and `profiles.lastUpdatedProfile IS NULL` _before_ the update:
 
 1. Fetch the member's email from `auth.users`.
 2. Compute the desired program-tag set from their current `profile_programs` rows joined to programs with non-null `buttondownTag`.
@@ -100,7 +100,7 @@ When a member saves their profile and `profiles.lastUpdatedProfile IS NULL` *bef
 
 This path exists only to shorten the new-member time-to-first-email. It is a latency optimization, not a correctness guarantee. The cron is what we trust.
 
-**Name edits.** A *subsequent* `PUT /me` that changes the display name fires a scoped resync (`runProfileResyncForServer`, reason `update-name`) right after the DB commit — the same merge-preserving name reconcile the cron runs, but inline so the name lands in Buttondown within the request instead of a day later. First saves are excluded: the inline first-save hook above already seeds the name, and firing here too would pre-empt its `new`/`returning` ownership. Like join/leave, it's best-effort, swallows failures, and is gated on `BUTTONDOWN_SYNC_WRITE`.
+**Name edits.** A _subsequent_ `PUT /me` that changes the display name fires a scoped resync (`runProfileResyncForServer`, reason `update-name`) right after the DB commit — the same merge-preserving name reconcile the cron runs, but inline so the name lands in Buttondown within the request instead of a day later. First saves are excluded: the inline first-save hook above already seeds the name, and firing here too would pre-empt its `new`/`returning` ownership. Like join/leave, it's best-effort, swallows failures, and is gated on `BUTTONDOWN_SYNC_WRITE`.
 
 ### 2. Daily reconciler (Vercel cron)
 
@@ -189,7 +189,7 @@ Four independent locks. Any one keeps the integration off:
 1. **Cron entry in `vercel.json`** — Vercel's scheduler fires only on the production deployment. Preview deployments host the same code but the scheduler doesn't invoke them.
 2. **`BUTTONDOWN_API_KEY` set only in the Production env scope.** Code path detects missing key → no-op + Sentry breadcrumb (expected on dev/preview, not an error).
 3. **`CRON_SECRET` bearer check** on the endpoint, so a public hit can't run it.
-4. **`BUTTONDOWN_SYNC_WRITE=1` cron write toggle** — this *is* the dry-run mechanism, not a separate concept. The cron reads this env var to decide whether to pass `write: true` or `write: false` into the sync function. The actual gate lives one layer deeper, at the Buttondown API client: every mutation method (PATCH/POST/DELETE) short-circuits when called with `write: false`, regardless of trigger. With the env var unset (the default), the cron runs dry; set to `1` to go live and leave set after rollout. Admin-triggered runs (see [Endpoint shape](#endpoint-shape)) skip the env var and pass their `write` choice explicitly.
+4. **`BUTTONDOWN_SYNC_WRITE=1` cron write toggle** — this _is_ the dry-run mechanism, not a separate concept. The cron reads this env var to decide whether to pass `write: true` or `write: false` into the sync function. The actual gate lives one layer deeper, at the Buttondown API client: every mutation method (PATCH/POST/DELETE) short-circuits when called with `write: false`, regardless of trigger. With the env var unset (the default), the cron runs dry; set to `1` to go live and leave set after rollout. Admin-triggered runs (see [Endpoint shape](#endpoint-shape)) skip the env var and pass their `write` choice explicitly.
 
 The inline-on-first-save path uses lock #2 only — no `BUTTONDOWN_API_KEY` in env means it no-ops in dev and preview.
 
@@ -197,7 +197,7 @@ The inline-on-first-save path uses lock #2 only — no `BUTTONDOWN_API_KEY` in e
 
 Buttondown ties each API key to a specific API version and only moves it when we ask. Concretely: `BUTTONDOWN_API_KEY` on production sees the same API surface until someone clicks "migrate to latest version" on that key in Buttondown's UI — drift is impossible by construction, and an upgrade is a deliberate ops action. The api-golds re-record (Appendix A) is part of that flow.
 
-Optionally we can issue a *second* key on a newer version while keeping the original key in place — useful for A/B comparing behavior under the new version before committing to the migration. Not required; the default is a single in-place key migration when we decide to move forward.
+Optionally we can issue a _second_ key on a newer version while keeping the original key in place — useful for A/B comparing behavior under the new version before committing to the migration. Not required; the default is a single in-place key migration when we decide to move forward.
 
 ## Schema changes
 
@@ -245,9 +245,9 @@ A one-shot script reconciled the app's CSV-imported memberships against Buttondo
 3. **Set `BUTTONDOWN_API_KEY` and `CRON_SECRET`** in the prod env scope only.
 4. **Set `buttondownTag` on the relevant programs** (e.g., `weekly-web-updates` → the same string the Apps Script wrote) via `/admin/programs`. The dry-run cron now produces a realistic diff against real data.
 5. **Verify the dry-run output** over one or two daily cycles in Axiom: numbers look plausible, the diff doesn't propose touching the non-member newsletter audience, no surprises.
-6. **One-shot bootstrap reconciliation** *(completed and deleted 2026-05-25)*. See the dedicated section above.
-7. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** *(completed 2026-06-12)*. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. The Form was retired in the same step.
-8. **Wire the inline first-profile-save hook** *(completed 2026-05-25 in PR #280)*. Lowest priority — purely latency. The cron covers correctness once step 7 lands.
+6. **One-shot bootstrap reconciliation** _(completed and deleted 2026-05-25)_. See the dedicated section above.
+7. **Set `BUTTONDOWN_SYNC_WRITE=1` and disable the Apps Script trigger** _(completed 2026-06-12)_. With the cron writing, the Apps Script is no longer needed and leaving it active risks tag races on edge cases. The Form was retired in the same step.
+8. **Wire the inline first-profile-save hook** _(completed 2026-05-25 in PR #280)_. Lowest priority — purely latency. The cron covers correctness once step 7 lands.
 
 ## Future work
 
@@ -259,7 +259,7 @@ A one-shot script reconciled the app's CSV-imported memberships against Buttondo
 
 ## Appendix A: Fake-vs-real comparison (recording from a dedicated newsletter)
 
-The in-memory fake at `tests/functional/server/buttondown-fake.ts` reflects how we *believe* Buttondown behaves today. Two ways that belief can be wrong:
+The in-memory fake at `tests/functional/server/buttondown-fake.ts` reflects how we _believe_ Buttondown behaves today. Two ways that belief can be wrong:
 
 - **Wire shape drift.** Buttondown adds, renames, or retypes a response field; the new shape no longer matches our `ButtondownSubscriber` projection or the fake's synthesized responses.
 - **Stateful behavior drift.** The fake's reaction to a sequence (create → PATCH → GET) diverges from real Buttondown's reaction to the same sequence — same wire shape, different transitions.
@@ -280,7 +280,7 @@ The manual tests deliberately live outside the `npm test` portfolio. They're run
 
 Record and seed both load `.env.prod` and require `BUTTONDOWN_TEST_API_KEY`. The primary safety is structural — Buttondown's per-newsletter key scoping confines writes (and `listSubscribers` reads) to the key's specific newsletter, so a mis-pasted key cannot reach the wrong audience. The operational sanity check is `assertTestNewsletter` in `tests/manual/_buttondown-probes.ts`: it calls `GET /v1/accounts/me`, which returns the single newsletter the key writes to, and refuses to proceed unless the username matches `intentional-society-api-tests`. That catches both wrong-account and wrong-newsletter-same-account swaps. The key needs `administrivia_access` to call `/accounts/me` (in addition to `subscriber_access` for the destructive ops); the seed-fixtures script's startup error message points at this if the permission is missing.
 
-Both scripts construct their client with `allowReservedTestEmails: true`. The canonical audience is `@fixture.test` addresses, and the client's reserved-TLD wire guard (a prod safety: refuse `.test`/`.local`/etc. so a test user never reaches real Buttondown) would otherwise refuse every probe and seed call *before* any HTTP — which silently broke both scripts from when the guard landed (2026-05-25) until #444. Opting out is safe here precisely because the structural safety above (per-newsletter key scope + `assertTestNewsletter`) is what confines these scripts, not the TLD guard. Every prod path leaves the opt-out off.
+Both scripts construct their client with `allowReservedTestEmails: true`. The canonical audience is `@fixture.test` addresses, and the client's reserved-TLD wire guard (a prod safety: refuse `.test`/`.local`/etc. so a test user never reaches real Buttondown) would otherwise refuse every probe and seed call _before_ any HTTP — which silently broke both scripts from when the guard landed (2026-05-25) until #444. Opting out is safe here precisely because the structural safety above (per-newsletter key scope + `assertTestNewsletter`) is what confines these scripts, not the TLD guard. Every prod path leaves the opt-out off.
 
 ### One probe sequence
 

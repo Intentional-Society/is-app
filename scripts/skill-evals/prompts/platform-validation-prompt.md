@@ -11,7 +11,7 @@ and for onboarding a teammate on a new OS.
   sequencing.
 - **Issue number:** fill `<ISSUE>` per run. For the baseline macOS smoke this is the
   **Phase-2 phase issue `#510`** (acceptance requires the artifact land there). Blocks
-  *baseline completion*, never the Phase-2 PR.
+  _baseline completion_, never the Phase-2 PR.
 - **The one real-`gh` touch:** posting the artifact comment uses the real `gh` against real
   GitHub. That is the sanctioned human-run action — it posts a validation comment, it does
   **not** execute an eval against the real repo. If `gh` is not authenticated, the prompt

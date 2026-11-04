@@ -13,25 +13,25 @@ The local Supabase stack is a singleton: it's keyed by `project_id` in
 database via `/api/_test/reset`. Two checkouts pointed at one stack therefore
 clobber each other's data and ports. GoTrue (auth) and Storage can't be
 multi-tenanted, so the only real isolation is **one full Supabase stack per
-worktree** — a *lane*.
+worktree** — a _lane_.
 
 A lane is just a port offset + a renamed Supabase project, derived from the
 worktree's directory name:
 
-| Dir name   | Lane | Offset |
-|------------|------|--------|
+| Dir name   | Lane | Offset                |
+| ---------- | ---- | --------------------- |
 | `is-app`   | 0    | base ports, untouched |
-| `is-app-2` | 2    | +200 |
-| `is-app-3` | 3    | +300 |
+| `is-app-2` | 2    | +200                  |
+| `is-app-3` | 3    | +300                  |
 
-| Service              | Base  | Lane 2 | Lane 3 |
-|----------------------|-------|--------|--------|
-| Supabase API / Kong  | 54321 | 54521  | 54621  |
-| Postgres             | 54322 | 54522  | 54622  |
-| Studio               | 54323 | 54523  | 54623  |
-| Inbucket (email)     | 54324 | 54524  | 54624  |
-| shadow / analytics / pooler | 54320/54327/54329 | +200 | +300 |
-| `next dev`           | 3000  | 3200   | 3300   |
+| Service                     | Base              | Lane 2 | Lane 3 |
+| --------------------------- | ----------------- | ------ | ------ |
+| Supabase API / Kong         | 54321             | 54521  | 54621  |
+| Postgres                    | 54322             | 54522  | 54622  |
+| Studio                      | 54323             | 54523  | 54623  |
+| Inbucket (email)            | 54324             | 54524  | 54624  |
+| shadow / analytics / pooler | 54320/54327/54329 | +200   | +300   |
+| `next dev`                  | 3000              | 3200   | 3300   |
 
 The e2e suite has no port of its own — it reuses the lane's `next dev` server
 (see [Running in a lane](#running-in-a-lane)).
@@ -84,14 +84,14 @@ npm run test:functional         # isolated DB
 `reuseExistingServer` runs the suite against a server you already have up — or
 starts its own `npm run dev` on that port when none is. Two `next dev` instances
 can't share one worktree's `.next` anyway, so a single server per lane is the
-only workable shape; concurrent isolated dev+e2e is what separate *lanes* are
+only workable shape; concurrent isolated dev+e2e is what separate _lanes_ are
 for. The base worktree (no lane vars) falls back to port 3000.
 
 **Tradeoff:** an e2e run resets and drives the seeded `@testfake.local` users in
 the lane's dev DB (not your real account), so a manual dev session's test-user
 state gets churned underneath it. This mirrors how CI runs against the
 prod-backed preview, so it's the same model — but if you want a stable manual
-session *and* an e2e run at once, use two lanes (each lane is one Supabase stack
+session _and_ an e2e run at once, use two lanes (each lane is one Supabase stack
 = one database).
 
 ## Reuse, teardown, caveats

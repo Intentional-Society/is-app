@@ -17,14 +17,14 @@ work.
 
 ## The pipeline
 
-| Phase | Lives in | Board status | Enters when |
-| --- | --- | --- | --- |
-| 1. Ideation | **Ideas** tab of the Ideation doc | | Someone has an idea |
-| 2. Definition | Its own tab in the Ideation doc | | Someone starts defining it |
-| 3. Ready | GitHub issue + `docs/spec-<feature-name>.md` | Ready | It's a GitHub issue with reward |
-| 4. Implementation | Branch + PR | In progress | There's enough spec to start building |
-| 5. Acceptance and deployment | PR, then production | In progress, then Done on merge | A PR to `main` is open |
-| 6. Reward | | Done; Reward status: Set, then Paid or Declined | Its PR is merged |
+| Phase                        | Lives in                                     | Board status                                    | Enters when                           |
+| ---------------------------- | -------------------------------------------- | ----------------------------------------------- | ------------------------------------- |
+| 1. Ideation                  | **Ideas** tab of the Ideation doc            |                                                 | Someone has an idea                   |
+| 2. Definition                | Its own tab in the Ideation doc              |                                                 | Someone starts defining it            |
+| 3. Ready                     | GitHub issue + `docs/spec-<feature-name>.md` | Ready                                           | It's a GitHub issue with reward       |
+| 4. Implementation            | Branch + PR                                  | In progress                                     | There's enough spec to start building |
+| 5. Acceptance and deployment | PR, then production                          | In progress, then Done on merge                 | A PR to `main` is open                |
+| 6. Reward                    |                                              | Done; Reward status: Set, then Paid or Declined | Its PR is merged                      |
 
 Quest issues carry the `quest` label. The public board's **Quests** view tracks
 them; see
@@ -32,8 +32,8 @@ them; see
 
 ## 1. Ideation
 
-Add brainstorms as bullets on the **Ideas** tab of the Ideation doc *(link
-TODO)*. Half-formed is fine.
+Add brainstorms as bullets on the **Ideas** tab of the Ideation doc _(link
+TODO)_. Half-formed is fine.
 
 ## 2. Definition
 

@@ -21,17 +21,17 @@ call Supabase's admin `inviteUserByEmail` (the IS invite-code system runs on
 top of an ordinary magic-link send). That makes two Supabase templates
 reachable:
 
-| Supabase template | Triggered by                                    |
-| ----------------- | ----------------------------------------------- |
+| Supabase template | Triggered by                                           |
+| ----------------- | ------------------------------------------------------ |
 | `magic_link`      | `/signin` and `/signup` (both existing and new emails) |
-| `recovery`        | `/forgot-password`                              |
+| `recovery`        | `/forgot-password`                                     |
 
 `signInWithOtp` — the only account-creation path (`/signup`) — renders
 `magic_link` for both returning and brand-new emails, so one magic-link body
 has to read naturally as both "sign in" and "first-time sign up." This holds
 because **email confirmations are off** (prod dashboard → Authentication →
 Email; local `supabase/config.toml` → `enable_confirmations = false`). With
-confirmations *on*, a first-time email gets the `confirmation` template instead
+confirmations _on_, a first-time email gets the `confirmation` template instead
 ([discussion #28947](https://github.com/orgs/supabase/discussions/28947)) — the
 unstyled-signup-email bug (#366).
 
@@ -150,7 +150,7 @@ npm run update_email_templates                   # PATCH the hosted project
 git add -A && git commit                         # snapshot + source changes land together
 ```
 
-The snapshot in each PR reflects what prod looked like *right before*
+The snapshot in each PR reflects what prod looked like _right before_
 that PR's push, so future readers can see the exact recipient-facing
 change by diffing snapshot vs source files within the PR.
 
@@ -215,11 +215,11 @@ The action-URL pattern both reachable templates use:
 build it as the full callback URL with `type` and (for signup) `invite`
 already in the query string:
 
-| Form              | `emailRedirectTo`                                                 |
-| ----------------- | ----------------------------------------------------------------- |
-| `/signin`         | `${origin}/auth/callback?type=email`                              |
-| `/signup`         | `${origin}/auth/callback?type=email&invite=${code}`               |
-| `/forgot-password`| `${origin}/auth/callback?type=recovery`                           |
+| Form               | `emailRedirectTo`                                   |
+| ------------------ | --------------------------------------------------- |
+| `/signin`          | `${origin}/auth/callback?type=email`                |
+| `/signup`          | `${origin}/auth/callback?type=email&invite=${code}` |
+| `/forgot-password` | `${origin}/auth/callback?type=recovery`             |
 
 This is what makes preview-deploy emails work: the action URL's host
 comes from the form's `window.location.origin` (preview / prod /
