@@ -34,10 +34,17 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
   await requireUser();
   const { slug } = await params;
   const result = await loadProgram(slug);
+  // A missing program (404) falls through to the client's own "not found". Any
+  // other failure fails the render, as requireUser does, rather than showing
+  // the page without its feature sections: the client fetching the program
+  // later couldn't add them back.
+  if ("status" in result && result.status !== 404) {
+    throw new Error(`Failed to load program ${slug}: ${result.status}`);
+  }
 
   // Seed the client QueryClient through HydrationBoundary, so ProgramSlugDetail's
-  // useQuery mounts on a warm cache. A missing or failed program isn't seeded;
-  // the client fetches it and shows its own error.
+  // useQuery mounts on a warm cache. A missing program isn't seeded; the
+  // client fetches it and shows its own error.
   const queryClient = new QueryClient();
   if ("program" in result) queryClient.setQueryData(programQueryKey(slug), result.program);
 

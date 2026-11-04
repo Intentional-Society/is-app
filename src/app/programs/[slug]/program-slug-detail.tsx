@@ -6,11 +6,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { LocalTime } from "@/components/local-time";
 import { Markdown, MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { ProgramDetail } from "@/lib/api-types";
-import { formatDate } from "@/lib/format-date";
 
 import { HYDRATED_STALE_TIME, messageBoxQueryKey, programQueryKey } from "./query-keys";
 
@@ -103,7 +103,12 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
         )}
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
-          {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}
+          {program.joined && program.joinedAt && (
+            <>
+              {" "}
+              · Joined <LocalTime iso={program.joinedAt} />
+            </>
+          )}
         </p>
       </header>
 

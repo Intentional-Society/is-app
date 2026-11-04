@@ -6,12 +6,12 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { LocalTime } from "@/components/local-time";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
 import type { MessageBoxMessage, MessageBoxResponse } from "@/lib/api-types";
-import { formatDateTime } from "@/lib/format-date";
 import { MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
 
 import { HYDRATED_STALE_TIME, messageBoxQueryKey } from "./query-keys";
@@ -194,7 +194,9 @@ function MessageItem({
         <Link href={href} className="whitespace-nowrap font-medium hover:underline">
           {message.author.displayName ?? "Member"}
         </Link>
-        <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(message.createdAt)}</span>
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          <LocalTime iso={message.createdAt} withTime />
+        </span>
         {canModerate &&
           (confirming ? (
             <span className="ml-auto flex items-center gap-2">

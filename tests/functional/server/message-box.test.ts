@@ -21,6 +21,7 @@ import {
   programFeatures,
   programs,
 } from "@/server/schema";
+import { E2E_EMAILS } from "@/server/test-reset";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 
@@ -39,6 +40,27 @@ const authAs = (userId: string | null) => {
     auth: {
       getUser: vi.fn().mockResolvedValue({
         data: { user: userId ? fakeUser(userId) : null },
+        error: null,
+      }),
+    },
+    // biome-ignore lint/suspicious/noExplicitAny: test mock shape
+  } as any);
+};
+
+// A session for an admin row that is also a seeded e2e account. The account is
+// flagged by email or by the e2e_account app_metadata claim; either one caps
+// its admin powers (auth-middleware.ts).
+const authAsE2EAdmin = (userId: string, via: "email" | "claim") => {
+  mockCreateServerClient.mockReturnValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: {
+          user: {
+            ...fakeUser(userId),
+            email: via === "email" ? E2E_EMAILS[1] : `${userId}@testfake.local`,
+            app_metadata: via === "claim" ? { e2e_account: true } : {},
+          } as User,
+        },
         error: null,
       }),
     },
@@ -215,6 +237,28 @@ describe("Message box program feature", () => {
         author: { id: participant, displayName: "Pat Participant" },
       });
     });
+
+    it.each(["email", "claim"] as const)(
+      "treats the seeded e2e admin (flagged by %s) as a plain member: no admins-only messages, no hidden authors, no moderation",
+      async (via) => {
+        const hidden = await seedUser({ hidden: true, displayName: "Hidden" });
+        await seedMessage(participant, "visible");
+        await seedMessage(hidden, "from hidden");
+
+        authAsE2EAdmin(admin, via);
+        expect(await getBox()).toMatchObject({
+          visibility: "admins",
+          canRead: false,
+          canModerate: false,
+          messages: [],
+        });
+
+        await setVisibilityDirect("members");
+        const box = await getBox();
+        expect(box.canModerate).toBe(false);
+        expect(box.messages.map((m) => m.body)).toEqual(["visible"]);
+      },
+    );
 
     it("returns newest messages first", async () => {
       await setVisibilityDirect("members");

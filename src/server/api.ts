@@ -398,16 +398,19 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
   .get("/", async (c) => {
     const user = c.get("user");
     const programId = c.req.param("id") ?? "";
-    const [visibility, admin] = await Promise.all([getVisibility(programId), isAdmin(user.id)]);
+    // The seeded e2e admin is a real admin row whose password sits in CI
+    // secrets used by unreviewed branch code, so its admin powers are capped
+    // (E2E_ADMIN_READS in auth-middleware.ts). Treat it as a plain member here:
+    // no admins-only messages, no hidden or deactivated authors, no delete.
+    const [visibility, adminFlag] = await Promise.all([getVisibility(programId), isAdmin(user.id)]);
+    const admin = adminFlag && !isE2EAccount(user);
     const canRead = visibility === "members" || admin;
     const messages = canRead ? await listMessages(programId, admin) : [];
     return c.json({
       visibility,
       canRead,
       canPost: c.get("featureParticipant"),
-      // The e2e admin is capped to a few admin reads (E2E_ADMIN_READS), so it
-      // gets no moderation controls that would only 404.
-      canModerate: admin && !isE2EAccount(user),
+      canModerate: admin,
       messages,
     });
   })
