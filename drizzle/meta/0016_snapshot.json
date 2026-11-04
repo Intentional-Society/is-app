@@ -1,5 +1,5 @@
 {
-  "id": "d4035347-25d1-4ed3-b241-cd09f9cfdba3",
+  "id": "c010ccde-658b-479e-aaa9-30ef172c6fd4",
   "prevId": "96f29156-ad2c-45a6-b3a4-dfe339e39691",
   "version": "7",
   "dialect": "postgresql",
@@ -329,6 +329,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'admins'"
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
