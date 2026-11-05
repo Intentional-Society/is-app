@@ -67,7 +67,7 @@ function MessageBoxBody({ programId, data }: { programId: string; data: MessageB
         <p className="text-sm text-muted-foreground">Join this program to leave a message.</p>
       )}
       {data.canRead ? (
-        <MessageList programId={programId} messages={data.messages} canDelete={data.canDelete} />
+        <MessageList programId={programId} messages={data.messages} canDelete={data.canDelete} canEdit={data.canPost} />
       ) : (
         <p className="text-sm text-muted-foreground">Messages sent here are read by the program's admins.</p>
       )}
@@ -142,10 +142,13 @@ function MessageList({
   programId,
   messages,
   canDelete,
+  canEdit,
 }: {
   programId: string;
   messages: MessageBoxMessage[];
   canDelete: boolean;
+  // The viewer may edit their own messages (they are a participant).
+  canEdit: boolean;
 }) {
   if (messages.length === 0) {
     return <p className="text-sm text-muted-foreground">No messages yet.</p>;
@@ -153,7 +156,7 @@ function MessageList({
   return (
     <ul className="flex flex-col gap-3">
       {messages.map((m) => (
-        <MessageItem key={m.id} programId={programId} message={m} canDelete={canDelete} />
+        <MessageItem key={m.id} programId={programId} message={m} canDelete={canDelete} canEdit={canEdit && m.mine} />
       ))}
     </ul>
   );
@@ -163,13 +166,16 @@ function MessageItem({
   programId,
   message,
   canDelete,
+  canEdit,
 }: {
   programId: string;
   message: MessageBoxMessage;
   canDelete: boolean;
+  canEdit: boolean;
 }) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -199,46 +205,126 @@ function MessageItem({
         <span className="whitespace-nowrap text-xs text-muted-foreground">
           <LocalTime iso={message.createdAt} withTime />
         </span>
-        {canDelete &&
-          (confirming ? (
-            <span className="ml-auto flex items-center gap-2">
-              <Button
-                type="button"
-                variant="destructive"
-                size="xs"
-                disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate()}
-              >
-                {deleteMutation.isPending ? "Deleting…" : "Confirm delete"}
+        {!editing && (canEdit || canDelete) && (
+          <span className="ml-auto flex items-center gap-2">
+            {canEdit && !confirming && (
+              <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(true)}>
+                Edit
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                disabled={deleteMutation.isPending}
-                onClick={() => setConfirming(false)}
-              >
-                Cancel
-              </Button>
-            </span>
-          ) : (
-            <Button
-              type="button"
-              variant="destructive"
-              size="xs"
-              className="ml-auto"
-              onClick={() => setConfirming(true)}
-            >
-              Delete
-            </Button>
-          ))}
+            )}
+            {canDelete &&
+              (confirming ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="xs"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => deleteMutation.mutate()}
+                  >
+                    {deleteMutation.isPending ? "Deleting…" : "Confirm delete"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => setConfirming(false)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button type="button" variant="destructive" size="xs" onClick={() => setConfirming(true)}>
+                  Delete
+                </Button>
+              ))}
+          </span>
+        )}
       </div>
-      <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
+      {editing ? (
+        <EditForm programId={programId} message={message} onDone={() => setEditing(false)} />
+      ) : (
+        <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
+      )}
       {deleteMutation.isError && (
         <p role="alert" className="text-sm text-destructive">
           {deleteMutation.error.message}
         </p>
       )}
     </li>
+  );
+}
+
+// Inline editor for the author's own message. No "edited" marker is kept; the
+// message keeps its place in the list.
+function EditForm({
+  programId,
+  message,
+  onDone,
+}: {
+  programId: string;
+  message: MessageBoxMessage;
+  onDone: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [text, setText] = useState(message.body);
+  const trimmed = text.trim();
+
+  const saveMutation = useMutation({
+    mutationFn: async (body: string) => {
+      const res = await apiClient.api.programs[":id"]["message-box"].messages[":messageId"].$patch({
+        param: { id: programId, messageId: message.id },
+        json: { body },
+      });
+      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't save your changes."));
+      return res.json();
+    },
+    // Wait for the refetch so the list shows the new text before the editor closes.
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) });
+      onDone();
+    },
+  });
+
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (trimmed && !saveMutation.isPending) saveMutation.mutate(trimmed);
+      }}
+    >
+      <Textarea
+        aria-label="Edit your message"
+        value={text}
+        maxLength={MESSAGE_BOX_MAX_LENGTH}
+        rows={3}
+        autoFocus
+        disabled={saveMutation.isPending}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          type="submit"
+          variant="secondary"
+          size="xs"
+          disabled={!trimmed || trimmed === message.body || saveMutation.isPending}
+        >
+          {saveMutation.isPending ? "Saving…" : "Save"}
+        </Button>
+        <Button type="button" variant="ghost" size="xs" disabled={saveMutation.isPending} onClick={onDone}>
+          Cancel
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {text.length}/{MESSAGE_BOX_MAX_LENGTH}
+        </span>
+      </div>
+      {saveMutation.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {saveMutation.error.message}
+        </p>
+      )}
+    </form>
   );
 }

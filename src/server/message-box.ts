@@ -26,6 +26,8 @@ export type MessageBoxMessage = {
   id: string;
   body: string;
   createdAt: string;
+  // True when the viewer wrote it, so the client can offer Edit.
+  mine: boolean;
   author: {
     id: string;
     slug: string | null;
@@ -115,9 +117,12 @@ export const updateSettings = async (
 // Newest messages with their authors. Non-admin viewers don't see messages
 // from deactivated or hidden profiles (both are invisible to members
 // everywhere else); admins see everything, so moderation can reach it.
-export const listMessages = async (programId: string, viewerIsAdmin: boolean): Promise<MessageBoxMessage[]> => {
+export const listMessages = async (
+  programId: string,
+  viewer: { id: string; isAdmin: boolean },
+): Promise<MessageBoxMessage[]> => {
   const conditions: SQL[] = [eq(messageBoxMessages.programId, programId)];
-  if (!viewerIsAdmin) {
+  if (!viewer.isAdmin) {
     conditions.push(isNull(profiles.deactivatedAt), eq(profiles.hidden, false));
   }
 
@@ -142,6 +147,7 @@ export const listMessages = async (programId: string, viewerIsAdmin: boolean): P
     id: r.id,
     body: r.body,
     createdAt: r.createdAt.toISOString(),
+    mine: r.authorId === viewer.id,
     author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
   }));
 };
@@ -167,4 +173,29 @@ export const deleteMessage = async (
     .where(and(eq(messageBoxMessages.id, messageId), eq(messageBoxMessages.programId, programId)))
     .returning({ id: messageBoxMessages.id });
   return deleted.length > 0 ? { ok: true } : { error: "not_found" };
+};
+
+// Authors can rewrite their own message. Scoped to program and author, so a
+// message that is someone else's, or from another program, answers not_found
+// (nothing is revealed about whether it exists). createdAt stays, so an edit
+// doesn't reorder the box; there is no "edited" marker.
+export const updateMessage = async (input: {
+  programId: string;
+  messageId: string;
+  authorId: string;
+  body: string;
+}): Promise<{ ok: true } | { error: "not_found" }> => {
+  if (!isUuid(input.programId) || !isUuid(input.messageId)) return { error: "not_found" };
+  const updated = await db
+    .update(messageBoxMessages)
+    .set({ body: input.body })
+    .where(
+      and(
+        eq(messageBoxMessages.id, input.messageId),
+        eq(messageBoxMessages.programId, input.programId),
+        eq(messageBoxMessages.authorId, input.authorId),
+      ),
+    )
+    .returning({ id: messageBoxMessages.id });
+  return updated.length > 0 ? { ok: true } : { error: "not_found" };
 };

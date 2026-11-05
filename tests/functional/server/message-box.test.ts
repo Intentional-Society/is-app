@@ -95,7 +95,7 @@ type Box = {
   canRead: boolean;
   canPost: boolean;
   canDelete: boolean;
-  messages: Array<{ id: string; body: string; author: { id: string; displayName: string | null } }>;
+  messages: Array<{ id: string; body: string; mine: boolean; author: { id: string; displayName: string | null } }>;
 };
 
 describe("Message box program feature", () => {
@@ -324,6 +324,88 @@ describe("Message box program feature", () => {
     it("accepts a message at exactly the length limit", async () => {
       authAs(participant);
       expect((await postMessage({ body: "x".repeat(MESSAGE_BOX_MAX_LENGTH) })).status).toBe(201);
+    });
+  });
+
+  describe("PATCH /api/programs/:id/message-box/messages/:messageId (edit your own)", () => {
+    const edit = (messageId: string, body: unknown, id = programId) =>
+      app.request(`${boxUrl(id)}/messages/${messageId}`, jsonInit("PATCH", body));
+    const bodyOf = async (messageId: string) =>
+      (await db.select().from(messageBoxMessages).where(eq(messageBoxMessages.id, messageId)))[0];
+
+    it("lets the author rewrite their message, trimmed, keeping its timestamp and place", async () => {
+      const messageId = await seedMessage(participant, "first draft");
+      const before = await bodyOf(messageId);
+      authAs(participant);
+      expect((await edit(messageId, { body: "  better draft  " })).status).toBe(200);
+      const after = await bodyOf(messageId);
+      expect(after.body).toBe("better draft");
+      expect(after.createdAt).toEqual(before.createdAt);
+      expect(after.authorId).toBe(participant);
+    });
+
+    it("404s editing someone else's message, and leaves it unchanged", async () => {
+      const other = await seedUser({ displayName: "Other" });
+      await db.insert(profilePrograms).values({ profileId: other, programId });
+      const messageId = await seedMessage(other, "theirs");
+      authAs(participant);
+      expect((await edit(messageId, { body: "hijack" })).status).toBe(404);
+      expect((await bodyOf(messageId)).body).toBe("theirs");
+    });
+
+    it("gives admins no right to edit another member's message", async () => {
+      await db.insert(profilePrograms).values({ profileId: admin, programId });
+      const messageId = await seedMessage(participant, "mine");
+      authAs(admin);
+      expect((await edit(messageId, { body: "admin edit" })).status).toBe(404);
+      expect((await bodyOf(messageId)).body).toBe("mine");
+    });
+
+    it("403s an author who is no longer a participant", async () => {
+      const messageId = await seedMessage(participant, "old");
+      await db.update(profilePrograms).set({ leftAt: new Date() }).where(eq(profilePrograms.profileId, participant));
+      authAs(participant);
+      expect((await edit(messageId, { body: "new" })).status).toBe(403);
+      expect((await bodyOf(messageId)).body).toBe("old");
+    });
+
+    it("only edits through the message's own program", async () => {
+      const other = await seedProgram();
+      await db.insert(profilePrograms).values({ profileId: participant, programId: other });
+      const messageId = await seedMessage(participant, "here");
+      authAs(participant);
+      expect((await edit(messageId, { body: "there" }, other)).status).toBe(404);
+      expect((await bodyOf(messageId)).body).toBe("here");
+    });
+
+    it.each([
+      ["a blank message", { body: "  " }],
+      ["a non-string body", { body: 3 }],
+      ["an over-long message", { body: "x".repeat(MESSAGE_BOX_MAX_LENGTH + 1) }],
+    ])("rejects %s with 400", async (_label, payload) => {
+      const messageId = await seedMessage(participant, "keep");
+      authAs(participant);
+      expect((await edit(messageId, payload)).status).toBe(400);
+      expect((await bodyOf(messageId)).body).toBe("keep");
+    });
+
+    it("404s a missing or malformed message id, and requires sign-in and the feature", async () => {
+      authAs(participant);
+      expect((await edit(randomUUID(), { body: "x" })).status).toBe(404);
+      expect((await edit("not-a-uuid", { body: "x" })).status).toBe(404);
+      const unattached = await seedProgram({ attached: false });
+      expect((await edit(randomUUID(), { body: "x" }, unattached)).status).toBe(404);
+      authAs(null);
+      expect((await edit(randomUUID(), { body: "x" })).status).toBe(401);
+    });
+
+    it("marks only the viewer's own messages as mine", async () => {
+      await setVisibilityDirect("members");
+      await seedMessage(participant, "mine");
+      await seedMessage(admin, "not mine");
+      authAs(participant);
+      const box = await getBox();
+      expect(Object.fromEntries(box.messages.map((m) => [m.body, m.mine]))).toEqual({ mine: true, "not mine": false });
     });
   });
 

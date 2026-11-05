@@ -7,7 +7,11 @@ vi.mock("@/lib/api", () => ({
     api: {
       programs: {
         ":id": {
-          "message-box": { $get: vi.fn(), $post: vi.fn() },
+          "message-box": {
+            $get: vi.fn(),
+            $post: vi.fn(),
+            messages: { ":messageId": { $patch: vi.fn() } },
+          },
         },
       },
       admin: {
@@ -29,6 +33,7 @@ import type { MessageBoxResponse } from "@/lib/api-types";
 
 const $get = vi.mocked(apiClient.api.programs[":id"]["message-box"].$get);
 const $post = vi.mocked(apiClient.api.programs[":id"]["message-box"].$post);
+const $patch = vi.mocked(apiClient.api.programs[":id"]["message-box"].messages[":messageId"].$patch);
 const $delete = vi.mocked(apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete);
 
 const box = (overrides: Partial<MessageBoxResponse> = {}): MessageBoxResponse => ({
@@ -42,6 +47,7 @@ const box = (overrides: Partial<MessageBoxResponse> = {}): MessageBoxResponse =>
       id: "m1",
       body: "Sending love from afar",
       createdAt: "2026-11-01T18:00:00.000Z",
+      mine: false,
       author: { id: "u1", slug: "ada", displayName: "Ada Lovelace", avatarUrl: null },
     },
   ],
@@ -159,6 +165,77 @@ describe("MessageBox", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
     expect($delete).not.toHaveBeenCalled();
+  });
+
+  describe("editing your own message", () => {
+    const mine = (overrides: Partial<MessageBoxResponse["messages"][number]> = {}) => ({
+      ...box().messages[0],
+      id: "m-mine",
+      body: "My first draft",
+      mine: true,
+      ...overrides,
+    });
+
+    it("offers Edit only on the viewer's own messages", async () => {
+      mockBox(box({ messages: [mine(), box().messages[0]] }));
+      renderBox();
+      await screen.findByText("My first draft");
+      expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
+    });
+
+    it("offers no Edit to someone who can't post, even on their own message", async () => {
+      mockBox(box({ canPost: false, messages: [mine()] }));
+      renderBox();
+      await screen.findByText("My first draft");
+      expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    });
+
+    it("saves the trimmed text and closes the editor", async () => {
+      mockBox(box({ messages: [mine()] }));
+      $patch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+
+      const textarea = screen.getByLabelText("Edit your message");
+      expect(textarea).toHaveValue("My first draft");
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+      fireEvent.change(textarea, { target: { value: "  My better draft  " } });
+      mockBox(box({ messages: [mine({ body: "My better draft" })] }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() =>
+        expect($patch).toHaveBeenCalledWith({
+          param: { id: "p1", messageId: "m-mine" },
+          json: { body: "My better draft" },
+        }),
+      );
+      expect(await screen.findByText("My better draft")).toBeVisible();
+      expect(screen.queryByLabelText("Edit your message")).not.toBeInTheDocument();
+    });
+
+    it("leaves the message alone on Cancel", async () => {
+      mockBox(box({ messages: [mine()] }));
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+      fireEvent.change(screen.getByLabelText("Edit your message"), { target: { value: "changed my mind" } });
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByText("My first draft")).toBeVisible();
+      expect($patch).not.toHaveBeenCalled();
+    });
+
+    it("keeps the editor open and shows the error when saving fails", async () => {
+      mockBox(box({ messages: [mine()] }));
+      $patch.mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: "not_participant" }) } as never);
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+      fireEvent.change(screen.getByLabelText("Edit your message"), { target: { value: "new text" } });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Only participants of this program can leave a message.",
+      );
+      expect(screen.getByLabelText("Edit your message")).toHaveValue("new text");
+    });
   });
 
   it("surfaces a load error", async () => {

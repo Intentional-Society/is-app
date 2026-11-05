@@ -44,6 +44,7 @@ import {
   listMessages,
   parseMessageBody,
   parseSettingsUpdate,
+  updateMessage,
   updateSettings,
 } from "./message-box";
 import {
@@ -406,7 +407,7 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
     const { visibility, prompt } = settings;
     const admin = adminFlag && !isE2EAccount(user);
     const canRead = visibility === "members" || admin;
-    const messages = canRead ? await listMessages(programId, admin) : [];
+    const messages = canRead ? await listMessages(programId, { id: user.id, isAdmin: admin }) : [];
     return c.json({
       visibility,
       prompt,
@@ -431,6 +432,27 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
         body: c.req.valid("json").body,
       });
       return c.json({ id: result.id }, 201);
+    },
+  )
+  // Authors edit their own messages. Same participant rule as posting; a
+  // message that isn't theirs answers 404 whoever asks, admins included.
+  .patch(
+    "/messages/:messageId",
+    validator("json", (body, c) => {
+      const parsed = parseMessageBody(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      if (!c.get("featureParticipant")) return c.json({ error: "not_participant" }, 403);
+      const result = await updateMessage({
+        programId: c.req.param("id") ?? "",
+        messageId: c.req.param("messageId"),
+        authorId: c.get("user").id,
+        body: c.req.valid("json").body,
+      });
+      if ("error" in result) return c.json({ error: result.error }, 404);
+      return c.json({ ok: true });
     },
   );
 
