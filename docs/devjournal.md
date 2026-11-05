@@ -16,6 +16,12 @@ See `docs/doc-biome.md`.
 
 ---
 
+## 2026-11-03 | Benji (with Kiro) | Message box: the first program feature
+
+Built the program-features infrastructure from `docs/design-programs.md` with the message box as its first feature (#12; details in `docs/feature-message-box.md`). Posting is for participants; reading is a per-program admin setting; admins can delete; each program has an optional markdown prompt. `/programs/[slug]` is now server-rendered with prefetch-and-hydrate. Not built: Miro replication, and a "Program Contact" role.
+
+---
+
 ## 2026-11-01 | James (with Opus 5.5) | Server-side Sentry now reports from production
 
 `instrumentation.ts` moved to `src/`. At the repo root, Next compiled it but left it out of the deployed function, so the server SDK had never started in production and every server-side capture was dropped. Server entry points also call `flushSentry()` so queued events survive the Vercel freeze, and `api.onError` reports thrown API errors.

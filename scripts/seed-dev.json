@@ -639,6 +639,7 @@
       "description": "(LOCAL DEV) This is a subscription to the weekly internal newsletter containing event links and announcements across the IS Web."
     }
   ],
+  "programFeatures": [{ "programId": "00000000-0000-0000-0000-0000000000a3", "featureKey": "message-box" }],
   "profilePrograms": [
     { "profileId": "00000000-0000-0000-0000-000000000001", "programId": "00000000-0000-0000-0000-0000000000a1" },
     { "profileId": "00000000-0000-0000-0000-000000000002", "programId": "00000000-0000-0000-0000-0000000000a1" },

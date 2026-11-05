@@ -1,6 +1,6 @@
 # Design — Programs
 
-Status: the model and lifecycle sections describe programs as built (#139, #166, #226, #280). Program features: designed 2026-10-30, not yet built. Author: James and Claude.
+Status: the model and lifecycle sections describe programs as built (#139, #166, #226, #280). Program features: designed 2026-10-30; built with the first feature, the message box (#12). Authors: James and Claude; message box by Benji.
 
 ## Vocabulary
 
@@ -39,7 +39,7 @@ Soft-deleted membership. A row means "was ever joined"; `leftAt IS NULL` means c
 
 A program feature has two halves:
 
-- **Definition (code)** — a registry entry per feature key: the key, a display name, and an optional home card (title, description, href). The feature's own code (program-page section, pages, API routes, tables) lives with the feature and is looked up by key.
+- **Definition (code)** — a registry entry per feature key: the key, a display name, and an optional home card (title, description, href). The feature's own code (program-page section, pages, API routes, tables) lives with the feature and is looked up by key. The registry is `src/lib/program-features.ts`, shared by server and client.
 - **Attachment (data)** — which programs have which features:
 
 ```ts
@@ -60,13 +60,15 @@ A row means attached. Detaching deletes the row and leaves the feature's data in
 
 Attachments live in the database because a feature can attach to several programs, and code has no stable per-environment handle on a program: prod IDs are random UUIDs and slugs are editable.
 
-Admins attach and detach features on `/admin/programs/[id]`, which lists every registry feature with a toggle, backed by `PUT` and `DELETE /api/admin/programs/:id/features/:key`. The admin UI ships with the first feature. `scripts/seed-dev.json` attaches features to seed programs locally.
+Admins attach and detach features on `/admin/programs/[id]`, which lists every registry feature with a toggle, backed by `PUT` and `DELETE /api/admin/programs/:id/features/:key`. `GET /api/admin/programs/:id/features` feeds that list. `scripts/seed-dev.json` attaches features to seed programs locally (the `programFeatures` key).
 
 ### Access rule
 
 A feature is available to active participants of the active (unarchived) programs it is attached to. Admins get no bypass.
 
-One server helper in `src/server/program-features.ts` owns this rule. The home page, the program page, and every feature API route call it, so the UI and the API can't disagree.
+The helper (`getFeatureAccess`) answers `not_found` (unknown key, missing or archived program, or not attached) or `{ participant }`. What a non-participant may do is the feature's call. Most features are participant-only; the message box lets any signed-in member read when its visibility setting allows (see `docs/feature-message-box.md`).
+
+One server helper in `src/server/program-features.ts` owns this rule. The program page and every feature API route go through it, so the UI and the API can't disagree. Feature routes get it as the `requireProgramFeature(key)` middleware, which sets `featureParticipant` on the Hono context. The home page doesn't call it yet; no feature has a home card.
 
 - **API** — feature routes live under `/api/programs/:id/<feature-key>/…` behind a shared middleware that applies the rule for that key and `:id`. A feature that isn't attached, or an archived program, returns `404 not_found` (matching the existing archived handling); an attached feature with a non-participant caller returns `403 not_participant`.
 - **Pages** — a feature page's existence is public. A non-participant who opens one sees that it is for participants, with a link to the program page.
@@ -88,9 +90,9 @@ The program page server-renders feature sections with the prefetch-and-hydrate p
 - `page.tsx` fetches the program server-side, including the features the caller can use.
 - Each feature renders as an async Server Component inside its own `<Suspense>`. It prefetches its initial data into a `QueryClient` and wraps its client components in `HydrationBoundary`, so their `useQuery` calls mount on a warm cache.
 - Sections fetch in parallel on the server and stream into the document response. A slow section delays only itself.
-- `ProgramSlugDetail` hydrates the same way. The page is client-rendered today; it moves to server rendering with the first feature.
+- `ProgramSlugDetail` hydrates the same way. `page.tsx` seeds the program query (`setQueryData`) and passes the feature sections as `children`, which render between the join controls and the member list. Hydrated queries set a `staleTime`, because the app-wide default of 0 would refetch on mount and discard the server data.
 
-The home page gets the caller's features from `GET /me`, which runs the feature query in parallel with the profile read.
+The program page reads the program's attached feature keys from `GET /programs/by-slug/:slug` (`features`), fetched in parallel with the roster. A home-page "Your programs" section, fed from `GET /me`, comes with the first feature that has a home card.
 
 ### Performance
 
@@ -98,6 +100,10 @@ The home page gets the caller's features from `GET /me`, which runs the feature 
 - The access query is an indexed join over small tables; its cost is the round trip to the pooler.
 - Every `serverApiClient` call runs `requireAuth`, which calls `supabase.auth.getUser()` — a network round trip to Supabase Auth. Feature lookups therefore ride on calls a page already makes (`/me`, `programs/by-slug`), and feature API routes fold the access check into, or run it alongside, their own query. A program page with N sections makes N Auth calls in parallel, which is fine at current scale.
 
+## Message box
+
+The first program feature (`message-box`, issue #12). Its tables, rules, routes and UI are in `docs/feature-message-box.md`.
+
 ## Open questions
 
-- **Feature data on program delete.** `deleteProgram` is allowed with no current participants. A cascading FK deletes a feature's data with the program; a restricting FK makes the delete fail with an FK error `deleteProgram` doesn't map yet. Decide with the first feature table.
+None open. Decided with the first feature table: **feature data on program delete** cascades. `message_box_*` rows are removed with their program (`ON DELETE CASCADE`), so `deleteProgram` needs no FK error mapping. A member's messages are likewise removed with their profile.

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import { invites, profilePrograms, profiles, programs, relations } from "../src/server/schema.js";
+import { invites, profilePrograms, profiles, programFeatures, programs, relations } from "../src/server/schema.js";
 
 // Load .env.local so this script works standalone via `npx tsx`.
 config({ path: resolve(process.cwd(), ".env.local") });
@@ -47,6 +47,7 @@ type SeedProgram = {
   description: string;
 };
 type SeedProfilePrograms = { profileId: string; programId: string };
+type SeedProgramFeature = { programId: string; featureKey: string };
 type SeedInvite = {
   id: string;
   code: string;
@@ -60,6 +61,7 @@ type SeedInvite = {
 type SeedData = {
   profiles: SeedProfile[];
   programs: SeedProgram[];
+  programFeatures: SeedProgramFeature[];
   profilePrograms: SeedProfilePrograms[];
   invites: SeedInvite[];
 };
@@ -172,6 +174,29 @@ async function seedPrograms(): Promise<SeedResult> {
   }));
   const result = await db.insert(programs).values(values).onConflictDoNothing().returning({ id: programs.id });
   return { inserted: result.length, skipped: values.length - result.length };
+}
+
+// Attaches program features (docs/design-programs.md). Program ids are
+// resolved by slug for the same reason as seedProfilePrograms below.
+async function seedProgramFeatures(): Promise<SeedResult> {
+  const slugByJsonId = new Map(seedData.programs.map((p) => [p.id, p.slug]));
+  const dbPrograms = await db.select({ id: programs.id, slug: programs.slug }).from(programs);
+  const idBySlug = new Map(dbPrograms.map((p) => [p.slug, p.id]));
+  const values = seedData.programFeatures
+    .map((pf) => {
+      const slug = slugByJsonId.get(pf.programId);
+      const programId = slug ? idBySlug.get(slug) : undefined;
+      return programId ? { programId, featureKey: pf.featureKey } : null;
+    })
+    .filter((v): v is { programId: string; featureKey: string } => v !== null);
+  // A long-lived local DB can predate a seed program's slug; nothing to attach then.
+  if (values.length === 0) return { inserted: 0, skipped: seedData.programFeatures.length };
+  const result = await db
+    .insert(programFeatures)
+    .values(values)
+    .onConflictDoNothing()
+    .returning({ programId: programFeatures.programId });
+  return { inserted: result.length, skipped: seedData.programFeatures.length - result.length };
 }
 
 async function seedProfilePrograms(): Promise<SeedResult> {
@@ -307,6 +332,9 @@ async function main() {
 
   const programResult = await seedPrograms();
   logResult("programs:", programResult);
+
+  const featureResult = await seedProgramFeatures();
+  logResult("program_features:", featureResult);
 
   const membershipResult = await seedProfilePrograms();
   logResult("profile_programs:", membershipResult);

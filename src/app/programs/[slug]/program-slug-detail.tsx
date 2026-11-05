@@ -3,15 +3,16 @@
 import type { UrlObject } from "node:url";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { LocalTime } from "@/components/local-time";
 import { Markdown, MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { ProgramDetail } from "@/lib/api-types";
-import { formatDate } from "@/lib/format-date";
 
-const programQueryKey = (slug: string) => ["programs", "by-slug", slug] as const;
+import { HYDRATED_STALE_TIME, messageBoxQueryKey, programQueryKey } from "./query-keys";
 
 const fetchProgram = async (slug: string): Promise<ProgramDetail> => {
   const res = await apiClient.api.programs["by-slug"][":slug"].$get({ param: { slug } });
@@ -22,11 +23,17 @@ const fetchProgram = async (slug: string): Promise<ProgramDetail> => {
   return body.program;
 };
 
-export function ProgramSlugDetail({ slug }: { slug: string }) {
+// `children` are the program-feature sections the server page renders (each an
+// async Server Component in its own <Suspense>). They show between the join
+// controls and the member list, once the program has loaded.
+export function ProgramSlugDetail({ slug, children }: { slug: string; children?: ReactNode }) {
   const query = useQuery({
     queryKey: programQueryKey(slug),
     queryFn: () => fetchProgram(slug),
     retry: false,
+    // The server page seeds this key; without a staleTime the app-wide default
+    // of 0 would refetch on mount and throw the seed away.
+    staleTime: HYDRATED_STALE_TIME,
   });
 
   if (query.isPending) {
@@ -41,12 +48,16 @@ export function ProgramSlugDetail({ slug }: { slug: string }) {
     );
   }
 
-  return <ProgramBody program={query.data} />;
+  return <ProgramBody program={query.data}>{children}</ProgramBody>;
 }
 
-function ProgramBody({ program }: { program: ProgramDetail }) {
+function ProgramBody({ program, children }: { program: ProgramDetail; children?: ReactNode }) {
   const queryClient = useQueryClient();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) });
+  // Joining or leaving changes whether the viewer can post to a feature's box.
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) });
+    queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(program.id) });
+  };
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -92,7 +103,12 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
         )}
         <p className="text-xs text-muted-foreground">
           {program.memberCount} {program.memberCount === 1 ? "member" : "members"}
-          {program.joined && program.joinedAt && <> · Joined {formatDate(program.joinedAt)}</>}
+          {program.joined && program.joinedAt && (
+            <>
+              {" "}
+              · Joined <LocalTime iso={program.joinedAt} />
+            </>
+          )}
         </p>
       </header>
 
@@ -118,6 +134,8 @@ function ProgramBody({ program }: { program: ProgramDetail }) {
           {actionError}
         </p>
       )}
+
+      {children}
 
       <section className="flex flex-col gap-3">
         <h3 className="text-base font-semibold uppercase tracking-wide text-muted-foreground">
