@@ -1,7 +1,7 @@
 # Routing session-runner (Phase 8)
 
 Automates the **nine `kind: routing` evals** — the ones a sandboxed subagent can't test,
-because routing is *whether/how the skill fires in a live session*, not what it does once
+because routing is _whether/how the skill fires in a live session_, not what it does once
 invoked. This runner drives a fresh headless `claude -p` session that **discovers** the
 three team skills naturally and measures the routing outcome as a **trigger rate** over N
 repetitions.
@@ -13,7 +13,7 @@ repetitions.
 ## The idea
 
 Routing can't be tested by handing a subagent the skill path — the skill has to be
-*found*. So each run:
+_found_. So each run:
 
 1. builds a disposable sandbox (`make-sandbox`) and **copies the routing context in** —
    the three `SKILL.md` files, the real `CLAUDE.md` "AI Skills" section (verbatim), and

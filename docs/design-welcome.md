@@ -56,12 +56,12 @@ standalone `/programs` page).
 Progress is tracked by four nullable timestamp columns on `profiles`, following
 a consistent `last_<verb>_<noun>` naming pattern:
 
-| Column                  | Set when                                   | Status   |
-| ----------------------- | ------------------------------------------ | -------- |
-| `last_signed_agreements`| user clicks "I agree"                      | **new**  |
-| `last_updated_profile`  | profile form saves (`PUT /me`)             | existing |
-| `last_reviewed_programs`| user clicks "Done" on the programs step    | **new**  |
-| `last_updated_web`      | user clicks "Done" on `/myweb`             | existing |
+| Column                   | Set when                                | Status   |
+| ------------------------ | --------------------------------------- | -------- |
+| `last_signed_agreements` | user clicks "I agree"                   | **new**  |
+| `last_updated_profile`   | profile form saves (`PUT /me`)          | existing |
+| `last_reviewed_programs` | user clicks "Done" on the programs step | **new**  |
+| `last_updated_web`       | user clicks "Done" on `/myweb`          | existing |
 
 The two new columns are an additive (expand-only) migration — new nullable
 columns, no contract phase needed.

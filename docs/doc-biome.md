@@ -11,8 +11,8 @@ JSON itself can't carry.
 validation tracks whatever version is installed — bumping `@biomejs/biome`
 (e.g. via Dependabot) needs no edit to `biome.json`. This is deliberate: a
 pinned `schemas/<version>/schema.json` URL silently drifts whenever the package
-bumps but the URL doesn't, which CI flags as *"configuration schema version
-does not match"*.
+bumps but the URL doesn't, which CI flags as _"configuration schema version
+does not match"_.
 
 After a bump, run `npm run lint` once to surface any renamed or newly
 recommended rules.
@@ -30,13 +30,22 @@ recommended rules.
   components we don't hand-edit.
 - **`noNonNullAssertion`** — an error in app code, relaxed to off under `tests/`
   and `scripts/`.
-- **Markdown formatter off** — Biome 2.6 added Markdown formatting, and a trial
-  pass on 2.6.3 changed how 8 docs render on GitHub: whitespace before `**bold**`
-  was dropped in some files containing GFM tables, nested and tight lists were
-  restructured, and fenced TS snippets were reformatted into different code.
-  Markdown linting stays on. To re-check after a Biome bump, run
-  `biome format --write .` with the override removed, then compare the rendered
-  output before and after.
+- **Markdown formatter on, code blocks left as written** — on since 2.6.4 (on
+  2.6.3 it changed how 8 docs rendered). `formatEmbeds: false` stops it
+  reformatting the code inside fenced blocks, which it otherwise rewrites (e.g.
+  collapsing a multi-line JSX snippet and appending `;`). The enabling pass left
+  55 of 59 changed files rendering identically under micromark + GFM; the rest
+  gained a final newline or turned a list loose (it puts blank lines around a
+  fenced block inside a list item, as Prettier does).
+  A literal `|` inside a code span in a table cell must be escaped as `\|`:
+  GFM splits the cell there, and the formatter pads the extra column. CI skips
+  `biome ci` on docs-only PRs, so the lefthook pre-commit hook (which formats
+  staged `*.md`) is the only check those get; a doc that lands unformatted
+  fails the next code PR's lint. An override turns Markdown formatting off for
+  `docs/old-archive/spec-skill-evals-baseline.md`: 2.6.4 re-indents a blank `>`
+  line after a list item inside a blockquote on every pass, until the next
+  paragraph leaves the quote (biomejs/biome#12703, fixed after 2.6.4). Drop the
+  override when the Biome bump that includes the fix lands.
 - **Excluded paths** — the `files.includes` negations skip generated or vendored
   trees Biome shouldn't touch: `.next`, `next-env.d.ts`, Supabase email
   templates, `docs/_temp-*`, `drizzle/meta`, the functional-test

@@ -34,6 +34,7 @@ The `invites` table itself already exists from Phase 1 — only the endpoints, U
 The invite code has to survive the magic-link round-trip. Flow:
 
 1. `/signup`: user enters code → `GET /api/invites/:code/check` validates → user sees the note (context of who/why) → enters email + display name → client calls:
+
    ```ts
    supabase.auth.signInWithOtp({
      email,
@@ -43,10 +44,12 @@ The invite code has to survive the magic-link round-trip. Flow:
      },
    });
    ```
+
    The Supabase redirect allowlist uses a trailing-`*` wildcard on `/auth/callback*` so the invite query param is permitted — without that, Supabase would silently redirect to `site_url` and strand the visitor at `/login`.
 2. User clicks the magic link → lands on `/auth/callback?code=<pkce>&invite=<code>`.
 3. Callback exchanges PKCE → gets user → inside `db.transaction`:
    - Atomic redemption:
+
      ```sql
      UPDATE invites
      SET redeemed_by = $userId, redeemed_at = now()

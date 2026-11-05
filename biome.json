@@ -44,7 +44,7 @@
   },
   "markdown": {
     "formatter": {
-      "enabled": false
+      "formatEmbeds": false
     }
   },
   "linter": {
@@ -134,6 +134,14 @@
           "suspicious": {
             "noConsole": "off"
           }
+        }
+      }
+    },
+    {
+      "includes": ["docs/old-archive/spec-skill-evals-baseline.md"],
+      "markdown": {
+        "formatter": {
+          "enabled": false
         }
       }
     }

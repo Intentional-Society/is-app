@@ -43,22 +43,22 @@ Two problems with the free-text field, from #136:
 
 ### Storage backend
 
-| Option | Verdict |
-|---|---|
-| **Supabase Storage** | **Chosen.** Already in our stack — `[storage]` is enabled in `config.toml`, runs in the local Docker stack, S3-backed with a CDN on the hosted side. No new vendor, no new bill. |
-| S3 + CloudFront | Rejected — a second vendor, IAM, and a CDN to wire up for no gain over what Supabase already gives us. |
-| Bytes in a Postgres column | Rejected — bloats the DB and its backups, no CDN, defeats `next/image`. An anti-pattern for binary blobs. |
+| Option                     | Verdict                                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Supabase Storage**       | **Chosen.** Already in our stack — `[storage]` is enabled in `config.toml`, runs in the local Docker stack, S3-backed with a CDN on the hosted side. No new vendor, no new bill. |
+| S3 + CloudFront            | Rejected — a second vendor, IAM, and a CDN to wire up for no gain over what Supabase already gives us.                                                                           |
+| Bytes in a Postgres column | Rejected — bloats the DB and its backups, no CDN, defeats `next/image`. An anti-pattern for binary blobs.                                                                        |
 
 ### Cropping UI library
 
-| Library | Notes |
-|---|---|
-| **`react-easy-crop`** | **Chosen.** ~1.9M weekly downloads, actively maintained. Built-in pinch-zoom and drag, supports a circular crop overlay, and hands back crop geometry we feed to a `<canvas>`. Best mobile UX of the field, small. |
-| `react-image-crop` | Lighter and dependency-free, but no zoom — a worse fit for "position your face in the circle". |
-| `react-cropper` (Cropper.js) | Heaviest; more than we need. |
-| Pintura | Commercial licence. Overkill. |
+| Library                      | Notes                                                                                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`react-easy-crop`**        | **Chosen.** ~1.9M weekly downloads, actively maintained. Built-in pinch-zoom and drag, supports a circular crop overlay, and hands back crop geometry we feed to a `<canvas>`. Best mobile UX of the field, small. |
+| `react-image-crop`           | Lighter and dependency-free, but no zoom — a worse fit for "position your face in the circle".                                                                                                                     |
+| `react-cropper` (Cropper.js) | Heaviest; more than we need.                                                                                                                                                                                       |
+| Pintura                      | Commercial licence. Overkill.                                                                                                                                                                                      |
 
-`react-easy-crop` gives us a crop *rectangle*; the actual pixel
+`react-easy-crop` gives us a crop _rectangle_; the actual pixel
 extraction is our own ~30-line `<canvas>` helper. The library does not
 upload, resize, or encode — that is deliberate and fine.
 
@@ -82,7 +82,7 @@ Object paths stay `<userId>/<random-uuid>.webp`.
 
 Rationale — this is a deliberately private membership network, so the
 privacy bar sits above a consumer product's. A signed URL is fetchable
-without a login *while valid* (the same model Facebook, Instagram, and
+without a login _while valid_ (the same model Facebook, Instagram, and
 Discord settled on for image CDNs — none auth-check every image GET),
 but it **expires**: a URL that leaks via a `Referer` header, browser
 history, or a pasted link stops working. A public bucket can't offer
@@ -142,7 +142,7 @@ Rationale — this matches the app's existing architecture:
   this way: the server connects as a privileged role and RLS is only a
   backstop. Storage should mirror that.
 - Browser-direct upload would require our **first** Storage RLS
-  policies and the first browser→Supabase *data* path (today the
+  policies and the first browser→Supabase _data_ path (today the
   browser only talks to Supabase for auth). Routing through Hono keeps
   that surface closed.
 - The server can validate type, size, and decoded dimensions before
@@ -279,9 +279,9 @@ avatar a new path, so a replace shows immediately.
      safe on the transaction pooler (no `db.transaction`).
    - Delete the member's previous object, if any.
    - Return the new signed `avatarUrl`.
-   The write order matters: the object exists before the row points at
-   it, and the old object is removed last — so any mid-failure leaves a
-   harmless orphan object, never a row referencing a missing file.
+     The write order matters: the object exists before the row points at
+     it, and the old object is removed last — so any mid-failure leaves a
+     harmless orphan object, never a row referencing a missing file.
 5. **Delete endpoint** — `DELETE /api/me/avatar`: null out
    `avatar_path` (and legacy `avatar_url`), remove the object.
 6. Remove `avatarUrl` from `EDITABLE_PROFILE_FIELDS` in
@@ -308,6 +308,7 @@ avatar a new path, so a replace shows immediately.
     (mirror the existing `isProd` CSP branching).
 11. **`supabase/config.toml`** — declare the bucket so the local stack
     and `dev:db:reset` provision it:
+
     ```toml
     [storage.buckets.avatars]
     public = false
@@ -352,7 +353,7 @@ avatar a new path, so a replace shows immediately.
   avatar's `alt` follows the existing `Avatar` convention (empty when a
   visible name sits beside it).
 - **Seed data** — give the seeded e2e users an avatar so the upload
-  *and* the already-set state both have e2e coverage.
+  _and_ the already-set state both have e2e coverage.
 
 ## Testing
 

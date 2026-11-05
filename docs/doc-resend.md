@@ -42,8 +42,8 @@ Buttondown handles newsletters and program announcements, sending from `@intenti
 
 The split going forward:
 
-- **Announcement-shaped** (cohort kicks off, monthly digest) → Buttondown, from apex. Triggered by *us* deciding to tell a group something.
-- **Event-shaped** (magic link, password reset, invite accepted) → Resend, from `mail.intentionalsociety.org`. Triggered by *one user doing one thing*.
+- **Announcement-shaped** (cohort kicks off, monthly digest) → Buttondown, from apex. Triggered by _us_ deciding to tell a group something.
+- **Event-shaped** (magic link, password reset, invite accepted) → Resend, from `mail.intentionalsociety.org`. Triggered by _one user doing one thing_.
 
 Buttondown is not a candidate for the Supabase auth slot — it's a newsletter platform, not a transactional SMTP backend.
 

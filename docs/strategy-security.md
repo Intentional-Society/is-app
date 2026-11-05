@@ -163,7 +163,7 @@ Three GitHub features and one workflow act on dependency advisories, configured 
 
 **Dependabot version updates** are configured in `.github/dependabot.yml`: weekly, with patch and minor bumps batched into one `minor-and-patch` group PR. For npm they bump only direct dependencies (Dependabot doesn't support `dependency-type: indirect` for npm), so a transitive fix lands only when a direct bump re-resolves it. The weekly `npm audit fix` PR clears the rest.
 
-**The weekly `npm audit fix` PR** (`.github/workflows/npm-audit-fix.yml`) runs plain `npm audit fix --package-lock-only --ignore-scripts` on Tuesdays, after Dependabot's Monday run, and keeps one lockfile-only PR open on `chore/npm-audit-fix`. npm resolves through `.npmrc`, so the quarantine above still applies. Review the PR's version table for downgrades: npm can move a deduped package down within its range.
+**The weekly `npm audit fix` PR** (`.github/workflows/npm-audit-fix.yml`) runs plain `npm audit fix --package-lock-only --ignore-scripts` on Tuesdays, after Dependabot's Monday run, and keeps one lockfile-only PR open on `chore/npm-audit-fix`. The PR opens only when the run clears at least one advisory, and lists the ones it clears: `npm audit fix` also bumps every package flagged through a vulnerable dependency to its newest in-range version, which can churn much of the lockfile while clearing nothing. npm resolves through `.npmrc`, so the quarantine above still applies. Review the PR's version table for downgrades: npm can move a deduped package down within its range.
 
 **Dependabot security updates** — the repo-level toggle at `PUT /repos/{owner}/{repo}/automated-security-fixes` — are deliberately **off**. With the toggle on, Dependabot opens a pull request per alert with an available patch, up to 10 open at once regardless of `open-pull-requests-limit`. Grouping them (`groups` with `applies-to: security-updates`) would collapse those into one PR, but `cooldown` doesn't apply to security updates, so they'd skip the three-day quarantine; `npm audit fix` honors it.
 
@@ -171,13 +171,13 @@ Three GitHub features and one workflow act on dependency advisories, configured 
 
 A repository auto-triage rule named **Critical alert fast lane** gives us a bypass for genuinely urgent advisories without the flood. As built on 2026-09-03:
 
-| Setting | Value |
-|---|---|
-| Target alerts | `severity:critical` `scope:runtime` |
-| Action | Open a pull request to resolve this alert |
-| State | Enabled |
+| Setting       | Value                                     |
+| ------------- | ----------------------------------------- |
+| Target alerts | `severity:critical` `scope:runtime`       |
+| Action        | Open a pull request to resolve this alert |
+| State         | Enabled                                   |
 
-The mechanism is the rule, not the toggle. **The "open pull requests" action is available only while Dependabot security updates are off**, and dismissal rules do *not* suppress pull requests while they are on — the two are alternative PR sources, not layers. GitHub's docs put it plainly: "for an 'open a pull request' rule to take effect, you must ensure that Dependabot security updates are **disabled**." Turning the toggle back on silently supersedes this rule. Related ordering nuance: dismissal rules always act before rules that open pull requests.
+The mechanism is the rule, not the toggle. **The "open pull requests" action is available only while Dependabot security updates are off**, and dismissal rules do _not_ suppress pull requests while they are on — the two are alternative PR sources, not layers. GitHub's docs put it plainly: "for an 'open a pull request' rule to take effect, you must ensure that Dependabot security updates are **disabled**." Turning the toggle back on silently supersedes this rule. Related ordering nuance: dismissal rules always act before rules that open pull requests.
 
 Rules live at Settings → Advanced Security → Dependabot rules → New rule (limit 10 per repository during the public preview). They are **UI-only** — no YAML, and no documented REST or GraphQL API for repository-level rules; the public GraphQL schema exposes no auto-triage types at all. So unlike `dependabot.yml`, this configuration is not in the repo, not reviewable in a pull request, and not reproducible from a clone. The table above is the only record — keep it current if the rule changes.
 

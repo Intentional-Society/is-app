@@ -25,11 +25,11 @@ So:
   [Patterns](#patterns), preferred first:
   1. **One statement** — collapse the writes into a single statement (writable CTE).
   2. **Postgres function** — move the logic into the database, call it as one statement.
-  3. **`dbTx` client** — run the transaction over the *session* pooler, where
+  3. **`dbTx` client** — run the transaction over the _session_ pooler, where
      multi-statement transactions are sound.
 
-If you remember one thing: *the hazard is multi-statement transactions on the
-transaction pooler — nothing else.*
+If you remember one thing: _the hazard is multi-statement transactions on the
+transaction pooler — nothing else._
 
 ## Background — why this doc exists (the #149 investigation)
 
@@ -46,7 +46,7 @@ had just cleared, so `/` skipped the redirect to `/welcome`):
 the reset returning **HTTP 200 with a stale `bio`** — the UPDATE's `RETURNING`
 reported the row touched, yet the read-back milliseconds later saw the old
 value with an `updated_at` older than the reset. Production logs (Axiom) also
-showed the *loud* variant: `POST /api/_test/reset` returning 500 with a
+showed the _loud_ variant: `POST /api/_test/reset` returning 500 with a
 Postgres `25P02` ("current transaction is aborted") error. The reset never
 needed atomicity, so #173 replaced the transaction with two plain autocommit
 statements. The probe's anomaly assertion — kept as the reset tripwire in
@@ -65,7 +65,7 @@ correctly the whole time; the unmodeled writer was the other CI run. Fixed by
 #358: a global concurrency group in `e2e.yml` serializes e2e runs.
 
 Bug 1 is why this doc exists: the same `db.transaction`-over-the-pooler hazard
-applies to *real* application transactions, so those are written safely by
+applies to _real_ application transactions, so those are written safely by
 construction.
 
 ## The mechanism
@@ -81,7 +81,7 @@ two pooling **modes**, selected by the port you connect to:
 - **Session mode** — port `5432` on the pooler host. A backend is dedicated to a
   client for its entire connection lifetime.
 
-"Transaction mode" is a property of the *pooler endpoint*, not of your app
+"Transaction mode" is a property of the _pooler endpoint_, not of your app
 issuing a SQL transaction — but the two are linked: in transaction mode, a SQL
 transaction (`BEGIN…COMMIT`) is the unit Supavisor pins a backend around. It
 watches the wire for `BEGIN` and `COMMIT` to know when to pin and release.
@@ -98,8 +98,8 @@ result shapes below were observed directly:
 
 - **Silent discard** — the transaction appears to commit (no error; `RETURNING`
   even returns row data), but the writes were never persisted.
-- **Loud abort** — a later statement hits `25P02` *"current transaction is
-  aborted, commands ignored until end of transaction block"*, because the
+- **Loud abort** — a later statement hits `25P02` _"current transaction is
+  aborted, commands ignored until end of transaction block"_, because the
   transaction was aborted before that statement ran.
 
 A **single statement** has no `BEGIN…COMMIT` for the pooler to mishandle. The
@@ -112,10 +112,10 @@ implicit transaction, atomically. Single statements are immune.
   (probe-observed: HTTP 200 + stale data) and intermittently aborted with
   `25P02` (Axiom-observed). Dropping the transaction fixed it: the read-back
   assertion has stayed silent since 2026-05-16.
-- **Sure:** every `#149`-signature failure *after* the transaction was dropped
+- **Sure:** every `#149`-signature failure _after_ the transaction was dropped
   was cross-run clobbering (#358), fixed by serializing e2e runs — those
   failures say nothing about the pooler.
-- **Working model, not proven:** the precise trigger — the *first* error that
+- **Working model, not proven:** the precise trigger — the _first_ error that
   aborted the transaction — was never captured in logs. The backend-split
   explanation above is the most coherent fit but is not confirmed from our own
   traces. The direct evidence is the mid-May 2026 probe captures; the anomaly
@@ -127,33 +127,33 @@ implicit transaction, atomically. Single statements are immune.
   `READ COMMITTED`. A strong sibling, not a verified root-cause match.
 
 The uncertainty about the exact trigger does not change the guidance: the
-patterns below are safe *by construction*, whatever the precise pooler bug.
+patterns below are safe _by construction_, whatever the precise pooler bug.
 
 ## Why we use the transaction pooler at all
 
 Two reasons, doing different jobs (see `devjournal.md`, 2026-04-04):
 
-- **IPv4** — Supabase's *direct* database connection is IPv6-only; Vercel
+- **IPv4** — Supabase's _direct_ database connection is IPv6-only; Vercel
   functions cannot reliably reach it. This forces us off the direct connection
-  onto *a pooler*. Both pooler modes provide IPv4, so this alone does not
+  onto _a pooler_. Both pooler modes provide IPv4, so this alone does not
   dictate the mode.
 - **Serverless** — Vercel functions are transient. A connection is held for the
-  lifetime of the (Fluid Compute) function *instance* — minutes, across many
-  requests — not per request. In *session* mode each held connection pins a
+  lifetime of the (Fluid Compute) function _instance_ — minutes, across many
+  requests — not per request. In _session_ mode each held connection pins a
   backend for that whole lifetime; a swarm of warm instances would exhaust
-  Postgres's connection limit. *Transaction* mode avoids this by consuming a
+  Postgres's connection limit. _Transaction_ mode avoids this by consuming a
   backend only per-transaction (milliseconds).
 
-So: IPv4 forces a pooler; serverless makes it the *transaction* pooler. The
+So: IPv4 forces a pooler; serverless makes it the _transaction_ pooler. The
 session pooler stays available (and IPv4) for the narrow set of operations that
 need real transactions — see the `dbTx` pattern.
 
 ## Failure modes to recognize
 
-| Mode | What you see | Where |
-|---|---|---|
+| Mode           | What you see                                                             | Where                                                    |
+| -------------- | ------------------------------------------------------------------------ | -------------------------------------------------------- |
 | Silent discard | Operation "succeeds" (HTTP 2xx, `RETURNING` data), rows aren't in the DB | No error anywhere — only detectable by reading data back |
-| Loud abort | Postgres `25P02`, surfaced by the code as a 5xx | App logs / Axiom (`vercel` dataset) |
+| Loud abort     | Postgres `25P02`, surfaced by the code as a 5xx                          | App logs / Axiom (`vercel` dataset)                      |
 
 The silent mode is the dangerous one: every `try/catch` and success-check in the
 calling code is defeated, because nothing throws.
@@ -266,8 +266,8 @@ Caveats — important:
   (`DATABASE_URL` is the `:6543` one).
 - Session mode pins a backend per connection. `max: 1` plus a short
   `idle_timeout` keeps a process from holding more than one backend and releases
-  it shortly after use — so steady-state backend use tracks *recent transaction
-  activity*, not the number of warm function instances.
+  it shortly after use — so steady-state backend use tracks _recent transaction
+  activity_, not the number of warm function instances.
 - This is bounded-by-traffic, not bounded-by-design. It is fine at this app's
   scale; if a transactional path ever becomes high-traffic, move it to pattern
   1 or 2.
@@ -288,15 +288,15 @@ statements is not.
 
 ## Connection options reference
 
-| | Direct | Session pooler | Transaction pooler |
-|---|---|---|---|
-| Host / port | DB host : 5432 | pooler host : 5432 | pooler host : 6543 |
-| IPv4 | ❌ IPv6-only | ✅ | ✅ |
-| Backend held for | the connection | the connection | one transaction |
-| Serverless-safe | ❌ exhausts connections | ⚠️ only with small `max` + `idle_timeout` | ✅ |
-| Multi-statement txns | ✅ sound | ✅ sound | ⚠️ can be mishandled |
-| Prepared statements | ✅ | ✅ | ⚠️ partial (Supavisor-emulated) |
-| In this app | unused | pattern 3 (design — not yet wired) | `db` (`DATABASE_URL`) |
+|                      | Direct                  | Session pooler                            | Transaction pooler              |
+| -------------------- | ----------------------- | ----------------------------------------- | ------------------------------- |
+| Host / port          | DB host : 5432          | pooler host : 5432                        | pooler host : 6543              |
+| IPv4                 | ❌ IPv6-only            | ✅                                        | ✅                              |
+| Backend held for     | the connection          | the connection                            | one transaction                 |
+| Serverless-safe      | ❌ exhausts connections | ⚠️ only with small `max` + `idle_timeout` | ✅                              |
+| Multi-statement txns | ✅ sound                | ✅ sound                                  | ⚠️ can be mishandled            |
+| Prepared statements  | ✅                      | ✅                                        | ⚠️ partial (Supavisor-emulated) |
+| In this app          | unused                  | pattern 3 (design — not yet wired)        | `db` (`DATABASE_URL`)           |
 
 postgres-js options worth knowing: `max` (pool size), `idle_timeout` (close idle
 connections — the key to bounding session-mode backends), `prepare` (defaults
@@ -313,17 +313,17 @@ re-introduce a variable — see the comment in `db.ts`.
   discard. Confirm by reading the row back.
 - A `25P02` error, or a 5xx on a path that runs a `db.transaction` → loud abort.
 - Logs are in Axiom, `vercel` dataset (Vercel log drain). Filter by the request
-  id; note the *root* error may be a separate, earlier line — and may not be
+  id; note the _root_ error may be a separate, earlier line — and may not be
   logged at all if it happened pooler-side.
 
 ## Current transaction inventory
 
 Keep this current as transactions are added or changed.
 
-| Site | Status |
-|---|---|
-| `resetE2EUsers` (`src/server/test-reset.ts`) | Fixed — `db.transaction` dropped; two autocommit statements (it never needed atomicity). |
-| `createInvite` (`src/server/invites.ts`) | Hardened — pattern 1 (writable CTE): invite + hint rows written in one statement, no transaction. |
+| Site                                               | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `resetE2EUsers` (`src/server/test-reset.ts`)       | Fixed — `db.transaction` dropped; two autocommit statements (it never needed atomicity).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `createInvite` (`src/server/invites.ts`)           | Hardened — pattern 1 (writable CTE): invite + hint rows written in one statement, no transaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | invited sign-in (`src/app/auth/callback/route.ts`) | Accepted risk, alarmed (decision 2026-07-02) — multi-statement txn (profile insert + invite redemption + relations) kept as-is. Monitoring covers both failure shapes: loud aborts hit `Sentry_captureException` (tags `feature:auth-callback`) plus an Axiom `invite redemption failed` line with `pgCode`; silent discard is caught by a post-commit read-back of the invite's `redeemed_by`, which raises a Sentry error on mismatch. A 2026-06 audit found zero anomalies across all 22 prod redemptions. Pattern 2 (a `redeem_invite` function) is the harden path if the alarm ever fires. |
 
 ## References

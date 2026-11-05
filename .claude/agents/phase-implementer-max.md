@@ -1,4 +1,5 @@
 ---
+
 name: phase-implementer-max
 description: Escalation variant of phase-implementer (Opus, maximum reasoning effort) for the skill-evals program's hard surfaces — Phase 2's harness/safety build, Phase 8's driver spike — or relaunching a phase where the standard implementer struggled. Same contract as phase-implementer.
 model: opus

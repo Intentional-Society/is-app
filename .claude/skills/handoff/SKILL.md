@@ -1,4 +1,5 @@
 ---
+
 name: handoff
 description: "[is-app] Generate a session hand-off doc plus a copy-pasteable bootstrap prompt so a fresh Claude Code session (or a human teammate) can pick up in-flight work with zero prior context. Verifies current state via git/gh instead of trusting only what was said earlier in chat, and calls out any uncommitted changes. Supports three depths — compact (the default), full (complex, risky, or multi-workstream work), minimal (explicit request only) — selected via `--mode compact|full|minimal` or natural-language cues like \"quick minimal handoff\" or \"full handoff with the decisions and risks\". Use whenever the user is wrapping up a session and wants to continue later, is handing work to someone else, or says things like \"write a hand-off doc\", \"give me a bootstrap prompt for a fresh session\", \"prep this for tomorrow\", \"let's pick this up later\", `/handoff` — or is about to step away from a long multi-step task (mid-PR, mid-issue, blocked on review) with no next step written down anywhere."
 ---
@@ -36,7 +37,7 @@ the user to rephrase as a slash command: "write a handoff so I can pick this up 
 the next agent enough context to resume this work", "let's stop here and leave a handoff". Clear
 depth modifiers in context are mode selections: "quick"/"minimal" → minimal; "compact" → compact;
 "full"/"detailed"/"comprehensive" → full. The user's explicit wording always beats automatic
-selection. If the wording is genuinely ambiguous *and* the choice materially affects how useful
+selection. If the wording is genuinely ambiguous _and_ the choice materially affects how useful
 the doc will be, ask one focused question; otherwise use the default and proceed.
 
 Unlike `/commit` and `/pr`, this Skill only writes a gitignored scratch file and prints a message —
@@ -122,7 +123,7 @@ Depth changes how much explanation the doc carries, not what it's for. At any de
 - says **how the work is done**, not just what state it is in: the orchestration pattern in use
   (solo, pair, hub-and-spoke), the agent roles or personas involved and what each owns, and the
   roles worth adding or swapping in next — plus the one question that keeps that list honest:
-  *what gap did this effort hit that no role owned?* Required at every depth; for solo work,
+  _what gap did this effort hit that no role owned?_ Required at every depth; for solo work,
   one line ("solo, no personas") is a complete answer;
 - omits empty, redundant, irrelevant, or ceremonial sections — and never invents missing state.
 
@@ -206,17 +207,17 @@ Resume Here.
 Full retains the relevant Compact content and adds detail only where omission would increase
 delivery, technical, safety, ownership, or coordination risk.
 
-| Compact area | Full expansion |
-|---|---|
-| Objective | Separate definition of done, deliverables, constraints, and non-goals. |
-| Status | Separate completed, in-progress, not-started, deferred, and blocked work; identify the exact stopping point. |
-| Verified State | Add base/baseline commit, change ownership, relevant recent changes, tracker status or relationships, environments, and artifact locations. |
-| Work context | Add the approach taken, component or data flow, important boundaries, and partial implementation details. |
-| Decisions | Use a concise decision log with rationale, alternatives, evidence, consequences, and final/provisional status. |
-| Validation | Separate passed, failed, not-run, and manual checks; explain what each result proves. |
-| Coordination | Add risks, dependencies, owners, open questions, and recovery notes when relevant. |
+| Compact area          | Full expansion                                                                                                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Objective             | Separate definition of done, deliverables, constraints, and non-goals.                                                                                                              |
+| Status                | Separate completed, in-progress, not-started, deferred, and blocked work; identify the exact stopping point.                                                                        |
+| Verified State        | Add base/baseline commit, change ownership, relevant recent changes, tracker status or relationships, environments, and artifact locations.                                         |
+| Work context          | Add the approach taken, component or data flow, important boundaries, and partial implementation details.                                                                           |
+| Decisions             | Use a concise decision log with rationale, alternatives, evidence, consequences, and final/provisional status.                                                                      |
+| Validation            | Separate passed, failed, not-run, and manual checks; explain what each result proves.                                                                                               |
+| Coordination          | Add risks, dependencies, owners, open questions, and recovery notes when relevant.                                                                                                  |
 | How this work is done | Add the model policy in force, the rules learned from failures during this effort (each tied to the failure), and per-role attributes for any persona the next agent should define. |
-| Resume plan | Add ordered preflight, subsequent steps, stop conditions, approval gates, and next-session completion criteria. |
+| Resume plan           | Add ordered preflight, subsequent steps, stop conditions, approval gates, and next-session completion criteria.                                                                     |
 
 Don't add Full-only sections for appearance. Include them when the scenario actually supplies
 relevant content or their absence would raise recovery cost.
@@ -225,16 +226,16 @@ relevant content or their absence would raise recovery cost.
 
 Minimal preserves safe resumption while removing ceremony.
 
-| Compact area | Minimal contraction |
-|---|---|
-| Objective | Combine the goal and completion condition into one or two lines. |
-| Status | Short Done, Remaining, and Blocker/Unknown bullets. |
-| Verified State | Preserve the essential workspace, tracker, plan/spec, decision-log, key-file, branch/commit, and relevant working-tree anchors, presented concisely; omit deeper history, ownership, relationships, and environment detail unless needed for safe resumption. |
-| Decisions | Only a decision, assumption, or correction that directly affects the next action. |
-| Validation | The last meaningful result and the next required check. |
-| How this work is done | One line: the pattern, and either the roles or "solo, no personas". Never omit the section. |
-| Resume plan | One verification step, one exact next action, and any real downstream approval gate. |
-| Omitted material | Decision tables, risk registers, detailed chronology, alternatives, multi-step plans. |
+| Compact area          | Minimal contraction                                                                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Objective             | Combine the goal and completion condition into one or two lines.                                                                                                                                                                                              |
+| Status                | Short Done, Remaining, and Blocker/Unknown bullets.                                                                                                                                                                                                           |
+| Verified State        | Preserve the essential workspace, tracker, plan/spec, decision-log, key-file, branch/commit, and relevant working-tree anchors, presented concisely; omit deeper history, ownership, relationships, and environment detail unless needed for safe resumption. |
+| Decisions             | Only a decision, assumption, or correction that directly affects the next action.                                                                                                                                                                             |
+| Validation            | The last meaningful result and the next required check.                                                                                                                                                                                                       |
+| How this work is done | One line: the pattern, and either the roles or "solo, no personas". Never omit the section.                                                                                                                                                                   |
+| Resume plan           | One verification step, one exact next action, and any real downstream approval gate.                                                                                                                                                                          |
+| Omitted material      | Decision tables, risk registers, detailed chronology, alternatives, multi-step plans.                                                                                                                                                                         |
 
 If Minimal needs many exceptions to stay safe, keep the requested mode and state the essential
 extra context concisely.

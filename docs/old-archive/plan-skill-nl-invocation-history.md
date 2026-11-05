@@ -37,15 +37,15 @@
 ## Pick‑up guide (resume cold)
 
 **What PR3 is.** Two NL‑path gaps surfaced in use (the second on the **#459** commit):
-- **(a) routing** — when the *assistant* offers to commit/PR and the human replies a bare
-  "yes"/"go ahead", the model could read it as approval of its *own* ad‑hoc plan and run `git`/`gh`
+- **(a) routing** — when the _assistant_ offers to commit/PR and the human replies a bare
+  "yes"/"go ahead", the model could read it as approval of its _own_ ad‑hoc plan and run `git`/`gh`
   directly instead of routing through the Skill (the trigger phrase came from the assistant, so the
   affirmation got disconnected from it).
 - **(b) observability** — even when the Skill fired, nothing visibly said so (Step 0's confirmation
   is suppressed by opt‑out / delegation / slash), so you couldn't tell the Skill ran vs. a
   hand‑rolled commit.
 
-**Fix (model‑level, no harness change):** a bare affirmation of the assistant's *own* commit/PR offer
+**Fix (model‑level, no harness change):** a bare affirmation of the assistant's _own_ commit/PR offer
 is a trigger that routes through the Skill (scoped so it doesn't over‑trigger on unrelated offers),
 and every model‑invoked `/commit`/`/pr` run announces `Using /commit`/`Using /pr` as its first line —
 including down the `/ship` → `/pr` → `/commit` delegation chain.
@@ -61,7 +61,7 @@ deferred), and PR #484 merged on 2026‑07‑02.
 
 ## Scope (what PR3 delivers)
 
-1. **Affirmation routing** — a bare "yes"/"go ahead" affirming the assistant's *own* commit/PR offer
+1. **Affirmation routing** — a bare "yes"/"go ahead" affirming the assistant's _own_ commit/PR offer
    routes through the Skill tool, never ad‑hoc `git`/`gh`. **Scoped:** a "yes" to an unrelated
    (non‑commit/PR) offer is not a trigger.
 2. **Announcement** — every model‑invoked `/commit`/`/pr` run leads with `Using /commit`/`Using /pr`,
@@ -73,22 +73,22 @@ deferred), and PR #484 merged on 2026‑07‑02.
 
 Ran the synthetic checklist cold (fresh, un‑primed sessions) against `ba9dc59`+`48d497c`:
 
-- **Routing through the Skill: 5/5** — the #459 *bypass* never recurred. ✅
+- **Routing through the Skill: 5/5** — the #459 _bypass_ never recurred. ✅
 - **Opt‑out / slash / `/ship` explicit‑only: clean.** ✅
 - **Over‑trigger guard holds under real semantic pressure** — passed even with `/commit` literally in
-  the affirmed offer. The original alphabetize control was *uninformative* (no semantic proximity). →
+  the affirmed offer. The original alphabetize control was _uninformative_ (no semantic proximity). →
   **Finding 2.**
 - **Announcement: 5/6 (~83%).** The miss called the Skill tool first then skipped the in‑Skill
   announce; the 5 hits pre‑announced at the routing decision. → **Finding 1.**
 
-**Finding 1 — announcement reliability + delegation.** *Resolution:* relocate the announce to the
+**Finding 1 — announcement reliability + delegation.** _Resolution:_ relocate the announce to the
 routing decision (CLAUDE.md + descriptions); make `/pr` and `/ship` narrate the handoff on
 delegation (**the parent owns each hop's announce; the child suppresses its self‑announce when the
 delegation marker is present**, so the line prints once per hop); keep "every" as the goal; hook
-deferred. *(Delegation was
-never exercised by the cold run — all direct NL — so it gets a new verification scenario + eval.)*
+deferred. _(Delegation was
+never exercised by the cold run — all direct NL — so it gets a new verification scenario + eval.)_
 
-**Finding 2 — over‑trigger eval was weak.** Behavior is fine; the *test* was toothless. *Resolution:*
+**Finding 2 — over‑trigger eval was weak.** Behavior is fine; the _test_ was toothless. _Resolution:_
 rewrite to **semantic** over‑triggers, as distinct evals by domain (below).
 
 ## Evals (PR3)
@@ -97,13 +97,13 @@ Shipped on the branch (`ba9dc59`): `commit-4`/`pr-8` (announcement), `commit-6`/
 (affirmation‑after‑offer routing), `commit-5(c)` (announcement survives opt‑out).
 
 Finding‑1/2 follow‑up (distinct evals localize a regression to its exact vector; F4 is ship‑domain):
-| Eval | Asserts |
-|---|---|
-| `commit-7` ← **F2** (rewrite) | "yes" to "explain `/commit`'s Step 0" must NOT fire `/commit` |
-| `commit-8` ← **F3** (new) | "does the commit message follow Conventional Commits?" must answer, not fire |
-| `ship-5` ← **F4** (new) | "remind me what `/ship` does" must explain, not ship |
-| `pr-3` (extend) | when `/pr` delegates to `/commit`, the delegated `/commit` announces `Using /commit` |
-| `ship-6` (new) | the full `/ship`→`/pr`→`/commit` cascade announces each hop |
+| Eval                          | Asserts                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------ |
+| `commit-7` ← **F2** (rewrite) | "yes" to "explain `/commit`'s Step 0" must NOT fire `/commit`                        |
+| `commit-8` ← **F3** (new)     | "does the commit message follow Conventional Commits?" must answer, not fire         |
+| `ship-5` ← **F4** (new)       | "remind me what `/ship` does" must explain, not ship                                 |
+| `pr-3` (extend)               | when `/pr` delegates to `/commit`, the delegated `/commit` announces `Using /commit` |
+| `ship-6` (new)                | the full `/ship`→`/pr`→`/commit` cascade announces each hop                          |
 
 Net counts: **commit 8 / pr 9 / ship 6** (each ≥3 for #396 Plan PR 2). Optional `pr-10` (`/pr`
 over‑trigger symmetry) deferred. The skill‑creator triggering‑eval loop (Future hardening) stays out
@@ -121,7 +121,7 @@ re‑verify record. Nothing here is outstanding.
 
 # ✅ Landed — PR1 + PR2 (#353, merged)
 
-> Shipped and in production. Kept as the durable record of *what* shipped and *why*; the imperative
+> Shipped and in production. Kept as the durable record of _what_ shipped and _why_; the imperative
 > build steps are obsolete (the code is the source of truth now — `.claude/skills/{commit,pr,ship}/SKILL.md`,
 > `.claude/settings.json`). Rationale lives in the Decision log.
 
@@ -132,14 +132,14 @@ re‑verify record. Nothing here is outstanding.
 - **Step 0 — NL intent gate (model‑invoked only).** Fires when invoked via the `Skill` tool and none
   of {verified slash entry, live delegation marker, opt‑out file} holds; presents an AskUserQuestion
   ("Run `/[commit|pr]` with: …?") with Proceed / Proceed‑and‑don't‑ask‑again (writes
-  `.claude/skip-nl-confirm-commit-pr.local`) / Stop. Confirms *intent detection*; the bundled approval
-  block (still) approves *content*.
+  `.claude/skip-nl-confirm-commit-pr.local`) / Stop. Confirms _intent detection_; the bundled approval
+  block (still) approves _content_.
 - **Single‑use delegation marker (Thread 1).** A parent (`/pr`, `/ship`) writes
   `.claude/.nl-delegation-active` as `<parent>\t<ISO‑8601 UTC>` immediately before the downstream
   `Skill()` call and deletes it after; the callee consumes it at Step 0 (clear‑on‑read) only if <30s
   old (stale → delete + treat as standalone). Release‑in‑`finally` + short lease — so a crashed
   delegation can't leave a stale marker that suppresses a later standalone NL invocation.
-- **Opt‑out:** the *presence* of gitignored `.claude/skip-nl-confirm-commit-pr.local` skips only Step
+- **Opt‑out:** the _presence_ of gitignored `.claude/skip-nl-confirm-commit-pr.local` skips only Step
   0's confirmation — never approval checkpoints, the test gate, or refusal rules; never `/ship`.
 
 ## PR2 — harness merge gate, `/ship` explicit‑only (what shipped)
@@ -160,14 +160,14 @@ re‑verify record. Nothing here is outstanding.
 Drove the changed skills against real merged PRs in a **disposable worktree/clone** (never the shared
 tree) — each PR's merged form is the known‑good comparison.
 
-| PR | Shape | Replay validates |
-|---|---|---|
-| **#395** | `.claude/skill-creator/**` + `.gitignore` negation + `CLAUDE.md` + `evals/` + devjournal (28 files) | suspicious‑file blocker does **not** false‑positive on `.claude/**`; deliberate payload (no `git add .`); devjournal hard‑trigger (new skill). Structural twin of this work. |
-| **#417** | one `docs/**` file | devjournal **skip** (docs‑only); `/ship` docs‑only path (required check green fast, e2e skipped). |
-| **#416** | app + server + functional test (3 files) | happy‑path payload; `fix` vs `feat` inference; Test‑Plan provenance with real `npm test` counts. |
-| **#393** | `package.json` + lockfile + server + docs | lockfile change **allowed** (paired with intentional dep bump); dependency devjournal hard‑trigger. |
-| **#245** (expand) | `ADD COLUMN`×2 + backfill `UPDATE` + schema.ts + UI | schema → **expand**; approval notes `prod:db:expand` dispatch + post‑deploy e2e gate. |
-| **#319** (contract) | `DROP COLUMN` + schema.ts | schema → **contract**; no dispatch; no phase‑split demand. Complement to #245. |
+| PR                  | Shape                                                                                               | Replay validates                                                                                                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **#395**            | `.claude/skill-creator/**` + `.gitignore` negation + `CLAUDE.md` + `evals/` + devjournal (28 files) | suspicious‑file blocker does **not** false‑positive on `.claude/**`; deliberate payload (no `git add .`); devjournal hard‑trigger (new skill). Structural twin of this work. |
+| **#417**            | one `docs/**` file                                                                                  | devjournal **skip** (docs‑only); `/ship` docs‑only path (required check green fast, e2e skipped).                                                                            |
+| **#416**            | app + server + functional test (3 files)                                                            | happy‑path payload; `fix` vs `feat` inference; Test‑Plan provenance with real `npm test` counts.                                                                             |
+| **#393**            | `package.json` + lockfile + server + docs                                                           | lockfile change **allowed** (paired with intentional dep bump); dependency devjournal hard‑trigger.                                                                          |
+| **#245** (expand)   | `ADD COLUMN`×2 + backfill `UPDATE` + schema.ts + UI                                                 | schema → **expand**; approval notes `prod:db:expand` dispatch + post‑deploy e2e gate.                                                                                        |
+| **#319** (contract) | `DROP COLUMN` + schema.ts                                                                           | schema → **contract**; no dispatch; no phase‑split demand. Complement to #245.                                                                                               |
 
 **Method (Thread 3) — disposable tree, never the shared one.** A merged PR's diff applies cleanly
 onto its own base commit:
@@ -189,7 +189,6 @@ replay + cleanup to the disposable tree; ultimate cleanup is discarding the lane
 James's #353 confirmation‑friction concern is answered by the "fires once per machine, then never"
 opt‑out property (surface in the PR for James). The flagged dependency was skill‑creator (#395, now
 vendored), offering `run_eval.py` triggering evals (noted as an upgrade path, kept out of scope). No
-blocking dependency on #396 Plan PR 2 (sequenced *after*, encodes the contract this defines).
+blocking dependency on #396 Plan PR 2 (sequenced _after_, encodes the contract this defines).
 
 ---
-

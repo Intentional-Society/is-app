@@ -13,6 +13,12 @@ name: Weekly npm audit fix
 # quarantine still applies, and `--ignore-scripts` + `--package-lock-only`
 # keep package code from executing in a job that holds a write token.
 #
+# `npm audit fix` also moves each package flagged through a vulnerable
+# dependency (including direct ones like shadcn or @sentry/nextjs) to its
+# newest in-range version, so it can rewrite much of the lockfile without
+# clearing a single advisory. The PR opens only when at least one advisory ID
+# in the audit report before the fix is gone from the report after it.
+#
 # A PR opened with GITHUB_TOKEN gets its `pull_request` runs (ci.yml) in an
 # approval-required state: click "Approve workflows to run" on the PR.
 
@@ -64,12 +70,15 @@ jobs:
             exit 1
           }
 
+          close_existing() {
+            if [ -n "$existing" ]; then
+              gh pr close "$existing" --delete-branch --comment "$1"
+            fi
+          }
+
           if git diff --quiet -- package-lock.json; then
             echo "npm audit fix changed nothing."
-            if [ -n "$existing" ]; then
-              gh pr close "$existing" --delete-branch \
-                --comment "main no longer needs these lockfile changes; closing. The weekly run will reopen if new in-range fixes appear."
-            fi
+            close_existing "main no longer needs these lockfile changes; closing. The weekly run will reopen if new in-range fixes appear."
             exit 0
           fi
 
@@ -77,6 +86,20 @@ jobs:
             echo "::error::npm audit fix changed package.json — expected a lockfile-only change; run it by hand and review"
             git diff -- package.json
             exit 1
+          fi
+
+          # Advisories in the report before the fix and gone after it, one
+          # Markdown bullet each.
+          fixed="$(jq -rn --slurpfile a before.json --slurpfile b fix.json '
+            [$b[0].audit.vulnerabilities[].via[] | objects | .source] as $after
+            | [$a[0].vulnerabilities[].via[] | objects] | unique_by(.source)[]
+            | select(.source | IN($after[]) | not)
+            | "- [\(.title)](\(.url)): `\(.name)`, \(.severity)"')"
+
+          if [ -z "$fixed" ]; then
+            echo "npm audit fix changed the lockfile but cleared no advisory; no PR."
+            close_existing "This week's run changes the lockfile on main without clearing any advisory; closing. The weekly run will reopen when an in-range fix appears."
+            exit 0
           fi
 
           # counts <file> <jq path to the audit metadata>
@@ -87,6 +110,10 @@ jobs:
             echo
             echo "- Before: $(counts before.json .metadata)"
             echo "- After: $(counts fix.json .audit.metadata)"
+            echo
+            echo "Cleared:"
+            echo
+            echo "$fixed"
             echo
             echo "Advisories left over need a major bump or an upstream release; see docs/strategy-security.md (\"Reading \`npm audit\`\")."
             echo

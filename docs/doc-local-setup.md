@@ -4,11 +4,11 @@
 
 Install these once. See [setup-dev-machine.md](setup-dev-machine.md) for detailed instructions.
 
-| Tool | Minimum version | Notes |
-|------|-----------------|-------|
-| Node.js | 22+ | Install via `nvm`; the repo's `.nvmrc` pins the version |
-| Docker Desktop | latest | Must be **running** before `npm run dev` |
-| Git | any | Mac: `xcode-select --install`; Windows: git-scm.com |
+| Tool           | Minimum version | Notes                                                   |
+| -------------- | --------------- | ------------------------------------------------------- |
+| Node.js        | 22+             | Install via `nvm`; the repo's `.nvmrc` pins the version |
+| Docker Desktop | latest          | Must be **running** before `npm run dev`                |
+| Git            | any             | Mac: `xcode-select --install`; Windows: git-scm.com     |
 
 **Mac shortcut:**
 ```bash
@@ -71,13 +71,13 @@ Supabase containers keep running after Ctrl+C. The Next.js server does not.
 
 ## Local service endpoints
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| App | http://localhost:3000 | Next.js dev server |
-| Supabase Studio | http://localhost:54323 | Database browser, table editor, SQL runner |
-| Inbucket | http://localhost:54324 | Catches all outgoing auth emails (magic links, password resets) in development |
-| Supabase API | http://localhost:54321 | Auth and PostgREST endpoints (used internally by the app) |
-| Postgres | localhost:54322 | Direct database connection (user: `postgres`, pass: `postgres`, db: `postgres`) |
+| Service         | URL                    | Purpose                                                                         |
+| --------------- | ---------------------- | ------------------------------------------------------------------------------- |
+| App             | http://localhost:3000  | Next.js dev server                                                              |
+| Supabase Studio | http://localhost:54323 | Database browser, table editor, SQL runner                                      |
+| Inbucket        | http://localhost:54324 | Catches all outgoing auth emails (magic links, password resets) in development  |
+| Supabase API    | http://localhost:54321 | Auth and PostgREST endpoints (used internally by the app)                       |
+| Postgres        | localhost:54322        | Direct database connection (user: `postgres`, pass: `postgres`, db: `postgres`) |
 
 **Inbucket** is the local email inbox. Any email Supabase Auth sends during local development (magic links, email verification, password reset) is captured here instead of being delivered to a real address. Open http://localhost:54324 and click the recipient address to read it.
 

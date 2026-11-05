@@ -17,6 +17,7 @@ The alternative was considered: a `release` branch with its own Vercel environme
 When production breaks happen, the question to ask is: **"do we strengthen CI, or add a staging branch?"** The hypothesis is that stronger CI (better tests, migration checks, linting) is the higher-leverage answer — especially with AI-assisted development — but we're open to being wrong.
 
 ## TODO: We need to support a "dev environment"
+
 This requires separate-from-prod dev-testing database(s) for the e2e tests. We also want a "copy prod data to testing db" for testing the preview deploys, to give us db migration testing against real data.
 
 ## Feature branch conventions
@@ -30,7 +31,7 @@ This requires separate-from-prod dev-testing database(s) for the e2e tests. We a
 
 When `main` advances mid-PR, rebase the branch onto it (`git fetch origin && git rebase origin/main && git push --force-with-lease`); don't merge `main` in. Conflicts get resolved once during the rebase, the eventual PR merge stays conflict-free, and the branch keeps a linear history with no inner merge commits.
 
-Branch protection enforces *up-to-date-with-main* before the merge button works (`strict_required_status_checks_policy: true`), so this isn't optional. The rule doesn't enforce *via rebase*, though — GitHub's "Update branch" button would merge `main` in instead, which the convention above avoids.
+Branch protection enforces _up-to-date-with-main_ before the merge button works (`strict_required_status_checks_policy: true`), so this isn't optional. The rule doesn't enforce _via rebase_, though — GitHub's "Update branch" button would merge `main` in instead, which the convention above avoids.
 
 ### Merging the PR
 
