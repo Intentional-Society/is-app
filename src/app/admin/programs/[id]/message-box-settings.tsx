@@ -52,10 +52,13 @@ export function MessageBoxSettings({ programId }: { programId: string }) {
 
 function MessageBoxSettingsForm({ programId, settings }: { programId: string; settings: Settings }) {
   const queryClient = useQueryClient();
+  // Both settings are edited locally and saved together with one button, like
+  // the Details form above, so nothing saves behind the admin's back.
+  const [visibility, setVisibility] = useState(settings.visibility);
   const [prompt, setPrompt] = useState(settings.prompt ?? "");
 
   const saveMutation = useMutation({
-    mutationFn: async (update: { visibility?: MessageBoxVisibility; prompt?: string | null }) => {
+    mutationFn: async (update: { visibility: MessageBoxVisibility; prompt: string | null }) => {
       const res = await apiClient.api.admin.programs[":id"]["message-box"].$patch({
         param: { id: programId },
         json: update,
@@ -66,22 +69,27 @@ function MessageBoxSettingsForm({ programId, settings }: { programId: string; se
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: settingsQueryKey(programId) });
-      queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) });
-    },
+    // Returning the refetch keeps the mutation pending until the saved values
+    // are back in `settings`, so the button never flickers to "dirty" in between.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: settingsQueryKey(programId) }),
+        queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
+      ]),
   });
 
-  // Show the pending choice right away instead of waiting for the refetch.
-  const shownVisibility =
-    saveMutation.isPending && saveMutation.variables?.visibility
-      ? saveMutation.variables.visibility
-      : settings.visibility;
-  const promptDirty = prompt.trim() !== (settings.prompt ?? "");
+  const trimmedPrompt = prompt.trim();
+  const dirty = visibility !== settings.visibility || trimmedPrompt !== (settings.prompt ?? "");
+  const edit =
+    <T,>(setter: (value: T) => void) =>
+    (value: T) => {
+      setter(value);
+      if (saveMutation.isSuccess || saveMutation.isError) saveMutation.reset();
+    };
 
   return (
     <div className="flex flex-col gap-3">
-      <fieldset className="flex flex-col gap-1.5 rounded border border-border p-2">
+      <fieldset className="flex flex-col gap-1.5 rounded border border-border p-2" disabled={saveMutation.isPending}>
         <legend className="px-1 text-xs font-medium text-muted-foreground">Who can read messages</legend>
         {MESSAGE_BOX_VISIBILITIES.map((value) => (
           <label key={value} className="flex items-start gap-2">
@@ -89,9 +97,8 @@ function MessageBoxSettingsForm({ programId, settings }: { programId: string; se
               type="radio"
               name={`message-box-visibility-${programId}`}
               value={value}
-              checked={shownVisibility === value}
-              disabled={saveMutation.isPending}
-              onChange={() => saveMutation.mutate({ visibility: value })}
+              checked={visibility === value}
+              onChange={() => edit(setVisibility)(value)}
               className="mt-1"
             />
             <span>
@@ -113,7 +120,7 @@ function MessageBoxSettingsForm({ programId, settings }: { programId: string; se
           variant="full"
           ariaLabel="Message box prompt"
           value={prompt}
-          onChange={setPrompt}
+          onChange={edit(setPrompt)}
           disabled={saveMutation.isPending}
           placeholder="e.g. Won't be there at the next call? Send a short message of connection."
         />
@@ -121,16 +128,23 @@ function MessageBoxSettingsForm({ programId, settings }: { programId: string; se
           Shown above the message box on the program page. Leave blank for none. Max {MESSAGE_BOX_MAX_PROMPT_LENGTH}{" "}
           characters.
         </p>
+      </div>
+
+      <div className="flex items-center gap-3">
         <Button
           type="button"
           variant="secondary"
           size="xs"
-          className="self-start"
-          disabled={saveMutation.isPending || !promptDirty}
-          onClick={() => saveMutation.mutate({ prompt: prompt.trim() || null })}
+          disabled={saveMutation.isPending || !dirty}
+          onClick={() => saveMutation.mutate({ visibility, prompt: trimmedPrompt || null })}
         >
-          {saveMutation.isPending && saveMutation.variables?.prompt !== undefined ? "Saving…" : "Save prompt"}
+          {saveMutation.isPending ? "Saving…" : "Save changes"}
         </Button>
+        {saveMutation.isSuccess && !dirty && (
+          <span role="status" className="text-xs text-muted-foreground">
+            Saved.
+          </span>
+        )}
       </div>
 
       {saveMutation.isError && (
