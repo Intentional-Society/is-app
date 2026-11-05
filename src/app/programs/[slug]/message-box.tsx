@@ -15,6 +15,7 @@ import { apiClient } from "@/lib/api";
 import type { MessageBoxMessage, MessageBoxResponse } from "@/lib/api-types";
 import { MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
 
+import { MESSAGE_BOX_CARD_CLASSNAME } from "./message-box-card";
 import { HYDRATED_STALE_TIME, messageBoxQueryKey } from "./query-keys";
 
 const fetchMessageBox = async (programId: string): Promise<MessageBoxResponse> => {
@@ -40,7 +41,7 @@ export function MessageBox({ programId }: { programId: string }) {
   });
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="message-box-heading">
+    <section className={MESSAGE_BOX_CARD_CLASSNAME} aria-labelledby="message-box-heading">
       <h3 id="message-box-heading" className="text-base font-semibold uppercase tracking-wide text-muted-foreground">
         Message box
       </h3>
@@ -192,7 +193,7 @@ function MessageItem({
   const href: UrlObject = { pathname: `/members/${message.author.slug ?? message.author.id}` };
 
   return (
-    <li className="flex flex-col gap-1 rounded border border-border p-3">
+    <li className="flex flex-col gap-1 rounded bg-background p-3">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <Avatar
           name={message.author.displayName}
