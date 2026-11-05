@@ -77,7 +77,8 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - `docs/design-welcome.md` — multi-step onboarding/welcome flow design
 - `docs/design-emails.md` — auth email template authoring and prod sync
 - `docs/design-profile-pictures.md` — avatar uploads, storage bucket, signed URLs
-- `docs/design-programs.md` — programs and participants, plus program features (registry, attachment, access rule, message box)
+- `docs/design-programs.md` — programs and participants, plus program features (registry, attachment, access rule)
+- `docs/feature-message-box.md` — the message box program feature: tables, who can read/post/delete, the prompt, routes
 - `docs/design-relations.md` — the relationship web (schema, flows, rationale)
 - `docs/design-buttondown.md` — Buttondown sync (program tag mirror, cron, write policy)
 - `docs/design-richtext.md` — rich text: markdown storage, react-markdown render, MDXEditor authoring

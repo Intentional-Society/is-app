@@ -15,7 +15,7 @@ export const PROGRAM_FEATURES: readonly ProgramFeatureDefinition[] = [
   {
     key: MESSAGE_BOX_FEATURE,
     name: "Message box",
-    description: "Participants leave short messages on the program page. Admins choose who can read them.",
+    description: "Participants can leave short messages on the program page.",
   },
 ];
 

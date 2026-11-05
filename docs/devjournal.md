@@ -12,7 +12,7 @@ Each entry: **Date** | **Author** | **Title**, followed by description text. Mos
 
 ## 2026-11-03 | Benji (with Kiro) | Message box: the first program feature
 
-Built the program-features infrastructure from `docs/design-programs.md` (registry, `program_features` attachment table, one access helper, admin toggle) with the message box as its first feature (#12). Decisions: each program gets an optional markdown prompt above the box (the Community Calls "Won't be there?" text); posting is for active participants; reading is a per-program admin setting, `admins` (default) or `members`; admins can always read and delete; feature data cascades with the program and the author. `/programs/[slug]` is now server-rendered with prefetch-and-hydrate, as the design called for. Not built: Miro replication, and a "Program Contact" role as a permissions tier between participant and admin.
+Built the program-features infrastructure from `docs/design-programs.md` with the message box as its first feature (#12; details in `docs/feature-message-box.md`). Posting is for participants; reading is a per-program admin setting; admins can delete; each program has an optional markdown prompt. `/programs/[slug]` is now server-rendered with prefetch-and-hydrate. Not built: Miro replication, and a "Program Contact" role.
 
 ---
 

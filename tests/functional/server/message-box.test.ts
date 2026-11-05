@@ -94,7 +94,7 @@ type Box = {
   prompt: string | null;
   canRead: boolean;
   canPost: boolean;
-  canModerate: boolean;
+  canDelete: boolean;
   messages: Array<{ id: string; body: string; author: { id: string; displayName: string | null } }>;
 };
 
@@ -214,7 +214,7 @@ describe("Message box program feature", () => {
       await seedMessage(participant, "secret");
       authAs(participant);
       const box = await getBox();
-      expect(box).toMatchObject({ visibility: "admins", canRead: false, canPost: true, canModerate: false });
+      expect(box).toMatchObject({ visibility: "admins", canRead: false, canPost: true, canDelete: false });
       expect(box.messages).toEqual([]);
     });
 
@@ -222,7 +222,7 @@ describe("Message box program feature", () => {
       await seedMessage(participant, "for admins");
       authAs(admin);
       const box = await getBox();
-      expect(box).toMatchObject({ canRead: true, canPost: false, canModerate: true });
+      expect(box).toMatchObject({ canRead: true, canPost: false, canDelete: true });
       expect(box.messages.map((m) => m.body)).toEqual(["for admins"]);
     });
 
@@ -231,7 +231,7 @@ describe("Message box program feature", () => {
       await seedMessage(participant, "open to all");
       authAs(outsider);
       const box = await getBox();
-      expect(box).toMatchObject({ visibility: "members", canRead: true, canPost: false, canModerate: false });
+      expect(box).toMatchObject({ visibility: "members", canRead: true, canPost: false, canDelete: false });
       expect(box.messages).toHaveLength(1);
       expect(box.messages[0]).toMatchObject({
         body: "open to all",
@@ -250,13 +250,13 @@ describe("Message box program feature", () => {
         expect(await getBox()).toMatchObject({
           visibility: "admins",
           canRead: false,
-          canModerate: false,
+          canDelete: false,
           messages: [],
         });
 
         await setVisibilityDirect("members");
         const box = await getBox();
-        expect(box.canModerate).toBe(false);
+        expect(box.canDelete).toBe(false);
         expect(box.messages.map((m) => m.body)).toEqual(["visible"]);
       },
     );

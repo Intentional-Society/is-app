@@ -412,7 +412,7 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
       prompt,
       canRead,
       canPost: c.get("featureParticipant"),
-      canModerate: admin,
+      canDelete: admin,
       messages,
     });
   })

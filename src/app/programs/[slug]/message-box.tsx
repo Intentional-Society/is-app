@@ -67,7 +67,7 @@ function MessageBoxBody({ programId, data }: { programId: string; data: MessageB
         <p className="text-sm text-muted-foreground">Join this program to leave a message.</p>
       )}
       {data.canRead ? (
-        <MessageList programId={programId} messages={data.messages} canModerate={data.canModerate} />
+        <MessageList programId={programId} messages={data.messages} canDelete={data.canDelete} />
       ) : (
         <p className="text-sm text-muted-foreground">Messages sent here are read by the program's admins.</p>
       )}
@@ -141,11 +141,11 @@ function MessageForm({ programId }: { programId: string }) {
 function MessageList({
   programId,
   messages,
-  canModerate,
+  canDelete,
 }: {
   programId: string;
   messages: MessageBoxMessage[];
-  canModerate: boolean;
+  canDelete: boolean;
 }) {
   if (messages.length === 0) {
     return <p className="text-sm text-muted-foreground">No messages yet.</p>;
@@ -153,7 +153,7 @@ function MessageList({
   return (
     <ul className="flex flex-col gap-3">
       {messages.map((m) => (
-        <MessageItem key={m.id} programId={programId} message={m} canModerate={canModerate} />
+        <MessageItem key={m.id} programId={programId} message={m} canDelete={canDelete} />
       ))}
     </ul>
   );
@@ -162,11 +162,11 @@ function MessageList({
 function MessageItem({
   programId,
   message,
-  canModerate,
+  canDelete,
 }: {
   programId: string;
   message: MessageBoxMessage;
-  canModerate: boolean;
+  canDelete: boolean;
 }) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
@@ -199,7 +199,7 @@ function MessageItem({
         <span className="whitespace-nowrap text-xs text-muted-foreground">
           <LocalTime iso={message.createdAt} withTime />
         </span>
-        {canModerate &&
+        {canDelete &&
           (confirming ? (
             <span className="ml-auto flex items-center gap-2">
               <Button

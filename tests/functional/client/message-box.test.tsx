@@ -36,7 +36,7 @@ const box = (overrides: Partial<MessageBoxResponse> = {}): MessageBoxResponse =>
   prompt: null,
   canRead: true,
   canPost: true,
-  canModerate: false,
+  canDelete: false,
   messages: [
     {
       id: "m1",
@@ -143,7 +143,7 @@ describe("MessageBox", () => {
   });
 
   it("lets a moderator delete a message after confirming", async () => {
-    mockBox(box({ canModerate: true }));
+    mockBox(box({ canDelete: true }));
     $delete.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
     renderBox();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
@@ -153,7 +153,7 @@ describe("MessageBox", () => {
   });
 
   it("backs out of a delete on Cancel", async () => {
-    mockBox(box({ canModerate: true }));
+    mockBox(box({ canDelete: true }));
     renderBox();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
