@@ -222,6 +222,12 @@
 .is-mdxeditor [role="toolbar"] {
   flex-wrap: wrap;
   overflow-x: visible;
+  /* The toolbar sits inside the editor's 1px rounded border. MDXEditor gives it
+     a smaller corner radius than the border's inner curve, so its grey
+     background pokes over the border at the top corners. Match the border's
+     inner radius (outer rounded-lg radius minus the 1px border). */
+  border-top-left-radius: calc(var(--radius-lg) - 1px);
+  border-top-right-radius: calc(var(--radius-lg) - 1px);
 }
 .is-mdxeditor [role="toolbar"] [role="combobox"] {
   width: 7rem;
