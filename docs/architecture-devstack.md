@@ -1,6 +1,6 @@
 # Intentional Society Application — Development & Testing Stack
 
-**Context:** Development tooling, testing infrastructure, and observability for the Intentional Society  application.
+**Context:** Development tooling, testing infrastructure, and observability for the Intentional Society application.
 
 ---
 

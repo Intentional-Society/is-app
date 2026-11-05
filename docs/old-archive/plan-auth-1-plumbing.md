@@ -24,14 +24,14 @@ Phase 1 does the minimum needed to prove auth works end-to-end: a user can sign 
 
 This phase lands as a single PR built from six sequential commits. Each commit keeps the app in a working state.
 
-| Commit | Scope | Key changes |
-|--------|-------|-------------|
-| **1a** | Schema + migration | `schema.ts` (2 tables), generated SQL |
-| **1b** | Next.js session-refresh middleware | `src/middleware.ts` (new) |
-| **1c** | Hono auth middleware | `api.ts` middleware, `auth-middleware.test.ts` |
-| **1d** | Auth callback + profile upsert | `auth/callback/route.ts`, `profiles.ts`, `auth-callback.test.ts`, `profiles.test.ts` |
-| **1e** | Login page | `login/page.tsx` |
-| **1f** | Protected home + `/api/me` + E2E | `page.tsx`, `api-me.test.ts`, `auth-redirect.spec.ts` |
+| Commit | Scope                              | Key changes                                                                          |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------------ |
+| **1a** | Schema + migration                 | `schema.ts` (2 tables), generated SQL                                                |
+| **1b** | Next.js session-refresh middleware | `src/middleware.ts` (new)                                                            |
+| **1c** | Hono auth middleware               | `api.ts` middleware, `auth-middleware.test.ts`                                       |
+| **1d** | Auth callback + profile upsert     | `auth/callback/route.ts`, `profiles.ts`, `auth-callback.test.ts`, `profiles.test.ts` |
+| **1e** | Login page                         | `login/page.tsx`                                                                     |
+| **1f** | Protected home + `/api/me` + E2E   | `page.tsx`, `api-me.test.ts`, `auth-redirect.spec.ts`                                |
 
 Commits 1a–1e are additive; 1f ("tie it all together") depends on all prior commits.
 
@@ -40,12 +40,14 @@ Commits 1a–1e are additive; 1f ("tie it all together") depends on all prior co
 Two tables, Drizzle `pg-core`. The `profiles` table ships minimal; Phase 2 alters it to add the rich fields. `invites` lands here too (endpoints in Phase 3) to keep the initial migration coherent. `programs` and `profilePrograms` are deferred to a dedicated micro-PR when a later phase actually needs them.
 
 ### `profiles` (minimal)
+
 - `id` — `uuid`, PK, references `auth.users(id)` (no cascade: members leave relational traces, so profile rows persist after a Supabase user is deleted; GDPR "forget me" is handled later via anonymization)
 - `displayName` — `text`, nullable (explicit "not yet collected" state until Phase 3 signup collects it)
 - `createdAt` — `timestamptz`, not null, default `now()`
 - `updatedAt` — `timestamptz`, not null, default `now()`, auto-updated via Drizzle `.$onUpdate(() => new Date())`
 
 ### `invites` (schema lands in Phase 1; endpoints in Phase 3)
+
 - `id` — `uuid`, PK, default `gen_random_uuid()`
 - `code` — `text`, unique, not null (12 chars base32, human-readable: `K3JA-9P2F-XQ7M`)
 - `createdBy` — `uuid`, nullable, FK to `profiles.id`, `onDelete: "set null"` (preserves invite audit history after member deletion)

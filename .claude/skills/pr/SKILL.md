@@ -1,4 +1,5 @@
 ---
+
 name: pr
 description: "[is-app] Open or update the PR for the current branch: fetch + rebase on main, re-test if rebased, drafted title/body with human approval. Delegates uncommitted changes to /commit; never switches branches or merges. Use for any PR intent — \"open a PR for this\", or `/pr #142`. Announce `Using /pr` as you route, before the Skill call."
 ---
@@ -20,21 +21,20 @@ Argument resolution order:
 
 No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow; `/pr` stops after opening or updating the PR.
 
-**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR") — **including when *you* offered to open a PR and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the PR with ad-hoc `git`/`gh` commands. Scope it to your own PR offer: a bare "yes" to an *unrelated* offer (a refactor, rename, or search) is **not** a PR trigger — don't fire `/pr` on it. On **every** model-invoked (natural-language) run, **announce `Using /pr` as you route — the first line of the message in which you call the `Skill` tool, before the call** so the human can see the Skill fired (a delegated call is the exception — the parent announces the handoff; see Step 0). On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/pr` and delegated calls (`/ship` → `/pr`) skip the *confirmation*, but the announcement still applies to any model-invoked run.
+**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR") — **including when _you_ offered to open a PR and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the PR with ad-hoc `git`/`gh` commands. Scope it to your own PR offer: a bare "yes" to an _unrelated_ offer (a refactor, rename, or search) is **not** a PR trigger — don't fire `/pr` on it. On **every** model-invoked (natural-language) run, **announce `Using /pr` as you route — the first line of the message in which you call the `Skill` tool, before the call** so the human can see the Skill fired (a delegated call is the exception — the parent announces the handoff; see Step 0). On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/pr` and delegated calls (`/ship` → `/pr`) skip the _confirmation_, but the announcement still applies to any model-invoked run.
 
 ## Steps
 
 0. **Announce + NL intent gate (model-invoked only).**
 
-   **Announcement — at the routing decision; backstop here.** You should already have announced `Using /pr` as you routed — the first line of the message in which you invoked the `Skill` tool, before the call (see CLAUDE.md / Invocation paths). **If you have not, announce it now as the first visible line of your response** — exactly once, never doubled. **Exception — delegated calls:** when the delegation marker (below) is present **and fresh** (its timestamp within the last 30s — the same lease the intent gate applies below), do **not** announce; the parent already printed `Using /pr — delegated from /ship` on your behalf. A **stale** marker (older than 30s, e.g. from a crashed delegation) is *not* a delegated call — announce as normal (the gate deletes it and treats this as a standalone run). The opt-out file does **not** suppress the announcement (it suppresses only the *confirmation* below); only delegation does. The announcement is the forcing function that keeps this flow inside the Skill — an ad-hoc `gh pr create` can't honestly print it.
+   **Announcement — at the routing decision; backstop here.** You should already have announced `Using /pr` as you routed — the first line of the message in which you invoked the `Skill` tool, before the call (see CLAUDE.md / Invocation paths). **If you have not, announce it now as the first visible line of your response** — exactly once, never doubled. **Exception — delegated calls:** when the delegation marker (below) is present **and fresh** (its timestamp within the last 30s — the same lease the intent gate applies below), do **not** announce; the parent already printed `Using /pr — delegated from /ship` on your behalf. A **stale** marker (older than 30s, e.g. from a crashed delegation) is _not_ a delegated call — announce as normal (the gate deletes it and treats this as a standalone run). The opt-out file does **not** suppress the announcement (it suppresses only the _confirmation_ below); only delegation does. The announcement is the forcing function that keeps this flow inside the Skill — an ad-hoc `gh pr create` can't honestly print it.
 
    **Intent gate.** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
-
-   - **Verified slash entry** — a `<command-name>` tag for `/pr` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward *firing* the gate).
+   - **Verified slash entry** — a `<command-name>` tag for `/pr` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward _firing_ the gate).
    - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 later.
    - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
 
-   When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: *[detected context — echo any user guidance]*?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects).
+   When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: _[detected context — echo any user guidance]_?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects).
 
    **If `AskUserQuestion` is not available** (headless, cloud, or any non-interactive session), present the same question and the same three options as plain text, and **stop**. Do not proceed without an answer. A missing prompter is not a skip condition — the only skip conditions are the three listed above.
 
@@ -58,85 +58,81 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 9. **If no open PR for this branch — draft and create.**
 
-    Draft a PR title, body, and reviewer list for human approval, then run `gh pr create` (always assigning the PR to its opener — see **Assignee** below).
+   Draft a PR title, body, and reviewer list for human approval, then run `gh pr create` (always assigning the PR to its opener — see **Assignee** below).
 
-    **Title:** same Conventional Commit-style headline rule as `/commit`. `<type>[(scope)]: <imperative summary>`, ≤70 chars, including `!` for breaking changes. The title is durable: GitHub uses it verbatim as the merge commit subject (`merge_commit_title: PR_TITLE`).
+   **Title:** same Conventional Commit-style headline rule as `/commit`. `<type>[(scope)]: <imperative summary>`, ≤70 chars, including `!` for breaking changes. The title is durable: GitHub uses it verbatim as the merge commit subject (`merge_commit_title: PR_TITLE`).
 
-    **Body:** the same structured convention as `/commit`'s message body.
+   **Body:** the same structured convention as `/commit`'s message body.
+   - `Summary:` — one sentence.
+   - `Why:` — motivation.
+   - `Behavior:` — observable change.
+   - `Test Plan:` — evidence (commands run with output, human attestations, or the collapsed `ran \`npm test\` locally`line). Same provenance rule as`/commit` — never invented.
+   - `Closes #N` / `(#N)` references.
+   - AI co-author trailer (same protocol as `/commit`: canonical form when detection succeeds, ask-once + body caveat on fallback).
 
-    - `Summary:` — one sentence.
-    - `Why:` — motivation.
-    - `Behavior:` — observable change.
-    - `Test Plan:` — evidence (commands run with output, human attestations, or the collapsed `ran \`npm test\` locally` line). Same provenance rule as `/commit` — never invented.
-    - `Closes #N` / `(#N)` references.
-    - AI co-author trailer (same protocol as `/commit`: canonical form when detection succeeds, ask-once + body caveat on fallback).
+   **Test-plan formatting.** Plain bullets, not Markdown task-list checkboxes. The body becomes the durable merge commit message in this repo (`merge_commit_message: PR_BODY`), and unchecked task-list boxes look like outstanding work. If human-only verification remains, surface it as a pending action or reviewer note, not as completed test evidence. Don't add task-list checkboxes unless they already come from `.github/PULL_REQUEST_TEMPLATE.md`.
 
-    **Test-plan formatting.** Plain bullets, not Markdown task-list checkboxes. The body becomes the durable merge commit message in this repo (`merge_commit_message: PR_BODY`), and unchecked task-list boxes look like outstanding work. If human-only verification remains, surface it as a pending action or reviewer note, not as completed test evidence. Don't add task-list checkboxes unless they already come from `.github/PULL_REQUEST_TEMPLATE.md`.
+   **Reviewers — show a one-line picker so the human picks correct logins without spelling them.** The bundled approval block has a third item alongside title and body: a `Reviewers:` picker built from a cached team list. Humans often think in real names ("add Blake") but GitHub needs the login (`NorsemanSpiff`); surfacing the team list eliminates name-to-handle guessing AND catches stale handles (e.g., `alexisChen9090` is a frozen historical handle for `AlexisChen99`).
 
-    **Reviewers — show a one-line picker so the human picks correct logins without spelling them.** The bundled approval block has a third item alongside title and body: a `Reviewers:` picker built from a cached team list. Humans often think in real names ("add Blake") but GitHub needs the login (`NorsemanSpiff`); surfacing the team list eliminates name-to-handle guessing AND catches stale handles (e.g., `alexisChen9090` is a frozen historical handle for `AlexisChen99`).
+   **Team cache.** Store at `.claude/skills/pr/.team-cache.json` (per-machine, gitignored):
 
-    **Team cache.** Store at `.claude/skills/pr/.team-cache.json` (per-machine, gitignored):
+   ```json
+   {
+     "collaborators": ["<login>", ...],
+     "displayNames": { "<login>": "<name or login>", ... },
+     "self": "<your login>",
+     "refreshedAt": "<ISO timestamp>"
+   }
+   ```
 
-    ```json
-    {
-      "collaborators": ["<login>", ...],
-      "displayNames": { "<login>": "<name or login>", ... },
-      "self": "<your login>",
-      "refreshedAt": "<ISO timestamp>"
-    }
-    ```
+   Populate on cold cache. Steps (1) and (2) run in parallel; step (3) fans out per-login after (1) returns and the bot filter is applied:
+   1. `gh api 'repos/<owner>/<repo>/collaborators' --paginate --jq '.[].login'` — full collaborator list.
+   2. `gh api user --jq '.login'` — the running human's login (stored as `self`).
+   3. For each surviving login, `gh api users/<login> --jq '.name // .login'` in parallel — display names. `// .login` returns the login when `.name` is null.
 
-    Populate on cold cache. Steps (1) and (2) run in parallel; step (3) fans out per-login after (1) returns and the bot filter is applied:
-
-    1. `gh api 'repos/<owner>/<repo>/collaborators' --paginate --jq '.[].login'` — full collaborator list.
-    2. `gh api user --jq '.login'` — the running human's login (stored as `self`).
-    3. For each surviving login, `gh api users/<login> --jq '.name // .login'` in parallel — display names. `// .login` returns the login when `.name` is null.
-
-    Apply the **bot filter** to (1) before writing the cache: drop `github-advanced-security`, `copilot-pull-request-reviewer`, `claude`, any login starting with `app/`, any login containing `[bot]`. Maintain the list here in the SKILL.md as GitHub adds new advisory bots over time.
+   Apply the **bot filter** to (1) before writing the cache: drop `github-advanced-security`, `copilot-pull-request-reviewer`, `claude`, any login starting with `app/`, any login containing `[bot]`. Maintain the list here in the SKILL.md as GitHub adds new advisory bots over time.
 
     <!-- TODO(PR#305-followup): bot filter is applied at cache-write time, so existing teammate caches don't auto-invalidate when this list changes. Self-heals on the next `gh pr create --reviewer` rejection via the refresh-on-rejection path — at the cost of one wasted prompt cycle. Worth an explicit "force-refresh on filter version bump" if that cycle ever matters in practice. -->
 
-    **Refresh triggers** (any one):
-    - `refreshedAt` is older than **15 days**.
-    - `gh pr create --reviewer <list>` rejects a login that exists in the cache (signal: a teammate was removed).
-    - The human types `refresh` in the reviewer prompt (escape hatch for "new teammate joined, refresh now").
+   **Refresh triggers** (any one):
+   - `refreshedAt` is older than **15 days**.
+   - `gh pr create --reviewer <list>` rejects a login that exists in the cache (signal: a teammate was removed).
+   - The human types `refresh` in the reviewer prompt (escape hatch for "new teammate joined, refresh now").
 
-    **Render the picker.** Exclude `self` at render time so the same cache works for any teammate running `/pr`. Sort the remaining collaborators alphabetically by display name, case-insensitive. Number them in sort order. Render every collaborator — no truncation:
+   **Render the picker.** Exclude `self` at render time so the same cache works for any teammate running `/pr`. Sort the remaining collaborators alphabetically by display name, case-insensitive. Number them in sort order. Render every collaborator — no truncation:
 
-    ```text
-    Reviewers? Reply with names, logins, numbers, "all", or blank:
-      [1] AlexisChen99    (AlexisChen)
-      [2] benjifriedman   (Benji Friedman)
-      [3] james-baker     (James Baker)
-      [4] oolu4236        (OLA)
-      [5] Ceantaur        (Sean)
-    ```
+   ```text
+   Reviewers? Reply with names, logins, numbers, "all", or blank:
+     [1] AlexisChen99    (AlexisChen)
+     [2] benjifriedman   (Benji Friedman)
+     [3] james-baker     (James Baker)
+     [4] oolu4236        (OLA)
+     [5] Ceantaur        (Sean)
+   ```
 
-    **Accept the human's reply** in any of these shapes and resolve to a list of GitHub logins:
+   **Accept the human's reply** in any of these shapes and resolve to a list of GitHub logins:
+   - Numbers (`1 3`, `1,3`, `1, 3`) — positional pick from the rendered order. If any number is out of range (e.g., `7` when only 5 entries are rendered), surface the invalid index and re-ask rather than partial-resolve.
+   - Display names or partial names (`james and benji`, `Alexis`) — match against the cached display-name dictionary. On ambiguity, ask one clarifying question rather than guess.
+   - Exact logins (`james-baker, benjifriedman`) — passed through after validating against the cache.
+   - `all` / `everyone` / `whole team` — every collaborator except `self`. If the resulting set is empty (one-person repo where `self` is the only collaborator), treat as `none`.
+   - `none` / blank / `skip` — no reviewers.
+   - `refresh` — refresh the team cache and re-render the picker.
 
-    - Numbers (`1 3`, `1,3`, `1, 3`) — positional pick from the rendered order. If any number is out of range (e.g., `7` when only 5 entries are rendered), surface the invalid index and re-ask rather than partial-resolve.
-    - Display names or partial names (`james and benji`, `Alexis`) — match against the cached display-name dictionary. On ambiguity, ask one clarifying question rather than guess.
-    - Exact logins (`james-baker, benjifriedman`) — passed through after validating against the cache.
-    - `all` / `everyone` / `whole team` — every collaborator except `self`. If the resulting set is empty (one-person repo where `self` is the only collaborator), treat as `none`.
-    - `none` / blank / `skip` — no reviewers.
-    - `refresh` — refresh the team cache and re-render the picker.
+   **Echo the resolution** as one line before `gh pr create`, so the human always sees what got resolved:
 
-    **Echo the resolution** as one line before `gh pr create`, so the human always sees what got resolved:
+   ```text
+   → Assigning to <self>; requesting review from james-baker, benjifriedman. Proceeding.
+   ```
 
-    ```text
-    → Assigning to <self>; requesting review from james-baker, benjifriedman. Proceeding.
-    ```
+   Pass the resolved list to `gh pr create --reviewer <login1>,<login2>,... --assignee @me` (no `@` prefix on reviewer logins, no spaces inside the `--reviewer` value); omit `--reviewer` when the list is empty, but **always keep `--assignee @me`**.
 
-    Pass the resolved list to `gh pr create --reviewer <login1>,<login2>,... --assignee @me` (no `@` prefix on reviewer logins, no spaces inside the `--reviewer` value); omit `--reviewer` when the list is empty, but **always keep `--assignee @me`**.
+   **Assignee — always assign the PR to its opener (you).** `gh pr create` leaves the Assignees field empty by default, so PRs end up owned by no one — the gap this fixes. Always pass `--assignee @me`; it resolves to the authenticated `gh` user running `/pr` (= `self` in the team cache) without a lookup. Unconditional, no picker needed: the opener is the person driving the PR (addressing review, shipping it). Distinct from reviewers — the reviewer list may be empty, the assignee never is. (If `/pr` runs on a branch authored by someone else, the executor is still the assignee: they're driving it now; the commit author field records original authorship.)
 
-    **Assignee — always assign the PR to its opener (you).** `gh pr create` leaves the Assignees field empty by default, so PRs end up owned by no one — the gap this fixes. Always pass `--assignee @me`; it resolves to the authenticated `gh` user running `/pr` (= `self` in the team cache) without a lookup. Unconditional, no picker needed: the opener is the person driving the PR (addressing review, shipping it). Distinct from reviewers — the reviewer list may be empty, the assignee never is. (If `/pr` runs on a branch authored by someone else, the executor is still the assignee: they're driving it now; the commit author field records original authorship.)
+   **Failure handling.**
+   - If the cache file is missing or unreadable, regenerate it via the cold-cache path above. If regeneration fails (network, rate limit, gh unauthenticated), fall back to a bare `Reviewers (comma-separated logins or blank):` prompt with no picker — the Skill still works, just less ergonomically.
+   - If `gh pr create --reviewer` rejects a login (typo, no longer a collaborator), refresh the cache, surface the exact `gh` error + the refreshed picker, and re-ask. Don't retry blindly.
 
-    **Failure handling.**
-
-    - If the cache file is missing or unreadable, regenerate it via the cold-cache path above. If regeneration fails (network, rate limit, gh unauthenticated), fall back to a bare `Reviewers (comma-separated logins or blank):` prompt with no picker — the Skill still works, just less ergonomically.
-    - If `gh pr create --reviewer` rejects a login (typo, no longer a collaborator), refresh the cache, surface the exact `gh` error + the refreshed picker, and re-ask. Don't retry blindly.
-
-    Present the full draft (title + body + reviewers) for human Y/n approval before `gh pr create`. On approval, run `gh pr create` with `--assignee @me` always, plus `--reviewer` when the reviewer list is non-empty.
+   Present the full draft (title + body + reviewers) for human Y/n approval before `gh pr create`. On approval, run `gh pr create` with `--assignee @me` always, plus `--reviewer` when the reviewer list is non-empty.
 
 10. **If an open PR for this branch exists — comment-by-default, body-update only on material scope change.**
 

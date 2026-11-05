@@ -8,8 +8,8 @@ would otherwise keep running old code indefinitely.
 The architecture rationale for each component lives in
 `docs/architecture-appstack.md`; the schema/API compatibility mechanics live in
 `docs/strategy-committing.md`. This doc is the single place that ties them together
-around one question: *what happens to a member who is using the app at the exact
-moment we deploy?*
+around one question: _what happens to a member who is using the app at the exact
+moment we deploy?_
 
 ## Core stance: stateless and backward-compatible at every layer
 
@@ -25,7 +25,7 @@ state that a deploy can pull out from under the user.
   (`docs/doc-vercel.md`).
 - **Auth continuity (stateless JWT).** The Supabase JWT lives client-side; Hono
   verifies it statelessly in middleware. Token refresh happens in the browser
-  *directly against Supabase GoTrue*, independent of our deployments. A deploy
+  _directly against Supabase GoTrue_, independent of our deployments. A deploy
   landing mid-session never logs anyone out and never invalidates a token, because
   there is no server-side session to lose.
 - **API compatibility (expand-contract).** An already-loaded tab talking to the
@@ -33,7 +33,7 @@ state that a deploy can pull out from under the user.
   pattern: add the new shape alongside the old, migrate clients, then remove the old
   one — never expand and contract in the same deploy. See `docs/strategy-committing.md`.
 - **Database migrations (forward-only, pre-cutover).** Migrations run in the
-  production build command *before* `next build`, so the schema is updated before the
+  production build command _before_ `next build`, so the schema is updated before the
   new code is live. The only window to reason about is "old code vs. new schema,"
   which expand-contract makes the safe direction. See `docs/strategy-committing.md`.
 - **Client data (stale-while-revalidate).** TanStack Query keeps rendering cached
@@ -45,9 +45,9 @@ own: the **front-end bundle** a member already downloaded.
 
 ## Version skew: Vercel Skew Protection
 
-When a deploy lands while a member has a tab open, that tab is running the *old*
+When a deploy lands while a member has a tab open, that tab is running the _old_
 JavaScript bundle. If it then requests an asset or runs a Server Action against the
-*new* deployment, the versions disagree — "version skew." Vercel Skew Protection
+_new_ deployment, the versions disagree — "version skew." Vercel Skew Protection
 solves this by version-locking a session to the deployment that served its initial
 page load.
 
@@ -66,26 +66,26 @@ what the update banner exists to pre-empt.
 
 So Max Age and the notify holds are independent clocks. Max Age is set
 to **7 days** — far longer than any notify hold (a first nudge at 6 hours for a patch, 2
-for a feature, then a reminder at most once every 8). The holds decide when we *gently
-offer* an update; Max Age is how
-long we *protect* a tab that hasn't taken one. With the pin that much longer than the
+for a feature, then a reminder at most once every 8). The holds decide when we _gently
+offer_ an update; Max Age is how
+long we _protect_ a tab that hasn't taken one. With the pin that much longer than the
 holds, the graceful path (banner, reloaded at a moment the member chooses) has nearly a
 week of runway before the 404 fallback can fire. See `docs/doc-vercel.md` for the
 dashboard setting.
 
 **The built-in document-navigation reload (our passive baseline).** Skew Protection
-deliberately does *not* pin full-page document navigations — a hard refresh, typing
-the URL, or opening a link in a new tab fetches the *latest* production deployment.
+deliberately does _not_ pin full-page document navigations — a hard refresh, typing
+the URL, or opening a link in a new tab fetches the _latest_ production deployment.
 When the framework detects the version mismatch on that load, it triggers a full page
 reload onto the new version. So a member who closes and reopens the tab, or hard-
 refreshes, lands on the latest version with no work from us.
 
-**What Skew Protection does *not* do** — and why a passive baseline isn't enough:
+**What Skew Protection does _not_ do** — and why a passive baseline isn't enough:
 
-1. It doesn't *tell* the member a new version exists.
+1. It doesn't _tell_ the member a new version exists.
 2. It doesn't move an already-open session onto new code. In-app navigation via
-   `<Link>` is a framework-managed request, so it stays *pinned to the old
-   deployment*. A member who clicks around the app for hours via SPA navigation never
+   `<Link>` is a framework-managed request, so it stays _pinned to the old
+   deployment_. A member who clicks around the app for hours via SPA navigation never
    triggers the built-in document-navigation reload and never sees fixes shipped in
    the meantime.
 3. The pin lapses once a tab outlives the Max Age, after which that long-idle tab is
@@ -104,7 +104,7 @@ Not every deploy deserves the same interruption. Updates fall into three tiers, 
 the banner's insistence scales with them:
 
 - **Patch** — bug fixes, refactors, infra. No member-facing changelog entry; nobody is
-  waiting for it. Notified *gently and late* (see "What the member sees").
+  waiting for it. Notified _gently and late_ (see "What the member sees").
 - **Feature** — new member-facing functionality. Earns a changelog entry. Notified
   after a brief hold, dismissibly.
 - **Urgent** — a fix for active breakage or a security exposure that old clients must
@@ -120,11 +120,11 @@ patches, and one pending urgent outranks everything.
 The open tab carries three values frozen into its bundle at build time, and compares
 each against the live production values from `GET /api/version`:
 
-| Frozen in the running bundle | Live from `/api/version` | The comparison says |
-| --- | --- | --- |
-| `NEXT_PUBLIC_BUILD_ID` (deployment id) | `id` | differ → a newer deploy exists at all → at least **patch** |
-| the bundle's own `appVersion` (`src/lib/changelog.tsx`) | `appVersion` | live is newer → a changelog entry shipped since → **feature** |
-| `NEXT_PUBLIC_BUILD_TIME` (when this build shipped) | `urgentReleasedAt` | `BUILD_TIME < urgentReleasedAt` → an urgent deploy shipped *after* this build → **urgent** |
+| Frozen in the running bundle                            | Live from `/api/version` | The comparison says                                                                        |
+| ------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_BUILD_ID` (deployment id)                  | `id`                     | differ → a newer deploy exists at all → at least **patch**                                 |
+| the bundle's own `appVersion` (`src/lib/changelog.tsx`) | `appVersion`             | live is newer → a changelog entry shipped since → **feature**                              |
+| `NEXT_PUBLIC_BUILD_TIME` (when this build shipped)      | `urgentReleasedAt`       | `BUILD_TIME < urgentReleasedAt` → an urgent deploy shipped _after_ this build → **urgent** |
 
 `NEXT_PUBLIC_BUILD_TIME` pulls double duty: it is both the urgent comparison above and
 the patch clock (see "What the member sees"). `next.config.ts` inlines it alongside
@@ -134,24 +134,24 @@ the tab compares its built-in copy against the live one; `urgentReleasedAt` is a
 `changelog.tsx` export but is read only server-side for `/api/version` — the tab needs
 no frozen copy of it, because it compares the live value against its own build time.
 `GET /api/version` (unauthenticated, in the Hono API at `src/server/api.ts`) returns
-the *current* deployment's view, read per request:
+the _current_ deployment's view, read per request:
 
 ```ts
 { id: process.env.VERCEL_DEPLOYMENT_ID ?? "dev", appVersion, urgentReleasedAt }
 ```
 
-The detection works *because of* a Skew Protection detail: the framework pins
+The detection works _because of_ a Skew Protection detail: the framework pins
 framework-managed requests, but **not custom `fetch()` calls**. The poll to
 `/api/version` is a plain client `fetch`, so it is not pinned — it resolves to the
-*current production* deployment and returns that deployment's values, not the
+_current production_ deployment and returns that deployment's values, not the
 session's. (Do not add `?dpl=` or an `x-deployment-id` header to this fetch, or it
 would pin and always report the session's own state.)
 
 Because `appVersion` and `urgentReleasedAt` are themselves baked into every deployment,
-an old tab polling the *current* `/api/version` learns the current high-water marks and
-can place itself without any per-session server state: `id` differing proves *something*
+an old tab polling the _current_ `/api/version` learns the current high-water marks and
+can place itself without any per-session server state: `id` differing proves _something_
 is newer; the live `appVersion` outrunning the tab's built-in copy, or `urgentReleasedAt`
-post-dating the tab's own build time, proves *what kind*. The server stays stateless
+post-dating the tab's own build time, proves _what kind_. The server stays stateless
 serverless.
 
 ### Update tiers
@@ -161,7 +161,7 @@ already do:
 
 - **Feature** is whatever bumps `appVersion`. `appVersion` is the date of the newest
   member-facing changelog entry (`src/lib/changelog.tsx`), so "did this deploy earn a
-  changelog entry?" *is* the patch-vs-feature decision — the same call we already make
+  changelog entry?" _is_ the patch-vs-feature decision — the same call we already make
   when writing the entry. Nothing extra.
 - **Patch** is the default: any deploy with no new changelog entry. No marker, no
   ceremony.
@@ -186,33 +186,33 @@ relies on.)
 
 ### What the member sees
 
-The same banner component renders all three tiers; the tier controls its message, *when*
+The same banner component renders all three tiers; the tier controls its message, _when_
 it appears, and whether it can be dismissed. The Reload control sits inline in the
 sentence and always calls `window.location.reload()` — a full document navigation, so it
 pulls the latest production assets.
 
-- **Patch:** a dismissible banner — *"A new version of the app is ready: please Reload
-  when convenient."* — held back until the session is worth interrupting. It does **not**
+- **Patch:** a dismissible banner — _"A new version of the app is ready: please Reload
+  when convenient."_ — held back until the session is worth interrupting. It does **not**
   appear the moment a patch lands. It waits until the running build is at least **6
   hours old**, then shows at most **once per 8 hours** (a dismissal is remembered in
   `localStorage`). An actively-used fresh session is never interrupted for a bug fix, and
   several patches landing across a day collapse into a single eventual nudge.
-- **Feature:** a dismissible banner that names the win — *"The app has new features for
-  you: please Reload when convenient."* — shown once the running build is **2 hours
+- **Feature:** a dismissible banner that names the win — _"The app has new features for
+  you: please Reload when convenient."_ — shown once the running build is **2 hours
   old**. A brief hold, far shorter than patch's: the member-facing change is the whole
   reason to tell them, but a just-loaded session isn't interrupted even for that.
   Persistent, not a modal: they finish what they are doing and reload at a safe stopping
   point. Like patch, a dismissal is remembered in `localStorage`, so the banner returns
   at most **once per 8 hours** rather than vanishing for the rest of the session.
-- **Urgent:** a non-dismissible banner — *"An urgent update to the app is ready: please
-  Reload at the first opportunity."* — **immediately**. Still member-initiated (one
+- **Urgent:** a non-dismissible banner — _"An urgent update to the app is ready: please
+  Reload at the first opportunity."_ — **immediately**. Still member-initiated (one
   click, never automatic), but it cannot be dismissed.
 
 The patch clock is the running build's own age (`NEXT_PUBLIC_BUILD_TIME`), not the
-moment a newer patch happened to land. Measuring from when the member's build *shipped*,
+moment a newer patch happened to land. Measuring from when the member's build _shipped_,
 rather than from when it was first superseded, keeps the clock to one value we can
 inline and reason about; the difference is at most the gap between a member's load and
-the next patch, and erring toward *later* notification is exactly the goal. This 6-hour
+the next patch, and erring toward _later_ notification is exactly the goal. This 6-hour
 window sits far inside the 7-day Skew Protection Max Age (see above), so the gentle
 nudge reliably reaches a patch-only tab long before its pin could lapse into a hard
 reload.
@@ -242,7 +242,7 @@ prompt impossible to ignore (non-dismissible) rather than impossible to avoid
 
 ### The home page: an active safe-refresh point
 
-The one place we *do* reload automatically is the home page (`/`). The rule above
+The one place we _do_ reload automatically is the home page (`/`). The rule above
 guards unsaved input; home has none at the moment a member lands on it. It is reached
 either by a fresh document load (already current) or by an in-app `<Link>` navigation
 (pinned to the old bundle), and in both cases nothing has been typed yet — so a small
@@ -251,16 +251,16 @@ immediately, bypassing the tier holds. (`window.location.reload()`, not
 `router.refresh()`: a soft refresh re-runs server components but stays pinned to the old
 deployment, so it would never pull the new bundle.)
 
-This turns home into an *active* version of the passive document-navigation reload — it
+This turns home into an _active_ version of the passive document-navigation reload — it
 catches the SPA navigator (gap #2) the built-in reload misses. Because members pass
 through home routinely, most self-heal to current there and never see the banner; the
 banner becomes the safety net for members who stay deep in the input surfaces.
 
-The safety rests on firing *before interaction*, not on home staying input-free. The
+The safety rests on firing _before interaction_, not on home staying input-free. The
 check is an async fetch, so a keystroke can land in the sub-second window after mount;
 if one does, the reload is skipped and the banner takes over. A short `sessionStorage`
 cooldown guards against a reload loop if the version endpoint ever flaps. Home can hold
-inputs freely — only the reload's *timing* carries the guarantee.
+inputs freely — only the reload's _timing_ carries the guarantee.
 
 ## Relationship to the changelog
 
@@ -268,7 +268,7 @@ Two identities do two jobs, and the split is the point:
 
 - `NEXT_PUBLIC_BUILD_ID` (deployment identity) decides **whether** there is anything
   newer at all. Most deploys — bug fixes, infra, the very fixes we sometimes most want
-  out — do not touch the changelog, so the *trigger* has to key on deployment id or it
+  out — do not touch the changelog, so the _trigger_ has to key on deployment id or it
   would miss them entirely.
 - `appVersion` in `src/lib/changelog.tsx` (the newest member-facing entry's date, shown
   on `/about`) decides **how loudly** to notify. A deploy that advanced it is a feature

@@ -9,12 +9,12 @@ subprocess pipe, which raises `OSError [WinError 10093]` on Windows (spec C2, re
 
 **Platform routing (spec II.2f):**
 
-| Platform | How Layer C runs |
-|---|---|
-| **macOS / Linux** | Run the block below **directly** (needs python3 + PyYAML + a logged-in `claude` CLI). |
-| **Cloud Claude Code session** | Linux, so the crash vanishes. Run the block below; **Step 0 is the C5 smoke** that confirms nested `claude -p` works in the cloud sandbox first. |
-| **Cowork** | Works per the vendored SKILL.md's Cowork section. Run the block below. |
-| **Windows** | **Never natively.** Hand this prompt to a cloud/Cowork session (or a Mac/Linux teammate), let it run, and take back the reported `best_description`. |
+| Platform                      | How Layer C runs                                                                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **macOS / Linux**             | Run the block below **directly** (needs python3 + PyYAML + a logged-in `claude` CLI).                                                                |
+| **Cloud Claude Code session** | Linux, so the crash vanishes. Run the block below; **Step 0 is the C5 smoke** that confirms nested `claude -p` works in the cloud sandbox first.     |
+| **Cowork**                    | Works per the vendored SKILL.md's Cowork section. Run the block below.                                                                               |
+| **Windows**                   | **Never natively.** Hand this prompt to a cloud/Cowork session (or a Mac/Linux teammate), let it run, and take back the reported `best_description`. |
 
 **Scope:** only `/commit` and `/pr` — the two natural-language-invocable skills. `/ship` is
 `disable-model-invocation: true` (explicit-only), so description optimization does not apply
@@ -113,7 +113,7 @@ one-line SKILL.md frontmatter edit that must go through the same guarded `/commi
 review as any other skill change, on the author's machine, with the maintainer's sign-off.
 
 **Interpreting the scores (spec II.2e):** triggering is probabilistic — `runs-per-query 3`
-means each query fires the skill up to 3 times and the pass threshold is a *rate*
+means each query fires the skill up to 3 times and the pass threshold is a _rate_
 (≥ `trigger-threshold`). The **test** score (held-out set the improver never sees — see the
 `blinded_history` in run_loop.py) is the overfitting guard: prefer a description that holds up
 on test, not one that only wins on train.

@@ -22,7 +22,7 @@ Keeping these separate matters: a WYSIWYG editor does not imply HTML storage. We
 Confirmed 2026-06-18. Every item is standard markdown (CommonMark + GFM) and renders through `react-markdown` with no raw HTML and no sanitizer — the toolbar exposes exactly this set and no more:
 
 - Paragraphs and line breaks (see [Line breaks](#line-breaks))
-- **Bold** and *italic*
+- **Bold** and _italic_
 - ~~Strikethrough~~ (GFM)
 - Bullet and numbered lists
 - Links
@@ -66,14 +66,14 @@ A single shared `<Markdown>` component wraps this, used everywhere formatted pro
 
 ### Cards and other constrained surfaces
 
-The programs list card shows `blurb`, falling back to `description` when blurb is empty (`src/app/programs/programs-list.tsx`). Cards **render markdown too**, in a **constrained inline variant** of `<Markdown>`: it keeps inline marks (emphasis, strikethrough, links), line breaks, and paragraphs — each paragraph rendered as a plain block line so the author's line breaks survive — while *unwrapping* the blowout-prone blocks (headings, lists, quotes) to their text. This shows the formatting and line breaks without letting a full description's heading sizes or list markers blow out the card layout — and it is still raw-HTML-free, since it uses `react-markdown`'s element allowlist (`allowedElements` + `unwrapDisallowed`), not a sanitizer. The same constrained renderer covers any future inline surface.
+The programs list card shows `blurb`, falling back to `description` when blurb is empty (`src/app/programs/programs-list.tsx`). Cards **render markdown too**, in a **constrained inline variant** of `<Markdown>`: it keeps inline marks (emphasis, strikethrough, links), line breaks, and paragraphs — each paragraph rendered as a plain block line so the author's line breaks survive — while _unwrapping_ the blowout-prone blocks (headings, lists, quotes) to their text. This shows the formatting and line breaks without letting a full description's heading sizes or list markers blow out the card layout — and it is still raw-HTML-free, since it uses `react-markdown`'s element allowlist (`allowedElements` + `unwrapDisallowed`), not a sanitizer. The same constrained renderer covers any future inline surface.
 
 ### Line breaks
 
 In a WYSIWYG editor the author never types newline characters — they press **Enter** for a new paragraph or **Shift+Enter** for a line break within one. MDXEditor serializes these as:
 
 - **Enter** → a blank line (`\n\n`) → separate `<p>`s.
-- **Shift+Enter** → a *soft* single `\n`. The editor shows it as a line break (its content area is `white-space: break-spaces`), and import is symmetric: a stored `\n` reads back as that same break.
+- **Shift+Enter** → a _soft_ single `\n`. The editor shows it as a line break (its content area is `white-space: break-spaces`), and import is symmetric: a stored `\n` reads back as that same break.
 
 A bare `\n` is what CommonMark collapses to a space, so **`remark-breaks`** is in the render pipeline (both the full and constrained-inline variants) to turn each one into a `<br>`. Editor, stored bytes, and rendered page then agree, and the same rule renders the breaks in legacy plain-text descriptions — so fixing the #432 collapse needs no data migration.
 
@@ -85,7 +85,7 @@ Authors get a **true WYSIWYG** surface — formatting appears as they type and t
 
 Why MDXEditor specifically, given markdown storage:
 
-- **Markdown is its native format.** MDXEditor reads markdown in and writes markdown out as its document model, so the round-trip is *faithful* — what we store is exactly what it parsed, with no second serialization to maintain and nothing silently dropped.
+- **Markdown is its native format.** MDXEditor reads markdown in and writes markdown out as its document model, so the round-trip is _faithful_ — what we store is exactly what it parsed, with no second serialization to maintain and nothing silently dropped.
 - **It hides markdown entirely**, satisfying the "everyone is unaware it's markdown under the hood" requirement.
 - **MIT-licensed**, actively maintained (~793K weekly npm downloads as of 2026-06-18).
 
@@ -95,18 +95,18 @@ Why MDXEditor specifically, given markdown storage:
 
 The candidates were the WYSIWYG-over-markdown editors:
 
-| Editor | Weekly npm (2026-06-18) | License | Markdown round-trip | Notes |
-|---|---|---|---|---|
-| **MDXEditor** (chosen) | ~793K | MIT | **Faithful** — markdown is the model | Built on Lexical; heavier bundle (mitigated by lazy-load) |
-| Tiptap + `tiptap-markdown` | ~10.2M | MIT (OSS core) | Lossy export — md is a serialization | Far most popular, but that popularity is for apps storing ProseMirror JSON, not markdown |
-| BlockNote | ~353K | MPL-2.0 (XL pkgs GPL-3.0) | Lossy export | Polished Notion-style block UX; licensing wrinkle |
-| Milkdown / Crepe | ~210K | MIT | Faithful (markdown-native) | Honourable mention; smaller community, more UI assembly |
+| Editor                     | Weekly npm (2026-06-18) | License                   | Markdown round-trip                  | Notes                                                                                    |
+| -------------------------- | ----------------------- | ------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| **MDXEditor** (chosen)     | ~793K                   | MIT                       | **Faithful** — markdown is the model | Built on Lexical; heavier bundle (mitigated by lazy-load)                                |
+| Tiptap + `tiptap-markdown` | ~10.2M                  | MIT (OSS core)            | Lossy export — md is a serialization | Far most popular, but that popularity is for apps storing ProseMirror JSON, not markdown |
+| BlockNote                  | ~353K                   | MPL-2.0 (XL pkgs GPL-3.0) | Lossy export                         | Polished Notion-style block UX; licensing wrinkle                                        |
+| Milkdown / Crepe           | ~210K                   | MIT                       | Faithful (markdown-native)           | Honourable mention; smaller community, more UI assembly                                  |
 
-The decisive axis is **round-trip fidelity**, not raw popularity. Tiptap's and BlockNote's native models are document trees with markdown as an *export*; pairing them with markdown columns means owning a lossy serializer that can normalize or drop constructs across edit/save cycles. MDXEditor (and Milkdown) make markdown the source of truth, removing that whole class of bug. Tiptap remains the right answer when you store *its* JSON — which we are not.
+The decisive axis is **round-trip fidelity**, not raw popularity. Tiptap's and BlockNote's native models are document trees with markdown as an _export_; pairing them with markdown columns means owning a lossy serializer that can normalize or drop constructs across edit/save cycles. MDXEditor (and Milkdown) make markdown the source of truth, removing that whole class of bug. Tiptap remains the right answer when you store _its_ JSON — which we are not.
 
 ### Bundle weight
 
-MDXEditor is built on Lexical and is not small. It is **lazily loaded** (`next/dynamic` with `ssr: false` — Lexical is client-only) **in every authoring surface** — the admin program editor *and* the member-facing profile/onboarding forms — and **never ships to a render-only page** (public program detail, member profile, list cards), which need only `react-markdown`. The render path and the authoring path have entirely separate dependency footprints. Member prose is authored on bundle-sensitive member routes — including onboarding — so the dynamic import matters there as much as in admin: the editor chunk is fetched only when an author actually mounts the form, never on a first paint that only displays prose.
+MDXEditor is built on Lexical and is not small. It is **lazily loaded** (`next/dynamic` with `ssr: false` — Lexical is client-only) **in every authoring surface** — the admin program editor _and_ the member-facing profile/onboarding forms — and **never ships to a render-only page** (public program detail, member profile, list cards), which need only `react-markdown`. The render path and the authoring path have entirely separate dependency footprints. Member prose is authored on bundle-sensitive member routes — including onboarding — so the dynamic import matters there as much as in admin: the editor chunk is fetched only when an author actually mounts the form, never on a first paint that only displays prose.
 
 ## Security model
 
@@ -122,7 +122,7 @@ v1 covers **both** program copy and member prose, on one shared `<Markdown>` ren
 - **Program copy** — `description` (full formatting) and `blurb` (inline only), authored on the admin edit page (`src/app/admin/programs/[id]/program-detail.tsx`) and the create form (`programs-admin.tsx`, which also uses the full editor for `description` so the create path never silently stores raw markdown from a plain textarea); rendered on the detail page (`program-slug-detail.tsx`) and, constrained, on list cards (`programs-list.tsx`).
 - **Member prose** — `bio`, `currentIntention`, `supplementaryInfo` (`src/components/profile-fields.tsx`, rendered in `src/app/members/[id]/page.tsx`).
 
-Suggested build order *within* v1: land the shared components against program `description` first (highest-trust authors, the urgent #432 case), then wire `blurb` and the member-prose fields in the same release. Storage is unchanged throughout, so every step is additive — render + editor wiring, no migration.
+Suggested build order _within_ v1: land the shared components against program `description` first (highest-trust authors, the urgent #432 case), then wire `blurb` and the member-prose fields in the same release. Storage is unchanged throughout, so every step is additive — render + editor wiring, no migration.
 
 ## Implementation notes
 

@@ -1,4 +1,5 @@
 ---
+
 name: ship
 description: "[is-app] Orchestrate the full commit → PR → merge → post-merge-watch chain for a branch or PR in the Intentional Society repo. Invoke explicitly as `/ship [PR#|URL|issue-or-context]`. Delegates dirty / on-main states to `/pr` (which delegates to `/commit`). Fetches `origin/main`, rebases if needed, dispatches the schema-expand workflow when a schema expand is pending and waits for the `prod-db` approval gate + post-deploy e2e, watches all required and visible advisory pre-merge checks for up to 5 minutes (offering `wait+5` / `troubleshoot` / `abort` — never `proceed anyway`), runs `gh pr merge --merge --delete-branch` (the only valid merge form per repo settings), tidies the local branch, then watches `main` for up to 5 minutes for the production deploy and post-merge e2e. Fires only on explicit `/ship` invocation."
 disable-model-invocation: true
@@ -39,7 +40,6 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 7. **Dispatch schema expand if pending.** If a schema expand from `/commit` is pending and not yet deployed, run `npm run prod:db:expand` to dispatch the `forward-migrate-prod-schema-expansion` workflow against the pushed branch.
 
    **While-you-wait narration.** The workflow pauses on a manual approval gate in the `prod-db` GitHub Actions environment before injecting production credentials. This gate can take minutes to hours depending on maintainer availability — that is expected and normal, not a hang. While waiting:
-
    - Surface the workflow run URL (so the human can find the approval button on the GitHub Actions page).
    - Surface the migration SQL preview (so the human can review what will be applied).
    - Surface the PR link (so the maintainer reviewing has full context).
@@ -50,7 +50,6 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 8. **Wait for CI checks.** `gh pr checks <N> --watch`. The required check (`Lint & Functional Tests`) plus every visible advisory check (E2E, CodeQL, and any others present) must be green.
 
    Wait up to **5 minutes** for pending advisories. After 5 minutes, present three options:
-
    - `wait+5` — wait another 5 minutes.
    - `troubleshoot` — exit the wait loop and surface the still-pending check name(s) and URL(s) for human investigation.
    - `abort` — abandon the merge attempt.
@@ -58,7 +57,6 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
    **There is no `proceed` option.** Anything not green blocks the merge.
 
 9. **Docs-only PR handling.** If the PR's diff is confined to `docs/**` and root `AGENTS.md` / `CLAUDE.md`:
-
    - `ci.yml`'s `dorny/paths-filter` step skips the test steps but still posts `Lint & Functional Tests` green within seconds (satisfies branch protection).
    - Vercel preview is skipped per `vercel.json`'s `ignoreCommand`, so no preview `deployment_status` event fires and preview `e2e.yml` does not run.
    - Treat the absent pre-merge advisory checks (E2E, anything else gated on the preview deploy) as **expected** per `docs/doc-github.md`'s docs-only rule. Proceed on required-green only — do not wait for advisories that the docs-only path skipped by design.
@@ -66,7 +64,6 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 10. **Read the PR conversation — right before the merge.** Run this after CI is green and after any wait above, immediately before the merge: review bots post several minutes after a push (17 minutes on PR #578), so a read taken the moment CI turns green can miss one. If anything else is waited on after this read, read again.
 
     Read every source — a bot can post a plain top-level comment rather than a review, so reading reviews alone misses it:
-
     - **Last push time:** the cutoff captured at step 4, before any rebase — not a fresh read of the head commit's date, which a rebase moves forward. GitHub does not expose when an ordinary push happened; the pre-rebase head commit's committer date is never later than its push, so using it can only list extra items, never hide one.
     - **Top-level comments and reviews:** `gh pr view <N> --json comments,reviews` (`comments[].createdAt`; `reviews[].submittedAt`, `.state`, `.body`).
     - **Poster identity for top-level comments:** `gh api --paginate repos/<owner>/<repo>/issues/<N>/comments` (`user.login`, `user.type`, `performed_via_github_app.slug`, `body`, `created_at`). `gh pr view` drops the `[bot]` suffix from logins, so this REST read is the only place the account type and the posting app are visible; match it to the `gh pr view` comments by `created_at` and body.
@@ -74,7 +71,6 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     - **Review threads' resolved state:** `gh api graphql -F owner=<owner> -F repo=<repo> -F n=<N> -f query='query($owner:String!,$repo:String!,$n:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$n){reviewThreads(first:100){pageInfo{hasNextPage} nodes{isResolved path comments(first:1){nodes{author{login} createdAt body}}}}}}}'`. The REST API has no resolved flag; GraphQL's `reviewThreads.isResolved` is the only place `gh` exposes it.
 
     **Unanswered** (the maintainer's definition, recorded on #580) means:
-
     - any top-level comment, review or inline comment posted after the last push — by anyone, **including the PR's author and the account running `/ship`**, because agent sessions post under the maintainer's account, so authorship shows nothing;
     - plus every inline review thread with `isResolved: false`, however old;
     - except an approval with no text (`state: APPROVED`, empty `body`), which never counts. Every other review counts, even one with an empty body.
@@ -82,16 +78,15 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
       - a **deployment card** — `user.type: Bot`, posted via the `vercel` app, body beginning `[vc]:`;
       - an **automated review that found nothing** — posted via the `claude` app, first lines `## Code review` then `No issues found.`; a Claude review reporting one or more issues **counts and stops the merge**;
       - **`/pr`'s own new-commits note** — first line exactly `_/pr: new commits since the PR body was written_`, posted by the account running this ship (`gh api user --jq .login`). Any other comment by that account still counts.
-      A new bot gets its own explicit line here; never a wildcard on `[bot]`.
+        A new bot gets its own explicit line here; never a wildcard on `[bot]`.
 
     List each item once, even when it matches both rules. If nothing is unanswered, print `Conversation: nothing unanswered since the last push (<time>).` and continue. Otherwise list each item — author, time (UTC), first line of its text (`(no text)` if empty), and the file for inline items — then **STOP** and ask `N unanswered since the last push — merge anyway?`. Continue to the merge only on an explicit yes; any other reply ends the run without merging, with the PR URL surfaced. If any read above fails, or `hasNextPage` is true, the conversation is not proven clear: say which read failed and ask the same question. Never treat a failed read as nothing unanswered.
 
     This stop is about the conversation, not the merge command, and fires only when something is unanswered or unread. It does not replace or duplicate step 11's merge confirmation; the harness `ask` prompt still fires at step 12.
 
-11. **Merge confirmation policy.** The checked-in `.claude/settings.json` `ask` rule on `gh pr merge` (step 12) is the merge confirmation in every case — whether `/ship` opened the PR during this run or the PR pre-existed — **in every permission mode, including `auto`** (see step 12's note on what can and cannot silence it). Do **not** add a separate conversational Y/n; the required one-line pre-merge narration (step 12) supplies the harness prompt's context. *(History: a path-dependent Y/n for the PR-created-this-run case was kept additively until the Thread-14 actual-`/ship`-path proof passed on 2026-06-24; removed here so the harness prompt is the one confirmation and that path no longer double-prompts. See `docs/plan-skill-nl-invocation.md`.)*
+11. **Merge confirmation policy.** The checked-in `.claude/settings.json` `ask` rule on `gh pr merge` (step 12) is the merge confirmation in every case — whether `/ship` opened the PR during this run or the PR pre-existed — **in every permission mode, including `auto`** (see step 12's note on what can and cannot silence it). Do **not** add a separate conversational Y/n; the required one-line pre-merge narration (step 12) supplies the harness prompt's context. _(History: a path-dependent Y/n for the PR-created-this-run case was kept additively until the Thread-14 actual-`/ship`-path proof passed on 2026-06-24; removed here so the harness prompt is the one confirmation and that path no longer double-prompts. See `docs/plan-skill-nl-invocation.md`.)_
 
 12. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — then run `gh pr merge <N> --merge --delete-branch`.
-
     - **Harness merge confirmation.** A checked-in `.claude/settings.json` `ask` rule on `Bash(gh pr merge *)` / `PowerShell(gh pr merge *)` makes the harness prompt a human to approve this exact command in every session — un-weakenable by a local `allow` or `bypassPermissions` (precedence is deny→ask→allow, first match). The required narration above gives that prompt context. Under default permission mode this is the merge confirmation — but it is **not** an absolute gate (see the caveat below). **Never add `allowed-tools: Bash(gh *)` (or any `gh` grant) to this Skill's frontmatter** — it would let the merge run without the human prompt and silently defeat this gate. **Note (#353 / #463):** step 11's conversational Y/n was removed in the #353 fast-follow, so this harness prompt is the merge confirmation. **It fires per-merge in every permission mode, `auto` included (verified 2026-09-23/24: seven real merges and every sandbox merge prompted once; Claude Code's docs list `ask` rules among the actions no mode auto-approves).** Nothing in the session can silence it: the prompt offers only a one-time approve, and a saved `allow` cannot outrank an `ask` rule. The only ways past it are the human's click or a change to the checked-in rule. (An earlier version of this note said `auto` mode auto-approved it, citing PR #460 on 2026-06-26; that no longer matches the CLI's behaviour and could not be re-verified.) Re-adding a model-level Y/n is an available option (precise recipe in #463) but is **deferred by decision (2026-06-26)** — the default-mode gate is sufficient for normal human-typed use. See `docs/plan-skill-nl-invocation.md` and #463.
     - Do **not** pass `--merge-title` or `--body` flags. GitHub uses the PR title and body verbatim per the repo's `merge_commit_title: PR_TITLE` / `merge_commit_message: PR_BODY` settings; custom flags would override that and create inconsistent history.
     - Never `--admin`, `--auto`, force-merge, `--squash` (repo-disabled), or any branch-protection bypass.
@@ -101,14 +96,12 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 14. **Capture merge SHA + discover post-merge runs.** `git log -1 --format=%H` on `main` after the pull gives the merge SHA. Then `gh run list --branch main --commit <merge-sha> --limit 10` to discover the post-merge runs (typically Vercel production deploy and `e2e.yml` against the production environment).
 
 15. **Post-merge watch on `main` (up to 5 minutes).** Poll the discovered runs via `gh run watch <run-id>`. Expected runs:
-
     - Vercel production deploy.
     - `e2e.yml` against the production environment (gated on the production `deployment_status` event).
 
     After a docs-only merge (step 9's condition), `ignoreCommand` usually skips the production build, so Vercel reports the commit as canceled and no production `e2e.yml` runs. Treat both as expected: watch whatever else ran (e.g. CodeQL) and report `main: green (production deploy skipped, docs-only).` The build still runs when production is behind `main` (an earlier code merge's production build failed or hadn't finished), because `ignoreCommand` compares against the last successful production deploy; then watch the deploy and production `e2e.yml` as usual.
 
     Outcomes:
-
     - **All-green within 5 minutes.** Report merge SHA + Vercel production URL + `main: green.`
     - **Red on any check.** Alert immediately with the failing check name, run URL, and a suggested next action (open hotfix branch or revert). The watch reports — it does not auto-act.
     - **Still pending at 5 minutes.** Report what's pending; offer `wait+5`.

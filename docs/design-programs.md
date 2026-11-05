@@ -12,13 +12,13 @@ Status: the model and lifecycle sections describe programs as built (#139, #166,
 
 ### `programs`
 
-| Column | Meaning |
-| --- | --- |
-| `slug` | Unique URL key (`/programs/[slug]`). Admins can edit it, so program features key on program IDs. |
-| `name`, `blurb`, `description` | Display copy; `blurb` and `description` are markdown (`docs/design-richtext.md`). |
-| `archivedAt` | Set = hidden from members. Member-facing reads treat an archived program as `not_found`; admins still see it at `/admin/programs`. |
-| `signupsOpen` | Gates self-serve join. Defaults to `false` so a new program accepts no joins until an admin opens it. Admin add-participant ignores it. |
-| `buttondownTag` | Buttondown tag this program's membership mirrors to; `NULL` = not synced (`docs/design-buttondown.md`). |
+| Column                         | Meaning                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`                         | Unique URL key (`/programs/[slug]`). Admins can edit it, so program features key on program IDs.                                        |
+| `name`, `blurb`, `description` | Display copy; `blurb` and `description` are markdown (`docs/design-richtext.md`).                                                       |
+| `archivedAt`                   | Set = hidden from members. Member-facing reads treat an archived program as `not_found`; admins still see it at `/admin/programs`.      |
+| `signupsOpen`                  | Gates self-serve join. Defaults to `false` so a new program accepts no joins until an admin opens it. Admin add-participant ignores it. |
+| `buttondownTag`                | Buttondown tag this program's membership mirrors to; `NULL` = not synced (`docs/design-buttondown.md`).                                 |
 
 ### `profile_programs`
 

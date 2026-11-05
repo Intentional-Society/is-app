@@ -32,14 +32,14 @@ Anyone may propose a change in a pull request. A change to a skill's `SKILL.md` 
 
 ## Which doc for which task
 
-| I want to... | Go to |
-|---|---|
-| create a new skill and its first evals | [The life of a skill](#the-life-of-a-skill), above |
-| add an eval to a skill, for example `/pr` | [Strategy doc section 3, "Adding a new eval"](strategy-skill-evals.md#adding-a-new-eval) |
+| I want to...                               | Go to                                                                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| create a new skill and its first evals     | [The life of a skill](#the-life-of-a-skill), above                                                             |
+| add an eval to a skill, for example `/pr`  | [Strategy doc section 3, "Adding a new eval"](strategy-skill-evals.md#adding-a-new-eval)                       |
 | change a skill's `SKILL.md` or description | [Strategy doc section 8, "Landing a description change"](strategy-skill-evals.md#landing-a-description-change) |
-| run a full execution batch | [Running the evals](#running-the-evals), below |
-| explain a REAL-MISS in a batch report | [Strategy doc section 6, "Miss labels"](strategy-skill-evals.md#miss-labels) |
-| anything else | The strategy doc's own table, ["Which doc do I want?"](strategy-skill-evals.md#which-doc-do-i-want) |
+| run a full execution batch                 | [Running the evals](#running-the-evals), below                                                                 |
+| explain a REAL-MISS in a batch report      | [Strategy doc section 6, "Miss labels"](strategy-skill-evals.md#miss-labels)                                   |
+| anything else                              | The strategy doc's own table, ["Which doc do I want?"](strategy-skill-evals.md#which-doc-do-i-want)            |
 
 ## Running the evals
 

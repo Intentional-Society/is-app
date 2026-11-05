@@ -17,7 +17,7 @@ Dark mode (`.dark { … }` block in the same file) mirrors the palette with valu
 
 `--card`, `--chart-1..5`, and `--sidebar-*` are defined but currently unused. They're kept because they're part of the shadcn token surface — future component installs will rely on them.
 
-A small naming-inversion note: `--primary` (the CSS token, dusty teal brand color) is the *fill* of the `secondary` Button variant — not the `primary` variant. The Button variant naming was deliberately flipped from shadcn's convention so the everyday workhorse button is called "primary"; the CSS token names follow shadcn unchanged. Keep the two name systems separate in your head.
+A small naming-inversion note: `--primary` (the CSS token, dusty teal brand color) is the _fill_ of the `secondary` Button variant — not the `primary` variant. The Button variant naming was deliberately flipped from shadcn's convention so the everyday workhorse button is called "primary"; the CSS token names follow shadcn unchanged. Keep the two name systems separate in your head.
 
 ## The `/colors` page
 
@@ -46,13 +46,13 @@ Button size variants align with the same names: `size="xs"` → `text-xs`, `size
 
 ## Button variants — mental model
 
-| Variant | Looks like | When to use |
-|---|---|---|
-| `primary` *(default)* | Light bordered surface, mint bg, teal hover | Everyday button — most things in the app |
-| `secondary` | Dark teal fill, light text | Emphasized CTA — main action of a form/page |
-| `destructive` | Translucent red bg, red text | Destructive actions (Revoke, etc.) |
-| `ghost` | No bg, hover shows muted bg | Toolbar/icon button blending into surroundings |
-| `link` | Inline text-link styling | Inline text links that need button behavior |
+| Variant               | Looks like                                  | When to use                                    |
+| --------------------- | ------------------------------------------- | ---------------------------------------------- |
+| `primary` _(default)_ | Light bordered surface, mint bg, teal hover | Everyday button — most things in the app       |
+| `secondary`           | Dark teal fill, light text                  | Emphasized CTA — main action of a form/page    |
+| `destructive`         | Translucent red bg, red text                | Destructive actions (Revoke, etc.)             |
+| `ghost`               | No bg, hover shows muted bg                 | Toolbar/icon button blending into surroundings |
+| `link`                | Inline text-link styling                    | Inline text links that need button behavior    |
 
 Most buttons in the app are `primary`. Use `secondary` sparingly — it's louder, and stops being emphasis when everything's emphasized.
 

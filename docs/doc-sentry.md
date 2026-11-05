@@ -8,13 +8,13 @@
 
 ## Environment Variables
 
-| Variable | Where | Purpose |
-|----------|-------|---------|
-| `NEXT_PUBLIC_SENTRY_DSN` | Vercel (Production only) | Client-side error reporting |
-| `SENTRY_DSN` | Vercel (Production only) | Server-side error reporting |
-| `SENTRY_ORG` | `.env.local`, Vercel | Source map upload (org slug) |
-| `SENTRY_PROJECT` | `.env.local`, Vercel | Source map upload (project slug) |
-| `SENTRY_AUTH_TOKEN` | `.env.local`, Vercel | Source map upload (auth token) |
+| Variable                 | Where                    | Purpose                          |
+| ------------------------ | ------------------------ | -------------------------------- |
+| `NEXT_PUBLIC_SENTRY_DSN` | Vercel (Production only) | Client-side error reporting      |
+| `SENTRY_DSN`             | Vercel (Production only) | Server-side error reporting      |
+| `SENTRY_ORG`             | `.env.local`, Vercel     | Source map upload (org slug)     |
+| `SENTRY_PROJECT`         | `.env.local`, Vercel     | Source map upload (project slug) |
+| `SENTRY_AUTH_TOKEN`      | `.env.local`, Vercel     | Source map upload (auth token)   |
 
 Auth tokens are generated at Settings → Auth Tokens in the Sentry dashboard.
 
@@ -60,10 +60,10 @@ Recordings are masked: `maskAllText: true` and `blockAllMedia: true` mean only s
 
 Sentry reports from production deploys only (the `enabled` gate), so a single set of rates applies:
 
-| Setting | Rate |
-|---------|------|
-| Traces | 10% |
-| Session replay | 0% (100% with `?debug-replay=1`) |
+| Setting         | Rate                             |
+| --------------- | -------------------------------- |
+| Traces          | 10%                              |
+| Session replay  | 0% (100% with `?debug-replay=1`) |
 | Replay on error | 0% (100% with `?debug-replay=1`) |
 
 Adjust in `instrumentation-client.ts` and `sentry.server.config.ts`.

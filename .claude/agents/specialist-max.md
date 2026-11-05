@@ -1,4 +1,5 @@
 ---
+
 name: specialist-max
 description: General-purpose Opus-xhigh specialist for delegated deep work with no phase contract — independent (SDET) review of someone else's fix, a scoped implementation task, a focused investigation. Use when the launch prompt itself defines the job; prefer phase-implementer(-max) when the work is one skill-evals program phase from its sub-issue packet.
 model: opus

@@ -85,20 +85,20 @@ WHEN DONE, REPORT:
 
 ## Filling the placeholders
 
-| Placeholder | Source |
-|---|---|
-| `{{SKILL}}` | `skill_name` from the eval file (`commit` / `pr` / `ship`) |
-| `{{EVAL_PROMPT}}` | the eval's `prompt` |
-| `{{FIXTURE}}` | the eval's `fixture` |
-| `{{PRECONDITIONS}}` | the eval's `preconditions` |
-| `{{HUMAN_SCRIPT}}` | the eval's `human_script` (verbatim) |
-| `{{EXPECTATIONS}}` | the eval's `expectations` list |
+| Placeholder                                                                  | Source                                                                                               |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `{{SKILL}}`                                                                  | `skill_name` from the eval file (`commit` / `pr` / `ship`)                                           |
+| `{{EVAL_PROMPT}}`                                                            | the eval's `prompt`                                                                                  |
+| `{{FIXTURE}}`                                                                | the eval's `fixture`                                                                                 |
+| `{{PRECONDITIONS}}`                                                          | the eval's `preconditions`                                                                           |
+| `{{HUMAN_SCRIPT}}`                                                           | the eval's `human_script` (verbatim)                                                                 |
+| `{{EXPECTATIONS}}`                                                           | the eval's `expectations` list                                                                       |
 | `{{SANDBOX_REPO}}`, `{{ACTIVATE_PS1}}`, `{{ACTIVATE_SH}}`, `{{GH_CALL_LOG}}` | fields of the `make-sandbox --json` manifest (`repoDir`, `activate.ps1`, `activate.sh`, `ghCallLog`) |
 
 ## Baseline arm
 
 For a skill **update**, the baseline arm runs the same prompt against a sandbox built the
-same way but with the *old* snapshot of the skill on the path (native skill-creator
+same way but with the _old_ snapshot of the skill on the path (native skill-creator
 convention). For a **new** skill, the baseline is "no skill". Build a second sandbox with
 `make-sandbox --fixture <name>` and point the baseline executor at the old `SKILL.md`.
 

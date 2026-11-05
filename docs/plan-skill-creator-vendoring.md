@@ -27,7 +27,7 @@ an upstream commit SHA, refreshed by a small Node script.** Five PRs, sequenced 
 (1), deterministic structural gate (2), scheduled drift detection (3), then two deferred
 upgrades (4, 5).
 
-Why vendoring wins: skill-creator is a *subdirectory of a monorepo*, and Claude Code auto-loads
+Why vendoring wins: skill-creator is a _subdirectory of a monorepo_, and Claude Code auto-loads
 project skills only from `.claude/skills/<name>/`. Vendoring puts it exactly there — zero setup
 for every teammate on clone, riding the `.gitignore` negation (`!.claude/skills/`) the repo
 already has. Updates are deliberate, reviewed PRs (pinned SHA), so upstream maintenance flows in
@@ -46,7 +46,7 @@ without silent drift.
 - **Status quo (manual per-user copies)** — the problem being solved.
 - **Upstream `quick_validate.py` as the CI gate** — would couple our merge gate to upstream's
   generic validator (their notion of "valid", their Python deps, their interface changes), and
-  needs Python in CI. Our gate asserts *our* spec instead; `quick_validate.py` remains a local
+  needs Python in CI. Our gate asserts _our_ spec instead; `quick_validate.py` remains a local
   authoring aid.
 - **Behavioral LLM evals as a blocking CI gate** — nondeterministic; a flaky required check is
   how `main` stalls. Behavioral evals stay local at authoring/refresh time and later
@@ -58,7 +58,7 @@ without silent drift.
 ## Validated facts (don't re-litigate without re-checking)
 
 1. Dependabot watches packaged ecosystems + `gitsubmodule` only — it cannot watch a vendored
-   directory. It *does* maintain `uses:` action pins in any new workflow via the existing
+   directory. It _does_ maintain `uses:` action pins in any new workflow via the existing
    `github-actions` ecosystem block in `.github/dependabot.yml` (weekly, Monday ~05:00 UTC).
 2. `anthropics/claude-code-action` (already used in `claude.yml` / `claude-code-review.yml`,
    authenticated by `secrets.CLAUDE_CODE_OAUTH_TOKEN` — subscription, not metered API) **refuses
@@ -86,9 +86,9 @@ the post-NL repo state, which is now live. **Verified post-NL state (don't re-de
   ≥3); it touches `/ship` SKILL.md too, but body-only (delegation narration) — the
   `disable-model-invocation: true` frontmatter is unchanged, so the expectation table holds. It
   also edits spec §2, so re-deriving the citations matters more.
-- **PR 3:** *(Superseded 2026-07-02 — PR 3 was redesigned to the scheduled drift workflow and
+- **PR 3:** _(Superseded 2026-07-02 — PR 3 was redesigned to the scheduled drift workflow and
   the `/commit` Step 14 surfacing was dropped; see the PR 3 section and the decision log. The
-  original Step 14 placement notes are retired with it.)*
+  original Step 14 placement notes are retired with it.)_
 - Both: `.claude/settings.json` is tracked (explicit `!.claude/settings.json` gitignore negation
   added by #353) — expected state, not a surprise to "fix".
 - **Resolved issue (know it):** Thread 15 (`.scratch/skill-nl-invocation-review-roundtable.md`;
@@ -155,10 +155,10 @@ skill contract. Assertions, each traceable to `docs/spec-portable-ai-procedures.
 5. Body >500 lines → **warn only** (spec calls it a soft cap; visible in CI logs, never red).
 6. `evals/evals.json` and `evals/skill-creator.evals.json`: every `skill_path` resolves; **≥3
    evals per skill**. Note the shape: `evals.json` has **one `skill_path` per skill** with the
-   eval cases nested under it (3 `skill_path` entries, not one per eval) — count cases *within*
+   eval cases nested under it (3 `skill_path` entries, not one per eval) — count cases _within_
    each skill's group, don't count `skill_path` occurrences.
 
-Deliberately *not* asserted (judgment/LLM territory, per spec L115): description quality,
+Deliberately _not_ asserted (judgment/LLM territory, per spec L115): description quality,
 `## Depends on` accuracy, "passes its eval set", self-hosting, eval realism.
 
 ## PR 3 — Scheduled drift check → tracking issue
@@ -167,7 +167,7 @@ Deliberately *not* asserted (judgment/LLM territory, per spec L115): description
 > **Scope decision (2026-07-02, reversing 2026-06-26):** PR 3 is the drift-detection workflow;
 > the previously planned `/commit` Step 14 surfacing edit is **dropped**. Rationale: the Step 14
 > hook fires only when `.claude/skills/skill-creator/**` is in a staged payload — i.e. on a
-> refresh the human has *already decided to do* — so it structurally cannot detect upstream
+> refresh the human has _already decided to do_ — so it structurally cannot detect upstream
 > staleness (nothing in our tree changes when upstream moves), and its eval reminder duplicates
 > what `update-skill-creator.mjs` and `UPSTREAM.md` already print at refresh time. The 2026-06-26
 > "low ROI" deferral had bundled this cheap issue-based version with the expensive auto-PR (PAT)
@@ -202,16 +202,16 @@ executable regression protection — but PR 1 only proved load (sc-1), validate 
 author (sc-3). The loop itself is unproven in this repo. Secondary payoff: the result is the
 go/no-go input for PR 5 (behavioral evals in CI).
 
-**Success criterion.** Not "the scripts ran" — it's: *a team-skill edit can be evaluated for
-regression by the next maintainer, repeatably, from documented commands alone.* An honest
+**Success criterion.** Not "the scripts ran" — it's: _a team-skill edit can be evaluated for
+regression by the next maintainer, repeatably, from documented commands alone._ An honest
 negative ("the loop isn't viable locally, here's the blocker and next action") is a valid
 spike outcome and feeds PR 5's go/no-go.
 
 **Facts established by code-reading (verify, don't re-derive):**
 
-- There are **two distinct loops**. (a) *Trigger evals* — `scripts/run_eval.py` / `run_loop.py` /
-  `improve_description.py`: standalone Python CLIs testing whether a skill's *description* causes
-  Claude to invoke it; used for description optimization. (b) *Behavioral evals* — the
+- There are **two distinct loops**. (a) _Trigger evals_ — `scripts/run_eval.py` / `run_loop.py` /
+  `improve_description.py`: standalone Python CLIs testing whether a skill's _description_ causes
+  Claude to invoke it; used for description optimization. (b) _Behavioral evals_ — the
   with-skill vs. baseline comparison: orchestrated by the **skill-creator skill itself in a
   Claude session** (read its SKILL.md workflow), using the `agents/` subagent definitions
   (analyzer, comparator, grader), `aggregate_benchmark.py`, and `eval-viewer/` for review.
@@ -222,8 +222,8 @@ spike outcome and feeds PR 5's go/no-go.
   (Windows `select` supports sockets only). Expect the trigger-eval CLIs to fail on native
   Windows; a worktree lane under WSL is the likely workaround. The behavioral loop may not share
   this problem (it is agent-orchestrated, not pipe-polling) — verify.
-- **Schema divergence:** upstream expects a per-skill `evals/evals.json` *inside the skill
-  directory* with integer `id` and an `expectations[]` list (see vendored
+- **Schema divergence:** upstream expects a per-skill `evals/evals.json` _inside the skill
+  directory_ with integer `id` and an `expectations[]` list (see vendored
   `references/schemas.md`). Our repo-root `evals/evals.json` uses string ids, `eval_name`, and
   no `expectations`. The spike must map one skill's evals into upstream's shape **in a local
   scratch copy** — do not rewrite the committed `evals/evals.json` without review.

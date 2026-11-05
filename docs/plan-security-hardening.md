@@ -6,7 +6,7 @@ A review of the repo, code, CI, and deployment. What we already have that's good
 
 ## What's already in place
 
-- **Drizzle parameterized queries everywhere** — no SQL-injection paths, including the raw `db.execute(sql\`...\`)` in `src/server/test-reset.ts` (uses `sql.join`, not string concatenation).
+- **Drizzle parameterized queries everywhere** — no SQL-injection paths, including the raw `db.execute(sql\`...\`)`in`src/server/test-reset.ts`(uses`sql.join`, not string concatenation).
 - **Allowlist on `PUT /me`** (`src/server/profiles.ts` → `parseEditableProfile`) blocks privilege escalation via `isAdmin` / `referredBy`. Backed by the regression test in `tests/functional/auth-middleware.test.ts`.
 - **Atomic invite redemption** (`src/app/auth/callback/route.ts`) — single-row UPDATE with active predicates + row lock + transaction rollback. Concurrent redeemers serialise cleanly.
 - **PKCE magic links**, `shouldCreateUser:false` on `/login`, `HttpOnly` cookies (Supabase SSR defaults), JSON content-type → SameSite=Lax CSRF defence holds for the API.

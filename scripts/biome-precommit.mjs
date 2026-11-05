@@ -37,9 +37,12 @@ function main() {
   const files = process.argv.slice(2);
   if (files.length === 0) process.exit(0);
 
+  // --no-install: without a local install (a fresh clone or worktree before
+  // `npm install`), plain `npx biome` fetches the unrelated npm package named
+  // `biome` instead of failing.
   const result = spawnSync(
     "npx",
-    ["biome", "check", "--write", "--no-errors-on-unmatched", "--files-ignore-unknown=true", ...files],
+    ["--no-install", "biome", "check", "--write", "--no-errors-on-unmatched", "--files-ignore-unknown=true", ...files],
     { stdio: ["inherit", "pipe", "inherit"], shell: true },
   );
 

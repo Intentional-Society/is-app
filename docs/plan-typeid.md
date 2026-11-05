@@ -19,20 +19,20 @@ Each axis has a default recommendation; the pros/cons are here so future-us can 
 
 ### Axis 1 — Storage representation
 
-| Option | Pros | Cons |
-| --- | --- | --- |
-| **`uuid` column, encode/decode at API boundary** (recommended) | 16 bytes; native Postgres indexing and FK semantics; no schema churn from prefix changes; prefix is implied by table | Prefix is convention, not enforced by storage; rows are not self-describing in raw psql |
-| **`text` column storing the canonical TypeID string** | Self-describing in raw psql and exports; prefix mismatch is a constraint check away | ~30 bytes per ID; index is bigger; redundant prefix on every row and every FK; renaming a table's prefix is a data migration; FK joins are text→text |
-| **`typeid` Postgres type via community extension** | Storage *and* wire are unified; type system enforces prefix at the DB | v0.3 community extension; not on Supabase by default; we'd own packaging/upgrades |
+| Option                                                         | Pros                                                                                                                 | Cons                                                                                                                                                 |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`uuid` column, encode/decode at API boundary** (recommended) | 16 bytes; native Postgres indexing and FK semantics; no schema churn from prefix changes; prefix is implied by table | Prefix is convention, not enforced by storage; rows are not self-describing in raw psql                                                              |
+| **`text` column storing the canonical TypeID string**          | Self-describing in raw psql and exports; prefix mismatch is a constraint check away                                  | ~30 bytes per ID; index is bigger; redundant prefix on every row and every FK; renaming a table's prefix is a data migration; FK joins are text→text |
+| **`typeid` Postgres type via community extension**             | Storage _and_ wire are unified; type system enforces prefix at the DB                                                | v0.3 community extension; not on Supabase by default; we'd own packaging/upgrades                                                                    |
 
 **Default: option 1.** Cheap, conventional, reversible. Only revisit if "wrong-prefix at DB layer" becomes a real bug source.
 
 ### Axis 2 — UUIDv7 generation site
 
-| Option | Pros | Cons |
-| --- | --- | --- |
-| **App-side via `typeid-js`** (recommended) | No SQL extension; one dependency; tests and scripts use the same one-liner; works identically across local and prod | App must remember to set `id` on every insert; ad-hoc inserts via psql or admin tools won't get a v7 default |
-| **DB-side `uuidv7()` function** | Column default keeps working; ad-hoc inserts get v7 for free | Custom SQL function to maintain through Supabase upgrades; one more thing that has to be present in fresh dev DBs |
+| Option                                     | Pros                                                                                                                | Cons                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **App-side via `typeid-js`** (recommended) | No SQL extension; one dependency; tests and scripts use the same one-liner; works identically across local and prod | App must remember to set `id` on every insert; ad-hoc inserts via psql or admin tools won't get a v7 default      |
+| **DB-side `uuidv7()` function**            | Column default keeps working; ad-hoc inserts get v7 for free                                                        | Custom SQL function to maintain through Supabase upgrades; one more thing that has to be present in fresh dev DBs |
 
 **Default: app-side.** Until/unless Postgres ships native `uuidv7()` and Supabase picks it up, the SQL-side option is more moving parts than it's worth.
 
@@ -40,19 +40,19 @@ Each axis has a default recommendation; the pros/cons are here so future-us can 
 
 This is the axis most likely to shift over time as tables are added.
 
-| Scope | Pros | Cons |
-| --- | --- | --- |
-| **Only tables we mint IDs for** (recommended) | Spec-compliant TypeIDs everywhere; no v4-inside-TypeID lock-in | A heterogeneous wire format — some IDs are TypeIDs, some are bare UUIDs |
-| **Every UUID, including Supabase-pinned ones** | Uniform wire format; "every ID has a prefix" is a clean rule | `prof_…` and similar are non-conforming UUIDv4-inside-TypeID; permanent because `profile.id == auth.users.id` |
-| **Selective per-table by privacy/auditing needs** | Fine-grained — e.g. encode IDs that show up in URLs, leave purely-internal ones bare | Higher mental tax; reviewers have to remember which tables are encoded |
+| Scope                                             | Pros                                                                                 | Cons                                                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **Only tables we mint IDs for** (recommended)     | Spec-compliant TypeIDs everywhere; no v4-inside-TypeID lock-in                       | A heterogeneous wire format — some IDs are TypeIDs, some are bare UUIDs                                       |
+| **Every UUID, including Supabase-pinned ones**    | Uniform wire format; "every ID has a prefix" is a clean rule                         | `prof_…` and similar are non-conforming UUIDv4-inside-TypeID; permanent because `profile.id == auth.users.id` |
+| **Selective per-table by privacy/auditing needs** | Fine-grained — e.g. encode IDs that show up in URLs, leave purely-internal ones bare | Higher mental tax; reviewers have to remember which tables are encoded                                        |
 
 **Default: only mint-we-own.** Convention: a UUID-shaped string in our API means "user/profile." Anything else gets a typed prefix. If that convention starts to feel surprising, revisit.
 
 ### Axis 4 — Type safety on the client
 
-| Option | Pros | Cons |
-| --- | --- | --- |
-| **Plain `string` on RPC** (recommended initial) | Hono RPC infers this for free; zero friction | No compile-time check that the right ID type is passed to the right route |
+| Option                                          | Pros                                                | Cons                                                                                                    |
+| ----------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Plain `string` on RPC** (recommended initial) | Hono RPC infers this for free; zero friction        | No compile-time check that the right ID type is passed to the right route                               |
 | **Branded types (`TypeID<'prog'>`) end-to-end** | Compile-time prevents `getProgram(userId)` mistakes | Friction at every component prop, every RPC return, every test fixture; have to cast at JSON boundaries |
 
 **Default: plain string for now.** Revisit if we ever ship a bug where the wrong ID got passed to the wrong route — that's the signal to add branding.
@@ -68,7 +68,7 @@ For every table we want to TypeID:
 5. **Internal logic stays UUID-shaped.** Drizzle queries, joins, business helpers all see and pass raw UUIDs. The TypeID string lives at the seam: response bodies on the way out, path/query params on the way in.
 6. **Tests** use the mint helpers for any ID that represents a row in a TypeID-enabled table. IDs that stand in for Supabase users (today: `profiles.id`) keep using `randomUUID()`.
 
-For tables we *don't* TypeID (anything keyed on Supabase auth, or anything we decide isn't worth the boundary work yet): no change. The "untyped UUID = user" convention covers the most common case.
+For tables we _don't_ TypeID (anything keyed on Supabase auth, or anything we decide isn't worth the boundary work yet): no change. The "untyped UUID = user" convention covers the most common case.
 
 ### Common module shape
 

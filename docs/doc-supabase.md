@@ -23,7 +23,7 @@ PKCE is still the configured client `flowType` and still governs session cookies
 Two reasons to keep `/signin` non-creating:
 
 1. **Spam / accidental rows.** Without `shouldCreateUser: false`, any bot or typo-er submitting an unknown email to `/signin` creates a row in `auth.users` with empty metadata. Closing that off means `/signup` is the only path to user creation.
-2. **Display-name integrity.** GoTrue only applies `options.data` on user *creation*, never on subsequent sign-ins. If a visitor had ever pre-existed (even from a mistyped `/signin`), the display name they type on `/signup` would silently fail to reach `user_metadata` and their profile would land with `display_name = NULL`.
+2. **Display-name integrity.** GoTrue only applies `options.data` on user _creation_, never on subsequent sign-ins. If a visitor had ever pre-existed (even from a mistyped `/signin`), the display name they type on `/signup` would silently fail to reach `user_metadata` and their profile would land with `display_name = NULL`.
 
 Tradeoff: GoTrue returns HTTP 422 (`otp_disabled`) for unknown emails and 200 for known ones, so the `/otp` endpoint is an account-enumeration oracle at the network layer. The sign-in form surfaces the 422 as a human-readable "no account found" message rather than swallowing it — UI-level hiding wouldn't change the network-visible signal, and silently showing "check your email" confuses genuine typo-ers. Closing enumeration for real would require proxying OTP through our own endpoint (shuttling a PKCE challenge round-trip) or adding CAPTCHA.
 
