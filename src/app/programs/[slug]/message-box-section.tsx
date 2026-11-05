@@ -3,6 +3,7 @@ import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query
 import { serverApiClient } from "@/lib/api-server";
 
 import { MessageBox } from "./message-box";
+import { MESSAGE_BOX_CARD_CLASSNAME } from "./message-box-card";
 import { messageBoxQueryKey } from "./query-keys";
 
 // Server Component for the message-box program feature. Prefetches the box
@@ -29,7 +30,7 @@ export async function MessageBoxSection({ programId }: { programId: string }) {
 
 export function MessageBoxFallback() {
   return (
-    <section aria-busy="true" className="flex flex-col gap-3">
+    <section aria-busy="true" className={MESSAGE_BOX_CARD_CLASSNAME}>
       <h3 className="text-base font-semibold uppercase tracking-wide text-muted-foreground">Message box</h3>
       <p className="text-sm text-muted-foreground">Loading…</p>
     </section>
