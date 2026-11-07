@@ -47,11 +47,19 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 
 **Transactions:** a multi-statement `db.transaction(...)` over the transaction pooler can be silently mishandled — read `docs/strategy-db-transactions.md` before adding one.
 
+**Raw SQL:** `db.execute` returns `timestamptz` as a string (Drizzle's Date mapping covers only the query builder) and rejects a bare JS `Date` parameter; bind an ISO string with `::timestamptz`.
+
+**Migrations:** `drizzle-kit generate` emits `CREATE TABLE "auth"."users"` unless the latest snapshot carries `auth.users`; never let that statement reach `drizzle/*.sql`.
+
 ## Workflow
 
 - Trunk-based development: feature branches PR into `main`, which auto-deploys to production
-- Run `npm test` before committing. Keep docs, AGENTS.md and CLAUDE.md in sync with code changes.
-- Schema/API migrations use the **expand-contract pattern** (see `docs/strategy-committing.md`)
+- Branch from a freshly fetched `origin/main`; rebase onto it when `main` moves.
+- Run `npm test` (functional + e2e) before committing code; docs-only changes skip it. Keep docs, AGENTS.md and CLAUDE.md in sync with code changes.
+- Each code push builds a Vercel preview and runs e2e against it; on a PR it also reruns ci.yml and claude-review. During review, commit locally and push once.
+- Schema/API migrations use the **expand-contract pattern** (see `docs/strategy-committing.md`). Dispatch `prod:db:expand` before a schema PR merges, ideally before opening it: previews share the prod DB but skip migrations, so they 500 on unmigrated columns.
+- Reference an issue whose fix is unconfirmed as "Addresses #N". "Fixes/Closes #N" in a merged title or commit auto-closes it.
+- Hold a dependency back by adding it to its group's `exclude-patterns` in `.github/dependabot.yml`, with a comment saying why and what green looks like. Never use an `ignore` rule: the standalone weekly PR is the signal that upstream fixed it.
 - All pushes trigger Vercel deployment; docs-only changes (`docs/**`, root `AGENTS.md` and `CLAUDE.md`) skip automatically, on branches and on `main` (see `docs/strategy-committing.md`)
 - Add `docs/devjournal.md` entries for decisions teammates should know about
 - All first-party code must stick to **Baseline widely available** (`docs/strategy-browser-support.md`)
@@ -61,6 +69,35 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - **ci.yml**: lint + functional tests on every PR (required to pass)
 - **e2e.yml**: Playwright against Vercel preview URL, triggered by `deployment_status` event. Not a required GitHub check, but team policy requires it green before merging to `main`.
 - Vercel auto-deploys `main` to production; the build command runs `drizzle-kit migrate` before `next build` on production deploys only (gated by `VERCEL_ENV`)
+- `main`'s ruleset requires up-to-date branches: after one PR in a batch merges, each remaining PR needs `gh pr update-branch` and a fresh CI round.
+- "Approve workflows to run" on a bot-opened PR (e.g. `chore/npm-audit-fix`) is not a review gate; approve it.
+## Testing
+
+- A flake is a bug: find and fix the root cause. A re-run is evidence for a diagnosis, never the fix.
+- Capture a gate's real exit code (`cmd > log 2>&1; echo $?`, or `set -o pipefail`). Piping through `tail` masks failures. `gh pr checks --watch` can exit 0 with a failed check, so re-read `gh pr checks` afterward.
+- A `23505` on a hardcoded fixture slug means parallel functional test files are racing; make the fixture unique per run.
+- A slow new route that flakes the first e2e spec gets warmed in `tests/e2e/reset.setup.ts`; don't raise `TIMEOUT_MS`.
+- `version-update.spec.ts` fails against a dev server or preview build more than 2h old (#492). Restart the server or redeploy the preview; rerunning reuses the stale build.
+- For a failure that reproduces only on the Vercel preview, read the runtime log before bisecting dependencies.
+
+## Production safety
+
+- Never read `.env.prod` or other live-secret env files, even through a redacting pipe. Ask whether a key is set, or run the script that loads the file.
+- Smoke-test a script only in a safe mode: `--dry-run`, a cleared credential variable (`SUPABASE_ACCESS_TOKEN= node …`), or a deliberately bad target. A loaded credential turns the destructive default into a real prod write.
+- Run prod data operations one command at a time: state what it writes, wait for an explicit go-ahead, inspect the result before the next step. After a safety block, only an explicit "run it" authorizes a retry.
+
+## Writing
+
+- Docs and comments state what the code is and why it is shaped that way. Leave out the conversation that produced them, removed code and rejected alternatives. Tighten rationale comments rather than delete them.
+- Commit and PR messages state the change and why it matters, without the path of discovery.
+- Agents propose `docs/devjournal.md` entries in chat and add one to the file only after a human approves the wording.
+- Changelog entries (`src/lib/changelog.tsx`): a 2–4 word title and a one-sentence description, no longer than the existing entries.
+- **AI attribution:**
+  - Commits: a `Co-Authored-By:` trailer with the bare model name and version, no patch level or variant suffix such as "(1M context)".
+  - No session links or session trailers anywhere, even when the agent's tooling supplies them.
+  - PR bodies need no attribution footer added; the commit trailers cover them.
+  - Issue bodies end with `🤖 Filed by <agent>`, and issue and PR comments with `🤖 Written by <agent>`, where `<agent>` is a link to the tool. For example: `🤖 Written by [Claude Code](https://claude.com/claude-code)`.
+- "The IS Web App" is the product and "Intentional Society" the organization. People in a program are "participants"; "members" means IS Web members generally.
 
 ## Key docs
 
