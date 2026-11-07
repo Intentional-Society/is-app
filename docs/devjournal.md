@@ -1,6 +1,8 @@
 # Development Journal
 
-Each entry: **Date** | **Author** | **Title**, followed by description text. Most recent first.
+This journal keeps humans, and secondarily agents, up to date on significant code changes. Member-facing announcements go in the Changelog (`src/lib/changelog.tsx`, shown on `/about`) instead, or as well.
+
+Each entry: **Date** | **Author** | **Title**, followed by at most 360 characters of description, usually one sentence. Most recent first.
 
 ---
 
