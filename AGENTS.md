@@ -60,7 +60,7 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - Schema/API migrations use the **expand-contract pattern** (see `docs/strategy-committing.md`). Dispatch `prod:db:expand` before a schema PR merges, ideally before opening it: previews share the prod DB but skip migrations, so they 500 on unmigrated columns.
 - Reference an issue whose fix is unconfirmed as "Addresses #N". "Fixes/Closes #N" in a merged title or commit auto-closes it.
 - Hold a dependency back by adding it to its group's `exclude-patterns` in `.github/dependabot.yml`, with a comment saying why and what green looks like. Never use an `ignore` rule: the standalone weekly PR is the signal that upstream fixed it.
-- All pushes trigger Vercel deployment; docs-only changes (`docs/**`, root `AGENTS.md` and `CLAUDE.md`) skip automatically, on branches and on `main` (see `docs/strategy-committing.md`)
+- All pushes trigger Vercel deployment; docs-only changes (defined in `scripts/docs-only.mjs`) skip automatically, on branches and on `main` (see `docs/strategy-committing.md`)
 - Add `docs/devjournal.md` entries for decisions teammates should know about
 - All first-party code must stick to **Baseline widely available** (`docs/strategy-browser-support.md`)
 
