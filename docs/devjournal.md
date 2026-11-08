@@ -6,6 +6,12 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-08 | James (with Opus 5.5) | Fixed claude-review, which had silently stopped reviewing PRs
+
+The code-review plugin had stopped reviewing (#680), so claude-review now runs Claude Code's bundled `/code-review high` on Opus with the job's GITHUB_TOKEN. Every reviewed push ends with one comment: a summary showing time and cost, or a "did not finish" notice.
+
+---
+
 ## 2026-11-04 | James (with Opus 5.5) | Biome now formats Markdown files
 
 See `docs/doc-biome.md`.
