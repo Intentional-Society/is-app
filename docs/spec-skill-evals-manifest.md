@@ -433,3 +433,21 @@ route: `issues/<N>/comments`), `scripts/skill-evals/README.md`,
 `tests/functional/skills/gh-stub.test.ts`, `docs/design-skill-evals-harness.md`, and this
 manifest. The `/ship` and `/pr` SKILL.md changes and `docs/spec-portable-ai-procedures.md`
 land with the maintainer-approved wording.
+
+## 2026-11 amendment — `ship-8` and `ship-9` reseeded for the bundled review (#680) (2026-11-08)
+
+**Status:** same IDs, kinds and fixture names; the seeded review comments change shape.
+`claude-code-review.yml` now posts via the `github-actions` app with first line
+`## Claude review`, and reports findings as inline comments.
+
+- `ship-8` seeds four excluded posts: the previous push's superseded review notice, the Vercel
+  card, the review's summary and `/pr`'s own note.
+- `ship-9` seeds the Vercel card and the review's summary (both excluded) and one inline
+  finding in an unresolved thread, which is listed once and stops the merge.
+
+**Totals:** unchanged.
+
+**Files updated in lockstep:** `.claude/skills/ship/SKILL.md`,
+`.claude/skills/ship/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs`,
+`tests/functional/skills/gh-stub.test.ts`, `docs/spec-portable-ai-procedures.md`, and this
+manifest.

@@ -275,7 +275,7 @@ describe("fixtures — top-level comments agree across both reads (#601)", () =>
 
   it.each([
     ["feature-open-pr-unanswered-comment", 223, 1],
-    ["feature-open-pr-bot-cards-only", 224, 3],
+    ["feature-open-pr-bot-cards-only", 224, 4],
     ["feature-open-pr-review-with-findings", 225, 2],
   ])("%s: PR %i's comments match in both shapes (%i each)", (name, number, count) => {
     const fx = buildGhFixture(getFixture(name));
@@ -309,7 +309,7 @@ describe("fixtures — top-level comments agree across both reads (#601)", () =>
     });
   });
 
-  it("feature-open-pr-bot-cards-only: a Vercel card, a clean Claude review, and /pr's note by the account `gh api user` names", () => {
+  it("feature-open-pr-bot-cards-only: a superseded review notice, a Vercel card, the review's summary, and /pr's note by the account `gh api user` names", () => {
     const fx = buildGhFixture(getFixture("feature-open-pr-bot-cards-only"));
     const dir = layout(fx);
     const self = gh(dir, ["api", "user", "--jq", ".login"]).stdout.trim();
@@ -319,17 +319,17 @@ describe("fixtures — top-level comments agree across both reads (#601)", () =>
     expect(
       rest.map((c) => [c.user.login, c.user.type, c.performed_via_github_app?.slug ?? null, c.created_at]),
     ).toEqual([
+      ["github-actions[bot]", "Bot", "github-actions", "2026-09-20T12:01:00Z"],
       ["vercel[bot]", "Bot", "vercel", "2026-09-20T12:05:00Z"],
-      ["claude[bot]", "Bot", "claude", "2026-09-20T12:17:00Z"],
+      ["github-actions[bot]", "Bot", "github-actions", "2026-09-20T12:17:00Z"],
       [self, "User", null, "2026-09-20T12:20:00Z"],
     ]);
-    expect(rest[0].body.startsWith("[vc]:")).toBe(true);
-    expect(rest[1].body.split("\n").slice(0, 3)).toEqual([
-      "## Code review",
-      "",
-      "No issues found. Checked for bugs and CLAUDE.md compliance.",
-    ]);
-    const note = rest[2].body.split("\n");
+    expect(rest[0].body.split("\n")[0]).toBe("## Claude review");
+    expect(rest[0].body).toContain("superseded it");
+    expect(rest[1].body.startsWith("[vc]:")).toBe(true);
+    expect(rest[2].body.split("\n")[0]).toBe("## Claude review");
+    expect(rest[2].body).not.toContain("did not finish");
+    const note = rest[3].body.split("\n");
     expect(note[0]).toBe("_/pr: new commits since the PR body was written_");
     expect(note.filter((l) => l.startsWith("- "))).toHaveLength(1);
     expect(fx.checks.every((c: { bucket: string }) => c.bucket === "pass")).toBe(true);
@@ -339,23 +339,24 @@ describe("fixtures — top-level comments agree across both reads (#601)", () =>
     expect(fx.branchPr?.reviews).toEqual([]);
   });
 
-  it("feature-open-pr-review-with-findings: a Vercel card and a Claude review that reports 2 issues", () => {
+  it("feature-open-pr-review-with-findings: a Vercel card, the review's summary, and one inline finding in an unresolved thread", () => {
     const fx = buildGhFixture(getFixture("feature-open-pr-review-with-findings"));
+    const dir = layout(fx);
     const rest: RestComment[] = JSON.parse(
-      gh(layout(fx), ["api", "repos/Intentional-Society/is-app/issues/225/comments"]).stdout,
+      gh(dir, ["api", "repos/Intentional-Society/is-app/issues/225/comments"]).stdout,
     );
     expect(rest.map((c) => [c.user.login, c.performed_via_github_app?.slug, c.created_at])).toEqual([
       ["vercel[bot]", "vercel", "2026-09-20T12:05:00Z"],
-      ["claude[bot]", "claude", "2026-09-20T12:17:00Z"],
+      ["github-actions[bot]", "github-actions", "2026-09-20T12:17:00Z"],
     ]);
-    expect(
-      rest[1].body.startsWith(
-        "## Code review\n\n2 issues found. Checked for bugs and CLAUDE.md compliance.\n\n### 1. ",
-      ),
-    ).toBe(true);
+    expect(rest[1].body.split("\n")[0]).toBe("## Claude review");
+    const inline = JSON.parse(gh(dir, ["api", "repos/Intentional-Society/is-app/pulls/225/comments"]).stdout);
+    expect(inline).toHaveLength(1);
+    expect(inline[0].user.login).toBe("github-actions[bot]");
+    expect(inline[0].path).toBe("src/app/flagged.ts");
+    expect(fx.reviewThreads).toHaveLength(1);
+    expect(fx.reviewThreads[0].isResolved).toBe(false);
     expect(fx.checks.every((c: { bucket: string }) => c.bucket === "pass")).toBe(true);
-    expect(fx.pullComments).toEqual([]);
-    expect(fx.reviewThreads).toEqual([]);
   });
 });
 

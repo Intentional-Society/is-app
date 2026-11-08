@@ -76,7 +76,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     - except an approval with no text (`state: APPROVED`, empty `body`), which never counts. Every other review counts, even one with an empty body.
     - except three automated posts that never carry anything a human must answer (#601), each keyed on the poster's account type and posting app, never on a display name or wording alone:
       - a **deployment card** — `user.type: Bot`, posted via the `vercel` app, body beginning `[vc]:`;
-      - an **automated review that found nothing** — posted via the `claude` app, first lines `## Code review` then `No issues found.`; a Claude review reporting one or more issues **counts and stops the merge**;
+      - the **automated review's own comment** — posted via the `github-actions` app, first line `## Claude review` (`claude-code-review.yml`, #680). Its summary never counts: the review posts each finding as an inline comment, and those **count and stop the merge** under the rules above. Its "did not finish" notice counts, because the latest push went unreviewed, unless it says a newer push superseded it;
       - **`/pr`'s own new-commits note** — first line exactly `_/pr: new commits since the PR body was written_`, posted by the account running this ship (`gh api user --jq .login`). Any other comment by that account still counts.
         A new bot gets its own explicit line here; never a wildcard on `[bot]`.
 
@@ -142,6 +142,6 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `.github/workflows/e2e.yml` (post-deploy advisory; gated on `deployment_status.environment` ∈ {Preview, Production})
 - `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/ship` dispatches for expand changes)
 - `gh` CLI (including `gh api` REST — `issues/<N>/comments` for poster identity, `pulls/<N>/comments` — and `gh api graphql` for step 10's conversation read)
-- Issue #580 (the maintainer's definition of "unanswered" that step 10 implements) and #601 (its three automated-post exclusions)
+- Issue #580 (the maintainer's definition of "unanswered" that step 10 implements), #601 (its three automated-post exclusions) and #680 (the automated review's comments)
 - `.claude/skills/pr/SKILL.md` (delegated to on dirty / on-main pre-flight; delegates further to `/commit`)
 - `.claude/skills/commit/SKILL.md` (leaf in the delegation chain)

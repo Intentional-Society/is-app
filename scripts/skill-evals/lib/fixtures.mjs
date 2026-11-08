@@ -134,31 +134,63 @@ const VERCEL_CARD = {
     "[Visit Preview](https://is-app-git-feature.vercel.app) | Sep 20, 2026 12:05pm |\n",
 };
 
-// A Claude review that found nothing, posted via the `claude` app — excluded (#601).
-const CLAUDE_REVIEW_CLEAN = {
-  id: 2000000012,
-  login: "claude",
-  type: "Bot",
-  app: "claude",
-  association: "NONE",
-  createdAt: "2026-09-20T12:17:00Z",
-  body: "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance.",
-};
+// claude-code-review.yml's comments (#680), posted with the job's GITHUB_TOKEN, so via the
+// `github-actions` app, first line `## Claude review`.
+function reviewComment(id, createdAt, text) {
+  return {
+    id,
+    login: "github-actions",
+    type: "Bot",
+    app: "github-actions",
+    association: "NONE",
+    createdAt,
+    body: `## Claude review\n\n${text}`,
+  };
+}
 
-// A Claude review that REPORTS issues — still counts as unanswered (#601).
-const CLAUDE_REVIEW_WITH_FINDINGS = {
-  id: 2000000013,
-  login: "claude",
-  type: "Bot",
-  app: "claude",
-  association: "NONE",
-  createdAt: "2026-09-20T12:17:00Z",
-  body:
-    "## Code review\n\n2 issues found. Checked for bugs and CLAUDE.md compliance.\n\n" +
-    "### 1. The new handler never awaits the write\n\n" +
-    "`src/app/flagged.ts` returns before the insert resolves, so a failure is silently dropped.\n\n" +
-    "### 2. CLAUDE.md: raw `fetch` instead of `apiClient`\n\n" +
-    "CLAUDE.md says to use the Hono RPC client (`apiClient`) rather than raw `fetch`.",
+// The "did not finish" notice of the previous push's review, cancelled by the head push —
+// excluded: it says nothing about the head commit.
+const REVIEW_NOTICE_SUPERSEDED = reviewComment(
+  2000000015,
+  "2026-09-20T12:01:00Z",
+  "The review of 1a2b3c4 did not finish: a newer push (5d6e7f8) superseded it. It reported nothing, and any inline comments it posted may be incomplete.\n\n<sub>[run](https://github.com/Intentional-Society/is-app/actions/runs/1)</sub>",
+);
+
+// The review's summary — excluded whatever it says; its findings are inline comments.
+const REVIEW_SUMMARY_CLEAN = reviewComment(
+  2000000012,
+  "2026-09-20T12:17:00Z",
+  "I reviewed PR #224 and found no issues.\n\n<sub>success, 2.5 min, $0.52, 0 turns (may wrongly read 0), 0 permission denials, models: claude-opus-5-5 · [run](https://github.com/Intentional-Society/is-app/actions/runs/2)</sub>",
+);
+
+const REVIEW_SUMMARY_WITH_FINDINGS = reviewComment(
+  2000000013,
+  "2026-09-20T12:17:00Z",
+  "I found 1 issue in PR #225 and posted it as an inline comment.\n\n1. `src/app/flagged.ts:3`: the new handler never awaits the write.\n\n<sub>success, 2.6 min, $0.55, 0 turns (may wrongly read 0), 0 permission denials, models: claude-opus-5-5 · [run](https://github.com/Intentional-Society/is-app/actions/runs/3)</sub>",
+);
+
+// The review's inline finding on PR 225 — counts as unanswered (#601, #680). Seeded as the
+// REST pulls/<N>/comments item and as the unresolved thread GraphQL returns for it.
+const REVIEW_INLINE_FINDING_BODY =
+  "**The new handler never awaits the write.** `src/app/flagged.ts` returns before the insert resolves, so a failure is silently dropped.";
+const REVIEW_INLINE_FINDING = {
+  id: 3000000001,
+  user: { login: "github-actions[bot]", type: "Bot" },
+  path: "src/app/flagged.ts",
+  line: 3,
+  body: REVIEW_INLINE_FINDING_BODY,
+  created_at: "2026-09-20T12:16:00Z",
+  html_url: "https://github.com/Intentional-Society/is-app/pull/225#discussion_r3000000001",
+};
+const REVIEW_INLINE_THREAD = {
+  id: "PRRT_flagged1",
+  isResolved: false,
+  path: "src/app/flagged.ts",
+  comments: {
+    nodes: [
+      { author: { login: "github-actions" }, body: REVIEW_INLINE_FINDING_BODY, createdAt: "2026-09-20T12:16:00Z" },
+    ],
+  },
 };
 
 // /pr step 10's new-commits note, posted by the account running the ship (SELF — the
@@ -732,12 +764,12 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
     },
   },
 
-  // ship-8 — pre-existing PR, all green; the only post-push comments are the three automated
-  // posts /ship step 10 excludes (#601): the Vercel card, a clean Claude review and /pr's own
-  // new-commits note. Merges.
+  // ship-8 — pre-existing PR, all green; the only post-push comments are automated posts
+  // /ship step 10 excludes (#601, #680): the previous push's superseded review notice, the
+  // Vercel card, the review's summary and /pr's own new-commits note. Merges.
   "feature-open-pr-bot-cards-only": {
     summary:
-      "Pre-existing open PR; clean; all checks green; after the head commit only a Vercel deployment card, a clean Claude review and the running account's own /pr new-commits note; merges.",
+      "Pre-existing open PR; clean; all checks green; after the head commit only a superseded review notice, a Vercel deployment card, the review's clean summary and the running account's own /pr new-commits note; merges.",
     branch: "feature-carded",
     branchCommits: [{ message: "feat: carded feature", write: { "src/app/carded.ts": featureModule("carded") } }],
     openPr: true,
@@ -747,8 +779,9 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       auth: AUTH_OK,
       self: SELF,
       ...prWithComments(224, "feature-carded", "feat: carded feature", [
+        REVIEW_NOTICE_SUPERSEDED,
         VERCEL_CARD,
-        CLAUDE_REVIEW_CLEAN,
+        REVIEW_SUMMARY_CLEAN,
         prNoteBySelf("feat: carded feature"),
       ]),
       checks: checksAllGreen(224),
@@ -759,11 +792,11 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
     },
   },
 
-  // ship-9 — pre-existing PR, all green; after the push a Vercel card (excluded) and a Claude
-  // review that REPORTS issues (not excluded, #601). No merge.
+  // ship-9 — pre-existing PR, all green; after the push a Vercel card and the review's summary
+  // (both excluded), and the review's inline finding (unanswered, #601, #680). No merge.
   "feature-open-pr-review-with-findings": {
     summary:
-      "Pre-existing open PR; clean; all checks green; after the head commit a Vercel deployment card and a Claude review reporting 2 issues; no merge.",
+      "Pre-existing open PR; clean; all checks green; after the head commit a Vercel deployment card, the review's summary, and one inline finding from the review in an unresolved thread; no merge.",
     branch: "feature-flagged",
     branchCommits: [{ message: "feat: flagged feature", write: { "src/app/flagged.ts": featureModule("flagged") } }],
     openPr: true,
@@ -772,12 +805,12 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
       repo: REPO,
       auth: AUTH_OK,
       self: SELF,
-      ...prWithComments(225, "feature-flagged", "feat: flagged feature", [VERCEL_CARD, CLAUDE_REVIEW_WITH_FINDINGS]),
+      ...prWithComments(225, "feature-flagged", "feat: flagged feature", [VERCEL_CARD, REVIEW_SUMMARY_WITH_FINDINGS]),
       checks: checksAllGreen(225),
       runs: POST_MERGE_RUNS,
       vercelProductionUrl: VERCEL_PROD_URL,
-      pullComments: [],
-      reviewThreads: [],
+      pullComments: [REVIEW_INLINE_FINDING],
+      reviewThreads: [REVIEW_INLINE_THREAD],
     },
   },
 
