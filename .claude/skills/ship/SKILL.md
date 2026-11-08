@@ -35,7 +35,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
 5. **Freshness check + rebase if needed.** Run `git merge-base --is-ancestor origin/main HEAD`. If it fails (main has moved), `git rebase origin/main`. On rebase conflict, abort and surface — do not auto-resolve.
 
-6. **Re-gate after rebase.** If the rebase changed anything, re-run `npm test`, then `git push --force-with-lease`.
+6. **Re-gate after rebase.** If the rebase changed anything, re-run `npm test`, then `git push --force-with-lease`. A docs-only branch (`node scripts/docs-only.mjs origin/main` exits 0; `AGENTS.md` → Workflow) skips `npm test` and runs `/pr` step 7's lighter check before the push: `git diff --check origin/main HEAD` shows no leftover conflict markers, `git diff --stat origin/main HEAD` shows only the intended change, and paths the changed lines reference still exist.
 
 7. **Dispatch schema expand if pending.** If a schema expand from `/commit` is pending and not yet deployed, run `npm run prod:db:expand` to dispatch the `forward-migrate-prod-schema-expansion` workflow against the pushed branch.
 
@@ -56,7 +56,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
    **There is no `proceed` option.** Anything not green blocks the merge.
 
-9. **Docs-only PR handling.** If the PR's diff is confined to `docs/**` and root `AGENTS.md` / `CLAUDE.md`:
+9. **Docs-only PR handling.** If the PR is docs-only (`node scripts/docs-only.mjs origin/main` exits 0):
    - `ci.yml`'s `dorny/paths-filter` step skips the test steps but still posts `Lint & Functional Tests` green within seconds (satisfies branch protection).
    - Vercel preview is skipped per `vercel.json`'s `ignoreCommand`, so no preview `deployment_status` event fires and preview `e2e.yml` does not run.
    - Treat the absent pre-merge advisory checks (E2E, anything else gated on the preview deploy) as **expected** per `docs/doc-github.md`'s docs-only rule. Proceed on required-green only — do not wait for advisories that the docs-only path skipped by design.
@@ -116,7 +116,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - **Target branch can't be safely checked out** (dirty working tree on current branch). Refuse with a suggestion to commit or stash; do not auto-stash.
 - **`gh` unavailable or unauthenticated.** Refuse loudly.
 - **Rebase conflict during freshness update.** Abort the rebase; surface the conflicted files; hand to human.
-- **`npm test` fails after rebase.** Refuse; surface the failing test.
+- **`npm test` fails after rebase, or a docs-only branch fails step 6's lighter check.** Refuse; surface the failing output.
 - **Any pre-merge check is red, pending past wait limits, or missing where it shouldn't be missing.** Refuse and offer the three supervised-handoff options (`wait+5`, `troubleshoot`, `abort`). No `proceed`.
 - **Schema expand required but `npm run prod:db:expand` dispatch fails, maintainer approval is denied, or post-deploy e2e fails.** Refuse; surface the failing run.
 - **Unanswered PR conversation since the last push, or a conversation read that failed (step 10).** List the items (or the failed read) and ask `N unanswered since the last push — merge anyway?`; merge only on an explicit yes.
@@ -130,6 +130,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `AGENTS.md`
 - `CLAUDE.md`
 - `package.json` (for `npm test`; for `npm run prod:db:expand`)
+- `scripts/docs-only.mjs` (the docs-only definition steps 6 and 9 check)
 - `docs/strategy-committing.md` (expand-contract phase rules; AI-trailer subsection)
 - `docs/strategy-branching.md` (rebase-when-main-moves rule; merge-commit default)
 - `docs/doc-github.md` (PR settings: merge-commit-only; `merge_commit_title`/`merge_commit_message`; `delete_branch_on_merge: true`; `prod-db` environment + required-reviewers gate; docs-only check semantics)

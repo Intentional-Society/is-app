@@ -77,7 +77,9 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
 
 10. **Validate issue argument if present.** If the parsed argument looks like an issue, `gh issue view <N>` to confirm it exists and is open. **Fail fast and hard if `gh` is unavailable or unauthenticated** — suggest `gh auth login` / `gh auth status` as the next command.
 
-11. **Run the local gate.** `npm test`. All suites must pass. This is the only local gate; if it's slow or flaky, the fix is to `npm test` itself, not to skip it here.
+11. **Run the local gate.** `npm test`. All suites must pass. This is the only local gate; if it's slow or flaky, fix `npm test` rather than skip it for a code payload.
+
+    **Docs-only payloads skip the gate** (`AGENTS.md` → Workflow). Run `node scripts/docs-only.mjs --staged` from the repo root: it prints `docs-only` and exits 0, or prints `code` and exits 1. Anything other than exit 0 runs the gate. On a skip, don't run `npm test`; step 12's Test Plan records the skip.
 
 12. **Draft the commit message.** Use a Conventional Commit-style subject and the repo's structured body. First inspect `git log --oneline -20 origin/main` to follow the repo-observed style. Reference: https://www.conventionalcommits.org/en/v1.0.0/
 
@@ -96,7 +98,7 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
     - `Closes #N` for issues this commit resolves. `(#N)` for non-resolving references.
     - AI co-author trailer (see protocol below).
 
-    **Test-plan provenance.** Every line in `Test Plan:` is either (a) a command the agent actually ran with captured output, (b) a verbatim human attestation ("Blake checked the new modal on mobile Safari, no clipping"), or (c) the single collapsed line `ran \`npm test\` locally` when the full suite was run with no surprises. Never invent test results. Fabrication is the failure mode this provenance rule exists to prevent.
+    **Test-plan provenance.** Every line in `Test Plan:` is either (a) a command the agent actually ran with captured output, (b) a verbatim human attestation ("Blake checked the new modal on mobile Safari, no clipping"), (c) the single collapsed line ``ran `npm test` locally`` when the full suite was run with no surprises, or (d) for a docs-only payload that skipped step 11, the line ``docs-only; `npm test` skipped per AGENTS.md``. Never invent test results, and never claim a run that step 11 skipped. Fabrication is the failure mode this provenance rule exists to prevent.
 
     **Test-plan formatting.** Use plain bullets (`- ran ...`), **not** Markdown task-list checkboxes (`- [ ]` / `- [x]`). The PR body becomes the durable merge commit message in this repo (`merge_commit_message: PR_BODY`), and unchecked task-list boxes look like outstanding work. If human-only verification remains, surface it as a pending action or reviewer note, not as completed test evidence. Don't add task-list checkboxes to commit messages or PR bodies unless they already come from the repo's PR template.
 
@@ -176,7 +178,7 @@ Do not use `git stash && <command>; git stash pop` to "test against a clean slat
 - **Suspicious-file match in the blocker list.** Refuse; surface the file; await human direction.
 - **Combined expand+contract schema payload.** Refuse; ask the human to split into two commits.
 - **`gh` unavailable or unauthenticated** when issue lookup is needed. Refuse; name the command to run (`gh auth login` / `gh auth status`).
-- **`npm test` fails.** Refuse; show the failing test output.
+- **`npm test` fails** (code payloads; docs-only payloads skip it per step 11). Refuse; show the failing test output.
 - **Schema touch with unresolved expand-vs-contract phase.** Refuse; ask which phase.
 - **Human rejects message draft, devjournal draft, or staged payload** at the approval checkpoint. Return to staging with the rejection reason captured.
 - **Staged payload changes between approval and commit.** Stop and re-show the approval block.
@@ -189,6 +191,7 @@ Do not use `git stash && <command>; git stash pop` to "test against a clean slat
 - `AGENTS.md`
 - `CLAUDE.md`
 - `package.json` (for `npm test`)
+- `scripts/docs-only.mjs` (the docs-only definition step 11 checks)
 - `docs/strategy-committing.md` (commit format, expand-contract phase rules, AI-trailer subsection, stash-safety note)
 - `docs/strategy-branching.md` (feature-branch-from-main rule)
 - `docs/doc-github.md` (GitHub settings, merge-commit-only, `merge_commit_message: PR_BODY`)

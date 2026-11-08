@@ -6,7 +6,7 @@ description: "[is-app] Open or update the PR for the current branch: fetch + reb
 
 # /pr
 
-The middle Skill in the commit → PR → ship chain. `/pr` ensures the branch is current with `origin/main`, runs `npm test` again if anything changed during rebase, and either opens a new PR or summarizes new commits on the existing one. It does **not** watch CI and it does **not** merge — that's `/ship`'s job.
+The middle Skill in the commit → PR → ship chain. `/pr` ensures the branch is current with `origin/main`, runs `npm test` again if anything changed during rebase (a lighter check for a docs-only branch), and either opens a new PR or summarizes new commits on the existing one. It does **not** watch CI and it does **not** merge — that's `/ship`'s job.
 
 ## Invocation
 
@@ -54,6 +54,13 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 7. **Re-run the gate after rebase.** If the rebase changed anything, re-run `npm test`. Skip the re-run when the rebase was a no-op.
 
+   **A docs-only branch skips the re-run** (`AGENTS.md` → Workflow) and gets a lighter check instead. The branch is docs-only when `node scripts/docs-only.mjs origin/main` exits 0 (it prints `docs-only`). After the rebase, confirm:
+   - `git diff --check origin/main HEAD` reports no leftover conflict markers (whitespace warnings alone don't block);
+   - `git diff --stat origin/main HEAD` shows only the intended change;
+   - files and paths the changed lines reference still exist in the rebased tree.
+
+   Any failure here stops the run the way a failing `npm test` does.
+
 8. **Push.** `git push -u origin <branch>`. Use `--force-with-lease` only if the rebase rewrote already-pushed commits. Never plain `--force`.
 
 9. **If no open PR for this branch — draft and create.**
@@ -66,7 +73,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
    - `Summary:` — one sentence.
    - `Why:` — motivation.
    - `Behavior:` — observable change.
-   - `Test Plan:` — evidence (commands run with output, human attestations, or the collapsed `ran \`npm test\` locally`line). Same provenance rule as`/commit` — never invented.
+   - `Test Plan:` — evidence (commands run with output, human attestations, the collapsed ``ran `npm test` locally`` line, or the docs-only skip line). Same provenance rule as `/commit` — never invented.
    - `Closes #N` / `(#N)` references.
    - AI co-author trailer (same protocol as `/commit`: canonical form when detection succeeds, ask-once + body caveat on fallback).
 
@@ -147,7 +154,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 - **`gh` unavailable or unauthenticated.** Refuse loudly; print `gh auth login`.
 - **Argument resolves to a PR on a different branch from the current checkout.** Refuse; name both branches; suggest `/ship <PR#>` for switching.
 - **Rebase conflict during `git rebase origin/main`.** Abort the rebase; report conflicted files; hand to human. Do not auto-resolve.
-- **`npm test` fails after rebase.** Refuse; surface the failing test output.
+- **`npm test` fails after rebase, or a docs-only branch fails step 7's lighter check.** Refuse; surface the failing output.
 - **`gh pr create` fails or the PR-comment update fails.** Report the error; do not retry blindly.
 - **Human rejects the PR draft text or the body-update proposal.** Return to step 9 or 10 with the rejection reason captured.
 - **Duplicate PR would result** (an open PR already exists for the branch and the argument asked to create another). Refuse.
@@ -159,6 +166,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 - `AGENTS.md`
 - `CLAUDE.md`
 - `package.json` (for `npm test`)
+- `scripts/docs-only.mjs` (the docs-only definition step 7 checks)
 - `docs/strategy-committing.md` (commit/PR format, AI-trailer subsection)
 - `docs/strategy-branching.md` (rebase-when-main-moves rule; up-to-date branch protection)
 - `docs/doc-github.md` (PR settings: merge-commit-only; `merge_commit_title: PR_TITLE`; `merge_commit_message: PR_BODY`; `allow_update_branch: true` but local rebase preferred so the post-update `npm test` gate can re-run)
