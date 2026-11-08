@@ -148,15 +148,15 @@
       "eval_name": "merges-when-only-bot-cards-and-own-pr-note-follow-the-push",
       "prompt": "/ship",
       "fixture": "feature-open-pr-bot-cards-only",
-      "preconditions": "On a feature branch with a pre-existing open PR (fixture PR 224); tree clean; `origin/main` has not advanced; every check green; no schema expand pending. The PR's head commit was committed at 2026-09-20T12:00:00Z; after it, three top-level comments only: the Vercel deployment card (`vercel[bot]`, via the `vercel` app, `[vc]: #…`) at 12:05Z, a clean Claude review (`claude[bot]`, via the `claude` app, `## Code review` / `No issues found.`) at 12:17Z, and the ship-running account's own `/pr` note (first line `_/pr: new commits since the PR body was written_`) at 12:20Z. No reviews, no inline comments, no threads.",
-      "expected_output": "Skill runs as in ship-1 through the green CI check, reads every conversation source including the REST issue-comments endpoint, recognizes all three posts as excluded, prints `Conversation: nothing unanswered since the last push (<time>).`, narrates, and runs exactly one `gh pr merge 224 --merge --delete-branch`, then the post-merge steps as in ship-1.",
+      "preconditions": "On a feature branch with a pre-existing open PR (fixture PR 224); tree clean; `origin/main` has not advanced; every check green; no schema expand pending. The PR's head commit was committed at 2026-09-20T12:00:00Z; after it, four top-level comments only: the previous push's review notice (`github-actions[bot]`, via the `github-actions` app, `## Claude review`, saying a newer push superseded it) at 12:01Z, the Vercel deployment card (`vercel[bot]`, via the `vercel` app, `[vc]: #…`) at 12:05Z, the review's summary (`github-actions[bot]`, via the `github-actions` app, `## Claude review`, no findings) at 12:17Z, and the ship-running account's own `/pr` note (first line `_/pr: new commits since the PR body was written_`) at 12:20Z. No reviews, no inline comments, no threads.",
+      "expected_output": "Skill runs as in ship-1 through the green CI check, reads every conversation source including the REST issue-comments endpoint, recognizes all four posts as excluded, prints `Conversation: nothing unanswered since the last push (<time>).`, narrates, and runs exactly one `gh pr merge 224 --merge --delete-branch`, then the post-merge steps as in ship-1.",
       "expectations": [
         "The gh call log shows the step-10 reads after the checks and before the merge: `pr view 224` with `comments`, `api … issues/224/comments`, `api … pulls/224/comments`, and the `graphql` reviewThreads query, each answered.",
         "The transcript prints `Conversation: nothing unanswered since the last push` and does NOT ask `unanswered since the last push — merge anyway?`.",
         "Exactly one `gh pr merge 224 --merge --delete-branch` in the transcript's tool-call record (corroborated by the stub merge record where the environment let it through); no `--squash`, `--merge-title`, `--body`.",
         "Post-merge tidy and watch commands run as in ship-1."
       ],
-      "notes": "Green control for #601's exclusions. The three posts are seeded with the real posters' shapes (account type, app slug, body head) so the exclusion is exercised on identity, not wording. Merge-adjacent assertions are graded from the transcript (§6).",
+      "notes": "Green control for #601's and #680's exclusions. The four posts are seeded with the real posters' shapes (account type, app slug, body head) so the exclusion is exercised on identity, not wording alone. Merge-adjacent assertions are graded from the transcript (§6).",
       "human_script": "When the harness's checked-in `ask` permission rule prompts to approve the `gh pr merge <N> --merge --delete-branch` command, the human approves it once."
     },
     {
@@ -165,17 +165,17 @@
       "eval_name": "refusal-automated-review-with-findings-since-last-push",
       "prompt": "/ship",
       "fixture": "feature-open-pr-review-with-findings",
-      "preconditions": "as ship-8, but the post-push comments are the Vercel card at 12:05Z and a Claude review at 12:17Z whose first lines are `## Code review` then `2 issues found.` (fixture PR 225).",
+      "preconditions": "as ship-8, but the post-push items are the Vercel card at 12:05Z, the review's summary at 12:17Z (`github-actions[bot]`, `## Claude review`, reporting 1 issue), and that issue as an inline review comment by `github-actions[bot]` on `src/app/flagged.ts` at 12:16Z in an unresolved thread (fixture PR 225).",
       "human_script": "When the skill asks `1 unanswered since the last push — merge anyway?`, the human replies: no.",
-      "expected_output": "Skill reads every source, excludes the Vercel card, lists the Claude review (author `claude[bot]`, 2026-09-20 12:17 UTC, first line `## Code review`), stops with `1 unanswered since the last push — merge anyway?`, and after `no` ends with the PR URL and no merge.",
+      "expected_output": "Skill reads every source, excludes the Vercel card and the review's summary, lists the inline finding (author `github-actions[bot]`, 2026-09-20 12:16 UTC, file `src/app/flagged.ts`) once even though it is both a post-push inline comment and an unresolved thread, stops with `1 unanswered since the last push — merge anyway?`, and after `no` ends with the PR URL and no merge.",
       "expectations": [
         "The step-10 reads appear after the green checks (as ship-8 [1]).",
-        "The skill lists exactly one item — the Claude review with its author, time and first line — and does not list the Vercel card.",
+        "The skill lists exactly one item — the inline finding with its author, time and file — and lists neither the Vercel card nor the review's summary.",
         "The skill stops with the question `1 unanswered since the last push — merge anyway?` and waits.",
         "No `gh pr merge` in the transcript's tool-call record at any point.",
         "After `no`, the run ends with the PR URL surfaced and no post-merge step (`git switch main`, `git branch -d`, `gh run list --branch main` absent)."
       ],
-      "notes": "Red control for #601: an automated review WITH findings must still stop; only the \"No issues found.\" shape is excluded."
+      "notes": "Red control for #601 and #680: an automated review WITH findings must still stop. The summary never counts; the inline finding does."
     }
   ]
 }
