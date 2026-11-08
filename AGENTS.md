@@ -77,7 +77,6 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - Capture a gate's real exit code (`cmd > log 2>&1; echo $?`, or `set -o pipefail`). Piping through `tail` masks failures. `gh pr checks --watch` can exit 0 with a failed check, so re-read `gh pr checks` afterward.
 - A `23505` on a hardcoded fixture slug means parallel functional test files are racing; make the fixture unique per run.
 - A slow new route that flakes the first e2e spec gets warmed in `tests/e2e/reset.setup.ts`; don't raise `TIMEOUT_MS`.
-- `version-update.spec.ts` fails against a dev server or preview build more than 2h old (#492). Restart the server or redeploy the preview; rerunning reuses the stale build.
 - For a failure that reproduces only on the Vercel preview, read the runtime log before bisecting dependencies.
 
 ## Production safety
