@@ -602,7 +602,7 @@ writing one from scratch.
 4. Create that root `0700`, and the per-sandbox directory with `fs.mkdtempSync`.
 5. `git init --bare` the origin, and `git init` the working repo.
 6. Apply `setLocalConfig()` to the working repo.
-7. Write `BASE_FILES` plus the profile's `baseFilesExtra`, commit them as the **seed commit**, add
+7. Write `BASE_FILES`, a verbatim copy of the repo's `scripts/docs-only.mjs` (the skills' docs-only classifier) and the profile's `baseFilesExtra`, commit them as the **seed commit**, add
    the local origin as a remote, and push `main` with `-u`, so `main` tracks `origin/main` as it
    would in a real clone and the skills' post-merge `git pull --ff-only` on `main` works (#597).
 8. Create the feature branch and replay `branchCommits`, pushing at `pushedBranchCommits` if set.

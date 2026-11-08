@@ -15,6 +15,9 @@ import { assertOutsideRepo, HARNESS_DIR, MARKER_FILENAME, SANDBOX_PREFIX, sandbo
 
 const GH_STUB_SRC = path.join(HARNESS_DIR, "gh-stub");
 const FAKE_TEST_SRC = path.join(HARNESS_DIR, "fake-test.mjs");
+// The real docs-only classifier, which /commit, /pr and /ship call. Copied verbatim into
+// every baseline so the skills' docs-only step runs as it does in the repo.
+const DOCS_ONLY_SRC = path.join(HARNESS_DIR, "..", "docs-only.mjs");
 const SCRUB_UNSET = ["GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"];
 
 /**
@@ -56,7 +59,11 @@ export function buildSandbox({ fixture, root, note }) {
   git(["init", "-b", "main", repoDir]);
   setLocalConfig(repoDir);
 
-  writeFiles(repoDir, { ...BASE_FILES, ...(profile.baseFilesExtra || {}) });
+  writeFiles(repoDir, {
+    ...BASE_FILES,
+    "scripts/docs-only.mjs": fs.readFileSync(DOCS_ONLY_SRC, "utf8"),
+    ...(profile.baseFilesExtra || {}),
+  });
   git(["-C", repoDir, "add", "-A"]);
   git(["-C", repoDir, "commit", "-m", "chore: sandbox baseline"]);
   git(["-C", repoDir, "remote", "add", "origin", pathToFileURL(originDir).href]);
