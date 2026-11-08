@@ -13,6 +13,8 @@ const STALE_ID = "e2e-stale-build";
 // its own — lets the patch and urgent cases isolate their own tier.
 const OLD_APP_VERSION = "2000-01-01";
 const EPOCH = "1970-01-01T00:00:00.000Z";
+// Earlier than any build of this test's code.
+const BEFORE_ANY_BUILD = "2026-01-01T00:00:00.000Z";
 
 type VersionPayload = { id: string; appVersion: string; urgentReleasedAt: string };
 
@@ -25,22 +27,32 @@ test.beforeEach(async ({ baseURL }) => {
 });
 
 test("a feature update shows a dismissible banner on an in-app page", async ({ page }) => {
-  // The feature banner waits out a 2h hold on the running build, and a preview
-  // build is always fresh — so drive a fake clock past the hold, then nudge a
-  // re-check (the hook polls on focus, not a timer).
-  await page.clock.install();
   await signInAs(page, "regular");
   await completeWelcome(page, { bio: "e2e bio · version-update · feature" });
+
+  // The feature banner holds until the running build is 2h old. A dev server
+  // or preview can be any age, so the test brackets the build time instead of
+  // knowing it: a clock set before any build reads as a build from the future
+  // (held), and a clock hours past real now reads as a build past the hold.
+  await page.clock.install({ time: BEFORE_ANY_BUILD });
 
   // A newer deploy that advanced the changelog → feature.
   await stubVersion(page, { id: STALE_ID, appVersion: "2999-12-31", urgentReleasedAt: EPOCH });
 
+  const versionPolled = page.waitForResponse("**/api/version");
   await page.goto("/me");
   const banner = page.getByText("The app has new features for you");
-  // Held while the build is younger than the feature hold.
+  // Held. toBeHidden passes on its first poll if the banner simply hasn't
+  // rendered yet, so let the mount check land and render before asserting
+  // the absence.
+  await versionPolled;
+  await page.waitForTimeout(500);
   await expect(banner).toBeHidden();
 
-  await page.clock.fastForward("02:01:00");
+  // Every build predates real now, so real now + 3h clears the 2h hold with an
+  // hour to spare for clock skew between the build machine and this runner.
+  // Then nudge a re-check (the hook polls on focus, not a timer).
+  await page.clock.setSystemTime(Date.now() + 3 * 60 * 60 * 1000);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
 
   await expect(banner).toBeVisible({ timeout: TIMEOUT_MS });
