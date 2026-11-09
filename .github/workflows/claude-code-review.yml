@@ -10,10 +10,13 @@ jobs:
     # refuses bot actors, and skipping here keeps the check neutral instead of
     # red. Skip drafts; marking one ready (ready_for_review) starts its
     # review. Skip fork PRs: they get no secrets, so the job could only fail.
+    # Skip PRs labelled skip-claude-review, for a PR that has had enough
+    # review; remove the label and push to review again.
     if: >-
       github.event.pull_request.user.type != 'Bot' &&
       !github.event.pull_request.draft &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-claude-review')
 
     runs-on: ubuntu-latest
     # A run killed here posts nothing, so keep this well above the longest
@@ -25,6 +28,7 @@ jobs:
       cancel-in-progress: true
     outputs:
       posted: ${{ steps.summary.outputs.posted }}
+      skipped: ${{ steps.gate.outputs.skip }}
 
     # The agent works with this job's GITHUB_TOKEN (passed as github_token
     # below), so these scopes bound what it can do on GitHub: read the repo,
@@ -44,7 +48,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          fetch-depth: 1
+          # The checkout is the PR merged into its base; depth 2 brings the
+          # base in as HEAD^1 for the docs-only check.
+          fetch-depth: 2
+
+      # Docs-only PRs skip the review. scripts/docs-only.mjs is the repo's one
+      # definition of docs-only; a git error counts as code, so it reviews.
+      - name: Skip docs-only changes
+        id: gate
+        run: |
+          if node scripts/docs-only.mjs HEAD^1 HEAD; then
+            echo "skip=docs-only" >> "$GITHUB_OUTPUT"
+            echo "::notice::Claude review skipped: docs-only change"
+          fi
 
       # github_token: the action uses this token instead of exchanging the
       # job's OIDC token for its App token. That exchange is also where the
@@ -59,11 +75,16 @@ jobs:
       #   `gh pr comment --body-file` posts any file, so allowing them would
       #   let an injected instruction run code or post the token.
       # - Read(.git/**) is denied so the agent can't read .git/config.
-      #   Reading files outside the checkout needs an approval a CI run can't
-      #   give, so the environment of running processes stays out of reach.
+      # - CLAUDE_CODE_SUBPROCESS_ENV_SCRUB has Claude Code remove Anthropic and
+      #   GitHub secrets from the environment of the commands the agent runs
+      #   (best effort). Without it, `gh … --jq 'env.NAME'` prints any
+      #   variable, including the Claude OAuth token.
       - name: Run Claude Code Review
         id: review
+        if: steps.gate.outputs.skip == ''
         uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
+        env:
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
@@ -106,7 +127,7 @@ jobs:
   # claude-review is killed.
   report-unfinished:
     needs: claude-review
-    if: ${{ always() && needs.claude-review.result != 'skipped' && needs.claude-review.outputs.posted != 'true' }}
+    if: ${{ always() && needs.claude-review.result != 'skipped' && needs.claude-review.outputs.skipped == '' && needs.claude-review.outputs.posted != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
