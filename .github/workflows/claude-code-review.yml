@@ -83,8 +83,7 @@ jobs:
       # seconds and cost cents probably didn't run.
       - name: Post the review summary
         id: summary
-        # !cancelled(), not always(): a cancelled review gets the
-        # report-unfinished notice instead.
+        # Skipped on cancel; report-unfinished posts that notice.
         if: ${{ !cancelled() && steps.review.outputs.execution_file != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,7 +96,7 @@ jobs:
           # stays under GitHub's 65,536-character comment limit.
           text=$(jq -r '(.result // "The review ended without a summary.")[0:60000]' <<<"$result")
           stats=$(jq -r '"\(.subtype // "no result"), \(((.duration_ms // 0) / 60000 * 10 | round) / 10) min, $\(.total_cost_usd // "?"), \(.num_turns // "?") turns (may wrongly read 0), \((.permission_denials // []) | length) permission denials, models: \((.modelUsage // {}) | keys | join(", "))"' <<<"$result")
-          printf '## Claude review\n\n%s\n\n<sub>%s · [run](%s)</sub>\n' "$text" "$stats" "$RUN_URL" > "$RUNNER_TEMP/summary.md"
+          printf '## Claude review\n\n%s\n\n<sub>%s · [run](%s)</sub>\n\n🤖 Written by [Claude Code](https://claude.com/claude-code)\n' "$text" "$stats" "$RUN_URL" > "$RUNNER_TEMP/summary.md"
           gh pr comment "$PR" -R "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/summary.md"
           echo "posted=true" >> "$GITHUB_OUTPUT"
 
@@ -126,7 +125,9 @@ jobs:
         # replaced it.
         run: |
           head_now=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid || true)
-          if [ "$RESULT" != "cancelled" ]; then
+          if [ "$RESULT" = "success" ]; then
+            why="the review step produced no output"
+          elif [ "$RESULT" != "cancelled" ]; then
             why="the job ended with result: $RESULT"
           elif [ -n "$head_now" ] && [ "$head_now" != "$REVIEWED_SHA" ]; then
             why="a newer push (${head_now:0:7}) superseded it"
