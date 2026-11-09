@@ -62,6 +62,20 @@ jobs:
             echo "::notice::Claude review skipped: docs-only change"
           fi
 
+      # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB (below) runs the agent's commands in
+      # bubblewrap, and Claude Code won't start without it. The action
+      # installs it only when allowed_non_write_users is set, so this step
+      # does the same install. Ubuntu 24.04 also blocks the unprivileged user
+      # namespaces bubblewrap needs, so the sysctl lifts that.
+      - name: Install bubblewrap for the subprocess scrub
+        if: steps.gate.outputs.skip == ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
       # github_token: the action uses this token instead of exchanging the
       # job's OIDC token for its App token. That exchange is also where the
       # action checks that this file matches the default branch, so with this
