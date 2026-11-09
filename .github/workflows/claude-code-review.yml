@@ -29,6 +29,7 @@ jobs:
     outputs:
       posted: ${{ steps.summary.outputs.posted }}
       skipped: ${{ steps.gate.outputs.skip }}
+      outcome: ${{ steps.summary.outputs.outcome }}
 
     # The agent works with this job's GITHUB_TOKEN (passed as github_token
     # below), so these scopes bound what it can do on GitHub: read the repo,
@@ -115,7 +116,10 @@ jobs:
       # The allow list gives the agent no way to post a top-level comment, so
       # this step posts its closing summary, with the result's outcome, time,
       # cost, turns, permission denials and models. A review that took
-      # seconds and cost cents probably didn't run.
+      # seconds and cost cents probably didn't run. A review that ended in
+      # error (error_max_turns, error_during_execution) posts no summary,
+      # because /ship ignores summaries; report-unfinished posts a notice
+      # naming the outcome instead, and /ship counts that.
       - name: Post the review summary
         id: summary
         # Skipped on cancel; report-unfinished posts that notice.
@@ -127,6 +131,11 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           result=$(jq -r '[.[] | select(.type == "result")] | last // {}' "$EXEC_FILE")
+          outcome=$(jq -r '.subtype // "no result"' <<<"$result")
+          if [ "$outcome" != "success" ]; then
+            echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Truncated by characters inside jq, which keeps the UTF-8 valid and
           # stays under GitHub's 65,536-character comment limit.
           text=$(jq -r '(.result // "The review ended without a summary.")[0:60000]' <<<"$result")
@@ -152,6 +161,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           RESULT: ${{ needs.claude-review.result }}
+          OUTCOME: ${{ needs.claude-review.outputs.outcome }}
           REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         # A cancelled run whose PR head has since moved was superseded by a
@@ -160,7 +170,9 @@ jobs:
         # replaced it.
         run: |
           head_now=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid || true)
-          if [ "$RESULT" = "success" ]; then
+          if [ "$RESULT" = "success" ] && [ -n "$OUTCOME" ]; then
+            why="the review ended with $OUTCOME"
+          elif [ "$RESULT" = "success" ]; then
             why="the review step produced no output"
           elif [ "$RESULT" != "cancelled" ]; then
             why="the job ended with result: $RESULT"
