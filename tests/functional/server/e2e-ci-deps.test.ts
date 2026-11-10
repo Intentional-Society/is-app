@@ -4,20 +4,35 @@
 // The script is CI tooling rather than server code; the functional-server
 // Vitest project gives it the node environment it needs.
 //
-// The last two describes run against the repo's real files. e2e.yml installs
-// only the script's output, so a spec importing a package outside
-// E2E_CI_DEPS would pass locally (the full node_modules has it) and fail in
-// CI; the import scan makes that a failing required check instead.
+// The describes from "the repo's lockfile" on run against the repo's real
+// files. e2e.yml installs only the script's output, so e2e code that loads a
+// package outside E2E_CI_DEPS would pass locally (the full node_modules has
+// it) and fail in CI; the import scan makes that a failing required check
+// instead.
 
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { isBuiltin } from "node:module";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  createSourceFile,
+  forEachChild,
+  isCallExpression,
+  isExportDeclaration,
+  isIdentifier,
+  isImportDeclaration,
+  isStringLiteralLike,
+  type Node,
+  ScriptTarget,
+  SyntaxKind,
+} from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { buildE2eCiManifest, E2E_CI_DEPS } from "../../../scripts/e2e-ci-deps.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = resolve(HERE, "..", "..", "..");
+const E2E_DIR = join(PROJECT_ROOT, "tests", "e2e");
 
 type LockEntry = {
   version: string;
@@ -140,27 +155,146 @@ describe("the repo's lockfile", () => {
   });
 });
 
+type FoundImport = { specifier: string; typeOnly: boolean };
+
+// Every module a source file loads, read from its syntax tree: import and
+// export-from statements, `import()` and `require()`. `typeOnly` marks an
+// `import type` / `export type` statement, which is erased before the code
+// runs. A statement that mixes in a value (`import { type A, b }`) is not
+// type-only.
+const importsOf = (fileName: string, source: string): FoundImport[] => {
+  const found: FoundImport[] = [];
+  const visit = (node: Node): void => {
+    if (isImportDeclaration(node) && isStringLiteralLike(node.moduleSpecifier)) {
+      found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.importClause?.isTypeOnly ?? false });
+    } else if (isExportDeclaration(node) && node.moduleSpecifier && isStringLiteralLike(node.moduleSpecifier)) {
+      found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.isTypeOnly });
+    } else if (
+      isCallExpression(node) &&
+      (node.expression.kind === SyntaxKind.ImportKeyword ||
+        (isIdentifier(node.expression) && node.expression.text === "require"))
+    ) {
+      const [argument] = node.arguments;
+      // A computed specifier can't be checked, so it is reported as one
+      // no package matches.
+      found.push({
+        specifier: argument && isStringLiteralLike(argument) ? argument.text : "<computed>",
+        typeOnly: false,
+      });
+    }
+    forEachChild(node, visit);
+  };
+  visit(createSourceFile(fileName, source, ScriptTarget.Latest));
+  return found;
+};
+
+// Why the e2e CI install can't satisfy an import, or null when it can.
+// The install holds E2E_CI_DEPS and the checkout holds the repo's files,
+// so a relative import inside tests/e2e always resolves. One that leaves
+// the directory reaches code whose own imports this scan doesn't follow,
+// and the `@/` alias is such an import too; both are allowed only as type
+// imports.
+const unmetImport = (file: string, { specifier, typeOnly }: FoundImport, deps: readonly string[]): string | null => {
+  if (typeOnly || isBuiltin(specifier)) return null;
+  if (specifier.startsWith(".")) {
+    return resolve(dirname(file), specifier).startsWith(E2E_DIR + sep) ? null : "leaves tests/e2e as a value import";
+  }
+  if (specifier.startsWith("@/")) return "leaves tests/e2e as a value import";
+  // "@scope/name/sub" and "name/sub" both belong to their package.
+  const name = specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0];
+  return deps.includes(name) ? null : "is not in E2E_CI_DEPS";
+};
+
+describe("importsOf", () => {
+  it("finds every way a file loads a module", () => {
+    const source = [
+      'import a from "pkg-a";',
+      'import "pkg-b";',
+      'export { c } from "pkg-c";',
+      'const d = require("pkg-d");',
+      'const e = await import("pkg-e");',
+      "const f = await import(name);",
+    ].join("\n");
+
+    expect(importsOf("x.ts", source).map((i) => i.specifier)).toEqual([
+      "pkg-a",
+      "pkg-b",
+      "pkg-c",
+      "pkg-d",
+      "pkg-e",
+      "<computed>",
+    ]);
+  });
+
+  it("marks only whole-statement type imports as type-only", () => {
+    const source = [
+      'import type { A } from "./a";',
+      'export type { B } from "./b";',
+      'import { type C, d } from "./c";',
+      '// import type { E } from "./commented-out";',
+      'import { e } from "./e";',
+    ].join("\n");
+
+    expect(importsOf("x.ts", source)).toEqual([
+      { specifier: "./a", typeOnly: true },
+      { specifier: "./b", typeOnly: true },
+      { specifier: "./c", typeOnly: false },
+      { specifier: "./e", typeOnly: false },
+    ]);
+  });
+});
+
+describe("unmetImport", () => {
+  const spec = join(E2E_DIR, "helpers", "example.ts");
+  const unmet = (specifier: string, typeOnly = false) =>
+    unmetImport(spec, { specifier, typeOnly }, ["runner", "@scope/pkg"]);
+
+  it("accepts listed packages, their subpaths, Node builtins and files inside tests/e2e", () => {
+    for (const specifier of [
+      "runner",
+      "runner/sub",
+      "@scope/pkg/sub",
+      "node:path",
+      "fs",
+      "./sibling",
+      "../other.spec",
+    ]) {
+      expect(unmet(specifier), specifier).toBeNull();
+    }
+  });
+
+  it("rejects a package outside the list", () => {
+    expect(unmet("zod")).toBe("is not in E2E_CI_DEPS");
+    expect(unmet("@scope/other")).toBe("is not in E2E_CI_DEPS");
+    expect(unmet("<computed>")).toBe("is not in E2E_CI_DEPS");
+  });
+
+  it("rejects a value import that leaves tests/e2e and accepts the same import as a type", () => {
+    for (const specifier of ["../../../src/server/test-reset", "../../e2e-elsewhere/x", "@/lib/api"]) {
+      expect(unmet(specifier), specifier).toBe("leaves tests/e2e as a value import");
+      expect(unmet(specifier, true), specifier).toBeNull();
+    }
+  });
+});
+
 describe("the e2e code's imports", () => {
   const sourceFiles = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) return sourceFiles(path);
-      return entry.name.endsWith(".ts") ? [path] : [];
+      return /\.[cm]?[jt]sx?$/.test(entry.name) ? [path] : [];
     });
 
-  it("name only packages in E2E_CI_DEPS", () => {
-    const files = [join(PROJECT_ROOT, "playwright.config.ts"), ...sourceFiles(join(PROJECT_ROOT, "tests", "e2e"))];
-    const outside: string[] = [];
-    for (const file of files) {
-      const source = readFileSync(file, "utf8");
-      for (const match of source.matchAll(/\bfrom\s+["']([^"']+)["']|\bimport\(\s*["']([^"']+)["']\s*\)/g)) {
-        const specifier = match[1] ?? match[2];
-        if (specifier.startsWith(".") || specifier.startsWith("node:")) continue;
-        // "@scope/name/sub" and "name/sub" both belong to their package.
-        const name = specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0];
-        if (!E2E_CI_DEPS.includes(name)) outside.push(`${file}: ${specifier}`);
-      }
-    }
-    expect(outside).toEqual([]);
+  it("are all satisfied by the e2e CI install", () => {
+    // playwright.config.ts sits at the repo root and loads tests/e2e
+    // helpers; everything else the job runs is under tests/e2e.
+    const files = [join(PROJECT_ROOT, "playwright.config.ts"), ...sourceFiles(E2E_DIR)];
+    const unmet = files.flatMap((file) =>
+      importsOf(file, readFileSync(file, "utf8")).flatMap((found) => {
+        const reason = unmetImport(file, found, E2E_CI_DEPS);
+        return reason ? [`${file}: "${found.specifier}" ${reason}`] : [];
+      }),
+    );
+    expect(unmet).toEqual([]);
   });
 });
