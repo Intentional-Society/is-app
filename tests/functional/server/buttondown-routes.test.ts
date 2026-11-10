@@ -57,6 +57,12 @@ const deleteUserAndProfile = async (id: string) => {
   await db.execute(sql`DELETE FROM auth.users WHERE id = ${id}::uuid`);
 };
 
+// The lock the sync runner takes (LOCK_NAME in src/server/buttondown-runner.ts).
+// Cleanup is scoped to it: Vitest runs files in parallel against one DB, and
+// sync-locks.test.ts holds a row of its own in the same table.
+const RUNNER_LOCK = "buttondown";
+const wipeRunnerLock = () => db.delete(syncLocks).where(eq(syncLocks.name, RUNNER_LOCK));
+
 describe("Buttondown sync routes", () => {
   let admin: string;
   let nonAdmin: string;
@@ -73,7 +79,7 @@ describe("Buttondown sync routes", () => {
     delete process.env.BUTTONDOWN_API_KEY;
     delete process.env.CRON_SECRET;
     delete process.env.BUTTONDOWN_SYNC_WRITE;
-    await db.delete(syncLocks);
+    await wipeRunnerLock();
   });
 
   afterEach(async () => {
@@ -83,7 +89,7 @@ describe("Buttondown sync routes", () => {
     process.env.BUTTONDOWN_API_KEY = originalApiKey;
     process.env.CRON_SECRET = originalCronSecret;
     process.env.BUTTONDOWN_SYNC_WRITE = originalWrite;
-    await db.delete(syncLocks);
+    await wipeRunnerLock();
   });
 
   describe("GET /api/cron/buttondown-sync", () => {
@@ -257,7 +263,7 @@ describe("Buttondown sync routes", () => {
       // retry runs end-to-end instead of bailing on the first miss.
       await db.execute(
         sql`INSERT INTO sync_locks (name, locked_until, acquired_by)
-            VALUES ('buttondown', now() + interval '200 milliseconds', 'test:hold-briefly')`,
+            VALUES (${RUNNER_LOCK}, now() + interval '200 milliseconds', 'test:hold-briefly')`,
       );
 
       authAs(memberId);
