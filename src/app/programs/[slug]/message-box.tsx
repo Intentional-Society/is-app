@@ -242,6 +242,9 @@ function MessageItem({
       }
     },
     onSuccess: () => refreshMessageBox(queryClient, programId),
+    // If the action failed because the message is already gone (say another admin
+    // removed it), refresh so the dead message leaves the list.
+    onError: () => refreshMessageBox(queryClient, programId),
     onSettled: () => setConfirming(null),
   });
 

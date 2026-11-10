@@ -211,6 +211,19 @@ describe("MessageBox", () => {
       expect(screen.getByText("Sending love from afar")).toBeVisible();
     });
 
+    it("refreshes the list when archiving fails because the message is already gone", async () => {
+      moderator();
+      $archive.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      mockBox(box({ canModerate: true, messages: [] }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer available");
+      // The box was refetched, so the dead message left the list.
+      await waitFor(() => expect($get).toHaveBeenCalledTimes(2));
+      expect(await screen.findByText("No messages yet.")).toBeVisible();
+    });
+
     it("keeps an Undo that is still counting down when a refetch fails", async () => {
       moderator();
       renderBox();

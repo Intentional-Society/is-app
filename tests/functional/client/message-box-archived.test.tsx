@@ -159,6 +159,17 @@ describe("ArchivedMessages (admin)", () => {
     await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
   });
 
+  it("keeps the restore error on screen after the refreshed list drops the row", async () => {
+    mockList([archived("a1", "Hidden one")]);
+    $restore.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
+    renderArchived();
+    fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
+    mockList([]);
+    expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer available");
+    await waitFor(() => expect(screen.queryByText("Hidden one")).not.toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent("That message is no longer available");
+  });
+
   it("shows nothing, not an error, when the viewer isn't allowed the archive (a 404)", async () => {
     $list.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
     renderArchived();

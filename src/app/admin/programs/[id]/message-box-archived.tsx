@@ -37,6 +37,9 @@ const fetchArchived = async (programId: string): Promise<ArchivedMessageBoxMessa
 export function ArchivedMessages({ programId }: { programId: string }) {
   const queryClient = useQueryClient();
   const undoQueue = useUndoQueue();
+  // Restore failures are reported here, not in the row: the failed restore also
+  // refreshes the list, which removes the row (and anything shown inside it).
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const query = useQuery({
     queryKey: messageBoxArchivedQueryKey(programId),
     queryFn: () => fetchArchived(programId),
@@ -85,13 +88,13 @@ export function ArchivedMessages({ programId }: { programId: string }) {
       </summary>
       <div className="mt-2 flex flex-col gap-2">
         <p className="text-xs text-muted-foreground">
-          Hidden from the program page for everyone. Restore puts a message back; Delete removes it permanently after 30
-          seconds, unless you undo.
+          Hidden from the program page for everyone. Restore puts a message back in the box at its original date; Delete
+          removes it permanently after 30 seconds, unless you undo.
         </p>
         <UndoNotices entries={undoQueue.entries} onUndo={(id) => void undoQueue.undo(id)} />
-        {undoQueue.error && (
+        {(restoreError ?? undoQueue.error) && (
           <p role="alert" className="text-sm text-destructive">
-            {undoQueue.error}
+            {restoreError ?? undoQueue.error}
           </p>
         )}
         {query.isPending ? (
@@ -105,7 +108,13 @@ export function ArchivedMessages({ programId }: { programId: string }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {visible?.map((m) => (
-              <ArchivedItem key={m.id} programId={programId} message={m} onDelete={() => scheduleDelete(m)} />
+              <ArchivedItem
+                key={m.id}
+                programId={programId}
+                message={m}
+                onDelete={() => scheduleDelete(m)}
+                onRestoreResult={setRestoreError}
+              />
             ))}
           </ul>
         )}
@@ -118,20 +127,29 @@ function ArchivedItem({
   programId,
   message,
   onDelete,
+  onRestoreResult,
 }: {
   programId: string;
   message: ArchivedMessageBoxMessage;
   onDelete: () => void;
+  // Called with the error text when a restore fails, or null when one starts.
+  onRestoreResult: (error: string | null) => void;
 }) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
   const restoreMutation = useMutation({
-    mutationFn: () => patchArchived(programId, message.id, false),
+    mutationFn: () => {
+      onRestoreResult(null);
+      return patchArchived(programId, message.id, false);
+    },
     // Restoring changes what the program page shows too. On failure (say another
     // admin already deleted it) refresh the list so a stale row goes away.
     onSuccess: () => refreshMessageBox(queryClient, programId),
-    onError: () => refreshArchive(queryClient, programId),
+    onError: (error) => {
+      onRestoreResult(error.message);
+      return refreshArchive(queryClient, programId);
+    },
   });
 
   return (
@@ -181,11 +199,6 @@ function ArchivedItem({
         </span>
       </div>
       <p className="whitespace-pre-wrap break-words">{message.body}</p>
-      {restoreMutation.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          {restoreMutation.error.message}
-        </p>
-      )}
     </li>
   );
 }
