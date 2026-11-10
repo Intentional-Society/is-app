@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import type { E2EResetState, ResetResult } from "../../../src/server/test-reset";
 import { ACCOUNTS, type Account, type AccountKey } from "./accounts";
 
 // Shared wait budget for page.waitForURL across the suite. The setup
@@ -60,46 +61,15 @@ export const signInThroughForm = async (page: Page, key: AccountKey): Promise<vo
   });
 };
 
-// The state a reset leaves an account in (E2EResetState in
-// src/server/test-reset.ts).
-//   fresh     — no welcome markers, empty profile: `/` enters the
-//               welcome flow at its first step.
-//   onboarded — welcome flow done, minimal profile saved: `/` renders
-//               the signed-in home page.
-export type AccountState = "fresh" | "onboarded";
-
-type ResetReadBackRow = {
-  ctid: string;
-  xmin: string;
-  bio: string | null;
-  lastSignedAgreements: string | null;
-  lastUpdatedProfile: string | null;
-  lastReviewedPrograms: string | null;
-  updatedAt: string | null;
-  inRecovery: boolean;
-  searchPath: string;
-  serverAddr: string | null;
-  backendPid: number;
-};
-
-type ResetAccountResult = {
-  account: AccountKey;
-  id: string;
-  email: string;
-  state: AccountState;
-  expectedBio: string | null;
-  welcomeStep: "agreements" | "profile" | "programs" | null;
-  rows: ResetReadBackRow[];
-};
-
 // Hits the CI-only /api/_test/reset endpoint, which deletes the
-// account's invites and rewrites its profile to `state`. With no
-// `account` it resets every seeded account. The setup project calls it
-// once for all accounts; the `user` fixture calls it for the worker's
-// own account before each signed-in test.
+// account's invites and rewrites its profile to `state` (fresh or
+// onboarded; see E2EResetState). With no `account` it resets every
+// seeded account. The setup project calls it once for all accounts; the
+// `user` fixture calls it for the worker's own account before each
+// signed-in test.
 export const resetAccounts = async (
   baseURL: string,
-  options: { account?: AccountKey; state?: AccountState } = {},
+  options: { account?: AccountKey; state?: E2EResetState } = {},
 ): Promise<void> => {
   const token = process.env.CI_RESET_TOKEN;
   if (!token) {
@@ -129,7 +99,7 @@ export const resetAccounts = async (
   // all (it has never signed in on this database) is fine, not flagged.
   // The dump shows the surviving row, its tuple identity, and whether
   // the read ran on a replica.
-  const body = (await res.json()) as { reset: number; updatedIds: string[]; accounts: ResetAccountResult[] };
+  const body = (await res.json()) as ResetResult;
   const anomalies = body.accounts.filter((a) => {
     if (a.rows.length > 1) return true;
     if (a.rows.length === 0) return a.state !== "fresh";
