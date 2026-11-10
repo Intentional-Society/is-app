@@ -138,6 +138,16 @@ const fetchMessages = async (conditions: SQL[], order: SQL, limit?: number) => {
   return attachAvatarUrls(await (limit === undefined ? query : query.limit(limit)));
 };
 
+type MessageRow = Awaited<ReturnType<typeof fetchMessages>>[number];
+
+// One row to the shape both lists share; each list adds its own extras.
+const toMessage = (r: MessageRow) => ({
+  id: r.id,
+  body: r.body,
+  createdAt: r.createdAt.toISOString(),
+  author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
+});
+
 // Newest messages with their authors, for the program page. Archived messages
 // never appear here, for anyone; admins find them in the admin area. Non-admin
 // viewers also don't see messages from deactivated or hidden profiles (both are
@@ -152,13 +162,7 @@ export const listMessages = async (
     conditions.push(isNull(profiles.deactivatedAt), eq(profiles.hidden, false));
   }
   const rows = await fetchMessages(conditions, desc(messageBoxMessages.createdAt), MESSAGE_LIMIT);
-  return rows.map((r) => ({
-    id: r.id,
-    body: r.body,
-    createdAt: r.createdAt.toISOString(),
-    mine: r.authorId === viewer.id,
-    author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
-  }));
+  return rows.map((r) => ({ ...toMessage(r), mine: r.authorId === viewer.id }));
 };
 
 // `mine` is dropped: the archive is an admin list with no Edit.
@@ -172,13 +176,7 @@ export const listArchivedMessages = async (programId: string): Promise<ArchivedM
     [eq(messageBoxMessages.programId, programId), isNotNull(messageBoxMessages.archivedAt)],
     desc(messageBoxMessages.archivedAt),
   );
-  return rows.map((r) => ({
-    id: r.id,
-    body: r.body,
-    createdAt: r.createdAt.toISOString(),
-    archivedAt: (r.archivedAt as Date).toISOString(),
-    author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
-  }));
+  return rows.map((r) => ({ ...toMessage(r), archivedAt: (r.archivedAt as Date).toISOString() }));
 };
 
 export const createMessage = async (input: {
@@ -190,8 +188,12 @@ export const createMessage = async (input: {
   return { id: row.id };
 };
 
-// Admin moderation. Scoped to the program so an id from another program's
-// box can't be removed through this one.
+// Admin moderation: permanent delete. Only an archived message can be deleted,
+// which is how the clients use it (archive first, delete after the Undo window).
+// That makes a late delete harmless: if another admin restored the message in
+// the meantime, it is no longer archived and the request is a plain not_found.
+// Scoped to the program so an id from another program's box can't be removed
+// through this one.
 export const deleteMessage = async (
   programId: string,
   messageId: string,
@@ -199,7 +201,13 @@ export const deleteMessage = async (
   if (!isUuid(programId) || !isUuid(messageId)) return { error: "not_found" };
   const deleted = await db
     .delete(messageBoxMessages)
-    .where(and(eq(messageBoxMessages.id, messageId), eq(messageBoxMessages.programId, programId)))
+    .where(
+      and(
+        eq(messageBoxMessages.id, messageId),
+        eq(messageBoxMessages.programId, programId),
+        isNotNull(messageBoxMessages.archivedAt),
+      ),
+    )
     .returning({ id: messageBoxMessages.id });
   return deleted.length > 0 ? { ok: true } : { error: "not_found" };
 };

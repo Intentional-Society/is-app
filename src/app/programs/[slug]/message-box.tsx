@@ -1,7 +1,7 @@
 "use client";
 
 import type { UrlObject } from "node:url";
-import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -18,8 +18,9 @@ import { errorFrom, MESSAGE_GONE } from "@/lib/message-box-errors";
 import { MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
 import { useUndoQueue } from "@/lib/use-undo-queue";
 
+import { deleteForever, patchArchived, refreshMessageBox } from "./message-box-actions";
 import { MESSAGE_BOX_CARD_CLASSNAME } from "./message-box-card";
-import { HYDRATED_STALE_TIME, messageBoxArchivedQueryKey, messageBoxQueryKey } from "./query-keys";
+import { HYDRATED_STALE_TIME, messageBoxQueryKey } from "./query-keys";
 
 const fetchMessageBox = async (programId: string): Promise<MessageBoxResponse> => {
   const res = await apiClient.api.programs[":id"]["message-box"].$get({ param: { id: programId } });
@@ -29,43 +30,12 @@ const fetchMessageBox = async (programId: string): Promise<MessageBoxResponse> =
 
 type UndoQueue = ReturnType<typeof useUndoQueue>;
 
-// Archive (hide, reversible) or restore a message. Throws with a readable
-// message on failure.
-const patchArchived = async (programId: string, messageId: string, archived: boolean) => {
-  const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$patch({
-    param: { id: programId, messageId },
-    json: { archived },
-  });
-  if (!res.ok) {
-    throw new Error(
-      await errorFrom(res, archived ? "Couldn't archive the message." : "Couldn't restore the message.", MESSAGE_GONE),
-    );
-  }
-};
-
-const deleteForever = async (programId: string, messageId: string) => {
-  const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete({
-    param: { id: programId, messageId },
-  });
-  if (!res.ok) throw new Error(await errorFrom(res, "Couldn't delete the message.", MESSAGE_GONE));
-};
-
-// Both lists change when a message is hidden, restored or deleted.
-const refreshBox = (queryClient: QueryClient, programId: string) =>
-  Promise.all([
-    queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
-    queryClient.invalidateQueries({ queryKey: messageBoxArchivedQueryKey(programId) }),
-  ]);
-
 // The message-box program feature: participants leave short messages and can
 // edit their own; who can read them is a per-program admin setting; admins can
 // archive (reversible, with Undo) or delete messages.
 export function MessageBox({ programId }: { programId: string }) {
-  const [undoError, setUndoError] = useState<string | null>(null);
   // Archive and Delete each leave an Undo notice for 30 seconds.
-  const undoQueue = useUndoQueue({
-    onError: (error) => setUndoError(error instanceof Error ? error.message : "Something went wrong."),
-  });
+  const undoQueue = useUndoQueue();
   const query = useQuery({
     queryKey: messageBoxQueryKey(programId),
     queryFn: () => fetchMessageBox(programId),
@@ -77,14 +47,16 @@ export function MessageBox({ programId }: { programId: string }) {
       <h3 id="message-box-heading" className="text-base font-semibold uppercase tracking-wide text-muted-foreground">
         Message box
       </h3>
-      {query.isPending ? (
+      {/* Keep showing the last good data when a refetch fails, so an Undo that is
+          still counting down never disappears from under the admin. */}
+      {query.data ? (
+        <MessageBoxBody programId={programId} data={query.data} undoQueue={undoQueue} />
+      ) : query.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : query.isError ? (
+      ) : (
         <p role="alert" className="text-sm text-destructive">
           Couldn't load the message box.
         </p>
-      ) : (
-        <MessageBoxBody programId={programId} data={query.data} undoQueue={undoQueue} undoError={undoError} />
       )}
     </section>
   );
@@ -94,12 +66,10 @@ function MessageBoxBody({
   programId,
   data,
   undoQueue,
-  undoError,
 }: {
   programId: string;
   data: MessageBoxResponse;
   undoQueue: UndoQueue;
-  undoError: string | null;
 }) {
   return (
     <>
@@ -110,9 +80,9 @@ function MessageBoxBody({
         <p className="text-sm text-muted-foreground">Join this program to leave a message.</p>
       )}
       <UndoNotices entries={undoQueue.entries} onUndo={(id) => void undoQueue.undo(id)} />
-      {undoError && (
+      {undoQueue.error && (
         <p role="alert" className="text-sm text-destructive">
-          {undoError}
+          {undoQueue.error}
         </p>
       )}
       {data.canRead ? (
@@ -255,7 +225,7 @@ function MessageItem({
       const name = message.author.displayName ?? "A member";
       const restore = async () => {
         await patchArchived(programId, message.id, false);
-        await refreshBox(queryClient, programId);
+        await refreshMessageBox(queryClient, programId);
       };
       if (intent === "archive") {
         undoQueue.add({ id: message.id, message: `Archived ${name}'s message.`, onUndo: restore });
@@ -266,12 +236,12 @@ function MessageItem({
           onUndo: restore,
           onExpire: async () => {
             await deleteForever(programId, message.id);
-            await refreshBox(queryClient, programId);
+            await refreshMessageBox(queryClient, programId);
           },
         });
       }
     },
-    onSuccess: () => refreshBox(queryClient, programId),
+    onSuccess: () => refreshMessageBox(queryClient, programId),
     onSettled: () => setConfirming(null),
   });
 

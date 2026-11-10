@@ -563,12 +563,21 @@ describe("Message box program feature", () => {
   describe("admin moderation and settings", () => {
     const adminBox = (id = programId) => `/api/admin/programs/${id}/message-box`;
 
-    it("lets an admin delete a message", async () => {
+    it("lets an admin delete an archived message", async () => {
       const messageId = await seedMessage(participant);
+      await db.update(messageBoxMessages).set({ archivedAt: new Date() }).where(eq(messageBoxMessages.id, messageId));
       authAs(admin);
       const res = await app.request(`${adminBox()}/messages/${messageId}`, { method: "DELETE" });
       expect(res.status).toBe(200);
       expect(await db.select().from(messageBoxMessages).where(eq(messageBoxMessages.id, messageId))).toEqual([]);
+    });
+
+    it("only deletes an archived message: deleting a visible one is a harmless 404, e.g. after another admin restored it", async () => {
+      const messageId = await seedMessage(participant, "restored meanwhile");
+      authAs(admin);
+      const res = await app.request(`${adminBox()}/messages/${messageId}`, { method: "DELETE" });
+      expect(res.status).toBe(404);
+      expect(await db.select().from(messageBoxMessages).where(eq(messageBoxMessages.id, messageId))).toHaveLength(1);
     });
 
     it("404s a delete from a non-admin, even the message's own author", async () => {
@@ -582,6 +591,7 @@ describe("Message box program feature", () => {
     it("only deletes a message through its own program", async () => {
       const other = await seedProgram();
       const messageId = await seedMessage(participant);
+      await db.update(messageBoxMessages).set({ archivedAt: new Date() }).where(eq(messageBoxMessages.id, messageId));
       authAs(admin);
       const res = await app.request(`${adminBox(other)}/messages/${messageId}`, { method: "DELETE" });
       expect(res.status).toBe(404);

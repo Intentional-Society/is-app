@@ -211,6 +211,38 @@ describe("MessageBox", () => {
       expect(screen.getByText("Sending love from afar")).toBeVisible();
     });
 
+    it("keeps an Undo that is still counting down when a refetch fails", async () => {
+      moderator();
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      // The refetch after the archive fails; the last good list must stay on screen.
+      $get.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+      fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+      expect(await screen.findByText("Archived Ada Lovelace's message.")).toBeVisible();
+      await waitFor(() => expect($get).toHaveBeenCalledTimes(2));
+      expect(screen.getByRole("button", { name: /Undo \(\d+s\)/ })).toBeVisible();
+      expect(screen.queryByText("Couldn't load the message box.")).not.toBeInTheDocument();
+    });
+
+    it("clears an old Undo error when the next moderation action starts", async () => {
+      moderator();
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+      await screen.findByText("Archived Ada Lovelace's message.");
+
+      // Undo fails: the restore request is rejected.
+      $archive.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) } as never);
+      fireEvent.click(screen.getByRole("button", { name: /Undo \(\d+s\)/ }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't restore the message.");
+
+      // A fresh archive wipes it.
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+      await screen.findByText("Archived Ada Lovelace's message.");
+      expect(screen.queryByText("Couldn't restore the message.")).not.toBeInTheDocument();
+    });
+
     it("backs out of a delete on Cancel", async () => {
       moderator();
       renderBox();
@@ -260,6 +292,22 @@ describe("MessageBox", () => {
             json: { archived: false },
           }),
         );
+        await act(() => vi.advanceTimersByTimeAsync(60_000));
+        expect($delete).not.toHaveBeenCalled();
+      });
+
+      it("leaving the page while the archive request is still in flight starts no delete timer", async () => {
+        moderator();
+        let finishArchive: (value: unknown) => void = () => {};
+        $archive.mockReturnValue(new Promise((resolve) => (finishArchive = resolve)) as never);
+        renderBox();
+        fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+        await waitFor(() => expect($archive).toHaveBeenCalledTimes(1));
+
+        cleanup();
+        // The slow PATCH completes only after the admin has left.
+        await act(async () => finishArchive(ok()));
         await act(() => vi.advanceTimersByTimeAsync(60_000));
         expect($delete).not.toHaveBeenCalled();
       });

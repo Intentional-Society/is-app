@@ -16,24 +16,26 @@ export type UndoEntry = {
   expiresAt: number;
 };
 
+const messageOf = (error: unknown): string => (error instanceof Error ? error.message : "Something went wrong.");
+
 // A short-lived list of "you just did X, Undo" notices. Each entry lives for
 // `windowMs`, then calls its `onExpire` and goes away. Leaving the page (the
 // owning component unmounting) cancels the timers WITHOUT running `onExpire`,
 // so an action that was only half-done, like a delete waiting out its window,
 // is left in its safe state instead of being finished behind the admin's back.
-export function useUndoQueue({
-  windowMs = UNDO_WINDOW_MS,
-  onError,
-}: {
-  windowMs?: number;
-  // Called when an undo or an expiry action throws, so the owner can show it.
-  onError?: (error: unknown) => void;
-} = {}) {
+// For the same reason `add` does nothing once the owner has unmounted: an action
+// that finishes after the admin left (a slow request) must not start a timer
+// that nothing will ever cancel.
+//
+// `error` holds the message from the latest failed undo or expiry. It clears
+// when a new entry is added or an undo is attempted, so it never outlives the
+// action it describes.
+export function useUndoQueue({ windowMs = UNDO_WINDOW_MS }: { windowMs?: number } = {}) {
   const [entries, setEntries] = useState<UndoEntry[]>([]);
-  const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
+  const [error, setError] = useState<string | null>(null);
   const entriesRef = useRef<UndoEntry[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const mounted = useRef(true);
 
   const drop = useCallback((id: string) => {
     const timer = timers.current.get(id);
@@ -45,6 +47,8 @@ export function useUndoQueue({
 
   const add = useCallback(
     (entry: Omit<UndoEntry, "expiresAt">) => {
+      if (!mounted.current) return;
+      setError(null);
       const existing = timers.current.get(entry.id);
       if (existing) clearTimeout(existing);
       const full: UndoEntry = { ...entry, expiresAt: Date.now() + windowMs };
@@ -56,8 +60,8 @@ export function useUndoQueue({
           drop(entry.id);
           try {
             await entry.onExpire?.();
-          } catch (error) {
-            onErrorRef.current?.(error);
+          } catch (e) {
+            setError(messageOf(e));
           }
         }, windowMs),
       );
@@ -69,11 +73,12 @@ export function useUndoQueue({
     async (id: string) => {
       const entry = entriesRef.current.find((e) => e.id === id);
       if (!entry) return;
+      setError(null);
       drop(id);
       try {
         await entry.onUndo();
-      } catch (error) {
-        onErrorRef.current?.(error);
+      } catch (e) {
+        setError(messageOf(e));
       }
     },
     [drop],
@@ -81,11 +86,13 @@ export function useUndoQueue({
 
   useEffect(() => {
     const pending = timers.current;
+    mounted.current = true;
     return () => {
+      mounted.current = false;
       for (const timer of pending.values()) clearTimeout(timer);
       pending.clear();
     };
   }, []);
 
-  return { entries, add, undo };
+  return { entries, add, undo, error };
 }

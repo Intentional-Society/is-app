@@ -87,17 +87,38 @@ describe("useUndoQueue", () => {
     expect(e.onExpire).not.toHaveBeenCalled();
   });
 
-  it("reports an error thrown by onUndo or onExpire", async () => {
-    const onError = vi.fn();
-    const { result } = renderHook(() => useUndoQueue({ onError }));
-    const boom = new Error("boom");
-    act(() => result.current.add(entry({ id: "u", onUndo: () => Promise.reject(boom) })));
+  it("exposes the message from a failed undo or expiry, and clears it on the next action", async () => {
+    const { result } = renderHook(() => useUndoQueue());
+    act(() => result.current.add(entry({ id: "u", onUndo: () => Promise.reject(new Error("undo failed")) })));
     await act(() => result.current.undo("u"));
-    expect(onError).toHaveBeenCalledWith(boom);
+    expect(result.current.error).toBe("undo failed");
 
-    act(() => result.current.add(entry({ id: "x", onExpire: () => Promise.reject(boom) })));
+    // A new entry starts clean.
+    act(() => result.current.add(entry({ id: "x", onExpire: () => Promise.reject(new Error("expiry failed")) })));
+    expect(result.current.error).toBeNull();
     await act(() => vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS));
-    expect(onError).toHaveBeenCalledTimes(2);
+    expect(result.current.error).toBe("expiry failed");
+
+    // Trying an undo clears it too.
+    act(() => result.current.add(entry({ id: "y" })));
+    expect(result.current.error).toBeNull();
+  });
+
+  it("falls back to a generic message for a non-Error rejection", async () => {
+    const { result } = renderHook(() => useUndoQueue());
+    act(() => result.current.add(entry({ onUndo: () => Promise.reject("nope") })));
+    await act(() => result.current.undo("m1"));
+    expect(result.current.error).toBe("Something went wrong.");
+  });
+
+  it("ignores an add that arrives after the owner unmounted, so no orphan timer runs", async () => {
+    const { result, unmount } = renderHook(() => useUndoQueue());
+    const { add } = result.current;
+    unmount();
+    const e = entry();
+    add(e);
+    await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS * 2);
+    expect(e.onExpire).not.toHaveBeenCalled();
   });
 
   it("honours a custom window", async () => {

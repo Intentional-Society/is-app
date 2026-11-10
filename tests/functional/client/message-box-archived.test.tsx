@@ -159,6 +159,15 @@ describe("ArchivedMessages (admin)", () => {
     await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
   });
 
+  it("shows nothing, not an error, when the viewer isn't allowed the archive (a 404)", async () => {
+    $list.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
+    renderArchived();
+    await waitFor(() => expect($list).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(screen.queryByText(/Archived messages/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("surfaces a load error", async () => {
     $list.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
     renderArchived();

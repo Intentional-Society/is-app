@@ -1,29 +1,33 @@
 "use client";
 
-import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { messageBoxArchivedQueryKey, messageBoxQueryKey } from "@/app/programs/[slug]/query-keys";
+import {
+  deleteForever,
+  patchArchived,
+  refreshArchive,
+  refreshMessageBox,
+} from "@/app/programs/[slug]/message-box-actions";
+import { messageBoxArchivedQueryKey } from "@/app/programs/[slug]/query-keys";
 import { Avatar } from "@/components/avatar";
 import { LocalTime } from "@/components/local-time";
 import { Button } from "@/components/ui/button";
 import { UndoNotices } from "@/components/undo-notices";
 import { apiClient } from "@/lib/api";
 import type { ArchivedMessageBoxMessage } from "@/lib/api-types";
-import { errorFrom, MESSAGE_GONE } from "@/lib/message-box-errors";
 import { useUndoQueue } from "@/lib/use-undo-queue";
+
+// Thrown for a 404: the viewer isn't allowed the archive (the seeded e2e admin
+// is capped from it), which is not a failure worth an error alert.
+const NOT_AVAILABLE = "not_available";
 
 const fetchArchived = async (programId: string): Promise<ArchivedMessageBoxMessage[]> => {
   const res = await apiClient.api.admin.programs[":id"]["message-box"].archived.$get({ param: { id: programId } });
+  if (res.status === 404) throw new Error(NOT_AVAILABLE);
   if (!res.ok) throw new Error(`admin/programs/${programId}/message-box/archived: ${res.status}`);
   return (await res.json()).messages;
 };
-
-const refreshArchive = (queryClient: QueryClient, programId: string, alsoProgramPage: boolean) =>
-  Promise.all([
-    queryClient.invalidateQueries({ queryKey: messageBoxArchivedQueryKey(programId) }),
-    alsoProgramPage ? queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }) : undefined,
-  ]);
 
 // Messages an admin archived from the program page. They are hidden from
 // members but kept in the database; from here an admin can restore one to the
@@ -32,13 +36,11 @@ const refreshArchive = (queryClient: QueryClient, programId: string, alsoProgram
 // archived, never half-deleted).
 export function ArchivedMessages({ programId }: { programId: string }) {
   const queryClient = useQueryClient();
-  const [undoError, setUndoError] = useState<string | null>(null);
-  const undoQueue = useUndoQueue({
-    onError: (error) => setUndoError(error instanceof Error ? error.message : "Something went wrong."),
-  });
+  const undoQueue = useUndoQueue();
   const query = useQuery({
     queryKey: messageBoxArchivedQueryKey(programId),
     queryFn: () => fetchArchived(programId),
+    retry: false,
   });
 
   // Rows that were deleted from the screen but not yet on the server: waiting
@@ -56,7 +58,6 @@ export function ArchivedMessages({ programId }: { programId: string }) {
   const count = visible?.length;
 
   const scheduleDelete = (message: ArchivedMessageBoxMessage) => {
-    setUndoError(null);
     setIsHidden(message.id, true);
     undoQueue.add({
       id: message.id,
@@ -65,18 +66,17 @@ export function ArchivedMessages({ programId }: { programId: string }) {
       onUndo: () => setIsHidden(message.id, false),
       onExpire: async () => {
         try {
-          const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete({
-            param: { id: programId, messageId: message.id },
-          });
-          if (!res.ok) throw new Error(await errorFrom(res, "Couldn't delete the message.", MESSAGE_GONE));
+          await deleteForever(programId, message.id);
         } finally {
           // Sync with the server whether the delete worked or the message was already gone.
-          await refreshArchive(queryClient, programId, false);
+          await refreshArchive(queryClient, programId);
           setIsHidden(message.id, false);
         }
       },
     });
   };
+
+  if (query.error?.message === NOT_AVAILABLE) return null;
 
   return (
     <details className="rounded border border-border p-2">
@@ -89,9 +89,9 @@ export function ArchivedMessages({ programId }: { programId: string }) {
           seconds, unless you undo.
         </p>
         <UndoNotices entries={undoQueue.entries} onUndo={(id) => void undoQueue.undo(id)} />
-        {undoError && (
+        {undoQueue.error && (
           <p role="alert" className="text-sm text-destructive">
-            {undoError}
+            {undoQueue.error}
           </p>
         )}
         {query.isPending ? (
@@ -127,18 +127,11 @@ function ArchivedItem({
   const [confirming, setConfirming] = useState(false);
 
   const restoreMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$patch({
-        param: { id: programId, messageId: message.id },
-        json: { archived: false },
-      });
-      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't restore the message.", MESSAGE_GONE));
-      return res.json();
-    },
+    mutationFn: () => patchArchived(programId, message.id, false),
     // Restoring changes what the program page shows too. On failure (say another
     // admin already deleted it) refresh the list so a stale row goes away.
-    onSuccess: () => refreshArchive(queryClient, programId, true),
-    onError: () => refreshArchive(queryClient, programId, false),
+    onSuccess: () => refreshMessageBox(queryClient, programId),
+    onError: () => refreshArchive(queryClient, programId),
   });
 
   return (
