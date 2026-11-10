@@ -453,6 +453,25 @@ describe("Message box program feature", () => {
       expect(typeof messages[0].archivedAt).toBe("string");
     });
 
+    it("returns the whole archive, past the 100-message cap of the live box", async () => {
+      await setVisibilityDirect("members");
+      await db.insert(messageBoxMessages).values(
+        Array.from({ length: 105 }, (_, i) => ({
+          programId,
+          authorId: participant,
+          body: `archived ${i}`,
+          archivedAt: new Date(Date.now() - i * 1000),
+        })),
+      );
+      await db
+        .insert(messageBoxMessages)
+        .values(Array.from({ length: 105 }, (_, i) => ({ programId, authorId: participant, body: `live ${i}` })));
+      authAs(admin);
+      expect((await getArchived()).messages).toHaveLength(105);
+      // The program page still shows only the newest 100 live messages.
+      expect((await getBox()).messages).toHaveLength(100);
+    });
+
     it("includes archived messages from hidden and deactivated authors for admins", async () => {
       const hidden = await seedUser({ hidden: true });
       const id = await seedMessage(hidden, "from hidden");

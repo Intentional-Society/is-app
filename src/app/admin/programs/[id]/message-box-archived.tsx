@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { UndoNotices } from "@/components/undo-notices";
 import { apiClient } from "@/lib/api";
 import type { ArchivedMessageBoxMessage } from "@/lib/api-types";
+import { errorFrom, MESSAGE_GONE } from "@/lib/message-box-errors";
 import { useUndoQueue } from "@/lib/use-undo-queue";
 
 const fetchArchived = async (programId: string): Promise<ArchivedMessageBoxMessage[]> => {
@@ -67,9 +68,10 @@ export function ArchivedMessages({ programId }: { programId: string }) {
           const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete({
             param: { id: programId, messageId: message.id },
           });
-          if (!res.ok) throw new Error("Couldn't delete the message.");
-          await refreshArchive(queryClient, programId, false);
+          if (!res.ok) throw new Error(await errorFrom(res, "Couldn't delete the message.", MESSAGE_GONE));
         } finally {
+          // Sync with the server whether the delete worked or the message was already gone.
+          await refreshArchive(queryClient, programId, false);
           setIsHidden(message.id, false);
         }
       },
@@ -130,11 +132,13 @@ function ArchivedItem({
         param: { id: programId, messageId: message.id },
         json: { archived: false },
       });
-      if (!res.ok) throw new Error("Couldn't restore the message.");
+      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't restore the message.", MESSAGE_GONE));
       return res.json();
     },
-    // Restoring changes what the program page shows too.
+    // Restoring changes what the program page shows too. On failure (say another
+    // admin already deleted it) refresh the list so a stale row goes away.
     onSuccess: () => refreshArchive(queryClient, programId, true),
+    onError: () => refreshArchive(queryClient, programId, false),
   });
 
   return (

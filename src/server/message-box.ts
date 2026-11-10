@@ -16,8 +16,10 @@ import { messageBoxMessages, messageBoxSettings, profiles, programs } from "./sc
 // messages (docs/design-programs.md). Access checks live in
 // program-features.ts; this module is the data layer.
 
-// Newest first, capped. The box is read aloud and skimmed, not archived;
-// pagination can come if a program ever needs it.
+// The live box shows the newest messages, capped: it is read aloud and
+// skimmed, and pagination can come if a program ever needs it. The admin
+// archive is not capped, so an admin can always reach every archived message
+// to restore or delete it.
 const MESSAGE_LIMIT = 100;
 
 export const DEFAULT_VISIBILITY: MessageBoxVisibility = "admins";
@@ -116,8 +118,8 @@ export const updateSettings = async (
 
 // Shared row fetch for the live box and the admin archive: messages joined to
 // their authors, with signed avatar URLs.
-const fetchMessages = async (conditions: SQL[], order: SQL) => {
-  const rows = await db
+const fetchMessages = async (conditions: SQL[], order: SQL, limit?: number) => {
+  const query = db
     .select({
       id: messageBoxMessages.id,
       body: messageBoxMessages.body,
@@ -132,8 +134,8 @@ const fetchMessages = async (conditions: SQL[], order: SQL) => {
     .innerJoin(profiles, eq(profiles.id, messageBoxMessages.authorId))
     .where(and(...conditions))
     .orderBy(order)
-    .limit(MESSAGE_LIMIT);
-  return attachAvatarUrls(rows);
+    .$dynamic();
+  return attachAvatarUrls(await (limit === undefined ? query : query.limit(limit)));
 };
 
 // Newest messages with their authors, for the program page. Archived messages
@@ -149,7 +151,7 @@ export const listMessages = async (
   if (!viewer.isAdmin) {
     conditions.push(isNull(profiles.deactivatedAt), eq(profiles.hidden, false));
   }
-  const rows = await fetchMessages(conditions, desc(messageBoxMessages.createdAt));
+  const rows = await fetchMessages(conditions, desc(messageBoxMessages.createdAt), MESSAGE_LIMIT);
   return rows.map((r) => ({
     id: r.id,
     body: r.body,
@@ -159,12 +161,13 @@ export const listMessages = async (
   }));
 };
 
-export type ArchivedMessage = MessageBoxMessage & { archivedAt: string };
+// `mine` is dropped: the archive is an admin list with no Edit.
+export type ArchivedMessage = Omit<MessageBoxMessage, "mine"> & { archivedAt: string };
 
 // The admin archive: messages an admin has hidden from the program page, most
-// recently archived first. Admin-only (the route guards it), so authors who are
-// deactivated or hidden are included.
-export const listArchivedMessages = async (programId: string, viewerId: string): Promise<ArchivedMessage[]> => {
+// recently archived first, with no cap. Admin-only (the route guards it), so
+// authors who are deactivated or hidden are included.
+export const listArchivedMessages = async (programId: string): Promise<ArchivedMessage[]> => {
   const rows = await fetchMessages(
     [eq(messageBoxMessages.programId, programId), isNotNull(messageBoxMessages.archivedAt)],
     desc(messageBoxMessages.archivedAt),
@@ -174,7 +177,6 @@ export const listArchivedMessages = async (programId: string, viewerId: string):
     body: r.body,
     createdAt: r.createdAt.toISOString(),
     archivedAt: (r.archivedAt as Date).toISOString(),
-    mine: r.authorId === viewerId,
     author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
   }));
 };

@@ -32,7 +32,6 @@ const archived = (id: string, body: string) => ({
   body,
   createdAt: "2026-11-01T18:00:00.000Z",
   archivedAt: "2026-11-02T18:00:00.000Z",
-  mine: false,
   author: { id: "u1", slug: "ada", displayName: "Ada Lovelace", avatarUrl: null },
 });
 
@@ -148,6 +147,16 @@ describe("ArchivedMessages (admin)", () => {
     renderArchived();
     fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't restore the message.");
+  });
+
+  it("explains a restore that fails because the message is gone, and refreshes the list", async () => {
+    mockList([archived("a1", "Hidden one")]);
+    $restore.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
+    renderArchived();
+    fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer available");
+    // Loaded once on mount, once more after the failure.
+    await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
   });
 
   it("surfaces a load error", async () => {

@@ -246,7 +246,7 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
   .get("/programs/:id/message-box/archived", async (c) => {
     const programId = c.req.param("id");
     if (!isUuid(programId)) return c.json({ error: "not_found" }, 404);
-    return c.json({ messages: await listArchivedMessages(programId, c.get("user").id) });
+    return c.json({ messages: await listArchivedMessages(programId) });
   })
   // validator-typed body, same path-param + JSON inference reason as the
   // PATCH routes above.

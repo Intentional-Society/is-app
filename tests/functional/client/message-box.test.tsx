@@ -320,6 +320,19 @@ describe("MessageBox", () => {
       expect(screen.queryByLabelText("Edit your message")).not.toBeInTheDocument();
     });
 
+    it("explains a save that fails because the message was archived meanwhile, and refreshes the box", async () => {
+      mockBox(box({ messages: [mine()] }));
+      $patch.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+      fireEvent.change(screen.getByLabelText("Edit your message"), { target: { value: "too late" } });
+      mockBox(box({ messages: [] }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect($get).toHaveBeenCalledTimes(2));
+      // The box refetched, so the archived message dropped out of the list.
+      expect(await screen.findByText("No messages yet.")).toBeVisible();
+    });
+
     it("leaves the message alone on Cancel", async () => {
       mockBox(box({ messages: [mine()] }));
       renderBox();

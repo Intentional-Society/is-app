@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UndoNotices } from "@/components/undo-notices";
 import { apiClient } from "@/lib/api";
 import type { MessageBoxMessage, MessageBoxResponse } from "@/lib/api-types";
+import { errorFrom, MESSAGE_GONE } from "@/lib/message-box-errors";
 import { MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
 import { useUndoQueue } from "@/lib/use-undo-queue";
 
@@ -26,13 +27,6 @@ const fetchMessageBox = async (programId: string): Promise<MessageBoxResponse> =
   return res.json();
 };
 
-const errorFrom = async (res: Response, fallback: string): Promise<string> => {
-  const body = (await res.json().catch(() => ({}))) as { error?: string };
-  if (body.error === "not_participant") return "Only participants of this program can leave a message.";
-  if (body.error === "not_found") return "The message box isn't available right now.";
-  return body.error ?? fallback;
-};
-
 type UndoQueue = ReturnType<typeof useUndoQueue>;
 
 // Archive (hide, reversible) or restore a message. Throws with a readable
@@ -43,7 +37,9 @@ const patchArchived = async (programId: string, messageId: string, archived: boo
     json: { archived },
   });
   if (!res.ok) {
-    throw new Error(await errorFrom(res, archived ? "Couldn't archive the message." : "Couldn't restore the message."));
+    throw new Error(
+      await errorFrom(res, archived ? "Couldn't archive the message." : "Couldn't restore the message.", MESSAGE_GONE),
+    );
   }
 };
 
@@ -51,7 +47,7 @@ const deleteForever = async (programId: string, messageId: string) => {
   const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete({
     param: { id: programId, messageId },
   });
-  if (!res.ok) throw new Error(await errorFrom(res, "Couldn't delete the message."));
+  if (!res.ok) throw new Error(await errorFrom(res, "Couldn't delete the message.", MESSAGE_GONE));
 };
 
 // Both lists change when a message is hidden, restored or deleted.
@@ -61,8 +57,9 @@ const refreshBox = (queryClient: QueryClient, programId: string) =>
     queryClient.invalidateQueries({ queryKey: messageBoxArchivedQueryKey(programId) }),
   ]);
 
-// The message-box program feature: participants leave short messages; who can
-// read them is a per-program admin setting; admins can delete.
+// The message-box program feature: participants leave short messages and can
+// edit their own; who can read them is a per-program admin setting; admins can
+// archive (reversible, with Undo) or delete messages.
 export function MessageBox({ programId }: { programId: string }) {
   const [undoError, setUndoError] = useState<string | null>(null);
   // Archive and Delete each leave an Undo notice for 30 seconds.
@@ -380,7 +377,7 @@ function EditForm({
         param: { id: programId, messageId: message.id },
         json: { body },
       });
-      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't save your changes."));
+      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't save your changes.", MESSAGE_GONE));
       return res.json();
     },
     // Wait for the refetch so the list shows the new text before the editor closes.
@@ -388,6 +385,9 @@ function EditForm({
       await queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) });
       onDone();
     },
+    // A 404 usually means an admin archived or deleted the message while the
+    // editor was open. Refetch so the stale message drops out of the list.
+    onError: () => queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
   });
 
   return (
