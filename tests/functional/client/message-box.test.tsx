@@ -18,7 +18,7 @@ vi.mock("@/lib/api", () => ({
         programs: {
           ":id": {
             "message-box": {
-              messages: { ":messageId": { $delete: vi.fn() } },
+              messages: { ":messageId": { $delete: vi.fn(), $patch: vi.fn() } },
             },
           },
         },
@@ -35,13 +35,14 @@ const $get = vi.mocked(apiClient.api.programs[":id"]["message-box"].$get);
 const $post = vi.mocked(apiClient.api.programs[":id"]["message-box"].$post);
 const $patch = vi.mocked(apiClient.api.programs[":id"]["message-box"].messages[":messageId"].$patch);
 const $delete = vi.mocked(apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete);
+const $archive = vi.mocked(apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$patch);
 
 const box = (overrides: Partial<MessageBoxResponse> = {}): MessageBoxResponse => ({
   visibility: "members",
   prompt: null,
   canRead: true,
   canPost: true,
-  canDelete: false,
+  canModerate: false,
   messages: [
     {
       id: "m1",
@@ -149,7 +150,7 @@ describe("MessageBox", () => {
   });
 
   it("lets a moderator delete a message after confirming", async () => {
-    mockBox(box({ canDelete: true }));
+    mockBox(box({ canModerate: true }));
     $delete.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
     renderBox();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
@@ -158,8 +159,43 @@ describe("MessageBox", () => {
     await waitFor(() => expect($delete).toHaveBeenCalledWith({ param: { id: "p1", messageId: "m1" } }));
   });
 
+  it("shows Archive only to moderators", async () => {
+    mockBox(box());
+    const { unmount } = renderBox();
+    await screen.findByText("Sending love from afar");
+    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+    unmount();
+
+    mockBox(box({ canModerate: true }));
+    renderBox();
+    expect(await screen.findByRole("button", { name: "Archive" })).toBeVisible();
+  });
+
+  it("archives a message straight away, with no confirmation, since it can be restored", async () => {
+    mockBox(box({ canModerate: true }));
+    $archive.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
+    renderBox();
+    fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    await waitFor(() =>
+      expect($archive).toHaveBeenCalledWith({
+        param: { id: "p1", messageId: "m1" },
+        json: { archived: true },
+      }),
+    );
+    expect($delete).not.toHaveBeenCalled();
+  });
+
+  it("shows the error and keeps the message when archiving fails", async () => {
+    mockBox(box({ canModerate: true }));
+    $archive.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+    renderBox();
+    fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't archive the message.");
+    expect(screen.getByText("Sending love from afar")).toBeVisible();
+  });
+
   it("backs out of a delete on Cancel", async () => {
-    mockBox(box({ canDelete: true }));
+    mockBox(box({ canModerate: true }));
     renderBox();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));

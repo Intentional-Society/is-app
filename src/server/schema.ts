@@ -254,6 +254,9 @@ export const messageBoxMessages = pgTable(
       .references(() => profiles.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Set = archived by an admin: kept in the database, hidden from the program
+    // page for everyone, shown only in the admin area where it can be restored.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
   (table) => [index("message_box_messages_program_created_idx").on(table.programId, table.createdAt)],
 ).enableRLS();

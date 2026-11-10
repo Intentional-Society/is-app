@@ -16,7 +16,7 @@ import type { MessageBoxMessage, MessageBoxResponse } from "@/lib/api-types";
 import { MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
 
 import { MESSAGE_BOX_CARD_CLASSNAME } from "./message-box-card";
-import { HYDRATED_STALE_TIME, messageBoxQueryKey } from "./query-keys";
+import { HYDRATED_STALE_TIME, messageBoxArchivedQueryKey, messageBoxQueryKey } from "./query-keys";
 
 const fetchMessageBox = async (programId: string): Promise<MessageBoxResponse> => {
   const res = await apiClient.api.programs[":id"]["message-box"].$get({ param: { id: programId } });
@@ -68,7 +68,12 @@ function MessageBoxBody({ programId, data }: { programId: string; data: MessageB
         <p className="text-sm text-muted-foreground">Join this program to leave a message.</p>
       )}
       {data.canRead ? (
-        <MessageList programId={programId} messages={data.messages} canDelete={data.canDelete} canEdit={data.canPost} />
+        <MessageList
+          programId={programId}
+          messages={data.messages}
+          canModerate={data.canModerate}
+          canEdit={data.canPost}
+        />
       ) : (
         <p className="text-sm text-muted-foreground">Messages sent here are read by the program's admins.</p>
       )}
@@ -142,12 +147,12 @@ function MessageForm({ programId }: { programId: string }) {
 function MessageList({
   programId,
   messages,
-  canDelete,
+  canModerate,
   canEdit,
 }: {
   programId: string;
   messages: MessageBoxMessage[];
-  canDelete: boolean;
+  canModerate: boolean;
   // The viewer may edit their own messages (they are a participant).
   canEdit: boolean;
 }) {
@@ -157,7 +162,13 @@ function MessageList({
   return (
     <ul className="flex flex-col gap-3">
       {messages.map((m) => (
-        <MessageItem key={m.id} programId={programId} message={m} canDelete={canDelete} canEdit={canEdit && m.mine} />
+        <MessageItem
+          key={m.id}
+          programId={programId}
+          message={m}
+          canModerate={canModerate}
+          canEdit={canEdit && m.mine}
+        />
       ))}
     </ul>
   );
@@ -166,12 +177,12 @@ function MessageList({
 function MessageItem({
   programId,
   message,
-  canDelete,
+  canModerate,
   canEdit,
 }: {
   programId: string;
   message: MessageBoxMessage;
-  canDelete: boolean;
+  canModerate: boolean;
   canEdit: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -186,11 +197,34 @@ function MessageItem({
       if (!res.ok) throw new Error(await errorFrom(res, "Couldn't delete the message."));
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
+        queryClient.invalidateQueries({ queryKey: messageBoxArchivedQueryKey(programId) }),
+      ]),
     onSettled: () => setConfirming(false),
   });
 
+  // Archiving is reversible (the message moves to the admin archive), so unlike
+  // Delete it needs no confirmation.
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$patch({
+        param: { id: programId, messageId: message.id },
+        json: { archived: true },
+      });
+      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't archive the message."));
+      return res.json();
+    },
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
+        queryClient.invalidateQueries({ queryKey: messageBoxArchivedQueryKey(programId) }),
+      ]),
+  });
+
   const href: UrlObject = { pathname: `/members/${message.author.slug ?? message.author.id}` };
+  const moderationError = archiveMutation.error ?? deleteMutation.error;
 
   return (
     <li className="flex flex-col gap-1 rounded bg-background p-3">
@@ -206,14 +240,25 @@ function MessageItem({
         <span className="whitespace-nowrap text-xs text-muted-foreground">
           <LocalTime iso={message.createdAt} withTime />
         </span>
-        {!editing && (canEdit || canDelete) && (
+        {!editing && (canEdit || canModerate) && (
           <span className="ml-auto flex items-center gap-2">
             {canEdit && !confirming && (
               <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(true)}>
                 Edit
               </Button>
             )}
-            {canDelete &&
+            {canModerate && !confirming && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={archiveMutation.isPending}
+                onClick={() => archiveMutation.mutate()}
+              >
+                {archiveMutation.isPending ? "Archiving…" : "Archive"}
+              </Button>
+            )}
+            {canModerate &&
               (confirming ? (
                 <>
                   <Button
@@ -248,9 +293,9 @@ function MessageItem({
       ) : (
         <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
       )}
-      {deleteMutation.isError && (
+      {moderationError && (
         <p role="alert" className="text-sm text-destructive">
-          {deleteMutation.error.message}
+          {moderationError.message}
         </p>
       )}
     </li>

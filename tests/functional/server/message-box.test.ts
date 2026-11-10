@@ -94,7 +94,7 @@ type Box = {
   prompt: string | null;
   canRead: boolean;
   canPost: boolean;
-  canDelete: boolean;
+  canModerate: boolean;
   messages: Array<{ id: string; body: string; mine: boolean; author: { id: string; displayName: string | null } }>;
 };
 
@@ -214,7 +214,7 @@ describe("Message box program feature", () => {
       await seedMessage(participant, "secret");
       authAs(participant);
       const box = await getBox();
-      expect(box).toMatchObject({ visibility: "admins", canRead: false, canPost: true, canDelete: false });
+      expect(box).toMatchObject({ visibility: "admins", canRead: false, canPost: true, canModerate: false });
       expect(box.messages).toEqual([]);
     });
 
@@ -222,7 +222,7 @@ describe("Message box program feature", () => {
       await seedMessage(participant, "for admins");
       authAs(admin);
       const box = await getBox();
-      expect(box).toMatchObject({ canRead: true, canPost: false, canDelete: true });
+      expect(box).toMatchObject({ canRead: true, canPost: false, canModerate: true });
       expect(box.messages.map((m) => m.body)).toEqual(["for admins"]);
     });
 
@@ -231,7 +231,7 @@ describe("Message box program feature", () => {
       await seedMessage(participant, "open to all");
       authAs(outsider);
       const box = await getBox();
-      expect(box).toMatchObject({ visibility: "members", canRead: true, canPost: false, canDelete: false });
+      expect(box).toMatchObject({ visibility: "members", canRead: true, canPost: false, canModerate: false });
       expect(box.messages).toHaveLength(1);
       expect(box.messages[0]).toMatchObject({
         body: "open to all",
@@ -250,13 +250,13 @@ describe("Message box program feature", () => {
         expect(await getBox()).toMatchObject({
           visibility: "admins",
           canRead: false,
-          canDelete: false,
+          canModerate: false,
           messages: [],
         });
 
         await setVisibilityDirect("members");
         const box = await getBox();
-        expect(box.canDelete).toBe(false);
+        expect(box.canModerate).toBe(false);
         expect(box.messages.map((m) => m.body)).toEqual(["visible"]);
       },
     );
@@ -406,6 +406,138 @@ describe("Message box program feature", () => {
       authAs(participant);
       const box = await getBox();
       expect(Object.fromEntries(box.messages.map((m) => [m.body, m.mine]))).toEqual({ mine: true, "not mine": false });
+    });
+  });
+
+  describe("archiving (reversible moderation)", () => {
+    const messageUrl = (messageId: string, id = programId) =>
+      `/api/admin/programs/${id}/message-box/messages/${messageId}`;
+    const archivedUrl = (id = programId) => `/api/admin/programs/${id}/message-box/archived`;
+    const setArchived = (messageId: string, archived: unknown, id = programId) =>
+      app.request(messageUrl(messageId, id), jsonInit("PATCH", { archived }));
+    const getArchived = async () =>
+      (await (await app.request(archivedUrl())).json()) as {
+        messages: Array<{ id: string; body: string; archivedAt: string; author: { id: string } }>;
+      };
+    const row = async (messageId: string) =>
+      (await db.select().from(messageBoxMessages).where(eq(messageBoxMessages.id, messageId)))[0];
+
+    it("hides an archived message from the program page for everyone, admins included, but keeps the row", async () => {
+      await setVisibilityDirect("members");
+      const keep = await seedMessage(participant, "keep");
+      const hide = await seedMessage(participant, "hide me");
+      authAs(admin);
+      expect((await setArchived(hide, true)).status).toBe(200);
+
+      expect((await row(hide)).archivedAt).not.toBeNull();
+      for (const viewer of [admin, participant, outsider]) {
+        authAs(viewer);
+        expect((await getBox()).messages.map((m) => m.id)).toEqual([keep]);
+      }
+    });
+
+    it("lists archived messages for admins only, most recently archived first", async () => {
+      const first = await seedMessage(participant, "first");
+      const second = await seedMessage(participant, "second");
+      authAs(admin);
+      await setArchived(first, true);
+      await db
+        .update(messageBoxMessages)
+        .set({ archivedAt: new Date(Date.now() - 60_000) })
+        .where(eq(messageBoxMessages.id, first));
+      await setArchived(second, true);
+
+      const { messages } = await getArchived();
+      expect(messages.map((m) => m.body)).toEqual(["second", "first"]);
+      expect(messages[0].author.id).toBe(participant);
+      expect(typeof messages[0].archivedAt).toBe("string");
+    });
+
+    it("includes archived messages from hidden and deactivated authors for admins", async () => {
+      const hidden = await seedUser({ hidden: true });
+      const id = await seedMessage(hidden, "from hidden");
+      authAs(admin);
+      await setArchived(id, true);
+      expect((await getArchived()).messages.map((m) => m.body)).toEqual(["from hidden"]);
+    });
+
+    it("restores a message to the program page", async () => {
+      await setVisibilityDirect("members");
+      const id = await seedMessage(participant, "back again");
+      authAs(admin);
+      await setArchived(id, true);
+      expect((await setArchived(id, false)).status).toBe(200);
+      expect((await row(id)).archivedAt).toBeNull();
+      expect((await getArchived()).messages).toEqual([]);
+      expect((await getBox()).messages.map((m) => m.id)).toEqual([id]);
+    });
+
+    it("is idempotent: archiving twice keeps the first timestamp, restoring an unarchived message is a no-op", async () => {
+      const id = await seedMessage(participant);
+      authAs(admin);
+      await setArchived(id, true);
+      const first = (await row(id)).archivedAt;
+      expect((await setArchived(id, true)).status).toBe(200);
+      expect((await row(id)).archivedAt).toEqual(first);
+
+      const other = await seedMessage(participant, "never archived");
+      expect((await setArchived(other, false)).status).toBe(200);
+      expect((await row(other)).archivedAt).toBeNull();
+    });
+
+    it("stops the author editing an archived message", async () => {
+      const id = await seedMessage(participant, "original");
+      authAs(admin);
+      await setArchived(id, true);
+      authAs(participant);
+      const res = await app.request(`${boxUrl()}/messages/${id}`, jsonInit("PATCH", { body: "sneaky edit" }));
+      expect(res.status).toBe(404);
+      expect((await row(id)).body).toBe("original");
+    });
+
+    it("lets an admin delete an archived message for good", async () => {
+      const id = await seedMessage(participant);
+      authAs(admin);
+      await setArchived(id, true);
+      expect((await app.request(messageUrl(id), { method: "DELETE" })).status).toBe(200);
+      expect(await row(id)).toBeUndefined();
+    });
+
+    it("404s non-admins on both the archive action and the archive list", async () => {
+      const id = await seedMessage(participant);
+      for (const viewer of [participant, outsider]) {
+        authAs(viewer);
+        expect((await setArchived(id, true)).status).toBe(404);
+        expect((await app.request(archivedUrl())).status).toBe(404);
+      }
+      expect((await row(id)).archivedAt).toBeNull();
+    });
+
+    it("gives the capped e2e admin no archive powers", async () => {
+      const id = await seedMessage(participant);
+      authAsE2EAdmin(admin, "email");
+      expect((await setArchived(id, true)).status).toBe(404);
+      expect((await app.request(archivedUrl())).status).toBe(404);
+      expect((await row(id)).archivedAt).toBeNull();
+    });
+
+    it("scopes the action to the message's own program, and 404s unknown ids", async () => {
+      const other = await seedProgram();
+      const id = await seedMessage(participant);
+      authAs(admin);
+      expect((await setArchived(id, true, other)).status).toBe(404);
+      expect((await setArchived(randomUUID(), true)).status).toBe(404);
+      expect((await setArchived("not-a-uuid", true)).status).toBe(404);
+      expect((await row(id)).archivedAt).toBeNull();
+    });
+
+    it.each([
+      ["a missing value", {}],
+      ["a non-boolean", { archived: "yes" }],
+    ])("rejects %s with 400", async (_label, payload) => {
+      const id = await seedMessage(participant);
+      authAs(admin);
+      expect((await app.request(messageUrl(id), jsonInit("PATCH", payload))).status).toBe(400);
     });
   });
 

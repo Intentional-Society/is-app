@@ -8,7 +8,7 @@ import { apiClient } from "@/lib/api";
 import type { AdminProgramFeature } from "@/lib/api-types";
 import { MESSAGE_BOX_FEATURE } from "@/lib/program-features";
 
-import { MessageBoxSettings } from "./message-box-settings";
+import { MessageBoxAdmin } from "./message-box-admin";
 
 const featuresQueryKey = (programId: string) => ["admin", "programs", programId, "features"] as const;
 
@@ -18,10 +18,10 @@ const fetchFeatures = async (programId: string): Promise<AdminProgramFeature[]> 
   return (await res.json()).features;
 };
 
-// Per-feature settings shown under a feature's toggle once it is attached.
-// A feature with no settings has no entry.
+// Per-feature admin controls shown under a feature's toggle once it is attached.
+// A feature with nothing to manage has no entry.
 const FEATURE_SETTINGS: Record<string, ComponentType<{ programId: string }>> = {
-  [MESSAGE_BOX_FEATURE]: MessageBoxSettings,
+  [MESSAGE_BOX_FEATURE]: MessageBoxAdmin,
 };
 
 // Admin toggles for the program features in the code registry

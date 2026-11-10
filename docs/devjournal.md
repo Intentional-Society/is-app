@@ -6,6 +6,12 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-09 | Benji (with Kiro) | Admins can archive message box messages
+
+Archiving hides a message from the program page for everyone but keeps the row; admins restore or delete it from an archive list on `/admin/programs/[id]`. It adds `message_box_messages.archived_at`, so it needs `npm run prod:db:expand` first. Details in `docs/feature-message-box.md`.
+
+---
+
 ## 2026-11-08 | James (with Opus 5.5) | Fixed claude-review, which had silently stopped reviewing PRs
 
 The code-review plugin had stopped reviewing (#680), so claude-review now runs Claude Code's bundled `/code-review high` on Opus with the job's GITHUB_TOKEN. Every reviewed push ends with one comment: a summary showing time and cost, or a "did not finish" notice. Docs-only PRs skip it; label a PR `skip-claude-review` to stop further reviews.

@@ -41,9 +41,12 @@ import {
   createMessage,
   deleteMessage,
   getSettings,
+  listArchivedMessages,
   listMessages,
+  parseArchiveUpdate,
   parseMessageBody,
   parseSettingsUpdate,
+  setMessageArchived,
   updateMessage,
   updateSettings,
 } from "./message-box";
@@ -240,6 +243,30 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       return c.json({ ok: true });
     },
   )
+  .get("/programs/:id/message-box/archived", async (c) => {
+    const programId = c.req.param("id");
+    if (!isUuid(programId)) return c.json({ error: "not_found" }, 404);
+    return c.json({ messages: await listArchivedMessages(programId, c.get("user").id) });
+  })
+  // validator-typed body, same path-param + JSON inference reason as the
+  // PATCH routes above.
+  .patch(
+    "/programs/:id/message-box/messages/:messageId",
+    validator("json", (body, c) => {
+      const parsed = parseArchiveUpdate(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      const result = await setMessageArchived(
+        c.req.param("id"),
+        c.req.param("messageId"),
+        c.req.valid("json").archived,
+      );
+      if ("error" in result) return c.json({ error: result.error }, 404);
+      return c.json({ ok: true });
+    },
+  )
   .delete("/programs/:id/message-box/messages/:messageId", async (c) => {
     const result = await deleteMessage(c.req.param("id"), c.req.param("messageId"));
     if ("error" in result) return c.json({ error: result.error }, 404);
@@ -413,7 +440,7 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
       prompt,
       canRead,
       canPost: c.get("featureParticipant"),
-      canDelete: admin,
+      canModerate: admin,
       messages,
     });
   })
