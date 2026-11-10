@@ -41,8 +41,16 @@ jobs:
           cache: npm
       - run: npm install
 
+      # Headless shell only: the suite runs headless Chromium, which is
+      # that binary, so the full Chrome download is skipped. No
+      # --with-deps: on ubuntu-latest every shared library Chromium needs
+      # is preinstalled, and the flag's apt run only added nine font
+      # packages (CJK, Thai, unifont) for ~13s. The suite compares no
+      # pixels, so the default fonts are enough. If a runner image ever
+      # drops a library, Playwright fails at launch with "Host system is
+      # missing dependencies"; restore the flag then.
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: npx playwright install --only-shell chromium
 
       - name: Fail fast if base URL isn't Vercel
         # The job-level `if:` already filters by environment, but a malformed
