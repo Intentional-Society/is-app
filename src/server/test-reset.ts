@@ -96,6 +96,16 @@ export type ResetAccountResult = {
   rows: ResetReadBackRow[];
 };
 
+// What the reset endpoint responds with. The e2e tripwire in
+// tests/e2e/helpers/session.ts reads the response as this type.
+export type ResetResult = {
+  reset: number;
+  // ids the UPDATEs' RETURNING reported — one entry per row touched, so
+  // a duplicated id surfaces here as a repeat.
+  updatedIds: string[];
+  accounts: ResetAccountResult[];
+};
+
 // Puts the named e2e accounts into a known state: deletes their invites
 // and rewrites their profile to `fresh` or `onboarded`. isAdmin is
 // preserved so the admin account keeps its flag across runs, and hidden
@@ -110,13 +120,7 @@ export type ResetAccountResult = {
 // a duplicate tuple, a replica, or a schema-resolution mismatch.
 export const resetE2EUsers = async (
   request: E2EResetRequest = { accounts: E2E_ACCOUNT_KEYS, state: "fresh" },
-): Promise<{
-  reset: number;
-  // ids the UPDATEs' RETURNING reported — one entry per row touched, so
-  // a duplicated id surfaces here as a repeat.
-  updatedIds: string[];
-  accounts: ResetAccountResult[];
-}> => {
+): Promise<ResetResult> => {
   const emailToKey = new Map<string, E2EAccountKey>(request.accounts.map((key) => [E2E_ACCOUNTS[key], key]));
   const emailList = sql.join(
     [...emailToKey.keys()].map((e) => sql`${e}`),
