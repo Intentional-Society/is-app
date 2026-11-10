@@ -14,18 +14,16 @@ import { E2E_EMAILS } from "./test-reset";
 const AUTO_SUBSCRIBE_SLUGS = ["weekly-web-updates"] as const;
 
 // Best-effort: subscribe a freshly-created member to the auto-subscribe
-// programs. A missing slug is logged to Sentry and skipped rather than
-// failing — sign-in shouldn't break over a misconfigured program list,
-// and operators can patch the database after the fact. Idempotent via
-// onConflictDoNothing, but callers should still gate on "is this a new
+// programs. Idempotent, but callers should still gate on "is this a new
 // profile" so re-subscribing won't undo a member's opt-out.
-//
-// `slugs` is a parameter so a test can name a program that doesn't exist;
-// the real program row is shared by every test file running against the DB.
-export const autoSubscribeNewMember = async (
-  userId: string,
-  slugs: readonly string[] = AUTO_SUBSCRIBE_SLUGS,
-): Promise<void> => {
+export const autoSubscribeNewMember = (userId: string): Promise<void> =>
+  subscribeToProgramSlugs(userId, AUTO_SUBSCRIBE_SLUGS);
+
+// Subscribes a member to the program behind each slug. A missing slug
+// is logged to Sentry and skipped rather than failing — sign-in
+// shouldn't break over a misconfigured program list, and operators can
+// patch the database after the fact. Idempotent via onConflictDoNothing.
+export const subscribeToProgramSlugs = async (userId: string, slugs: readonly string[]): Promise<void> => {
   const rows = await db
     .select({ id: programs.id, slug: programs.slug })
     .from(programs)
