@@ -426,30 +426,28 @@ describe("autoSubscribeNewMember", () => {
   });
 
   it("does not throw or re-subscribe when the program is missing — captures to Sentry instead", async () => {
-    // The slug is shared with other tests running in parallel workers,
-    // so the missingness window has to be tight: delete, exercise the
-    // path, and restore inside the test rather than waiting for the
-    // next beforeEach. The outer await on autoSubscribeNewMember
-    // finishes before any restore concurrency could matter.
-    await db.delete(programs).where(eq(programs.id, weeklyProgramId));
+    // The program's row is shared with every test file running in
+    // parallel, so it stays in place: the function's lookup, its first
+    // db.select, is stubbed to find nothing.
+    const lookup = vi.spyOn(db, "select").mockReturnValueOnce({
+      from: () => ({ where: () => Promise.resolve([]) }),
+    } as unknown as ReturnType<typeof db.select>);
+    const captureMock = vi.mocked(Sentry_captureException);
+    captureMock.mockClear();
 
     try {
-      const captureMock = vi.mocked(Sentry_captureException);
-      captureMock.mockClear();
-
       await expect(autoSubscribeNewMember(userId)).resolves.toBeUndefined();
-
-      expect(captureMock).toHaveBeenCalledOnce();
-      const arg = captureMock.mock.calls[0][0];
-      expect(arg).toBeInstanceOf(Error);
-      expect((arg as Error).message).toMatch(/weekly-web-updates/);
-
-      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
-      expect(rows).toHaveLength(0);
+      expect(lookup).toHaveBeenCalledOnce();
     } finally {
-      // Restore so any concurrent test that depends on the slug isn't
-      // stranded by our delete.
-      await ensureWeeklyProgram();
+      lookup.mockRestore();
     }
+
+    expect(captureMock).toHaveBeenCalledOnce();
+    const arg = captureMock.mock.calls[0][0];
+    expect(arg).toBeInstanceOf(Error);
+    expect((arg as Error).message).toMatch(/weekly-web-updates/);
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(0);
   });
 });
