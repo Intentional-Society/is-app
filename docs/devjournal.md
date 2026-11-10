@@ -155,9 +155,11 @@ Phase 7 (#515) is the right-sizing pass. A per-eval sweep found the suite alread
 ## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 6 — ship merge assertions now discriminate
 
 Phase 6 (#514) closes the two critical-behavior gaps the Phase-3 audit surfaced. **Merge assertions were non-discriminating:** the checked-in `ask` rule on `gh pr merge *` fires at the permission layer before the sandbox `gh` stub can log, so the "no `gh pr merge` in the log" negatives passed vacuously and a `/ship` that wrongly merged could score a false PASS. Merge-adjacent assertions are now graded from the transcript's tool-call record, corroborated by the log and `gh-stub-state.json`; strategy §6 carries the merge-discrimination rule. **Evidence wasn't preserved:** archiving the raw triad into the eval's `outputs/` before teardown is now harness behavior, selfcheck-gated, so grading is executor-independent. No skill content changed. (#507, #514)
+
 ## 2026-07-19 | Blake (with Fable) | Skill-evals wired into the repo — baseline self-hosting
 
 Phase 5 makes the skill-eval system discoverable and self-hosting. `docs/strategy-skill-evals.md` is complete: run instructions in both PowerShell and bash (§6), plus the real-repo exception runbook (§10) — the one sanctioned human-run smoke, gated by a recorded justification and a cleanup-owed checklist so "occasional" can't drift into "whenever convenient." The PR template gained an eval-batch checklist line, and `doc-skill-creator.md` notes that a vendored refresh trips the testing rule. Baseline still owes the macOS validation artifact (#510) and the cloud Layer-C run (#512); neither blocks this wiring. (#507, #513)
+
 ## 2026-07-19 | Blake (with Fable) | Skill-eval sandbox harness landed
 
 `scripts/skill-evals/` now builds throwaway sandboxes (temp git repo + local bare origin + default-deny logging `gh` stub + fake `npm test`) for executing the per-skill evals — never against the real repo; `node scripts/skill-evals/selfcheck.mjs` runs the 20-check safety checklist. The batch + executor prompts under `scripts/skill-evals/prompts/` are the canonical way to run the suite. (#507)

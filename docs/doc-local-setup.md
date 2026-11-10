@@ -11,6 +11,7 @@ Install these once. See [setup-dev-machine.md](setup-dev-machine.md) for detaile
 | Git            | any             | Mac: `xcode-select --install`; Windows: git-scm.com     |
 
 **Mac shortcut:**
+
 ```bash
 nvm install 22        # installs Node.js 22 via nvm
 nvm use               # switches to the version in .nvmrc

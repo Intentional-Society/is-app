@@ -31,6 +31,7 @@ One caveat: `next-axiom`'s `log` buffers in-process and sends on a 1s throttle. 
 ## Request Logging
 
 Every API request is logged by Hono middleware in `src/server/api.ts` with:
+
 - `method` — HTTP method
 - `path` — request path
 - `status` — response status code
@@ -102,7 +103,6 @@ The dashboard is four thematic columns — **Members**, **Totals**, **Requests**
 ["vercel"] | where message == "api request" and isnotnull(['fields.userId']) and ['fields.path'] !startswith "/api/_test" | summarize members = dcount(['fields.userId']) by bin_auto(_time)
 ```
 
-
 ### Totals
 
 - **Total Active Users:** Statistic — distinct members within the selected time range (reads as WAU/MAU as you widen the picker, not an all-time total).
@@ -116,7 +116,6 @@ The dashboard is four thematic columns — **Members**, **Totals**, **Requests**
 ```
 ["vercel"] | where message == "api request" and ['fields.path'] !startswith "/api/_test" | summarize topk(['fields.path'], 25)
 ```
-
 
 ### Requests
 
@@ -132,7 +131,6 @@ The dashboard is four thematic columns — **Members**, **Totals**, **Requests**
 ["vercel"] | where message == "api request" and isnotnull(['fields.userId']) and ['fields.path'] !startswith "/api/_test" | summarize requests = count() by ['fields.userId'], bin(_time, 1d)
 ```
 
-
 ### Performance
 
 - **Latency percentiles (ms):** multi-line Timeseries — p50/p95/p99 of request `duration`, in milliseconds; the three aggregations render as separate charts by default — tick **Merge Charts** to overlay them as three lines on one graph. Don't use _stacked_ bars: percentiles nest (p99 ≥ p95 ≥ p50), so a stack sums to a meaningless total (grouped bars would be fine, lines are clearer). Axiom's y-axis carries no unit, so a `1.5K` tick means 1,500 ms (1.5 s); the `_ms` series aliases and the panel title keep the unit visible. Bucketed at a fixed `bin(_time, 12h)` (not `bin_auto`) for a steady resolution across ranges, on a **log y-axis** since latency spans orders of magnitude (p50 in tens of ms, p99 up to seconds).
@@ -147,7 +145,6 @@ The dashboard is four thematic columns — **Members**, **Totals**, **Requests**
 ["vercel"] | where message == "api request" and ['fields.path'] !startswith "/api/_test" | extend path = ['fields.path'] | summarize p95_ms = percentile(['fields.duration'], 95), requests = count() by path | top 20 by p95_ms
 ```
 
-
 ### Not on the dashboard yet (candidates)
 
 _Drafted but not added to IS Web Overall: Adoption below, plus the Health & latency and Whole-site volume groups. A panel that ranks by a non-count aggregate (e.g. Adoption, by distinct members) must use a **Table** element with `top N by <expr>` after `summarize` — the **Top list** element ranks only by `count`/`topk`/`topkif` (one expression, only `take`/`limit` after `summarize`), so it can't rank by `dcount` or a percentile._
@@ -157,7 +154,6 @@ _Drafted but not added to IS Web Overall: Adoption below, plus the Health & late
 ```
 ["vercel"] | where message == "api request" and isnotnull(['fields.userId']) and ['fields.path'] !startswith "/api/_test" | summarize members = dcount(['fields.userId']) by ['fields.path'] | top 20 by members
 ```
-
 
 ### Health & latency
 
@@ -172,7 +168,6 @@ _Drafted but not added to IS Web Overall: Adoption below, plus the Health & late
 ```
 ["vercel"] | where message == "api request" and ['fields.status'] >= 400 and ['fields.path'] !startswith "/api/_test" | summarize errors = count() by ['fields.status'], bin_auto(_time)
 ```
-
 
 ### Whole-site volume (lambda source — pages + API, production only)
 
@@ -193,6 +188,5 @@ _Drafted but not added to IS Web Overall: Adoption below, plus the Health & late
 ```
 ["vercel"] | where ['vercel.source'] == "lambda" and ['vercel.environment'] == "production" and toint(['request.statusCode']) >= 400 and ['request.path'] !startswith "/api/_test" | summarize requests = count() by ['request.statusCode'], ['request.path'] | top 30 by requests
 ```
-
 
 **Not included: Web Vitals.** `next-axiom` ships `<AxiomWebVitals/>` but it is not mounted in the app, so no LCP/CLS/INP data flows yet. Mount it in the root layout first; then a percentile-over-time panel on those events becomes worthwhile.
