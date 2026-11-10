@@ -21,7 +21,7 @@ import {
   programFeatures,
   programs,
 } from "@/server/schema";
-import { E2E_EMAILS } from "@/server/test-reset";
+import { E2E_ACCOUNTS } from "@/server/test-reset";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 
@@ -57,7 +57,7 @@ const authAsE2EAdmin = (userId: string, via: "email" | "claim") => {
         data: {
           user: {
             ...fakeUser(userId),
-            email: via === "email" ? E2E_EMAILS[1] : `${userId}@testfake.local`,
+            email: via === "email" ? E2E_ACCOUNTS.admin : `${userId}@testfake.local`,
             app_metadata: via === "claim" ? { e2e_account: true } : {},
           } as User,
         },
