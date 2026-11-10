@@ -173,9 +173,12 @@ describe("ArchivedMessages (admin)", () => {
   it("shows nothing, not an error, when the viewer isn't allowed the archive (a 404)", async () => {
     $list.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
     renderArchived();
-    await waitFor(() => expect($list).toHaveBeenCalledTimes(1));
-    await act(async () => {});
-    expect(screen.queryByText(/Archived messages/)).not.toBeInTheDocument();
+    // The section is on screen while the list loads and goes once the 404
+    // has settled. TanStack Query delivers that result in a timer, so the
+    // test waits for the section to leave instead of flushing microtasks.
+    expect(screen.getByText(/Archived messages/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText(/Archived messages/)).not.toBeInTheDocument());
+    expect($list).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
