@@ -5,35 +5,35 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { UndoEntry } from "@/lib/use-undo-queue";
 
-// Seconds left, ticking once a second while any notice is showing.
-function useSecondsLeft(expiresAt: number): number {
+// One clock for the whole list, ticking once a second while any notice shows.
+function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
-  return Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  }, [active]);
+  return now;
 }
 
-function UndoNotice({ entry, onUndo }: { entry: UndoEntry; onUndo: (id: string) => void }) {
-  const seconds = useSecondsLeft(entry.expiresAt);
-  return (
-    <li className="flex items-center justify-between gap-3 rounded bg-muted px-3 py-2 text-sm">
-      <span>{entry.message}</span>
-      <Button type="button" variant="primary" size="xs" onClick={() => onUndo(entry.id)}>
-        Undo ({seconds}s)
-      </Button>
-    </li>
-  );
-}
-
-// The "Undo" notices from `useUndoQueue`. Renders nothing when empty. A polite
-// live region, so screen readers hear the notice appear.
+// The "Undo" notices from `useUndoQueue`. Renders nothing when empty.
+//
+// Only the notice text is a live region, so a screen reader announces the
+// notice once when it appears. The ticking "(29s)" is visual only
+// (aria-hidden) and the button keeps a static accessible name, "Undo", so
+// nothing is re-announced every second.
 export function UndoNotices({ entries, onUndo }: { entries: UndoEntry[]; onUndo: (id: string) => void }) {
+  const now = useNow(entries.length > 0);
   return (
-    <ul aria-live="polite" className="flex flex-col gap-2 empty:hidden">
+    <ul className="flex flex-col gap-2 empty:hidden">
       {entries.map((entry) => (
-        <UndoNotice key={entry.id} entry={entry} onUndo={onUndo} />
+        <li key={entry.id} className="flex items-center justify-between gap-3 rounded bg-muted px-3 py-2 text-sm">
+          <span role="status">{entry.message}</span>
+          <Button type="button" variant="primary" size="xs" aria-label="Undo" onClick={() => onUndo(entry.id)}>
+            <span aria-hidden="true">Undo ({Math.max(0, Math.ceil((entry.expiresAt - now) / 1000))}s)</span>
+          </Button>
+        </li>
       ))}
     </ul>
   );

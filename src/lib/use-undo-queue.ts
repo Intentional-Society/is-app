@@ -3,8 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export const UNDO_WINDOW_MS = 30_000;
 
 export type UndoEntry = {
-  // Identifies what was acted on (e.g. a message id). Adding an entry with an
-  // existing id replaces it and restarts the window.
+  // Identifies what was acted on (e.g. a message id). Only one entry per id
+  // can be pending: adding another while one is pending is ignored, so a
+  // scheduled onExpire (like a permanent delete) is never silently dropped or
+  // restarted.
   id: string;
   // Shown in the notice, e.g. "Archived Ada's message."
   message: string;
@@ -48,11 +50,10 @@ export function useUndoQueue({ windowMs = UNDO_WINDOW_MS }: { windowMs?: number 
   const add = useCallback(
     (entry: Omit<UndoEntry, "expiresAt">) => {
       if (!mounted.current) return;
+      if (entriesRef.current.some((e) => e.id === entry.id)) return;
       setError(null);
-      const existing = timers.current.get(entry.id);
-      if (existing) clearTimeout(existing);
       const full: UndoEntry = { ...entry, expiresAt: Date.now() + windowMs };
-      entriesRef.current = [...entriesRef.current.filter((e) => e.id !== entry.id), full];
+      entriesRef.current = [...entriesRef.current, full];
       setEntries(entriesRef.current);
       timers.current.set(
         entry.id,
@@ -94,5 +95,9 @@ export function useUndoQueue({ windowMs = UNDO_WINDOW_MS }: { windowMs?: number 
     };
   }, []);
 
-  return { entries, add, undo, error };
+  // For failures the owner sees outside the queue (say the archive request that
+  // would have created an entry), so they show in the same place; null clears.
+  const reportError = useCallback((message: string | null) => setError(message), []);
+
+  return { entries, add, undo, error, reportError };
 }

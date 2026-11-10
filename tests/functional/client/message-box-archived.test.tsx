@@ -123,7 +123,7 @@ describe("ArchivedMessages (admin)", () => {
 
     it("Undo brings the row back and never deletes it", async () => {
       await confirmDelete();
-      fireEvent.click(await screen.findByRole("button", { name: /Undo \(\d+s\)/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
       expect(await screen.findByText("Hidden one")).toBeInTheDocument();
       await act(() => vi.advanceTimersByTimeAsync(60_000));
       expect($delete).not.toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe("ArchivedMessages (admin)", () => {
     $restore.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: "not_found" }) } as never);
     renderArchived();
     fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer available");
+    expect(await screen.findByRole("alert")).toHaveTextContent("already removed or restored by someone else");
     // Loaded once on mount, once more after the failure.
     await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
   });
@@ -165,9 +165,9 @@ describe("ArchivedMessages (admin)", () => {
     renderArchived();
     fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
     mockList([]);
-    expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer available");
+    expect(await screen.findByRole("alert")).toHaveTextContent("already removed or restored by someone else");
     await waitFor(() => expect(screen.queryByText("Hidden one")).not.toBeInTheDocument());
-    expect(screen.getByRole("alert")).toHaveTextContent("That message is no longer available");
+    expect(screen.getByRole("alert")).toHaveTextContent("already removed or restored by someone else");
   });
 
   it("shows nothing, not an error, when the viewer isn't allowed the archive (a 404)", async () => {

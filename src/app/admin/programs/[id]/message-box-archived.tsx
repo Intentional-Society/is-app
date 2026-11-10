@@ -61,6 +61,7 @@ export function ArchivedMessages({ programId }: { programId: string }) {
   const count = visible?.length;
 
   const scheduleDelete = (message: ArchivedMessageBoxMessage) => {
+    setRestoreError(null);
     setIsHidden(message.id, true);
     undoQueue.add({
       id: message.id,

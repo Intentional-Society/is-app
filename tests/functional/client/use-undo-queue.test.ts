@@ -47,20 +47,26 @@ describe("useUndoQueue", () => {
     expect(e.onExpire).not.toHaveBeenCalled();
   });
 
-  it("adding the same id again replaces the entry and restarts the window", async () => {
+  it("ignores an add for an id that is already pending, so a scheduled onExpire is never dropped or restarted", async () => {
     const { result } = renderHook(() => useUndoQueue());
     const first = entry();
-    const second = entry();
+    const second = entry({ onExpire: undefined });
     act(() => result.current.add(first));
     await act(() => vi.advanceTimersByTimeAsync(20_000));
     act(() => result.current.add(second));
     expect(result.current.entries).toHaveLength(1);
 
-    await act(() => vi.advanceTimersByTimeAsync(20_000));
-    expect(second.onExpire).not.toHaveBeenCalled();
+    // The first entry's window was neither restarted nor replaced.
     await act(() => vi.advanceTimersByTimeAsync(10_000));
-    expect(second.onExpire).toHaveBeenCalledTimes(1);
-    expect(first.onExpire).not.toHaveBeenCalled();
+    expect(first.onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the owner report an error that shows with the queue's own", async () => {
+    const { result } = renderHook(() => useUndoQueue());
+    act(() => result.current.reportError("archive failed"));
+    expect(result.current.error).toBe("archive failed");
+    act(() => result.current.add(entry()));
+    expect(result.current.error).toBeNull();
   });
 
   it("tracks several entries independently", async () => {

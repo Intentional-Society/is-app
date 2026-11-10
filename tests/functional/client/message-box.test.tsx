@@ -193,7 +193,7 @@ describe("MessageBox", () => {
       expect(await screen.findByText("Archived Ada Lovelace's message.")).toBeVisible();
       expect($delete).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole("button", { name: /Undo \(\d+s\)/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
       await waitFor(() =>
         expect($archive).toHaveBeenLastCalledWith({ param: { id: "p1", messageId: "m1" }, json: { archived: false } }),
       );
@@ -218,10 +218,11 @@ describe("MessageBox", () => {
       fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
       mockBox(box({ canModerate: true, messages: [] }));
       fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("That message is no longer available");
-      // The box was refetched, so the dead message left the list.
+      // The box was refetched, so the dead message left the list...
       await waitFor(() => expect($get).toHaveBeenCalledTimes(2));
       expect(await screen.findByText("No messages yet.")).toBeVisible();
+      // ...and the error is still on screen, because it lives above the list, not in the dead row.
+      expect(screen.getByRole("alert")).toHaveTextContent("already removed or restored by someone else");
     });
 
     it("keeps an Undo that is still counting down when a refetch fails", async () => {
@@ -233,8 +234,10 @@ describe("MessageBox", () => {
       fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
       expect(await screen.findByText("Archived Ada Lovelace's message.")).toBeVisible();
       await waitFor(() => expect($get).toHaveBeenCalledTimes(2));
-      expect(screen.getByRole("button", { name: /Undo \(\d+s\)/ })).toBeVisible();
-      expect(screen.queryByText("Couldn't load the message box.")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Undo" })).toBeVisible();
+      // The stale list stays, with a warning that it may be out of date.
+      expect(screen.getByText("Sending love from afar")).toBeVisible();
+      expect(screen.getByText(/Couldn't refresh the message box/)).toBeVisible();
     });
 
     it("clears an old Undo error when the next moderation action starts", async () => {
@@ -246,7 +249,7 @@ describe("MessageBox", () => {
 
       // Undo fails: the restore request is rejected.
       $archive.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) } as never);
-      fireEvent.click(screen.getByRole("button", { name: /Undo \(\d+s\)/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't restore the message.");
 
       // A fresh archive wipes it.
@@ -298,7 +301,7 @@ describe("MessageBox", () => {
 
       it("Undo within the window restores the message and never deletes it", async () => {
         await startDelete();
-        fireEvent.click(screen.getByRole("button", { name: /Undo \(\d+s\)/ }));
+        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
         await waitFor(() =>
           expect($archive).toHaveBeenLastCalledWith({
             param: { id: "p1", messageId: "m1" },

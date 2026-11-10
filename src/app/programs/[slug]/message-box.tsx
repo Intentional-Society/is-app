@@ -14,11 +14,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { UndoNotices } from "@/components/undo-notices";
 import { apiClient } from "@/lib/api";
 import type { MessageBoxMessage, MessageBoxResponse } from "@/lib/api-types";
-import { errorFrom, MESSAGE_GONE } from "@/lib/message-box-errors";
+import { errorFrom, MESSAGE_UNAVAILABLE } from "@/lib/message-box-errors";
 import { MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
 import { useUndoQueue } from "@/lib/use-undo-queue";
 
-import { deleteForever, patchArchived, refreshMessageBox } from "./message-box-actions";
+import { deleteForever, patchArchived, refreshArchive, refreshMessageBox } from "./message-box-actions";
 import { MESSAGE_BOX_CARD_CLASSNAME } from "./message-box-card";
 import { HYDRATED_STALE_TIME, messageBoxQueryKey } from "./query-keys";
 
@@ -47,8 +47,13 @@ export function MessageBox({ programId }: { programId: string }) {
       <h3 id="message-box-heading" className="text-base font-semibold uppercase tracking-wide text-muted-foreground">
         Message box
       </h3>
-      {/* Keep showing the last good data when a refetch fails, so an Undo that is
-          still counting down never disappears from under the admin. */}
+      {/* When a refetch fails, keep showing the last good data (so an Undo that is
+          still counting down never disappears from under the admin) and say so. */}
+      {query.data && query.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't refresh the message box. What you see may be out of date.
+        </p>
+      )}
       {query.data ? (
         <MessageBoxBody programId={programId} data={query.data} undoQueue={undoQueue} />
       ) : query.isPending ? (
@@ -235,16 +240,27 @@ function MessageItem({
           message: `Deleting ${name}'s message.`,
           onUndo: restore,
           onExpire: async () => {
-            await deleteForever(programId, message.id);
-            await refreshMessageBox(queryClient, programId);
+            try {
+              await deleteForever(programId, message.id);
+            } catch (error) {
+              // Usually the message was restored meanwhile; show it again.
+              await refreshMessageBox(queryClient, programId);
+              throw error;
+            }
+            // The message was already hidden from the live box; only the archive changed.
+            await refreshArchive(queryClient, programId);
           },
         });
       }
     },
     onSuccess: () => refreshMessageBox(queryClient, programId),
     // If the action failed because the message is already gone (say another admin
-    // removed it), refresh so the dead message leaves the list.
-    onError: () => refreshMessageBox(queryClient, programId),
+    // removed it), the refresh drops this row, and the row's own error with it. So
+    // the error is reported at the list level, next to the Undo notices.
+    onError: (error) => {
+      undoQueue.reportError(error.message);
+      return refreshMessageBox(queryClient, programId);
+    },
     onSettled: () => setConfirming(null),
   });
 
@@ -320,11 +336,6 @@ function MessageItem({
       ) : (
         <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
       )}
-      {moderateMutation.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          {moderateMutation.error.message}
-        </p>
-      )}
     </li>
   );
 }
@@ -350,7 +361,7 @@ function EditForm({
         param: { id: programId, messageId: message.id },
         json: { body },
       });
-      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't save your changes.", MESSAGE_GONE));
+      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't save your changes.", MESSAGE_UNAVAILABLE));
       return res.json();
     },
     // Wait for the refetch so the list shows the new text before the editor closes.

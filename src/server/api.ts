@@ -419,8 +419,8 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
 // middleware answers 404 for a program that is archived or doesn't have the
 // feature attached (docs/design-programs.md, "Access rule"). Any signed-in
 // member may read when the program's visibility is "members"; admins may
-// always read; only active participants may post. Moderation (delete) is in
-// the admin routes.
+// always read; only active participants may post, and authors may edit their
+// own messages. Moderation (archive, restore, delete) is in the admin routes.
 const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
   .use("*", requireProgramFeature(MESSAGE_BOX_FEATURE))
   .get("/", async (c) => {
@@ -429,7 +429,7 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
     // The seeded e2e admin is a real admin row whose password sits in CI
     // secrets used by unreviewed branch code, so its admin powers are capped
     // (E2E_ADMIN_READS in auth-middleware.ts). Treat it as a plain member here:
-    // no admins-only messages, no hidden or deactivated authors, no delete.
+    // no admins-only messages, no hidden or deactivated authors, no moderation.
     const [settings, adminFlag] = await Promise.all([getSettings(programId), isAdmin(user.id)]);
     const { visibility, prompt } = settings;
     const admin = adminFlag && !isE2EAccount(user);

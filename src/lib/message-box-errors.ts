@@ -2,11 +2,16 @@
 // Shared by the program page and the admin archive list, so both report the
 // same failure the same way.
 
-// A 404 on a message action can mean the message is gone (removed by another
-// admin or the author's admin archive) or that the whole box was turned off or
-// its program archived in the meantime. The API answers both the same way, so
-// the text covers both.
-export const MESSAGE_GONE =
+// A 404 on an admin message action (archive, restore, delete): the message is not
+// where the action expected it. The admin routes don't depend on the box being
+// on, so this is about the message: another admin removed it, restored it, or it
+// was already deleted. (Permanent delete also 404s on a message that is no longer
+// archived.)
+export const MESSAGE_GONE = "That message was already removed or restored by someone else.";
+
+// A 404 when an author saves an edit. Here the API answers "message gone" and
+// "box turned off or program archived" the same way, so the text covers both.
+export const MESSAGE_UNAVAILABLE =
   "That message is no longer available. It may have been removed, or the message box may have been turned off.";
 
 // `notFound` is what a 404 means for the call: for a message action it is
