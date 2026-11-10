@@ -35,14 +35,34 @@ jobs:
       contains(fromJSON('["Production","Preview"]'), github.event.deployment_status.environment)
     steps:
       - uses: actions/checkout@v7
+      # No npm cache: the install below fetches four packages, and
+      # restoring the ~300 MB cache took longer than that.
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-          cache: npm
-      - run: npm install
 
+      # The job drives a deployed preview, so it needs the test runner and
+      # the one other package its config imports, not the app's
+      # dependencies. scripts/e2e-ci-deps.mjs cuts those out of
+      # package-lock.json, entries unchanged, and `npm ci` installs them
+      # against the same versions and integrity hashes a full install
+      # would use.
+      - name: Install the e2e dependencies
+        run: |
+          node scripts/e2e-ci-deps.mjs "$RUNNER_TEMP/e2e-deps"
+          npm ci --prefix "$RUNNER_TEMP/e2e-deps" --ignore-scripts --no-audit --no-fund
+          mv "$RUNNER_TEMP/e2e-deps/node_modules" node_modules
+
+      # Headless shell only: the suite runs headless Chromium, which is
+      # that binary, so the full Chrome download is skipped. No
+      # --with-deps: on ubuntu-latest every shared library Chromium needs
+      # is preinstalled, and the flag's apt run only added nine font
+      # packages (CJK, Thai, unifont) for ~13s. The suite compares no
+      # pixels, so the default fonts are enough. If a runner image ever
+      # drops a library, Playwright fails at launch with "Host system is
+      # missing dependencies"; restore the flag then.
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: npx playwright install --only-shell chromium
 
       - name: Fail fast if base URL isn't Vercel
         # The job-level `if:` already filters by environment, but a malformed

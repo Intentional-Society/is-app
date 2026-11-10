@@ -1,35 +1,23 @@
 import { expect, test } from "./helpers/fixtures";
-import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { TIMEOUT_MS } from "./helpers/session";
 
-// These tests exercise the authed invite UI end-to-end against the
-// regular seeded user. Each test in the authed describe resets the
-// user's state first so the invite-count assertions hold regardless
-// of CI retries or prior tests. /signup is partially stubbed because
-// we don't want to drive Inbucket for every run — the magic-link
-// callback itself is covered by functional tests.
-//
-// Serial mode: all the authed tests in this file share the regular
-// user, so parallel runs would race on beforeEach resets / invite
-// creation. playwright.config.ts pins workers to 1 globally; this
-// serial mode is within-file belt-and-braces on top of that.
-test.describe.configure({ mode: "serial" });
+// These tests exercise the invite UI end-to-end against the worker's
+// seeded account. The `member` reset deletes the account's invites
+// before each test, so the invite-count assertions hold regardless of
+// CI retries or prior tests. /signup is partially stubbed because we
+// don't want to drive Inbucket for every run — the magic-link callback
+// itself is covered by functional tests.
 
 test.describe("invites — authed member flow", () => {
-  test.beforeEach(async ({ page, baseURL }) => {
-    if (!baseURL) throw new Error("invites.spec.ts: baseURL is not configured");
-    await resetSeededUsers(baseURL);
-    await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller: if a reset leaves this
-    // value behind, the reset tripwire names this exact call site.
-    await completeWelcome(page, {
-      displayName: "Member Under Test",
-      bio: "e2e bio · invites.spec · authed-flow beforeEach",
-    });
+  test.use({ user: "member" });
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Invite a friend" }).click();
+    await page.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
   });
 
   test("create an invite, see it listed, revoke it", async ({ page }) => {
-    await page.getByRole("link", { name: "Invite a friend" }).click();
-    await page.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
     await expect(page.getByRole("heading", { name: "Invite a new member" })).toBeVisible();
 
     await page.getByLabel("Who are you inviting?").fill("bringing a friend from the meditation group");
@@ -47,8 +35,6 @@ test.describe("invites — authed member flow", () => {
   });
 
   test("429 from the API surfaces a friendly cap message", async ({ page }) => {
-    await page.getByRole("link", { name: "Invite a friend" }).click();
-    await page.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
     // Stub POST /api/invites to return 429 — we don't want to seed
     // fifty real invites per test run, and we only need to verify the
     // UI's error branch for the cap case.
@@ -88,65 +74,55 @@ test.describe("/signup — unauthed invite flow", () => {
     await expect(page.getByText(/doesn't match any invite/)).toBeVisible();
   });
 
-  test("valid code → note displayed → submitting email shows 'check your email'", async ({ browser, baseURL }) => {
-    if (!baseURL) throw new Error("invites.spec.ts: baseURL is not configured");
-    await resetSeededUsers(baseURL);
+  test.describe("with an invite from a member", () => {
+    test.use({ user: "member" });
 
-    // Phase 1: as the regular member, generate a real invite code.
-    const memberContext = await browser.newContext();
-    const memberPage = await memberContext.newPage();
-    let code: string;
-    try {
-      await signInAs(memberPage, "regular");
-      await completeWelcome(memberPage, {
-        displayName: "Inviter",
-        bio: "e2e bio · invites.spec · signup-flow inviter",
-      });
-      await memberPage.getByRole("link", { name: "Invite a friend" }).click();
-      await memberPage.waitForURL((u) => u.pathname === "/invites", { timeout: TIMEOUT_MS });
-      await memberPage.getByLabel("Who are you inviting?").fill("e2e signup-flow invite — come on in");
-      await memberPage.getByRole("button", { name: "Create invite" }).click();
-      const codeLocator = memberPage.locator("code").first();
+    test("valid code → note displayed → submitting email shows 'check your email'", async ({ page, browser }) => {
+      // Phase 1: as the member, generate a real invite code.
+      await page.goto("/invites");
+      await page.getByLabel("Who are you inviting?").fill("e2e signup-flow invite — come on in");
+      await page.getByRole("button", { name: "Create invite" }).click();
+      const codeLocator = page.locator("code").first();
       await expect(codeLocator).toHaveText(/^[A-HJ-NP-Z2-9]{10}$/);
-      code = ((await codeLocator.textContent()) ?? "").trim();
-    } finally {
-      await memberContext.close();
-    }
+      const code = ((await codeLocator.textContent()) ?? "").trim();
 
-    // Phase 2: fresh browser context as the unauthed prospective member.
-    const guestContext = await browser.newContext();
-    const guestPage = await guestContext.newPage();
+      // Phase 2: fresh browser context as the unauthed prospective
+      // member. A context made by hand inherits this describe's
+      // signed-in state unless told otherwise.
+      const guestContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      const guestPage = await guestContext.newPage();
 
-    try {
-      // Intercept only the OTP call — let /api/invites/:code/check hit
-      // the real app so it returns the real note from the DB.
-      // Note the regex (not a glob): supabase-js sends the redirect URL
-      // as ?redirect_to=..., and Playwright's **/auth/v1/otp glob does
-      // not match URLs that have a query string. A regex matches both.
-      await guestPage.route(/\/auth\/v1\/otp(\?|$)/, (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ data: {}, error: null }),
-        }),
-      );
+      try {
+        // Intercept only the OTP call — let /api/invites/:code/check hit
+        // the real app so it returns the real note from the DB.
+        // Note the regex (not a glob): supabase-js sends the redirect URL
+        // as ?redirect_to=..., and Playwright's **/auth/v1/otp glob does
+        // not match URLs that have a query string. A regex matches both.
+        await guestPage.route(/\/auth\/v1\/otp(\?|$)/, (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: {}, error: null }),
+          }),
+        );
 
-      await guestPage.goto("/signup");
-      await guestPage.getByLabel("Invite code").fill(code);
-      await guestPage.getByRole("button", { name: "Sign up!" }).click();
+        await guestPage.goto("/signup");
+        await guestPage.getByLabel("Invite code").fill(code);
+        await guestPage.getByRole("button", { name: "Sign up!" }).click();
 
-      await expect(guestPage.getByText("e2e signup-flow invite — come on in")).toBeVisible();
+        await expect(guestPage.getByText("e2e signup-flow invite — come on in")).toBeVisible();
 
-      await guestPage.getByLabel("Display name").fill("Future Member");
-      await guestPage.getByLabel("Email").fill("future-member@testfake.local");
-      await guestPage.getByRole("button", { name: "Verify your email" }).click();
+        await guestPage.getByLabel("Display name").fill("Future Member");
+        await guestPage.getByLabel("Email").fill("future-member@testfake.local");
+        await guestPage.getByRole("button", { name: "Verify your email" }).click();
 
-      await expect(guestPage.getByText("future-member@testfake.local")).toBeVisible();
-      await expect(guestPage.getByText(/Check.*for a sign-in link/)).toBeVisible();
-      // The intro line drops away once we switch to the "check your email" state.
-      await expect(guestPage.getByText("You've been invited to join!")).toBeHidden();
-    } finally {
-      await guestContext.close();
-    }
+        await expect(guestPage.getByText("future-member@testfake.local")).toBeVisible();
+        await expect(guestPage.getByText(/Check.*for a sign-in link/)).toBeVisible();
+        // The intro line drops away once we switch to the "check your email" state.
+        await expect(guestPage.getByText("You've been invited to join!")).toBeHidden();
+      } finally {
+        await guestContext.close();
+      }
+    });
   });
 });

@@ -1,6 +1,8 @@
 import { defineConfig } from "@playwright/test";
 import { config as loadEnv } from "dotenv";
 
+import { workerAccounts } from "./tests/e2e/helpers/accounts";
+
 // Load .env.local so the e2e session helper + reset-endpoint client
 // can pick up the seeded user passwords and the CI reset token.
 // Harmless in CI where the vars come from the environment instead.
@@ -21,12 +23,11 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  // Serialized across files: welcome and invites both mutate the shared
-  // seeded regular user's profile, so two spec files running in parallel
-  // workers would race on each other's resets. Within-file parallelism
-  // is also disabled by test.describe.configure({ mode: "serial" }) in
-  // the affected specs.
-  workers: 1,
+  // One worker per seeded account. Signed-in tests write to their
+  // account (profile, invites, welcome markers) and reset it first, so
+  // each worker owns one account for the run and tests never share one
+  // (tests/e2e/helpers/accounts.ts). More accounts means more workers.
+  workers: workerAccounts().length,
   reporter: "html",
   expect: {
     // Wide polling window absorbs Next.js Fast Refresh / first-compile cost
@@ -36,7 +37,12 @@ export default defineConfig({
   },
   use: {
     baseURL,
-    trace: "on-first-retry",
+    browserName: "chromium",
+    // No traces in CI. A trace holds DOM snapshots and response bodies,
+    // CI runs against a preview that shares prod data, and the report it
+    // would be attached to is uploaded from a public repo. Locally, pass
+    // `--trace on` to record one.
+    trace: isCI ? "off" : "on-first-retry",
     // Per-request timing for the redirect chain — see src/lib/timing.ts.
     // The middleware short-circuits unless this header is present, so the
     // cost on test traffic is a single header.get + boolean check; the
@@ -44,21 +50,26 @@ export default defineConfig({
     // for every CI run, queryable via `vercel logs ... --query "timing"`.
     extraHTTPHeaders: { "x-debug-timing": "1" },
   },
-  // The setup project calls POST /api/_test/reset once at the top of the
-  // run. Specs that need guaranteed-clean state (welcome, invites) also
-  // re-reset in their own beforeEach hooks — the top-level setup is the
-  // belt-and-braces for tests that don't.
+  // setup resets the seeded accounts, warms the server and signs each
+  // account in, saving the browser state the specs start from. teardown
+  // signs the accounts out through the UI once every spec has finished:
+  // the app's sign-out ends every session of an account, so it can't
+  // run alongside specs that share one. See tests/e2e/suite.setup.ts and
+  // tests/e2e/suite.teardown.ts.
   projects: [
     {
       name: "setup",
-      testMatch: /reset\.setup\.ts/,
-      use: { browserName: "chromium" },
+      testMatch: /suite\.setup\.ts/,
+      teardown: "teardown",
     },
     {
       name: "chromium",
-      testIgnore: [/reset\.setup\.ts/],
+      testIgnore: [/suite\.setup\.ts/, /suite\.teardown\.ts/],
       dependencies: ["setup"],
-      use: { browserName: "chromium" },
+    },
+    {
+      name: "teardown",
+      testMatch: /suite\.teardown\.ts/,
     },
   ],
   // Local dev: reuse a running dev server, or spin one up. CI: tests run

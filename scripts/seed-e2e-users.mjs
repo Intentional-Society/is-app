@@ -5,6 +5,10 @@
 // baked into the Supabase CLI) to create/update users via the Admin
 // API. CI never runs this — prod's two users are seeded by hand via
 // the Supabase dashboard per docs/doc-supabase.md.
+//
+// The same accounts are listed in src/server/test-reset.ts
+// (E2E_ACCOUNTS) and tests/e2e/helpers/accounts.ts (ACCOUNTS); an
+// account added here goes in all three.
 
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
