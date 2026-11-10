@@ -20,7 +20,7 @@ import { createServerClient } from "@supabase/ssr";
 
 import app from "@/server/api";
 import { db } from "@/server/db";
-import { autoSubscribeNewMember, subscribeToProgramSlugs } from "@/server/programs";
+import { autoSubscribeNewMember } from "@/server/programs";
 import { profilePrograms, profiles, programs } from "@/server/schema";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
@@ -424,63 +424,30 @@ describe("autoSubscribeNewMember", () => {
     const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
     expect(rows).toHaveLength(1);
   });
-});
 
-// The missing-program path, reached with slugs of this file's own: the
-// auto-subscribe program's row is shared with every test file running in
-// parallel, so these tests leave it alone.
-describe("subscribeToProgramSlugs", () => {
-  let userId: string;
-
-  beforeEach(async () => {
-    userId = randomUUID();
-    await db.execute(
-      sql`INSERT INTO auth.users (id, email, is_sso_user, is_anonymous)
-          VALUES (${userId}::uuid, ${`slugs-${userId.slice(0, 8)}@testfake.local`}, false, false)`,
-    );
-    await db.insert(profiles).values({ id: userId });
-    vi.mocked(Sentry_captureException).mockClear();
-  });
-
-  afterEach(async () => {
-    await db.delete(profilePrograms).where(eq(profilePrograms.profileId, userId));
-    await db.delete(profiles).where(eq(profiles.id, userId));
-    await db.execute(sql`DELETE FROM auth.users WHERE id = ${userId}::uuid`);
-  });
-
-  it("does not throw or subscribe when the program is missing — captures to Sentry instead", async () => {
-    const missingSlug = `missing-${randomUUID()}`;
-
-    await expect(subscribeToProgramSlugs(userId, [missingSlug])).resolves.toBeUndefined();
-
+  it("does not throw or re-subscribe when the program is missing — captures to Sentry instead", async () => {
+    // The program's row is shared with every test file running in
+    // parallel, so it stays in place: the function's lookup, its first
+    // db.select, is stubbed to find nothing.
+    const lookup = vi.spyOn(db, "select").mockReturnValueOnce({
+      from: () => ({ where: () => Promise.resolve([]) }),
+    } as unknown as ReturnType<typeof db.select>);
     const captureMock = vi.mocked(Sentry_captureException);
+    captureMock.mockClear();
+
+    try {
+      await expect(autoSubscribeNewMember(userId)).resolves.toBeUndefined();
+      expect(lookup).toHaveBeenCalledOnce();
+    } finally {
+      lookup.mockRestore();
+    }
+
     expect(captureMock).toHaveBeenCalledOnce();
     const arg = captureMock.mock.calls[0][0];
     expect(arg).toBeInstanceOf(Error);
-    expect((arg as Error).message).toContain(missingSlug);
+    expect((arg as Error).message).toMatch(/weekly-web-updates/);
 
     const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
     expect(rows).toHaveLength(0);
-  });
-
-  it("skips a missing program and still subscribes to the ones that exist", async () => {
-    const missingSlug = `missing-${randomUUID()}`;
-    const programId = randomUUID();
-    const existingSlug = `existing-${programId}`;
-    await db.insert(programs).values({ id: programId, slug: existingSlug, name: "Existing Program" });
-
-    try {
-      await subscribeToProgramSlugs(userId, [missingSlug, existingSlug]);
-
-      const captureMock = vi.mocked(Sentry_captureException);
-      expect(captureMock).toHaveBeenCalledOnce();
-      expect((captureMock.mock.calls[0][0] as Error).message).toContain(missingSlug);
-
-      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
-      expect(rows).toHaveLength(1);
-      expect(rows[0].programId).toBe(programId);
-    } finally {
-      await db.delete(programs).where(eq(programs.id, programId));
-    }
   });
 });

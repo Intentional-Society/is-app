@@ -14,23 +14,19 @@ import { E2E_EMAILS } from "./test-reset";
 const AUTO_SUBSCRIBE_SLUGS = ["weekly-web-updates"] as const;
 
 // Best-effort: subscribe a freshly-created member to the auto-subscribe
-// programs. Idempotent, but callers should still gate on "is this a new
+// programs. A missing slug is logged to Sentry and skipped rather than
+// failing — sign-in shouldn't break over a misconfigured program list,
+// and operators can patch the database after the fact. Idempotent via
+// onConflictDoNothing, but callers should still gate on "is this a new
 // profile" so re-subscribing won't undo a member's opt-out.
-export const autoSubscribeNewMember = (userId: string): Promise<void> =>
-  subscribeToProgramSlugs(userId, AUTO_SUBSCRIBE_SLUGS);
-
-// Subscribes a member to the program behind each slug. A missing slug
-// is logged to Sentry and skipped rather than failing — sign-in
-// shouldn't break over a misconfigured program list, and operators can
-// patch the database after the fact. Idempotent via onConflictDoNothing.
-export const subscribeToProgramSlugs = async (userId: string, slugs: readonly string[]): Promise<void> => {
+export const autoSubscribeNewMember = async (userId: string): Promise<void> => {
   const rows = await db
     .select({ id: programs.id, slug: programs.slug })
     .from(programs)
-    .where(inArray(programs.slug, [...slugs]));
+    .where(inArray(programs.slug, AUTO_SUBSCRIBE_SLUGS as unknown as string[]));
 
   const found = new Set(rows.map((r) => r.slug));
-  for (const slug of slugs) {
+  for (const slug of AUTO_SUBSCRIBE_SLUGS) {
     if (!found.has(slug)) {
       Sentry_captureException(new Error(`autoSubscribeNewMember: program slug "${slug}" not found in database`));
     }
