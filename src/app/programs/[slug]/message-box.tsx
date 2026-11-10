@@ -226,14 +226,16 @@ function MessageItem({
   // queue calls outlive this component, which unmounts once the list refetches.
   const moderateMutation = useMutation({
     mutationFn: async (intent: "archive" | "delete") => {
-      await patchArchived(programId, message.id, true);
+      const changed = await patchArchived(programId, message.id, true);
       const name = message.author.displayName ?? "A member";
       const restore = async () => {
         await patchArchived(programId, message.id, false);
         await refreshMessageBox(queryClient, programId);
       };
       if (intent === "archive") {
-        undoQueue.add({ id: message.id, message: `Archived ${name}'s message.`, onUndo: restore });
+        // Already archived by someone else: nothing of ours to undo, and an Undo
+        // here would bring back a message another admin chose to hide.
+        if (changed) undoQueue.add({ id: message.id, message: `Archived ${name}'s message.`, onUndo: restore });
       } else {
         undoQueue.add({
           id: message.id,

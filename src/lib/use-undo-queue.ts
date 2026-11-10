@@ -4,9 +4,10 @@ export const UNDO_WINDOW_MS = 30_000;
 
 export type UndoEntry = {
   // Identifies what was acted on (e.g. a message id). Only one entry per id
-  // can be pending: adding another while one is pending is ignored, so a
-  // scheduled onExpire (like a permanent delete) is never silently dropped or
-  // restarted.
+  // can be pending. A pending entry that has an onExpire (a scheduled permanent
+  // delete) is never dropped or restarted: a second add for that id is ignored.
+  // A pending entry with no onExpire (a plain "Archived" notice) is replaced by
+  // an add that has one, so Archive followed by Delete becomes a delete.
   id: string;
   // Shown in the notice, e.g. "Archived Ada's message."
   message: string;
@@ -50,7 +51,11 @@ export function useUndoQueue({ windowMs = UNDO_WINDOW_MS }: { windowMs?: number 
   const add = useCallback(
     (entry: Omit<UndoEntry, "expiresAt">) => {
       if (!mounted.current) return;
-      if (entriesRef.current.some((e) => e.id === entry.id)) return;
+      const pending = entriesRef.current.find((e) => e.id === entry.id);
+      if (pending) {
+        if (pending.onExpire || !entry.onExpire) return;
+        drop(entry.id);
+      }
       setError(null);
       const full: UndoEntry = { ...entry, expiresAt: Date.now() + windowMs };
       entriesRef.current = [...entriesRef.current, full];

@@ -123,7 +123,7 @@ describe("ArchivedMessages (admin)", () => {
 
     it("Undo brings the row back and never deletes it", async () => {
       await confirmDelete();
-      fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+      fireEvent.click(await screen.findByRole("button", { name: /^Undo/ }));
       expect(await screen.findByText("Hidden one")).toBeInTheDocument();
       await act(() => vi.advanceTimersByTimeAsync(60_000));
       expect($delete).not.toHaveBeenCalled();

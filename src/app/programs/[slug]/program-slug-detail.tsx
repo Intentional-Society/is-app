@@ -36,10 +36,13 @@ export function ProgramSlugDetail({ slug, children }: { slug: string; children?:
     staleTime: HYDRATED_STALE_TIME,
   });
 
-  if (query.isPending) {
-    return <p className="w-full max-w-3xl text-sm text-muted-foreground">Loading…</p>;
-  }
-  if (query.isError) {
+  // Once the program has loaded, a failed background refetch must not replace the
+  // page with an error: that would unmount the feature sections (and any Undo
+  // still counting down inside them). Keep showing the last good data.
+  if (!query.data) {
+    if (query.isPending) {
+      return <p className="w-full max-w-3xl text-sm text-muted-foreground">Loading…</p>;
+    }
     const missing = query.error instanceof Error && query.error.message === "not_found";
     return (
       <p role="alert" className="w-full max-w-3xl text-sm text-destructive">

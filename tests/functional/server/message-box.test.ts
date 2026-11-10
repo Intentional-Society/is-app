@@ -491,17 +491,26 @@ describe("Message box program feature", () => {
       expect((await getBox()).messages.map((m) => m.id)).toEqual([id]);
     });
 
-    it("is idempotent: archiving twice keeps the first timestamp, restoring an unarchived message is a no-op", async () => {
+    it("is idempotent, and says whether a request changed anything", async () => {
       const id = await seedMessage(participant);
       authAs(admin);
-      await setArchived(id, true);
+      const changedOf = async (res: Response) => ((await res.json()) as { changed: boolean }).changed;
+
+      expect(await changedOf(await setArchived(id, true))).toBe(true);
       const first = (await row(id)).archivedAt;
-      expect((await setArchived(id, true)).status).toBe(200);
+      // Archiving an archived message is a no-op that keeps the first timestamp.
+      const again = await setArchived(id, true);
+      expect(again.status).toBe(200);
+      expect(await changedOf(again)).toBe(false);
       expect((await row(id)).archivedAt).toEqual(first);
 
       const other = await seedMessage(participant, "never archived");
-      expect((await setArchived(other, false)).status).toBe(200);
+      const noop = await setArchived(other, false);
+      expect(noop.status).toBe(200);
+      expect(await changedOf(noop)).toBe(false);
       expect((await row(other)).archivedAt).toBeNull();
+
+      expect(await changedOf(await setArchived(id, false))).toBe(true);
     });
 
     it("stops the author editing an archived message", async () => {

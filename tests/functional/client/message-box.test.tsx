@@ -193,11 +193,45 @@ describe("MessageBox", () => {
       expect(await screen.findByText("Archived Ada Lovelace's message.")).toBeVisible();
       expect($delete).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Undo/ }));
       await waitFor(() =>
         expect($archive).toHaveBeenLastCalledWith({ param: { id: "p1", messageId: "m1" }, json: { archived: false } }),
       );
       await waitFor(() => expect(screen.queryByText("Archived Ada Lovelace's message.")).not.toBeInTheDocument());
+    });
+
+    it("offers no Undo when someone else had already archived the message", async () => {
+      moderator();
+      $archive.mockResolvedValue({ ok: true, json: async () => ({ ok: true, changed: false }) } as never);
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+      await waitFor(() =>
+        expect($archive).toHaveBeenCalledWith({ param: { id: "p1", messageId: "m1" }, json: { archived: true } }),
+      );
+      await waitFor(() => expect($get).toHaveBeenCalledTimes(2));
+      expect(screen.queryByRole("button", { name: /^Undo/ })).not.toBeInTheDocument();
+    });
+
+    it("turns a pending Archive notice into a delete when the admin then deletes the message", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        moderator();
+        renderBox();
+        fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+        fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+        await screen.findByText("Archived Ada Lovelace's message.");
+
+        // The list still shows the message (say another tab restored it), and the admin deletes it.
+        fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+        expect(await screen.findByText("Deleting Ada Lovelace's message.")).toBeVisible();
+
+        await act(() => vi.advanceTimersByTimeAsync(31_000));
+        await waitFor(() => expect($delete).toHaveBeenCalledWith({ param: { id: "p1", messageId: "m1" } }));
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("shows the error and no Undo notice when archiving fails", async () => {
@@ -234,7 +268,7 @@ describe("MessageBox", () => {
       fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
       expect(await screen.findByText("Archived Ada Lovelace's message.")).toBeVisible();
       await waitFor(() => expect($get).toHaveBeenCalledTimes(2));
-      expect(screen.getByRole("button", { name: "Undo" })).toBeVisible();
+      expect(screen.getByRole("button", { name: /^Undo/ })).toBeVisible();
       // The stale list stays, with a warning that it may be out of date.
       expect(screen.getByText("Sending love from afar")).toBeVisible();
       expect(screen.getByText(/Couldn't refresh the message box/)).toBeVisible();
@@ -249,7 +283,7 @@ describe("MessageBox", () => {
 
       // Undo fails: the restore request is rejected.
       $archive.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) } as never);
-      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Undo/ }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't restore the message.");
 
       // A fresh archive wipes it.
@@ -301,7 +335,7 @@ describe("MessageBox", () => {
 
       it("Undo within the window restores the message and never deletes it", async () => {
         await startDelete();
-        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        fireEvent.click(screen.getByRole("button", { name: /^Undo/ }));
         await waitFor(() =>
           expect($archive).toHaveBeenLastCalledWith({
             param: { id: "p1", messageId: "m1" },

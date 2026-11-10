@@ -214,20 +214,27 @@ export const deleteMessage = async (
 
 // Admin moderation, the reversible kind: hide a message from the program page
 // without deleting it, or bring it back. Scoped to the program like delete.
-// Archiving twice keeps the first timestamp (and restoring an unarchived
-// message changes nothing), so repeating a request is harmless.
+// Repeating a request is harmless: archiving an archived message (or restoring
+// a visible one) changes nothing and keeps the first timestamp. `changed` says
+// whether this request actually did something, so a client can tell "I archived
+// it" from "someone else already had" (and not offer an Undo that would undo
+// their decision).
 export const setMessageArchived = async (
   programId: string,
   messageId: string,
   archived: boolean,
-): Promise<{ ok: true } | { error: "not_found" }> => {
+): Promise<{ ok: true; changed: boolean } | { error: "not_found" }> => {
   if (!isUuid(programId) || !isUuid(messageId)) return { error: "not_found" };
+  const inBox = and(eq(messageBoxMessages.id, messageId), eq(messageBoxMessages.programId, programId));
   const updated = await db
     .update(messageBoxMessages)
-    .set({ archivedAt: archived ? sql`coalesce(${messageBoxMessages.archivedAt}, now())` : null })
-    .where(and(eq(messageBoxMessages.id, messageId), eq(messageBoxMessages.programId, programId)))
+    .set({ archivedAt: archived ? sql`now()` : null })
+    .where(and(inBox, archived ? isNull(messageBoxMessages.archivedAt) : isNotNull(messageBoxMessages.archivedAt)))
     .returning({ id: messageBoxMessages.id });
-  return updated.length > 0 ? { ok: true } : { error: "not_found" };
+  if (updated.length > 0) return { ok: true, changed: true };
+
+  const [existing] = await db.select({ id: messageBoxMessages.id }).from(messageBoxMessages).where(inBox);
+  return existing ? { ok: true, changed: false } : { error: "not_found" };
 };
 
 export const parseArchiveUpdate = (body: unknown): { archived: boolean } | { error: string } => {

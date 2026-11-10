@@ -83,44 +83,47 @@ export function ArchivedMessages({ programId }: { programId: string }) {
   if (query.error?.message === NOT_AVAILABLE) return null;
 
   return (
-    <details className="rounded border border-border p-2">
-      <summary className="cursor-pointer text-sm font-medium">
-        Archived messages{count !== undefined ? ` (${count})` : ""}
-      </summary>
-      <div className="mt-2 flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">
-          Hidden from the program page for everyone. Restore puts a message back in the box at its original date; Delete
-          removes it permanently after 30 seconds, unless you undo.
+    <div className="flex flex-col gap-2">
+      {/* Outside the <details> so collapsing the list can't hide a countdown or an error. */}
+      <UndoNotices entries={undoQueue.entries} onUndo={(id) => void undoQueue.undo(id)} />
+      {(restoreError ?? undoQueue.error) && (
+        <p role="alert" className="text-sm text-destructive">
+          {restoreError ?? undoQueue.error}
         </p>
-        <UndoNotices entries={undoQueue.entries} onUndo={(id) => void undoQueue.undo(id)} />
-        {(restoreError ?? undoQueue.error) && (
-          <p role="alert" className="text-sm text-destructive">
-            {restoreError ?? undoQueue.error}
+      )}
+      <details className="rounded border border-border p-2">
+        <summary className="cursor-pointer text-sm font-medium">
+          Archived messages{count !== undefined ? ` (${count})` : ""}
+        </summary>
+        <div className="mt-2 flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">
+            Hidden from the program page for everyone. Restore puts a message back in the box at its original date (the
+            box shows the newest 100); Delete removes it permanently after 30 seconds, unless you undo.
           </p>
-        )}
-        {query.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : query.isError ? (
-          <p role="alert" className="text-sm text-destructive">
-            Couldn't load archived messages.
-          </p>
-        ) : visible && visible.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No archived messages.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {visible?.map((m) => (
-              <ArchivedItem
-                key={m.id}
-                programId={programId}
-                message={m}
-                onDelete={() => scheduleDelete(m)}
-                onRestoreResult={setRestoreError}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-    </details>
+          {query.isPending ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : query.isError ? (
+            <p role="alert" className="text-sm text-destructive">
+              Couldn't load archived messages.
+            </p>
+          ) : visible && visible.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No archived messages.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {visible?.map((m) => (
+                <ArchivedItem
+                  key={m.id}
+                  programId={programId}
+                  message={m}
+                  onDelete={() => scheduleDelete(m)}
+                  onRestoreResult={setRestoreError}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
+    </div>
   );
 }
 

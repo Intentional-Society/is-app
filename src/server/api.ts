@@ -264,7 +264,7 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
         c.req.valid("json").archived,
       );
       if ("error" in result) return c.json({ error: result.error }, 404);
-      return c.json({ ok: true });
+      return c.json({ ok: true, changed: result.changed });
     },
   )
   .delete("/programs/:id/message-box/messages/:messageId", async (c) => {

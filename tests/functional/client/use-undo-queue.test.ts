@@ -61,6 +61,23 @@ describe("useUndoQueue", () => {
     expect(first.onExpire).toHaveBeenCalledTimes(1);
   });
 
+  it("upgrades a pending notice with no onExpire (Archived) to a scheduled delete, but never the reverse", async () => {
+    const { result } = renderHook(() => useUndoQueue());
+    const archivedNotice = entry({ onExpire: undefined, message: "Archived." });
+    const deleteNotice = entry({ message: "Deleting." });
+    act(() => result.current.add(archivedNotice));
+    act(() => result.current.add(deleteNotice));
+    expect(result.current.entries.map((e) => e.message)).toEqual(["Deleting."]);
+    await act(() => vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS));
+    expect(deleteNotice.onExpire).toHaveBeenCalledTimes(1);
+
+    // A pending delete is not displaced by a later plain notice.
+    const again = entry({ id: "m2", message: "Deleting two." });
+    act(() => result.current.add(again));
+    act(() => result.current.add(entry({ id: "m2", onExpire: undefined, message: "Archived two." })));
+    expect(result.current.entries.map((e) => e.message)).toEqual(["Deleting two."]);
+  });
+
   it("lets the owner report an error that shows with the queue's own", async () => {
     const { result } = renderHook(() => useUndoQueue());
     act(() => result.current.reportError("archive failed"));

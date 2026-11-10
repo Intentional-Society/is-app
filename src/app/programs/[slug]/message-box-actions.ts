@@ -9,9 +9,10 @@ import { messageBoxArchivedQueryKey, messageBoxQueryKey } from "./query-keys";
 // the program page and the admin archive list so both behave (and report
 // failures) the same way.
 
-// Archive (hide, reversible) or restore a message. Throws with a readable
-// message on failure.
-export const patchArchived = async (programId: string, messageId: string, archived: boolean) => {
+// Archive (hide, reversible) or restore a message. Resolves to whether this
+// request changed anything: false means someone else had already done it. Throws
+// with a readable message on failure.
+export const patchArchived = async (programId: string, messageId: string, archived: boolean): Promise<boolean> => {
   const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$patch({
     param: { id: programId, messageId },
     json: { archived },
@@ -21,6 +22,8 @@ export const patchArchived = async (programId: string, messageId: string, archiv
       await errorFrom(res, archived ? "Couldn't archive the message." : "Couldn't restore the message.", MESSAGE_GONE),
     );
   }
+  const body = await res.json();
+  return "changed" in body ? body.changed : true;
 };
 
 // Permanent delete. The server only deletes a message that is archived.

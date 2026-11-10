@@ -49,12 +49,16 @@ export function ProgramFeaturesPanel({ programId }: { programId: string }) {
   return (
     <section className="flex flex-col gap-3 rounded border border-border p-3">
       <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground">Features</h2>
-      {query.isPending ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : query.isError ? (
-        <p role="alert" className="text-sm text-destructive">
-          Couldn't load features.
-        </p>
+      {/* Keep the last good list when a refetch fails, so the per-feature controls (and
+          any Undo still counting down in them) are not unmounted. */}
+      {!query.data ? (
+        query.isPending ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : (
+          <p role="alert" className="text-sm text-destructive">
+            Couldn't load features.
+          </p>
+        )
       ) : (
         <ul className="flex flex-col gap-4 text-sm">
           {query.data.map((feature) => {
