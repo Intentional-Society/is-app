@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
   apiClient: {
@@ -82,18 +82,64 @@ describe("ArchivedMessages (admin)", () => {
     );
   });
 
-  it("deletes permanently only after confirming, and backs out on Cancel", async () => {
-    mockList([archived("a1", "Hidden one")]);
-    $delete.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
-    renderArchived();
+  describe("Delete waits out a 30-second Undo window", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect($delete).not.toHaveBeenCalled();
+    const confirmDelete = async () => {
+      mockList([archived("a1", "Hidden one"), archived("a2", "Hidden two")]);
+      $delete.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
+      renderArchived();
+      fireEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
+      fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    };
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
-    await waitFor(() => expect($delete).toHaveBeenCalledWith({ param: { id: "p1", messageId: "a1" } }));
+    it("asks for confirmation, and Cancel backs out", async () => {
+      mockList([archived("a1", "Hidden one")]);
+      renderArchived();
+      fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByText("Hidden one")).toBeInTheDocument();
+      expect($delete).not.toHaveBeenCalled();
+    });
+
+    it("hides the row at once with an Undo notice, and deletes only after 30 seconds", async () => {
+      await confirmDelete();
+      expect(await screen.findByText("Deleting Ada Lovelace's message.")).toBeInTheDocument();
+      expect(screen.queryByText("Hidden one")).not.toBeInTheDocument();
+      expect(screen.getByText("Hidden two")).toBeInTheDocument();
+      expect(screen.getByText("Archived messages (1)")).toBeInTheDocument();
+      expect($delete).not.toHaveBeenCalled();
+
+      await act(() => vi.advanceTimersByTimeAsync(29_000));
+      expect($delete).not.toHaveBeenCalled();
+      await act(() => vi.advanceTimersByTimeAsync(2_000));
+      await waitFor(() => expect($delete).toHaveBeenCalledWith({ param: { id: "p1", messageId: "a1" } }));
+      expect($delete).toHaveBeenCalledTimes(1);
+    });
+
+    it("Undo brings the row back and never deletes it", async () => {
+      await confirmDelete();
+      fireEvent.click(await screen.findByRole("button", { name: /Undo \(\d+s\)/ }));
+      expect(await screen.findByText("Hidden one")).toBeInTheDocument();
+      await act(() => vi.advanceTimersByTimeAsync(60_000));
+      expect($delete).not.toHaveBeenCalled();
+    });
+
+    it("shows the error and brings the row back if the delete fails", async () => {
+      mockList([archived("a1", "Hidden one")]);
+      $delete.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+      renderArchived();
+      fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+      await act(() => vi.advanceTimersByTimeAsync(31_000));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete the message.");
+      expect(await screen.findByText("Hidden one")).toBeInTheDocument();
+    });
   });
 
   it("shows the error when a restore fails", async () => {

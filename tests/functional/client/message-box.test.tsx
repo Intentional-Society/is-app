@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
   apiClient: {
@@ -149,58 +149,128 @@ describe("MessageBox", () => {
     expect(textarea).toHaveValue("hello");
   });
 
-  it("lets a moderator delete a message after confirming", async () => {
-    mockBox(box({ canModerate: true }));
-    $delete.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
-    renderBox();
-    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    expect($delete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
-    await waitFor(() => expect($delete).toHaveBeenCalledWith({ param: { id: "p1", messageId: "m1" } }));
-  });
+  describe("moderation (Archive and Delete, each with Undo)", () => {
+    const moderator = () => mockBox(box({ canModerate: true }));
+    const ok = () => ({ ok: true, json: async () => ({ ok: true }) }) as never;
 
-  it("shows Archive only to moderators", async () => {
-    mockBox(box());
-    const { unmount } = renderBox();
-    await screen.findByText("Sending love from afar");
-    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
-    unmount();
+    beforeEach(() => {
+      $archive.mockResolvedValue(ok());
+      $delete.mockResolvedValue(ok());
+    });
 
-    mockBox(box({ canModerate: true }));
-    renderBox();
-    expect(await screen.findByRole("button", { name: "Archive" })).toBeVisible();
-  });
+    it("shows Archive only to moderators", async () => {
+      mockBox(box());
+      const { unmount } = renderBox();
+      await screen.findByText("Sending love from afar");
+      expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+      unmount();
 
-  it("archives a message straight away, with no confirmation, since it can be restored", async () => {
-    mockBox(box({ canModerate: true }));
-    $archive.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as never);
-    renderBox();
-    fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
-    await waitFor(() =>
-      expect($archive).toHaveBeenCalledWith({
-        param: { id: "p1", messageId: "m1" },
-        json: { archived: true },
-      }),
-    );
-    expect($delete).not.toHaveBeenCalled();
-  });
+      moderator();
+      renderBox();
+      expect(await screen.findByRole("button", { name: "Archive" })).toBeVisible();
+    });
 
-  it("shows the error and keeps the message when archiving fails", async () => {
-    mockBox(box({ canModerate: true }));
-    $archive.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
-    renderBox();
-    fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't archive the message.");
-    expect(screen.getByText("Sending love from afar")).toBeVisible();
-  });
+    it("asks for confirmation before archiving, and backs out on Cancel", async () => {
+      moderator();
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      expect(screen.getByRole("button", { name: "Confirm archive" })).toBeVisible();
+      expect($archive).not.toHaveBeenCalled();
 
-  it("backs out of a delete on Cancel", async () => {
-    mockBox(box({ canModerate: true }));
-    renderBox();
-    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
-    expect($delete).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByRole("button", { name: "Archive" })).toBeVisible();
+      expect($archive).not.toHaveBeenCalled();
+    });
+
+    it("archives after confirming, and an Undo notice restores the message", async () => {
+      moderator();
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+      await waitFor(() =>
+        expect($archive).toHaveBeenCalledWith({ param: { id: "p1", messageId: "m1" }, json: { archived: true } }),
+      );
+      expect(await screen.findByText("Archived Ada Lovelace's message.")).toBeVisible();
+      expect($delete).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: /Undo \(\d+s\)/ }));
+      await waitFor(() =>
+        expect($archive).toHaveBeenLastCalledWith({ param: { id: "p1", messageId: "m1" }, json: { archived: false } }),
+      );
+      await waitFor(() => expect(screen.queryByText("Archived Ada Lovelace's message.")).not.toBeInTheDocument());
+    });
+
+    it("shows the error and no Undo notice when archiving fails", async () => {
+      moderator();
+      $archive.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't archive the message.");
+      expect(screen.queryByRole("button", { name: /Undo/ })).not.toBeInTheDocument();
+      expect(screen.getByText("Sending love from afar")).toBeVisible();
+    });
+
+    it("backs out of a delete on Cancel", async () => {
+      moderator();
+      renderBox();
+      fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+      expect($delete).not.toHaveBeenCalled();
+      expect($archive).not.toHaveBeenCalled();
+    });
+
+    describe("Delete waits out the Undo window", () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      const startDelete = async () => {
+        moderator();
+        renderBox();
+        fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+        // Hidden first (archived), not deleted yet.
+        await waitFor(() =>
+          expect($archive).toHaveBeenCalledWith({ param: { id: "p1", messageId: "m1" }, json: { archived: true } }),
+        );
+        expect(await screen.findByText("Deleting Ada Lovelace's message.")).toBeVisible();
+        expect($delete).not.toHaveBeenCalled();
+      };
+
+      it("deletes for good after 30 seconds", async () => {
+        await startDelete();
+        await act(() => vi.advanceTimersByTimeAsync(29_000));
+        expect($delete).not.toHaveBeenCalled();
+        await act(() => vi.advanceTimersByTimeAsync(2_000));
+        await waitFor(() => expect($delete).toHaveBeenCalledWith({ param: { id: "p1", messageId: "m1" } }));
+        expect($delete).toHaveBeenCalledTimes(1);
+      });
+
+      it("Undo within the window restores the message and never deletes it", async () => {
+        await startDelete();
+        fireEvent.click(screen.getByRole("button", { name: /Undo \(\d+s\)/ }));
+        await waitFor(() =>
+          expect($archive).toHaveBeenLastCalledWith({
+            param: { id: "p1", messageId: "m1" },
+            json: { archived: false },
+          }),
+        );
+        await act(() => vi.advanceTimersByTimeAsync(60_000));
+        expect($delete).not.toHaveBeenCalled();
+      });
+
+      it("leaving the page inside the window leaves the message archived, not deleted", async () => {
+        await startDelete();
+        cleanup();
+        await act(() => vi.advanceTimersByTimeAsync(60_000));
+        expect($delete).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("editing your own message", () => {

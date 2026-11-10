@@ -1,14 +1,16 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { messageBoxArchivedQueryKey, messageBoxQueryKey } from "@/app/programs/[slug]/query-keys";
 import { Avatar } from "@/components/avatar";
 import { LocalTime } from "@/components/local-time";
 import { Button } from "@/components/ui/button";
+import { UndoNotices } from "@/components/undo-notices";
 import { apiClient } from "@/lib/api";
 import type { ArchivedMessageBoxMessage } from "@/lib/api-types";
+import { useUndoQueue } from "@/lib/use-undo-queue";
 
 const fetchArchived = async (programId: string): Promise<ArchivedMessageBoxMessage[]> => {
   const res = await apiClient.api.admin.programs[":id"]["message-box"].archived.$get({ param: { id: programId } });
@@ -16,16 +18,63 @@ const fetchArchived = async (programId: string): Promise<ArchivedMessageBoxMessa
   return (await res.json()).messages;
 };
 
+const refreshArchive = (queryClient: QueryClient, programId: string, alsoProgramPage: boolean) =>
+  Promise.all([
+    queryClient.invalidateQueries({ queryKey: messageBoxArchivedQueryKey(programId) }),
+    alsoProgramPage ? queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }) : undefined,
+  ]);
+
 // Messages an admin archived from the program page. They are hidden from
 // members but kept in the database; from here an admin can restore one to the
-// page or delete it for good.
+// page or delete it for good. Delete waits out a 30-second Undo window before it
+// actually deletes (leaving the page in that window leaves the message
+// archived, never half-deleted).
 export function ArchivedMessages({ programId }: { programId: string }) {
+  const queryClient = useQueryClient();
+  const [undoError, setUndoError] = useState<string | null>(null);
+  const undoQueue = useUndoQueue({
+    onError: (error) => setUndoError(error instanceof Error ? error.message : "Something went wrong."),
+  });
   const query = useQuery({
     queryKey: messageBoxArchivedQueryKey(programId),
     queryFn: () => fetchArchived(programId),
   });
 
-  const count = query.data?.length;
+  // Rows that were deleted from the screen but not yet on the server: waiting
+  // out the Undo window, then until the real delete and the refetch finish, so a
+  // row never flickers back in between.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const setIsHidden = (id: string, value: boolean) =>
+    setHidden((current) => {
+      const next = new Set(current);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const visible = query.data?.filter((m) => !hidden.has(m.id));
+  const count = visible?.length;
+
+  const scheduleDelete = (message: ArchivedMessageBoxMessage) => {
+    setUndoError(null);
+    setIsHidden(message.id, true);
+    undoQueue.add({
+      id: message.id,
+      message: `Deleting ${message.author.displayName ?? "a member"}'s message.`,
+      // Nothing was changed on the server yet, so undoing just brings the row back.
+      onUndo: () => setIsHidden(message.id, false),
+      onExpire: async () => {
+        try {
+          const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete({
+            param: { id: programId, messageId: message.id },
+          });
+          if (!res.ok) throw new Error("Couldn't delete the message.");
+          await refreshArchive(queryClient, programId, false);
+        } finally {
+          setIsHidden(message.id, false);
+        }
+      },
+    });
+  };
 
   return (
     <details className="rounded border border-border p-2">
@@ -34,20 +83,27 @@ export function ArchivedMessages({ programId }: { programId: string }) {
       </summary>
       <div className="mt-2 flex flex-col gap-2">
         <p className="text-xs text-muted-foreground">
-          Hidden from the program page for everyone. Restore puts a message back; Delete removes it permanently.
+          Hidden from the program page for everyone. Restore puts a message back; Delete removes it permanently after 30
+          seconds, unless you undo.
         </p>
+        <UndoNotices entries={undoQueue.entries} onUndo={(id) => void undoQueue.undo(id)} />
+        {undoError && (
+          <p role="alert" className="text-sm text-destructive">
+            {undoError}
+          </p>
+        )}
         {query.isPending ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : query.isError ? (
           <p role="alert" className="text-sm text-destructive">
             Couldn't load archived messages.
           </p>
-        ) : query.data.length === 0 ? (
+        ) : visible && visible.length === 0 ? (
           <p className="text-sm text-muted-foreground">No archived messages.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {query.data.map((m) => (
-              <ArchivedItem key={m.id} programId={programId} message={m} />
+            {visible?.map((m) => (
+              <ArchivedItem key={m.id} programId={programId} message={m} onDelete={() => scheduleDelete(m)} />
             ))}
           </ul>
         )}
@@ -56,41 +112,30 @@ export function ArchivedMessages({ programId }: { programId: string }) {
   );
 }
 
-function ArchivedItem({ programId, message }: { programId: string; message: ArchivedMessageBoxMessage }) {
+function ArchivedItem({
+  programId,
+  message,
+  onDelete,
+}: {
+  programId: string;
+  message: ArchivedMessageBoxMessage;
+  onDelete: () => void;
+}) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
-  // Restoring changes what the program page shows; deleting only changes this list.
-  const refresh = (alsoProgramPage: boolean) =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: messageBoxArchivedQueryKey(programId) }),
-      alsoProgramPage ? queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }) : undefined,
-    ]);
-
-  const route = apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"];
-  const param = { id: programId, messageId: message.id };
-
   const restoreMutation = useMutation({
     mutationFn: async () => {
-      const res = await route.$patch({ param, json: { archived: false } });
+      const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$patch({
+        param: { id: programId, messageId: message.id },
+        json: { archived: false },
+      });
       if (!res.ok) throw new Error("Couldn't restore the message.");
       return res.json();
     },
-    onSuccess: () => refresh(true),
+    // Restoring changes what the program page shows too.
+    onSuccess: () => refreshArchive(queryClient, programId, true),
   });
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await route.$delete({ param });
-      if (!res.ok) throw new Error("Couldn't delete the message.");
-      return res.json();
-    },
-    onSuccess: () => refresh(false),
-    onSettled: () => setConfirming(false),
-  });
-
-  const busy = restoreMutation.isPending || deleteMutation.isPending;
-  const error = restoreMutation.error ?? deleteMutation.error;
 
   return (
     <li className="flex flex-col gap-1 rounded bg-background p-2 text-sm">
@@ -107,16 +152,10 @@ function ArchivedItem({ programId, message }: { programId: string; message: Arch
         <span className="ml-auto flex items-center gap-2">
           {confirming ? (
             <>
-              <Button
-                type="button"
-                variant="destructive"
-                size="xs"
-                disabled={busy}
-                onClick={() => deleteMutation.mutate()}
-              >
-                {deleteMutation.isPending ? "Deleting…" : "Confirm delete"}
+              <Button type="button" variant="destructive" size="xs" onClick={onDelete}>
+                Confirm delete
               </Button>
-              <Button type="button" variant="ghost" size="xs" disabled={busy} onClick={() => setConfirming(false)}>
+              <Button type="button" variant="ghost" size="xs" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
             </>
@@ -126,12 +165,18 @@ function ArchivedItem({ programId, message }: { programId: string; message: Arch
                 type="button"
                 variant="primary"
                 size="xs"
-                disabled={busy}
+                disabled={restoreMutation.isPending}
                 onClick={() => restoreMutation.mutate()}
               >
                 {restoreMutation.isPending ? "Restoring…" : "Restore"}
               </Button>
-              <Button type="button" variant="destructive" size="xs" disabled={busy} onClick={() => setConfirming(true)}>
+              <Button
+                type="button"
+                variant="destructive"
+                size="xs"
+                disabled={restoreMutation.isPending}
+                onClick={() => setConfirming(true)}
+              >
                 Delete
               </Button>
             </>
@@ -139,9 +184,9 @@ function ArchivedItem({ programId, message }: { programId: string; message: Arch
         </span>
       </div>
       <p className="whitespace-pre-wrap break-words">{message.body}</p>
-      {error && (
+      {restoreMutation.isError && (
         <p role="alert" className="text-sm text-destructive">
-          {error.message}
+          {restoreMutation.error.message}
         </p>
       )}
     </li>
