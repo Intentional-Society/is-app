@@ -3,11 +3,11 @@
 // the e2e CI job imports, cut from the repo's own lockfile.
 //
 // e2e.yml runs Playwright against a deployed preview, so it needs the test
-// runner and the two packages the specs import, not the app's ~900
-// dependencies. `npm ci` on this cut-down pair installs about ten packages
-// in a few seconds. Every entry is copied from package-lock.json unchanged,
-// so the versions and the integrity hashes npm verifies are the ones the
-// repo pins; nothing is resolved afresh.
+// runner and the one other package its config imports, not the app's ~900
+// dependencies. `npm ci` on this cut-down pair installs four packages in a
+// few seconds. Every entry is copied from package-lock.json unchanged, so
+// the versions and the integrity hashes npm verifies are the ones the repo
+// pins; nothing is resolved afresh.
 //
 // Usage: node scripts/e2e-ci-deps.mjs <output-dir>
 //
@@ -21,7 +21,7 @@ import { pathToFileURL } from "node:url";
 const repoRoot = resolve(import.meta.dirname, "..");
 
 // The packages tests/e2e/** and playwright.config.ts import by name.
-export const E2E_CI_DEPS = ["@playwright/test", "dotenv", "sharp"];
+export const E2E_CI_DEPS = ["@playwright/test", "dotenv"];
 
 // Finds the lockfile entry a package at `fromPath` gets when it requires
 // `name`, the way Node resolves it: its own node_modules first, then each

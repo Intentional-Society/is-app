@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import path from "node:path";
 
 import { expect, test } from "./helpers/fixtures";
 
@@ -12,12 +12,10 @@ import { expect, test } from "./helpers/fixtures";
 // upstream image (e.g. #469). See tests/e2e/helpers/fixtures.ts.
 test.use({ user: "member", mockImages: false });
 
-// A genuine PNG so the browser's createImageBitmap and the server's
-// sharp decode both succeed.
-const samplePng = (): Promise<Buffer> =>
-  sharp({ create: { width: 240, height: 240, channels: 3, background: { r: 210, g: 120, b: 70 } } })
-    .png()
-    .toBuffer();
+// A genuine PNG (240×240, one flat colour) so the browser's
+// createImageBitmap and the server's sharp decode both succeed. A file
+// in the repo, so the spec needs no image library to make one.
+const SAMPLE_PNG = path.join(__dirname, "fixtures", "avatar.png");
 
 test("a member can upload, crop, and see their profile picture", async ({ page }) => {
   await page.goto("/me");
@@ -25,11 +23,7 @@ test("a member can upload, crop, and see their profile picture", async ({ page }
 
   // The file input is hidden and click-triggered; setInputFiles drives
   // it directly.
-  await page.locator('input[type="file"]').setInputFiles({
-    name: "avatar.png",
-    mimeType: "image/png",
-    buffer: await samplePng(),
-  });
+  await page.locator('input[type="file"]').setInputFiles(SAMPLE_PNG);
 
   // The crop modal opens; confirm with the default framing.
   await expect(page.getByText("Position your photo")).toBeVisible();
