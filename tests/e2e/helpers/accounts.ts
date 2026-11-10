@@ -1,22 +1,30 @@
 import path from "node:path";
 
+// The server's list of the same accounts, as types only. test-reset.ts
+// is server code that opens the database, and the e2e CI job installs
+// none of its packages; a type import is erased before the suite runs.
+// Typing ACCOUNTS from it makes `tsc` fail when the two lists differ.
+import type { E2E_ACCOUNTS, E2EAccountKey } from "../../../src/server/test-reset";
+
 // The seeded e2e accounts (E2E_ACCOUNTS in src/server/test-reset.ts). A
 // local run always has them: `npm run test:e2e` runs `npm run dev:db`,
 // whose last step is `scripts/seed-e2e-users.mjs` — idempotent, and it
 // keeps each password in sync with `.env.local`. CI runs Playwright
 // against the Vercel preview, which shares prod Supabase; the same
 // accounts are seeded there by hand (docs/doc-supabase.md), never by CI.
-export type AccountKey = "regular" | "admin";
+export type AccountKey = E2EAccountKey;
 
-export type Account = {
-  key: AccountKey;
-  email: string;
+type AccountOf<K extends AccountKey> = {
+  key: K;
+  email: (typeof E2E_ACCOUNTS)[K];
   // Env var holding the account's password: .env.local for local runs,
   // a GitHub Actions secret in CI.
   passwordEnvVar: string;
 };
 
-export const ACCOUNTS: Record<AccountKey, Account> = {
+export type Account = { [K in AccountKey]: AccountOf<K> }[AccountKey];
+
+export const ACCOUNTS: { [K in AccountKey]: AccountOf<K> } = {
   regular: { key: "regular", email: "e2e-regular@testfake.local", passwordEnvVar: "E2E_REGULAR_PASSWORD" },
   admin: { key: "admin", email: "e2e-admin@testfake.local", passwordEnvVar: "E2E_ADMIN_PASSWORD" },
 };
