@@ -1,5 +1,5 @@
 import { expect, test } from "./helpers/fixtures";
-import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { TIMEOUT_MS } from "./helpers/session";
 
 // Smoke coverage of /myweb's wiring: page loads, the WebBuilder
 // suggestion feed renders, the Done button toggles into View mode and
@@ -7,25 +7,22 @@ import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpe
 // PR 4's e2e once the welcome tour seeds enough relational data to
 // drive a populated suggestion feed.
 
-test.describe.configure({ mode: "serial" });
+test.use({ user: "member" });
 
 test.describe("/myweb — tour pre-dismissed", () => {
-  test.beforeEach(async ({ page, baseURL }) => {
-    if (!baseURL) throw new Error("myweb.spec.ts: baseURL is not configured");
-    await resetSeededUsers(baseURL);
+  test.beforeEach(async ({ page }) => {
     // The welcome tour fires whenever lastUpdatedWeb is null; tests in
     // this block exercise the page wiring, not the tour, so pre-dismiss
-    // via the same sessionStorage key MyWeb checks on mount.
+    // via the same sessionStorage key MyWeb checks on mount. Registered
+    // before the first page load: the link click below is a client-side
+    // navigation, which runs no init script.
     await page.addInitScript(() => {
       window.sessionStorage.setItem("isweb-welcome-tour-dismissed", "1");
     });
   });
 
   test("/myweb loads, Done flips into View, Edit flips back", async ({ page }) => {
-    await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the reset tripwire.
-    await completeWelcome(page, { bio: "e2e bio · myweb.spec · tour-pre-dismissed" });
-
+    await page.goto("/");
     await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
     await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
@@ -46,17 +43,12 @@ test.describe("/myweb — tour pre-dismissed", () => {
   });
 });
 
+// No addInitScript in this block: it wants the tour to fire on mount.
+// The onboarded reset leaves lastUpdatedWeb null, as the welcome flow
+// does, so the member counts as a first-time visitor.
 test.describe("/myweb — first-time welcome tour", () => {
-  test.beforeEach(async ({ baseURL }) => {
-    if (!baseURL) throw new Error("myweb.spec.ts: baseURL is not configured");
-    await resetSeededUsers(baseURL);
-    // No addInitScript: this block wants the tour to fire on mount.
-  });
-
   test("tour appears for a first-time visitor and can be skipped", async ({ page }) => {
-    await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the reset tripwire.
-    await completeWelcome(page, { bio: "e2e bio · myweb.spec · first-time-tour" });
+    await page.goto("/");
     await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 
@@ -66,9 +58,7 @@ test.describe("/myweb — first-time welcome tour", () => {
   });
 
   test("first Done shows the farewell capstone over the home icon, then stays on /myweb", async ({ page }) => {
-    await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the reset tripwire.
-    await completeWelcome(page, { bio: "e2e bio · myweb.spec · farewell" });
+    await page.goto("/");
     await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 

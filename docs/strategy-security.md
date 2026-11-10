@@ -195,7 +195,7 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 
 ## `CI_RESET_TOKEN`
 
-**Impact if leaked:** An attacker can POST to `/api/_test/reset` on and wipe profile fields + invites for the two e2e test accounts.
+**Impact if leaked:** An attacker can POST to `/api/_test/reset` and wipe profile fields + invites for the two e2e test accounts, or put them in the onboarded state.
 
 **To rotate:**
 1. Generate a new random string (e.g. `openssl rand -hex 32`)
@@ -211,6 +211,8 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 1. Change the password in the Supabase dashboard → Authentication → Users (production project)
 2. Update the corresponding secret in GitHub Actions (Settings → Secrets → Actions)
 3. Update `.env.local.example` if the local default changed (though local values are arbitrary)
+
+**Keeping them out of the e2e report:** `e2e.yml` uploads the Playwright HTML report as an artifact, and artifacts of a public repo can be downloaded by any signed-in GitHub user. Playwright titles a fill step `Fill "<value>"` and a trace records every call's arguments and request bodies, so a password typed with `locator.fill` or under tracing ends up in that artifact. The suite therefore types passwords only through `signInThroughForm` (`tests/e2e/helpers/session.ts`), which sets the field from inside the page, and only in the setup project, which runs with `trace: "off"`. Session tokens can still reach a trace of a signed-in spec; the teardown project signs every account out at the end of the run, which ends those sessions before the report is uploaded.
 
 ## `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 

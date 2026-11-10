@@ -1,15 +1,15 @@
 import { expect, test } from "./helpers/fixtures";
-import { expectAuthed, signInAs } from "./helpers/session";
 
-// Sanity test for the session helper itself. Signed-in specs build on
-// this helper — if sign-in doesn't work, the rest of the signed-in
-// e2e surface is meaningless.
+// Sanity test for the saved session itself. Signed-in specs build on
+// it — if the browser state the setup project saved doesn't carry a
+// session, the rest of the signed-in e2e surface is meaningless.
 
-test("session helper lands an authed user off /signin", async ({ page }) => {
-  await signInAs(page, "regular");
-  await expectAuthed(page);
-  // By the time this file runs, welcome.spec.ts has filled bio, so the
-  // regular user lands on /. If it ever runs before welcome completes,
-  // /welcome is the next-best landing spot — either is past /signin.
-  await expect(page).toHaveURL(/\/welcome|\/$/);
+test.use({ user: "member" });
+
+test("the saved session lands a member on the signed-in home page", async ({ page }) => {
+  await page.goto("/");
+  // `/` serves both homes at the same URL; the greeting and the menu
+  // render only for a signed-in member.
+  await expect(page.getByText("What would you like to do?")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
 });

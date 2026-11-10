@@ -35,10 +35,14 @@ The Playwright e2e suite signs in as two long-lived users instead of admin-provi
 
 **Accounts (seed these once via the Supabase dashboard → Authentication → Users → Add user):**
 
-- `e2e-regular@testfake.local` — standard member. Used by welcome/invites/signout/session-helper specs.
-- `e2e-admin@testfake.local` — admin member. Used by `tests/e2e/admin.spec.ts`. **This account must have `profiles.is_admin = true`** — without it `/admin` calls `notFound()` and the admin specs fail. The `profiles` row is created on first sign-in (via the `/api/me` self-heal); set the flag for it in the SQL editor.
+- `e2e-regular@testfake.local` — standard member.
+- `e2e-admin@testfake.local` — admin member. **This account must have `profiles.is_admin = true`** — without it `/admin` calls `notFound()` and `tests/e2e/admin.spec.ts` fails. The `profiles` row is created on first sign-in (via the `/api/me` self-heal); set the flag for it in the SQL editor.
 
 Both users should be created with "Auto Confirm User" checked so they can sign in with a password immediately.
+
+The suite runs one Playwright worker per account, and each worker drives the member-facing specs (welcome, invites, profile, avatar, my web) as its own account, so both accounts take test writes. `e2e-admin` is an ordinary member as far as those features go; the admin-page specs also use its session, read-only. The list lives in `tests/e2e/helpers/accounts.ts`; an account added there, to `E2E_ACCOUNTS` in `src/server/test-reset.ts` and to `scripts/seed-e2e-users.mjs`, and seeded here, adds a worker.
+
+Both accounts are `hidden` (`profiles.hidden = true`), so their test data never shows in the member directory, the web, or a typeahead. The reset endpoint sets the flag on every reset.
 
 Both users also carry `app_metadata.e2e_account = true`, which `isE2EAccount` (`src/server/auth-middleware.ts`) reads to limit them to the reads in `E2E_ADMIN_READS`. Only the service role can write `app_metadata`, so set it in the SQL editor:
 
@@ -57,10 +61,12 @@ RETURNING email, raw_app_meta_data;
 
 **Blast radius if leaked:**
 
-- Passwords: attacker can sign in as one of two fake accounts. Regular sees its own profile + up to 10 self-created invites. Admin additionally sees the reads in `E2E_ADMIN_READS`: app settings, relation hints, hidden members, and the program list. Rotate by changing the password in the Supabase dashboard.
-- Reset token: attacker can wipe the profile fields + delete invites for those two accounts, on any environment (preview and prod share the same Supabase). Rotate by generating a new string and updating both the GH secret and Vercel env var.
+- Passwords: attacker can sign in as one of two fake accounts and see what any member sees. Admin additionally sees the reads in `E2E_ADMIN_READS`: app settings, relation hints, hidden members, and the program list. Rotate by changing the password in the Supabase dashboard (`docs/strategy-security.md` → Secret rotation).
+- Reset token: attacker can wipe the profile fields + delete invites for those two accounts, or put them in the onboarded state, on any environment (preview and prod share the same Supabase). Rotate by generating a new string and updating both the GH secret and Vercel env var.
 
-**Reset endpoint:** `POST /api/_test/reset`, token-gated. Defined in `src/server/test-reset.ts`; the Playwright setup project (`tests/e2e/reset.setup.ts`) calls it once at the top of every run. The token is the sole gate — preview and prod share one Supabase, so an environment gate would be theatre against a token that already mutates prod data either way. The destructive scope is fixed at the seeded e2e users, not arbitrary rows.
+**Reset endpoint:** `POST /api/_test/reset`, token-gated. Defined in `src/server/test-reset.ts`. An optional JSON body picks one account and the state to leave it in: `{ "account": "regular" | "admin", "state": "fresh" | "onboarded" }`. `fresh` clears the profile and the welcome markers, so `/` enters the welcome flow; `onboarded` stamps the markers and saves a minimal profile, so `/` renders the signed-in home page. With no body it resets every account to fresh. The Playwright setup project (`tests/e2e/suite.setup.ts`) resets all accounts at the top of every run, and each signed-in spec resets its worker's account before it starts. The token is the sole gate — preview and prod share one Supabase, so an environment gate would be theatre against a token that already mutates prod data either way. The destructive scope is fixed at the seeded e2e users, not arbitrary rows: the body names an account by key, never by email or id.
+
+**Sessions:** the setup project signs each account in once through the real `/signin` form and saves the browser state under `playwright/.auth/` (gitignored); specs start from that state. The teardown project (`tests/e2e/suite.teardown.ts`) signs each account out through the menu at the end of the run, which ends every session of the account on the Supabase side.
 
 ---
 
