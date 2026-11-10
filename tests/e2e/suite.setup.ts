@@ -9,21 +9,9 @@ import { resetAccounts, signInThroughForm } from "./helpers/session";
 // start from (helpers/fixtures.ts). suite.teardown.ts signs the
 // accounts out again at the end.
 
-// The second test builds on the first.
-setup.describe.configure({ mode: "serial" });
-
 // The sign-in below types the seeded passwords, and a trace records
 // every call's arguments and every request body.
 setup.use({ trace: "off" });
-
-// Wipes profile fields and deletes invites for every seeded account, so
-// the run starts from fresh accounts whatever the last run left behind.
-setup("reset the seeded accounts", async ({ baseURL }) => {
-  if (!baseURL) {
-    throw new Error("suite.setup.ts: baseURL is not configured");
-  }
-  await resetAccounts(baseURL);
-});
 
 // Public routes whose first hit pays compile (local `next dev`) or
 // function spin-up (CI Vercel) cost.
@@ -151,25 +139,31 @@ const signIn = async (browser: Browser, key: AccountKey, deadlineMs: number): Pr
   );
 };
 
-// Warm the page-serving path before any timed test runs, and sign in.
-// Paying cold-start cost here, in untimed setup, means no spec pays it
-// inside a waitForURL budget — so TIMEOUT_MS can sit tight at 12s. The reset
-// above only warms one API function; this warms the React/SSR page pipeline +
-// public routes, signs each account in the way a member does, then warms the
-// signed-in routes the specs visit. Every step is read-only — the routes are
-// GET-only (no welcome marker stamped), so the accounts stay fresh.
+// Reset the seeded accounts, warm the page-serving path before any timed
+// test runs, and sign in. Paying cold-start cost here, in untimed setup,
+// means no spec pays it inside a waitForURL budget — so TIMEOUT_MS can sit
+// tight at 12s. The reset only warms one API function; the rest warms the
+// React/SSR page pipeline + public routes, signs each account in the way a
+// member does, then warms the signed-in routes the specs visit. Past the
+// reset every step is read-only — the routes are GET-only (no welcome marker
+// stamped), so the accounts stay fresh.
 //
 // A warm-up that can't complete after its retries fails this setup project
 // loudly: a cold/brownout run becomes a clear "warm-up: X did not respond"
 // error rather than a confusing downstream first-test flake (#368, #437). CI's
 // project-level `retries: 2` still re-runs the whole warm-up, so only a
 // persistent brownout fails the suite — a transient one recovers on retry.
-setup("warm up the page-serving path and sign in", async ({ browser }) => {
+setup("reset the accounts, warm up the page-serving path and sign in", async ({ browser, baseURL }) => {
   setup.setTimeout(WARMUP_TEST_TIMEOUT_MS);
+  if (!baseURL) {
+    throw new Error("suite.setup.ts: baseURL is not configured");
+  }
 
-  // Phase 1 — public routes.
+  // Phase 1 — the reset and the public routes, side by side. The reset
+  // wipes profile fields and deletes invites for every seeded account, so
+  // the run starts from fresh accounts whatever the last run left behind.
   const anonymous = await browser.newContext();
-  await warmRoutes(anonymous, WARMUP_PUBLIC_ROUTES, WARMUP_ROUTES_BUDGET_MS);
+  await Promise.all([resetAccounts(baseURL), warmRoutes(anonymous, WARMUP_PUBLIC_ROUTES, WARMUP_ROUTES_BUDGET_MS)]);
   await anonymous.close();
 
   // Phase 2 — one real sign-in per account, saved for the specs.
@@ -181,7 +175,7 @@ setup("warm up the page-serving path and sign in", async ({ browser }) => {
 
   // Phase 3 — signed-in routes. Each GET compiles the route's module — the
   // same module the in-app RSC navigation reuses. (The API routes ride the
-  // Hono catch-all, already warmed by the reset above; and a GET stamps
+  // Hono catch-all, already warmed by the reset in phase 1; and a GET stamps
   // nothing, so the accounts stay fresh.)
   const member = sessions.get(workerAccounts()[0]) as BrowserContext;
   const admin = sessions.get("admin") as BrowserContext;
