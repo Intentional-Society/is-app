@@ -28,6 +28,7 @@ clients
 
 The original issue's "Consider PKCE" hypothesis is inverted: PKCE is the
 cause. The Supabase-documented fix for this scenario is the **token-hash
+
 - `verifyOtp`** flow (server-only, browser-agnostic). `flowType` stays
   on PKCE — that still governs session cookies and refresh rotation, which
   we want. We swap out only the _email-verification_ step.

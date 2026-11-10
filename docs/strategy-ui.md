@@ -7,6 +7,7 @@ The app's color palette lives in `src/app/globals.css` as CSS custom properties,
 Values use the [`oklch()`](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value/oklch) color function — perceptually uniform (equal numeric L steps look like equal brightness steps to the human eye), unlike `hsl()` where 50%-lightness yellow looks much brighter than 50%-lightness blue. That perceptual uniformity is what lets the grayscale steps in our palette sit on a clean lightness scale.
 
 The palette draws from `www.intentionalsociety.org`:
+
 - **Background**: a faint mint off-white, halfway between near-white and the site's `#E7EFEB` bg.
 - **Primary**: a muted version of the IS brand teal (`#24818e` family).
 - **Destructive**: terracotta rather than pure red, to sit in the same earthy palette.
@@ -24,6 +25,7 @@ A small naming-inversion note: `--primary` (the CSS token, dusty teal brand colo
 `src/app/colors/page.tsx` is a dev-only palette visualization. It calls `notFound()` when `process.env.NODE_ENV === "production"`, so it's not exposed in preview or production builds. Locally it lists every token role as a labeled swatch, side-by-side for light and dark.
 
 Use it when:
+
 - Tweaking palette values to see contrast and hierarchy at a glance.
 - Verifying that a new role behaves as intended in both light and dark.
 - Onboarding — it's the fastest way to see what the design system actually looks like.

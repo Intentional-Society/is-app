@@ -9,6 +9,7 @@ System prerequisites for working on is-app. These are one-time installs.
 We recommend using `nvm` to manage Node.js versions. The repo pins Node 24 (the current LTS) via `.nvmrc` and `engines.node` in `package.json`.
 
 **Mac:**
+
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 nvm install 24
@@ -18,6 +19,7 @@ The repo includes an `.nvmrc` file, so running `nvm use` inside the project dire
 **Windows:**
 
 Install [nvm-windows](https://github.com/coreybutler/nvm-windows/releases) (download and run the latest `nvm-setup.exe`), then:
+
 ```bash
 nvm install 24
 nvm use 24
@@ -75,16 +77,19 @@ Get-Process -Id (Get-NetTCPConnection -LocalPort 54321 -State Listen).OwningProc
 Optional — Not required to build or run the app. **Required for GitHub PR / issue workflows from the terminal**, which includes anything driven by Claude Code (Claude can't operate a web browser). The GitHub web UI is the alternative for humans.
 
 **Windows (PowerShell, Command Prompt, or Git Bash):**
+
 ```powershell
 winget install --id GitHub.cli
 ```
 
 **Mac:**
+
 ```bash
 brew install gh
 ```
 
 After installing, open a **new terminal** so PATH picks up the new binary, then authenticate:
+
 ```bash
 gh auth login
 ```
@@ -95,6 +100,7 @@ Verify with `gh --version` and `gh auth status`.
 > **Auth scope:** Credentials live in your OS keyring (Windows Credential Manager / macOS Keychain) plus a user-home config file, so one login covers every shell running as the same user — including the VS Code / Claude Code terminal. A different OS user or a WSL shell needs its own login.
 
 **If a new shell still can't find `gh`** (Rare — Usually a stale PATH cache), call it by full path:
+
 - Windows PowerShell: `& "C:\Program Files\GitHub CLI\gh.exe" auth login`
 - Windows Git Bash: `"/c/Program Files/GitHub CLI/gh.exe" auth login`
 - Mac (brew at /opt/homebrew): `/opt/homebrew/bin/gh auth login`

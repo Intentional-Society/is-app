@@ -45,12 +45,14 @@ referred_by, avatar_url, emergency_contact, live_desire, programs
 - `referred_by` — free text from the Google Form → `referredByLegacy`. `referredBy` (uuid FK) stays null for migrated members.
 
 Flow per row:
+
 1. Check if email already exists in `auth.users` (via `supabase.auth.admin.listUsers`). If yes, skip.
 2. `supabase.auth.admin.inviteUserByEmail(email)` with `SUPABASE_SERVICE_ROLE_KEY`. This creates the `auth.users` row and sends an invitation email containing a magic link.
 3. Insert `profiles` row with all fields from the CSV.
 4. Insert `profilePrograms` rows for each matching program.
 
 Flags:
+
 - `--dry-run` — prints intent, no writes, no email sends.
 - `--limit N` — only process the first N rows (staged rollout).
 - `--skip-email` — creates `auth.users` + `profiles` rows without sending invitation emails (staging).
@@ -71,6 +73,7 @@ Documented in `docs/doc-seed-members.md`. Not automated — runs once per enviro
 ## Environment
 
 New env var: **`SUPABASE_SERVICE_ROLE_KEY`**. Never exposed client-side. Only used by `scripts/*` and any admin-only server code. Added to:
+
 - `.env.local.example`
 - `npm run setup` (local Supabase prints the key in `supabase status`)
 - `docs/doc-vercel.md` — note that production **does not** need this key; it is only used for one-time migrations from a developer machine

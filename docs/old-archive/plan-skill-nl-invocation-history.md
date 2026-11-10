@@ -37,6 +37,7 @@
 ## Pick‑up guide (resume cold)
 
 **What PR3 is.** Two NL‑path gaps surfaced in use (the second on the **#459** commit):
+
 - **(a) routing** — when the _assistant_ offers to commit/PR and the human replies a bare
   "yes"/"go ahead", the model could read it as approval of its _own_ ad‑hoc plan and run `git`/`gh`
   directly instead of routing through the Skill (the trigger phrase came from the assistant, so the
@@ -97,6 +98,7 @@ Shipped on the branch (`ba9dc59`): `commit-4`/`pr-8` (announcement), `commit-6`/
 (affirmation‑after‑offer routing), `commit-5(c)` (announcement survives opt‑out).
 
 Finding‑1/2 follow‑up (distinct evals localize a regression to its exact vector; F4 is ship‑domain):
+
 | Eval                          | Asserts                                                                              |
 | ----------------------------- | ------------------------------------------------------------------------------------ |
 | `commit-7` ← **F2** (rewrite) | "yes" to "explain `/commit`'s Step 0" must NOT fire `/commit`                        |

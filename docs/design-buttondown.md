@@ -334,12 +334,14 @@ The production cron's key is a different key on a different newsletter — it st
 ### What this catches and what it doesn't
 
 Catches:
+
 - Field type changes in subscriber responses.
 - New required fields on POST.
 - Status-code changes on known cases.
 - Multi-step state-transition divergences (create-then-read returns the same shape as real Buttondown's create-then-read).
 
 Doesn't catch:
+
 - Rate-limit shape changes (we don't exercise them).
 - Behavior that only manifests at production scale.
 - Buttondown features we don't yet call.

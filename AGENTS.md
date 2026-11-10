@@ -34,7 +34,6 @@ Architecture specs in `docs/architecture-appstack.md` and `docs/architecture-dev
 - **TanStack Query** for client-side data caching
 - **Tailwind CSS v4** for styling
 
-
 ## Local Development
 
 Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postgres on port 54322, Auth, Studio on 54323) via Docker, then launches Next.js. Supabase containers persist after Ctrl+C — use `npm run dev:db:stop` to shut them down.

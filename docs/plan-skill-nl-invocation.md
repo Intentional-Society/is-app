@@ -165,6 +165,7 @@ escalation if drift is observed under monitoring.
 ## PR1/PR2 acceptance checklist (passed at #353)
 
 One prompt per fresh session; human reviewer re‑ran one before approving.
+
 1. NL "let's commit this" → `/commit` via Skill tool; Step‑0 first; Stop = clean.
 2. NL "open a PR" → `/pr`, Step‑0 first; Stop = clean.
 3. Guidance preserved ("…two commits: schema then UI") → Step‑0 echoes it.
@@ -184,6 +185,7 @@ notes stayed local, outside the repo; the outcome is recorded in the Decision lo
 Pre‑existing `/commit` guardrail coverage (not PR3 evals, not NL‑routing) deferred from #353 to #396's
 structural‑gate test, recorded so nothing is lost. **Refer to them by fixture** — PR3 reuses the
 `commit-6/7/8` IDs for different (affirmation / over‑trigger) evals:
+
 - **contract‑phase** — DROP‑only migration → classified **contract**, no `prod:db:expand`, no
   phase‑split demand. Fixture **#319**.
 - **suspicious‑file false‑positive** — legit `.claude/skills/**` additions not refused. Fixture **#395**.

@@ -198,6 +198,7 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 **Impact if leaked:** An attacker can POST to `/api/_test/reset` and wipe profile fields + invites for the two e2e test accounts, or put them in the onboarded state.
 
 **To rotate:**
+
 1. Generate a new random string (e.g. `openssl rand -hex 32`)
 2. Update the `CI_RESET_TOKEN` secret in GitHub Actions (Settings → Secrets → Actions)
 3. Update the `CI_RESET_TOKEN` env var in Vercel for Preview and Development environments
@@ -208,6 +209,7 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 **Impact if leaked:** An attacker can sign in as one of two fake e2e accounts (`e2e-regular@testfake.local` / `e2e-admin@testfake.local`). Either one sees what any member sees. `e2e-admin` is a prod admin whose admin access is capped to the reads in `E2E_ADMIN_READS` (`src/server/auth-middleware.ts`): app settings, pending relation hints, hidden members, and the program list.
 
 **To rotate:**
+
 1. Change the password in the Supabase dashboard → Authentication → Users (production project)
 2. Update the corresponding secret in GitHub Actions (Settings → Secrets → Actions)
 3. Update `.env.local.example` if the local default changed (though local values are arbitrary)
