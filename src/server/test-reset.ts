@@ -150,6 +150,9 @@ export const resetE2EUsers = async (
     avatarPath: null,
     emergencyContact: null,
     lastUpdatedWeb: null,
+    currentIntention: null,
+    intentionUpdatedAt: null,
+    deactivatedAt: null,
     hidden: true,
   };
   const [, updates] = await Promise.all([

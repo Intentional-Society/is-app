@@ -47,25 +47,18 @@ test.describe("/myweb — tour pre-dismissed", () => {
 // The onboarded reset leaves lastUpdatedWeb null, as the welcome flow
 // does, so the member counts as a first-time visitor.
 test.describe("/myweb — first-time welcome tour", () => {
-  test("tour appears for a first-time visitor and can be skipped", async ({ page }) => {
+  test("the tour greets a first-time visitor, and the first Done shows the farewell capstone", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "My web" }).click();
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 
+    // The tour appears on its own and can be skipped.
     await expect(page.getByText("Mapping your relational web")).toBeVisible({ timeout: 5_000 });
     await page.getByRole("button", { name: /^Dismiss tour$/ }).click();
     await expect(page.getByText("Mapping your relational web")).toBeHidden();
-  });
-
-  test("first Done shows the farewell capstone over the home icon, then stays on /myweb", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("link", { name: "My web" }).click();
-    await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
 
     // Farewell eligibility is decided at mount, so dismissing the
     // welcome tour mid-way still earns the goodbye.
-    await expect(page.getByText("Mapping your relational web")).toBeVisible({ timeout: 5_000 });
-    await page.getByRole("button", { name: /^Dismiss tour$/ }).click();
     await page.getByRole("button", { name: "Done", exact: true }).click();
 
     await expect(page.getByText("You're all set!")).toBeVisible();

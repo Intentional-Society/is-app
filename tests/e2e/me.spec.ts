@@ -58,3 +58,38 @@ test("a member can change their profile URL from settings", async ({ page, accou
   await expect(page.getByLabel("Profile URL")).toHaveValue(slug);
   await expect(page.getByText(`/members/${slug}`)).toBeVisible();
 });
+
+// The profile form on /me, after onboarding: plain inputs and the
+// rich-text editors both save and come back on a fresh load.
+test("a member can edit their profile, and the changes survive a reload", async ({ page }) => {
+  await page.goto("/me");
+
+  await page.getByLabel("Location").fill("Porto");
+  await page.getByLabel("Keywords (comma-separated)").fill("gardening, jazz");
+  await page.getByLabel("Current intention").fill("Listen before answering.");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Profile saved.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Location")).toHaveValue("Porto");
+  await expect(page.getByLabel("Keywords (comma-separated)")).toHaveValue("gardening, jazz");
+  await expect(page.getByLabel("Current intention")).toContainText("Listen before answering.");
+});
+
+test("a member can deactivate their account and reactivate it", async ({ page }) => {
+  await page.goto("/me#settings");
+
+  // The destructive button stays disabled until the confirm word is typed.
+  await page.getByRole("button", { name: "Deactivate account" }).click();
+  const confirm = page.getByRole("button", { name: "Yes, deactivate my account" });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel("Type DEACTIVATE to confirm").fill("DEACTIVATE");
+  await confirm.click();
+  await expect(page.getByText("Your account is currently deactivated.")).toBeVisible();
+
+  // Reactivating works straight away, on the page as the deactivation
+  // left it.
+  await page.getByRole("button", { name: "Reactivate account" }).click();
+  await expect(page.getByRole("button", { name: "Deactivate account" })).toBeVisible();
+  await expect(page.getByText("Your account is currently deactivated.")).toBeHidden();
+});

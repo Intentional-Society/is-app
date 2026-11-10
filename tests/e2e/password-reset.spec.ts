@@ -48,22 +48,20 @@ test("submitting the forgot-password form sends a recovery email and confirms", 
   expect(decodeURIComponent(recoverUrl ?? "")).toContain("/auth/callback?type=recovery");
 });
 
-test("reset-password rejects a too-short password", async ({ page }) => {
+test("reset-password rejects a too-short password, then a mismatched pair", async ({ page }) => {
   await page.goto("/auth/reset-password");
   await page.getByLabel("New password").fill("short");
   await page.getByLabel("Confirm password").fill("short");
   await page.getByRole("button", { name: "Set password" }).click();
 
   await expect(page.getByText("Password must be at least 8 characters.")).toBeVisible();
-});
 
-test("reset-password rejects mismatched passwords", async ({ page }) => {
-  await page.goto("/auth/reset-password");
   await page.getByLabel("New password").fill("long-enough-1");
   await page.getByLabel("Confirm password").fill("long-enough-2");
   await page.getByRole("button", { name: "Set password" }).click();
 
   await expect(page.getByText("Passwords do not match.")).toBeVisible();
+  await expect(page.getByText("Password must be at least 8 characters.")).toBeHidden();
 });
 
 test.describe("signed in", () => {
