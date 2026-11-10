@@ -4,11 +4,11 @@
 // The script is CI tooling rather than server code; the functional-server
 // Vitest project gives it the node environment it needs.
 //
-// The describes from "the repo's lockfile" on run against the repo's real
-// files. e2e.yml installs only the script's output, so e2e code that loads a
-// package outside E2E_CI_DEPS would pass locally (the full node_modules has
-// it) and fail in CI; the import scan makes that a failing required check
-// instead.
+// Two describes run against the repo's real files: "the repo's lockfile" and
+// "the e2e code's imports". e2e.yml installs only the script's output, so e2e
+// code that loads a package outside E2E_CI_DEPS would pass locally (the full
+// node_modules has it) and fail in CI; the import scan makes that a failing
+// required check instead.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { isBuiltin } from "node:module";
@@ -19,8 +19,10 @@ import {
   forEachChild,
   isCallExpression,
   isExportDeclaration,
+  isExternalModuleReference,
   isIdentifier,
   isImportDeclaration,
+  isImportEqualsDeclaration,
   isStringLiteralLike,
   type Node,
   ScriptTarget,
@@ -158,10 +160,10 @@ describe("the repo's lockfile", () => {
 type FoundImport = { specifier: string; typeOnly: boolean };
 
 // Every module a source file loads, read from its syntax tree: import and
-// export-from statements, `import()` and `require()`. `typeOnly` marks an
-// `import type` / `export type` statement, which is erased before the code
-// runs. A statement that mixes in a value (`import { type A, b }`) is not
-// type-only.
+// export-from statements, `import x = require()`, `import()` and
+// `require()`. `typeOnly` marks an `import type` / `export type` statement,
+// which is erased before the code runs. A statement that mixes in a value
+// (`import { type A, b }`) is not type-only.
 const importsOf = (fileName: string, source: string): FoundImport[] => {
   const found: FoundImport[] = [];
   const visit = (node: Node): void => {
@@ -169,6 +171,12 @@ const importsOf = (fileName: string, source: string): FoundImport[] => {
       found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.importClause?.isTypeOnly ?? false });
     } else if (isExportDeclaration(node) && node.moduleSpecifier && isStringLiteralLike(node.moduleSpecifier)) {
       found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.isTypeOnly });
+    } else if (isImportEqualsDeclaration(node) && isExternalModuleReference(node.moduleReference)) {
+      const { expression } = node.moduleReference;
+      found.push({
+        specifier: isStringLiteralLike(expression) ? expression.text : "<computed>",
+        typeOnly: node.isTypeOnly,
+      });
     } else if (
       isCallExpression(node) &&
       (node.expression.kind === SyntaxKind.ImportKeyword ||
@@ -214,6 +222,7 @@ describe("importsOf", () => {
       'const d = require("pkg-d");',
       'const e = await import("pkg-e");',
       "const f = await import(name);",
+      'import g = require("pkg-g");',
     ].join("\n");
 
     expect(importsOf("x.ts", source).map((i) => i.specifier)).toEqual([
@@ -223,6 +232,7 @@ describe("importsOf", () => {
       "pkg-d",
       "pkg-e",
       "<computed>",
+      "pkg-g",
     ]);
   });
 
