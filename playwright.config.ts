@@ -38,7 +38,11 @@ export default defineConfig({
   use: {
     baseURL,
     browserName: "chromium",
-    trace: "on-first-retry",
+    // No traces in CI. A trace holds DOM snapshots and response bodies,
+    // CI runs against a preview that shares prod data, and the report it
+    // would be attached to is uploaded from a public repo. Locally, pass
+    // `--trace on` to record one.
+    trace: isCI ? "off" : "on-first-retry",
     // Per-request timing for the redirect chain — see src/lib/timing.ts.
     // The middleware short-circuits unless this header is present, so the
     // cost on test traffic is a single header.get + boolean check; the

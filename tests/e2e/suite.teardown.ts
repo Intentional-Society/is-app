@@ -7,8 +7,10 @@ import { resetAccounts, TIMEOUT_MS } from "./helpers/session";
 // account out through the menu. The app's sign-out ends every session
 // of the account (Supabase's default `global` scope), including the one
 // the specs share, so it can't run while they do. Running it last also
-// means the session tokens saved under playwright/.auth, and any that a
-// trace captured, are dead before CI uploads the report.
+// means nothing the run created outlives it: the session tokens saved
+// under playwright/.auth are dead, and the reset each test starts with
+// deletes the account's invites, whose codes the report shows in the
+// signup spec's steps.
 
 for (const key of sessionAccounts()) {
   teardown(`sign-out ends every ${key} session`, async ({ browser, baseURL }) => {
