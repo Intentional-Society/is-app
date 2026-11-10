@@ -1,46 +1,29 @@
-import sharp from "sharp";
+import path from "node:path";
 
 import { expect, test } from "./helpers/fixtures";
-import { completeWelcome, resetSeededUsers, signInAs } from "./helpers/session";
 
 // Profile-picture upload (#131): a member picks a photo, confirms the
-// circular crop, and it is stored and rendered. Depends on the regular
-// seeded user starting clean, so reset per-test.
-
-test.describe.configure({ mode: "serial" });
+// circular crop, and it is stored and rendered. The `member` reset
+// clears any picture an earlier run left on the account.
 
 // The canary: opt out of the suite-wide /_next/image stub so this spec
 // drives the real optimizer → Storage → render path end to end. The
 // naturalWidth assertion below would catch the optimizer rejecting the
 // upstream image (e.g. #469). See tests/e2e/helpers/fixtures.ts.
-test.use({ mockImages: false });
+test.use({ user: "member", mockImages: false });
 
-test.beforeEach(async ({ baseURL }) => {
-  if (!baseURL) throw new Error("avatar.spec.ts: baseURL is not configured");
-  await resetSeededUsers(baseURL);
-});
-
-// A genuine PNG so the browser's createImageBitmap and the server's
-// sharp decode both succeed.
-const samplePng = (): Promise<Buffer> =>
-  sharp({ create: { width: 240, height: 240, channels: 3, background: { r: 210, g: 120, b: 70 } } })
-    .png()
-    .toBuffer();
+// A genuine PNG (240×240, one flat colour) so the browser's
+// createImageBitmap and the server's sharp decode both succeed. A file
+// in the repo, so the spec needs no image library to make one.
+const SAMPLE_PNG = path.join(__dirname, "fixtures", "avatar.png");
 
 test("a member can upload, crop, and see their profile picture", async ({ page }) => {
-  await signInAs(page, "regular");
-  await completeWelcome(page, { displayName: "Avatar Tester" });
-
   await page.goto("/me");
   await expect(page.getByRole("button", { name: "Upload photo" })).toBeVisible();
 
   // The file input is hidden and click-triggered; setInputFiles drives
   // it directly.
-  await page.locator('input[type="file"]').setInputFiles({
-    name: "avatar.png",
-    mimeType: "image/png",
-    buffer: await samplePng(),
-  });
+  await page.locator('input[type="file"]').setInputFiles(SAMPLE_PNG);
 
   // The crop modal opens; confirm with the default framing.
   await expect(page.getByText("Position your photo")).toBeVisible();

@@ -76,7 +76,9 @@ Requires Docker Desktop. `npm run dev` auto-starts a local Supabase stack (Postg
 - A flake is a bug: find and fix the root cause. A re-run is evidence for a diagnosis, never the fix.
 - Capture a gate's real exit code (`cmd > log 2>&1; echo $?`, or `set -o pipefail`). Piping through `tail` masks failures. `gh pr checks --watch` can exit 0 with a failed check, so re-read `gh pr checks` afterward.
 - A `23505` on a hardcoded fixture slug means parallel functional test files are racing; make the fixture unique per run.
-- A slow new route that flakes the first e2e spec gets warmed in `tests/e2e/reset.setup.ts`; don't raise `TIMEOUT_MS`.
+- A slow new route that flakes the first e2e spec gets warmed in `tests/e2e/suite.setup.ts`; don't raise `TIMEOUT_MS`.
+- A signed-in e2e spec sets `test.use({ user: "member" })` (or `"new-member"`, `"admin"`) and starts from a saved session; it never drives the sign-in form. Each Playwright worker owns one seeded account, so a value that must be unique across profiles (a slug) is built from `account.key`.
+- Never pass a secret to `locator.fill` or type one under tracing: Playwright writes fill values into step titles and call arguments into traces, and CI uploads the report as a public artifact.
 - For a failure that reproduces only on the Vercel preview, read the runtime log before bisecting dependencies.
 
 ## Production safety

@@ -104,7 +104,7 @@ import { getPersonalWeb } from "./relations-personal";
 import { profiles } from "./schema";
 import { listSigninsAdmin } from "./signins-admin";
 import { getSystemMetrics } from "./system-metrics";
-import { resetE2EUsers } from "./test-reset";
+import { parseResetRequest, resetE2EUsers } from "./test-reset";
 
 // Admin-only sub-router. requireAdmin runs after the main api's
 // requireAuth (mounted via .route() below), so handlers here can
@@ -995,16 +995,34 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .route("/programs/:id/message-box", messageBoxRoutes)
   .route("/admin", adminRoutes);
 
-// CI-only reset for the two seeded e2e users. Token header is the only
+// CI-only reset for the seeded e2e users. Token header is the only
 // gate — preview and prod share the same Supabase, so a VERCEL_ENV gate
 // here would be theatre against a token that already mutates prod data.
 // 404s on missing/wrong token to avoid advertising the endpoint.
+//
+// An optional JSON body narrows the reset to one account and picks the
+// state it is left in: { account?: "regular" | "admin", state?: "fresh" |
+// "onboarded" }. No body resets every account to fresh. See
+// src/server/test-reset.ts.
 api.post("/_test/reset", async (c) => {
   const token = c.req.header("x-ci-reset-token");
   if (!token || token !== process.env.CI_RESET_TOKEN) {
     return c.json({ error: "not_found" }, 404);
   }
-  const result = await resetE2EUsers();
+  let body: unknown;
+  const raw = await c.req.text();
+  if (raw.trim() !== "") {
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+  }
+  const request = parseResetRequest(body);
+  if ("error" in request) {
+    return c.json({ error: request.error }, 400);
+  }
+  const result = await resetE2EUsers(request);
   return c.json(result);
 });
 
