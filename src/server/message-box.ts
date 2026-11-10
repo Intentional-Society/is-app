@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, type SQL, sql } from "drizzle-orm";
 
 import {
   MESSAGE_BOX_MAX_LENGTH,
@@ -16,8 +16,10 @@ import { messageBoxMessages, messageBoxSettings, profiles, programs } from "./sc
 // messages (docs/design-programs.md). Access checks live in
 // program-features.ts; this module is the data layer.
 
-// Newest first, capped. The box is read aloud and skimmed, not archived;
-// pagination can come if a program ever needs it.
+// The live box shows the newest messages, capped: it is read aloud and
+// skimmed, and pagination can come if a program ever needs it. The admin
+// archive is not capped, so an admin can always reach every archived message
+// to restore or delete it.
 const MESSAGE_LIMIT = 100;
 
 export const DEFAULT_VISIBILITY: MessageBoxVisibility = "admins";
@@ -114,23 +116,15 @@ export const updateSettings = async (
   return { ok: true };
 };
 
-// Newest messages with their authors. Non-admin viewers don't see messages
-// from deactivated or hidden profiles (both are invisible to members
-// everywhere else); admins see everything, so moderation can reach it.
-export const listMessages = async (
-  programId: string,
-  viewer: { id: string; isAdmin: boolean },
-): Promise<MessageBoxMessage[]> => {
-  const conditions: SQL[] = [eq(messageBoxMessages.programId, programId)];
-  if (!viewer.isAdmin) {
-    conditions.push(isNull(profiles.deactivatedAt), eq(profiles.hidden, false));
-  }
-
-  const rows = await db
+// Shared row fetch for the live box and the admin archive: messages joined to
+// their authors, with signed avatar URLs.
+const fetchMessages = async (conditions: SQL[], order: SQL, limit?: number) => {
+  const query = db
     .select({
       id: messageBoxMessages.id,
       body: messageBoxMessages.body,
       createdAt: messageBoxMessages.createdAt,
+      archivedAt: messageBoxMessages.archivedAt,
       authorId: profiles.id,
       authorSlug: profiles.slug,
       authorDisplayName: profiles.displayName,
@@ -139,17 +133,50 @@ export const listMessages = async (
     .from(messageBoxMessages)
     .innerJoin(profiles, eq(profiles.id, messageBoxMessages.authorId))
     .where(and(...conditions))
-    .orderBy(desc(messageBoxMessages.createdAt))
-    .limit(MESSAGE_LIMIT);
+    .orderBy(order)
+    .$dynamic();
+  return attachAvatarUrls(await (limit === undefined ? query : query.limit(limit)));
+};
 
-  const withUrls = await attachAvatarUrls(rows);
-  return withUrls.map((r) => ({
-    id: r.id,
-    body: r.body,
-    createdAt: r.createdAt.toISOString(),
-    mine: r.authorId === viewer.id,
-    author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
-  }));
+type MessageRow = Awaited<ReturnType<typeof fetchMessages>>[number];
+
+// One row to the shape both lists share; each list adds its own extras.
+const toMessage = (r: MessageRow) => ({
+  id: r.id,
+  body: r.body,
+  createdAt: r.createdAt.toISOString(),
+  author: { id: r.authorId, slug: r.authorSlug, displayName: r.authorDisplayName, avatarUrl: r.avatarUrl },
+});
+
+// Newest messages with their authors, for the program page. Archived messages
+// never appear here, for anyone; admins find them in the admin area. Non-admin
+// viewers also don't see messages from deactivated or hidden profiles (both are
+// invisible to members everywhere else); admins see those so moderation can
+// reach them.
+export const listMessages = async (
+  programId: string,
+  viewer: { id: string; isAdmin: boolean },
+): Promise<MessageBoxMessage[]> => {
+  const conditions: SQL[] = [eq(messageBoxMessages.programId, programId), isNull(messageBoxMessages.archivedAt)];
+  if (!viewer.isAdmin) {
+    conditions.push(isNull(profiles.deactivatedAt), eq(profiles.hidden, false));
+  }
+  const rows = await fetchMessages(conditions, desc(messageBoxMessages.createdAt), MESSAGE_LIMIT);
+  return rows.map((r) => ({ ...toMessage(r), mine: r.authorId === viewer.id }));
+};
+
+// `mine` is dropped: the archive is an admin list with no Edit.
+export type ArchivedMessage = Omit<MessageBoxMessage, "mine"> & { archivedAt: string };
+
+// The admin archive: messages an admin has hidden from the program page, most
+// recently archived first, with no cap. Admin-only (the route guards it), so
+// authors who are deactivated or hidden are included.
+export const listArchivedMessages = async (programId: string): Promise<ArchivedMessage[]> => {
+  const rows = await fetchMessages(
+    [eq(messageBoxMessages.programId, programId), isNotNull(messageBoxMessages.archivedAt)],
+    desc(messageBoxMessages.archivedAt),
+  );
+  return rows.map((r) => ({ ...toMessage(r), archivedAt: (r.archivedAt as Date).toISOString() }));
 };
 
 export const createMessage = async (input: {
@@ -161,8 +188,12 @@ export const createMessage = async (input: {
   return { id: row.id };
 };
 
-// Admin moderation. Scoped to the program so an id from another program's
-// box can't be removed through this one.
+// Admin moderation: permanent delete. Only an archived message can be deleted,
+// which is how the clients use it (archive first, delete after the Undo window).
+// That makes a late delete harmless: if another admin restored the message in
+// the meantime, it is no longer archived and the request is a plain not_found.
+// Scoped to the program so an id from another program's box can't be removed
+// through this one.
 export const deleteMessage = async (
   programId: string,
   messageId: string,
@@ -170,14 +201,55 @@ export const deleteMessage = async (
   if (!isUuid(programId) || !isUuid(messageId)) return { error: "not_found" };
   const deleted = await db
     .delete(messageBoxMessages)
-    .where(and(eq(messageBoxMessages.id, messageId), eq(messageBoxMessages.programId, programId)))
+    .where(
+      and(
+        eq(messageBoxMessages.id, messageId),
+        eq(messageBoxMessages.programId, programId),
+        isNotNull(messageBoxMessages.archivedAt),
+      ),
+    )
     .returning({ id: messageBoxMessages.id });
   return deleted.length > 0 ? { ok: true } : { error: "not_found" };
 };
 
+// Admin moderation, the reversible kind: hide a message from the program page
+// without deleting it, or bring it back. Scoped to the program like delete.
+// Repeating a request is harmless: archiving an archived message (or restoring
+// a visible one) changes nothing and keeps the first timestamp. `changed` says
+// whether this request actually did something, so a client can tell "I archived
+// it" from "someone else already had" (and not offer an Undo that would undo
+// their decision).
+export const setMessageArchived = async (
+  programId: string,
+  messageId: string,
+  archived: boolean,
+): Promise<{ ok: true; changed: boolean } | { error: "not_found" }> => {
+  if (!isUuid(programId) || !isUuid(messageId)) return { error: "not_found" };
+  const inBox = and(eq(messageBoxMessages.id, messageId), eq(messageBoxMessages.programId, programId));
+  const updated = await db
+    .update(messageBoxMessages)
+    .set({ archivedAt: archived ? sql`now()` : null })
+    .where(and(inBox, archived ? isNull(messageBoxMessages.archivedAt) : isNotNull(messageBoxMessages.archivedAt)))
+    .returning({ id: messageBoxMessages.id });
+  if (updated.length > 0) return { ok: true, changed: true };
+
+  const [existing] = await db.select({ id: messageBoxMessages.id }).from(messageBoxMessages).where(inBox);
+  return existing ? { ok: true, changed: false } : { error: "not_found" };
+};
+
+export const parseArchiveUpdate = (body: unknown): { archived: boolean } | { error: string } => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { error: "body must be a JSON object" };
+  }
+  const archived = (body as Record<string, unknown>).archived;
+  if (typeof archived !== "boolean") return { error: "archived must be a boolean" };
+  return { archived };
+};
+
 // Authors can rewrite their own message. Scoped to program and author, so a
 // message that is someone else's, or from another program, answers not_found
-// (nothing is revealed about whether it exists). createdAt stays, so an edit
+// (nothing is revealed about whether it exists). An archived message can't be
+// edited either; its author doesn't see it. createdAt stays, so an edit
 // doesn't reorder the box; there is no "edited" marker.
 export const updateMessage = async (input: {
   programId: string;
@@ -194,6 +266,7 @@ export const updateMessage = async (input: {
         eq(messageBoxMessages.id, input.messageId),
         eq(messageBoxMessages.programId, input.programId),
         eq(messageBoxMessages.authorId, input.authorId),
+        isNull(messageBoxMessages.archivedAt),
       ),
     )
     .returning({ id: messageBoxMessages.id });

@@ -70,3 +70,8 @@ export type AdminProgramFeature = InferResponseType<
   (typeof apiClient.api.admin.programs)[":id"]["features"]["$get"],
   200
 >["features"][number];
+
+export type ArchivedMessageBoxMessage = InferResponseType<
+  (typeof apiClient.api.admin.programs)[":id"]["message-box"]["archived"]["$get"],
+  200
+>["messages"][number];
