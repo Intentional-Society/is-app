@@ -425,31 +425,37 @@ describe("autoSubscribeNewMember", () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("does not throw or re-subscribe when the program is missing — captures to Sentry instead", async () => {
-    // The slug is shared with other tests running in parallel workers,
-    // so the missingness window has to be tight: delete, exercise the
-    // path, and restore inside the test rather than waiting for the
-    // next beforeEach. The outer await on autoSubscribeNewMember
-    // finishes before any restore concurrency could matter.
-    await db.delete(programs).where(eq(programs.id, weeklyProgramId));
+  // The missing-program cases pass a slug no program has. Deleting the
+  // real row would pull it out from under every test file running in
+  // parallel, and its memberships with it (program_id cascades).
+  it("does not throw or subscribe when the program is missing — captures to Sentry instead", async () => {
+    const missingSlug = `missing-${randomUUID()}`;
+    const captureMock = vi.mocked(Sentry_captureException);
+    captureMock.mockClear();
 
-    try {
-      const captureMock = vi.mocked(Sentry_captureException);
-      captureMock.mockClear();
+    await expect(autoSubscribeNewMember(userId, [missingSlug])).resolves.toBeUndefined();
 
-      await expect(autoSubscribeNewMember(userId)).resolves.toBeUndefined();
+    expect(captureMock).toHaveBeenCalledOnce();
+    const arg = captureMock.mock.calls[0][0];
+    expect(arg).toBeInstanceOf(Error);
+    expect((arg as Error).message).toContain(missingSlug);
 
-      expect(captureMock).toHaveBeenCalledOnce();
-      const arg = captureMock.mock.calls[0][0];
-      expect(arg).toBeInstanceOf(Error);
-      expect((arg as Error).message).toMatch(/weekly-web-updates/);
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(0);
+  });
 
-      const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
-      expect(rows).toHaveLength(0);
-    } finally {
-      // Restore so any concurrent test that depends on the slug isn't
-      // stranded by our delete.
-      await ensureWeeklyProgram();
-    }
+  it("skips a missing program and still subscribes to the ones that exist", async () => {
+    const missingSlug = `missing-${randomUUID()}`;
+    const captureMock = vi.mocked(Sentry_captureException);
+    captureMock.mockClear();
+
+    await autoSubscribeNewMember(userId, [missingSlug, "weekly-web-updates"]);
+
+    expect(captureMock).toHaveBeenCalledOnce();
+    expect((captureMock.mock.calls[0][0] as Error).message).toContain(missingSlug);
+
+    const rows = await db.select().from(profilePrograms).where(eq(profilePrograms.profileId, userId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].programId).toBe(weeklyProgramId);
   });
 });

@@ -19,14 +19,20 @@ const AUTO_SUBSCRIBE_SLUGS = ["weekly-web-updates"] as const;
 // and operators can patch the database after the fact. Idempotent via
 // onConflictDoNothing, but callers should still gate on "is this a new
 // profile" so re-subscribing won't undo a member's opt-out.
-export const autoSubscribeNewMember = async (userId: string): Promise<void> => {
+//
+// `slugs` is a parameter so a test can name a program that doesn't exist;
+// the real program row is shared by every test file running against the DB.
+export const autoSubscribeNewMember = async (
+  userId: string,
+  slugs: readonly string[] = AUTO_SUBSCRIBE_SLUGS,
+): Promise<void> => {
   const rows = await db
     .select({ id: programs.id, slug: programs.slug })
     .from(programs)
-    .where(inArray(programs.slug, AUTO_SUBSCRIBE_SLUGS as unknown as string[]));
+    .where(inArray(programs.slug, [...slugs]));
 
   const found = new Set(rows.map((r) => r.slug));
-  for (const slug of AUTO_SUBSCRIBE_SLUGS) {
+  for (const slug of slugs) {
     if (!found.has(slug)) {
       Sentry_captureException(new Error(`autoSubscribeNewMember: program slug "${slug}" not found in database`));
     }
