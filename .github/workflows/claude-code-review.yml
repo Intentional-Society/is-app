@@ -131,8 +131,11 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
           # One line: /code-review reads everything after its level and flags
-          # as the review target.
-          prompt: /code-review high --comment ${{ github.event.pull_request.number }}
+          # as the review target. medium runs the same review prompt as high
+          # with the model at medium effort. The review aims for at least half
+          # its findings cap (10 by default), widening its search to reach it;
+          # --max-findings 8 lowers that floor to 4.
+          prompt: /code-review medium --max-findings 8 --comment ${{ github.event.pull_request.number }}
           claude_args: |
             --model opus
             --max-turns 60
