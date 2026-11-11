@@ -6,9 +6,15 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-10 | James (with Opus 5.5) | The reviewer sees its earlier threads
+
+Claude review now gives the reviewer its earlier threads on the PR, with replies from owners, members and collaborators, so later rounds don't re-raise a finding that was fixed or declined; a by-design reply settles it. The summary drops the turn count, which always read 0.
+
+---
+
 ## 2026-11-09 | Benji (with Kiro) | Admins can archive message box messages
 
-## Archiving hides a message from the program page for everyone but keeps the row; admins restore or delete it from an archive list on `/admin/programs/[id]`. It adds `message_box_messages.archived_at`, so it needs `npm run prod:db:expand` first. Details in `docs/feature-message-box.md`.
+Archiving hides a message from the program page for everyone but keeps the row; admins restore or delete it from an archive list on `/admin/programs/[id]`. It adds `message_box_messages.archived_at`, so it needs `npm run prod:db:expand` first. Details in `docs/feature-message-box.md`.
 
 ## 2026-11-09 | James (with Fable 5.2) | E2E runs in under a minute, with new rules for specs
 
