@@ -1,0 +1,80 @@
+{
+  "files": [
+    {
+      "source": ".claude/skills/batch-597-item8-workspace/GRADER-RULES.md",
+      "dest": "rules/GRADER-RULES.md"
+    },
+    {
+      "source": ".claude/skills/batch-597-item8-workspace/EXECUTOR-RULES.md",
+      "dest": "rules/EXECUTOR-RULES.md"
+    },
+    {
+      "source": ".claude/skills/batch-597-item8-workspace/eval-pr-6/with-skill/run-1/transcript.md",
+      "dest": "sample/transcript.md"
+    },
+    {
+      "source": ".claude/skills/batch-597-item8-workspace/eval-pr-6/with-skill/run-1/harness-tool-calls.txt",
+      "dest": "sample/harness-tool-calls.txt"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/executor.err",
+      "dest": "archive/eval-commit-4-with_skill-run-1/executor.err"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/grader-envelope.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/grader-envelope.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/grading.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/grading.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/input.jsonl",
+      "dest": "archive/eval-commit-4-with_skill-run-1/input.jsonl"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/outputs/archive-manifest.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/outputs/archive-manifest.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/outputs/gh-calls.log",
+      "dest": "archive/eval-commit-4-with_skill-run-1/outputs/gh-calls.log"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/outputs/gh-fixture.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/outputs/gh-fixture.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/outputs/git-state.txt",
+      "dest": "archive/eval-commit-4-with_skill-run-1/outputs/git-state.txt"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/outputs/manifest.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/outputs/manifest.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/outputs/observables.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/outputs/observables.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/outputs/sandbox-marker.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/outputs/sandbox-marker.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/raw.jsonl",
+      "dest": "archive/eval-commit-4-with_skill-run-1/raw.jsonl"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/seeded-turns.md",
+      "dest": "archive/eval-commit-4-with_skill-run-1/seeded-turns.md"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/timing.json",
+      "dest": "archive/eval-commit-4-with_skill-run-1/timing.json"
+    },
+    {
+      "source": ".claude/skills/routing-evals-workspace/2026-09-24T05-28-45-800Z/eval-commit-4/with_skill/run-1/transcript.md",
+      "dest": "archive/eval-commit-4-with_skill-run-1/transcript.md"
+    }
+  ]
+}
