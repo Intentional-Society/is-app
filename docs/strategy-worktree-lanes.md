@@ -18,20 +18,25 @@ worktree** — a _lane_.
 A lane is just a port offset + a renamed Supabase project, derived from the
 worktree's directory name:
 
-| Dir name   | Lane | Offset                |
-| ---------- | ---- | --------------------- |
-| `is-app`   | 0    | base ports, untouched |
-| `is-app-2` | 2    | +200                  |
-| `is-app-3` | 3    | +300                  |
+| Dir name   | Lane | Offset |
+| ---------- | ---- | ------ |
+| `is-app`   | 1    | +100   |
+| `is-app-2` | 2    | +200   |
+| `is-app-3` | 3    | +300   |
 
-| Service                     | Base              | Lane 2 | Lane 3 |
-| --------------------------- | ----------------- | ------ | ------ |
-| Supabase API / Kong         | 54321             | 54521  | 54621  |
-| Postgres                    | 54322             | 54522  | 54622  |
-| Studio                      | 54323             | 54523  | 54623  |
-| Inbucket (email)            | 54324             | 54524  | 54624  |
-| shadow / analytics / pooler | 54320/54327/54329 | +200   | +300   |
-| `next dev`                  | 3000              | 3200   | 3300   |
+| Service                     | Default           | Lane 1 | Lane 2 | Lane 3 |
+| --------------------------- | ----------------- | ------ | ------ | ------ |
+| Supabase API / Kong         | 54321             | 54421  | 54521  | 54621  |
+| Postgres                    | 54322             | 54422  | 54522  | 54622  |
+| Studio                      | 54323             | 54423  | 54523  | 54623  |
+| Inbucket (email)            | 54324             | 54424  | 54524  | 54624  |
+| shadow / analytics / pooler | 54320/54327/54329 | +100   | +200   | +300   |
+| `next dev`                  | 3000              | 3100   | 3200   | 3300   |
+
+A checkout where `make_lane_inside_worktree` never ran stays on the Supabase
+defaults (the "Default" column). That's the single-checkout setup in
+[doc-local-setup.md](doc-local-setup.md). Make the base worktree lane 1 when
+you run lanes, or to free the defaults for other Supabase projects.
 
 The e2e suite has no port of its own — it reuses the lane's `next dev` server
 (see [Running in a lane](#running-in-a-lane)).
@@ -50,6 +55,11 @@ npm install                                       # node_modules isn't shared ac
 npm run setup                                     # generates this worktree's .env.local
 npm run make_lane_inside_worktree                 # converts THIS worktree into lane 2
 ```
+
+The base worktree becomes lane 1 the same way, minus the `worktree add`: stop
+its stack (`npm run dev:db:stop`), then run `npm run make_lane_inside_worktree`
+in `C:\All\code\is-app`. Its `project_id` stays `is-app`, so the database
+volume and its data carry over to the new ports.
 
 `make_lane_inside_worktree` reads the lane from the directory name and, in
 this worktree only:
@@ -85,7 +95,7 @@ npm run test:functional         # isolated DB
 starts its own `npm run dev` on that port when none is. Two `next dev` instances
 can't share one worktree's `.next` anyway, so a single server per lane is the
 only workable shape; concurrent isolated dev+e2e is what separate _lanes_ are
-for. The base worktree (no lane vars) falls back to port 3000.
+for. A checkout that isn't a lane (no lane vars) falls back to port 3000.
 
 **Tradeoff:** an e2e run resets and drives the seeded `@testfake.local` users in
 the lane's dev DB (not your real account), so a manual dev session's test-user
@@ -119,3 +129,9 @@ session _and_ an e2e run at once, use two lanes (each lane is one Supabase stack
   in lanes, a pull won't update it there. Run `git update-index
   --no-skip-worktree supabase/config.toml`, pull, then re-run
   `npm run make_lane_inside_worktree` (it re-derives from the new base).
+- **Changing `config.toml` from a lane:** git ignores edits to a
+  `--skip-worktree` file, so they never reach a commit. Run `git update-index
+  --no-skip-worktree supabase/config.toml` and `git restore
+  supabase/config.toml` (back to the default ports), make and commit the edit,
+  then re-run `npm run make_lane_inside_worktree`. The script refuses to run
+  over uncommitted edits to an unflagged `config.toml`.

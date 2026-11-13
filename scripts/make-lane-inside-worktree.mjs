@@ -10,13 +10,17 @@
 // is one full stack per worktree — that's a "lane".
 //
 // A lane is derived from the worktree directory name:
-//   is-app      -> lane 0 (the base worktree; left untouched)
+//   is-app      -> lane 1 (the base worktree)
 //   is-app-2    -> lane 2
 //   is-app-3    -> lane 3
 // Lane N shifts every port by N*100 and renames the Supabase project, so
 // the existing dev:db / migrate / seed flow isolates itself with no other
 // changes. This script is the one-time, in-place configure step you run
 // AFTER `git worktree add` + `npm install` + `npm run setup`.
+//
+// A checkout where this script never ran keeps the Supabase default ports
+// (54321…, dev 3000). Making the base worktree lane 1 frees those defaults
+// for other Supabase projects.
 //
 // What it rewrites IN THIS WORKTREE ONLY (git worktrees have their own
 // checked-out files and their own index):
@@ -66,37 +70,32 @@ function fail(msg) {
 }
 
 // `name` is the project name in package.json (the base worktree's dir name
-// by convention). Lane is the trailing -N on the current dir; bare name = 0.
+// by convention). The bare name is lane 1; "<name>-N" is lane N. Lane 1 has
+// no suffixed form, so a worktree can't claim the base worktree's ports.
 const baseName = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")).name;
 const worktreeName = nameOverride ?? basename(repoRoot);
 
 function parseLane(dirName) {
-  if (dirName === baseName) return 0;
+  if (dirName === baseName) return 1;
   const m = dirName.match(new RegExp(`^${baseName}-(\\d+)$`));
   if (!m) {
     fail(
       `worktree dir "${dirName}" isn't a recognized lane name.\n` +
-        `  Expected "${baseName}" (base, lane 0) or "${baseName}-<N>" (e.g. "${baseName}-2").\n` +
+        `  Expected "${baseName}" (base, lane 1) or "${baseName}-<N>" (e.g. "${baseName}-2").\n` +
         `  Rename the worktree dir to set its lane, or pass --name=${baseName}-2 to preview.`,
     );
   }
   const lane = Number(m[1]);
-  if (lane < 1 || lane > MAX_LANE) {
-    fail(`lane ${lane} out of range (1–${MAX_LANE}); higher lanes would overflow the reserved port blocks.`);
+  if (lane < 2 || lane > MAX_LANE) {
+    fail(
+      `lane ${lane} out of range (2–${MAX_LANE}); lane 1 is the base worktree ("${baseName}"), and higher lanes would overflow the reserved port blocks.`,
+    );
   }
   return lane;
 }
 
 const lane = parseLane(worktreeName);
 const off = lane * LANE_STRIDE;
-
-if (lane === 0) {
-  process.stdout.write(
-    `This is the base worktree ("${baseName}", lane 0) — it keeps the default ports, nothing to configure.\n` +
-      `  Create a lane with:  git worktree add ../${baseName}-worktrees/${baseName}-2 && cd … && npm install && npm run setup && npm run make_lane_inside_worktree\n`,
-  );
-  process.exit(0);
-}
 
 const port = (p) => p.base + off;
 const apiPort = port(SUPABASE_PORTS.api);
@@ -181,6 +180,26 @@ if (dryRun) {
   process.exit(0);
 }
 
+// The rewrite re-derives config.toml from HEAD, so uncommitted edits to it
+// would be lost. Once the file is --skip-worktree (an already-configured
+// lane) git can't tell lane edits from real ones, so this guards only the
+// first run.
+function assertNoUncommittedConfigEdits() {
+  const flags = spawnSync("git", ["ls-files", "-v", "supabase/config.toml"], { cwd: repoRoot, encoding: "utf8" });
+  if (flags.stdout?.startsWith("S ")) return;
+  const diff = spawnSync("git", ["diff", "--quiet", "HEAD", "--", "supabase/config.toml"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (diff.status === 1) {
+    fail(
+      "supabase/config.toml has uncommitted changes, and this script rewrites it from HEAD. Commit or stash them first.",
+    );
+  }
+  if (diff.status !== 0) fail(`could not diff supabase/config.toml against HEAD (${(diff.stderr ?? "").trim()})`);
+}
+assertNoUncommittedConfigEdits();
+
 writeFileSync(configPath, configText);
 writeFileSync(envPath, envText);
 
@@ -197,7 +216,10 @@ if (skip.status !== 0) {
   );
 }
 
-process.stdout.write(`${summary}\n\nConfigured. Start it with:  npm run dev\n`);
+process.stdout.write(
+  `${summary}\n\nConfigured. Start it with:  npm run dev\n` +
+    `If this worktree's stack is already running on other ports, restart it first:  npm run dev:db:stop\n`,
+);
 process.stdout.write(
   `Windows only — reserve this lane's Supabase ports (admin shell, once):\n` +
     `  netsh int ipv4 add excludedportrange protocol=tcp startport=${SUPABASE_PORTS.api.base + off} numberofports=7\n`,
