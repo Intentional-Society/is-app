@@ -42,6 +42,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
+import { laneAuthUrls } from "./lib/lane.mjs";
+
 const repoRoot = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -49,8 +51,9 @@ const nameOverride = args.find((a) => a.startsWith("--name="))?.slice("--name=".
 
 // Base ports as committed in supabase/config.toml, each with the env var the
 // CLI reads in its place. The env mapping is the CLI's config loader, not
-// documented by Supabase: verified on CLI v2.122.0, so re-check it on a CLI
-// upgrade. The CLI reads [inbucket] as [local_smtp], hence that env name.
+// documented by Supabase (verified on CLI v2.122.0); ensure-supabase.mjs stops
+// a lane whose running stack doesn't match it. The CLI reads [inbucket] as
+// [local_smtp], hence that env name.
 const SUPABASE_PORTS = {
   api: { env: "SUPABASE_API_PORT", key: "port", base: 54321 },
   db: { env: "SUPABASE_DB_PORT", key: "port", base: 54322 },
@@ -105,6 +108,8 @@ const port = (p) => p.base + off;
 const devPort = APP_PORTS.dev + off;
 
 // --- supabase/config.toml (read only) --------------------------------------
+const configPath = resolve(repoRoot, "supabase", "config.toml");
+
 function committedConfig() {
   const res = git(["show", "HEAD:supabase/config.toml"]);
   if (res.status !== 0) fail(`could not read HEAD:supabase/config.toml (${(res.stderr ?? "").trim()})`);
@@ -121,24 +126,30 @@ function assertBasePorts(text) {
   }
 }
 
-// site_url and the redirect allow-list point at the dev server; shift them to
-// this lane's dev port so interactive auth flows resolve. (e2e reuses that
-// same dev server and doesn't depend on the allow-list for the password-login
-// flows the suite exercises.)
-function laneAuthUrls(text) {
-  const site = text.match(/^site_url\s*=\s*"([^"]*)"/m);
-  const list = text.match(/^additional_redirect_urls\s*=\s*\[([^\]]*)\]/m);
-  if (!site || !list) fail("expected site_url and additional_redirect_urls in config.toml's [auth] section");
-  const shift = (url) => url.replace(":3000", `:${devPort}`);
-  const redirects = [...list[1].matchAll(/"([^"]*)"/g)].map((m) => shift(m[1]));
-  return { siteUrl: shift(site[1]), redirectUrls: redirects.join(",") };
-}
-
 // Lanes configured before the .env.local overrides had a rewritten
 // config.toml hidden with --skip-worktree. Clearing the flag and restoring
 // the committed file converts them in place.
 function hasLegacyLaneConfig() {
   return git(["ls-files", "-v", "supabase/config.toml"]).stdout?.startsWith("S ") ?? false;
+}
+
+// The earlier rewrite: HEAD's config.toml with project_id, each base port and
+// the :3000 dev URLs shifted to this lane. Anything else in the flagged file
+// is a real edit that restoring would discard, so stop instead.
+function assertOnlyLegacyRewrite() {
+  let expected = committedConfig().replace(/^(\s*project_id\s*=\s*)"[^"]*"/m, `$1"${worktreeName}"`);
+  for (const { key, base } of Object.values(SUPABASE_PORTS)) {
+    expected = expected.replace(new RegExp(`^(\\s*${key}\\s*=\\s*)${base}\\b`, "m"), `$1${base + off}`);
+  }
+  expected = expected.replaceAll(":3000", `:${devPort}`);
+  const normalize = (t) => t.replace(/\r\n/g, "\n");
+  if (normalize(readFileSync(configPath, "utf8")) !== normalize(expected)) {
+    fail(
+      "supabase/config.toml is flagged --skip-worktree and has edits beyond the earlier lane rewrite, which restoring would discard.\n" +
+        "  Inspect them:  git update-index --no-skip-worktree supabase/config.toml && git diff supabase/config.toml\n" +
+        "  Keep what you need, run `git restore supabase/config.toml`, then re-run this script.",
+    );
+  }
 }
 
 function restoreCommittedConfig() {
@@ -160,29 +171,36 @@ function setEnvLine(text, key, value) {
   return `${text}${sep}${line}\n`;
 }
 
+// The auth URLs point interactive auth flows at this lane's dev server. (e2e
+// reuses that same dev server and doesn't depend on the allow-list for the
+// password-login flows the suite exercises.) ensure-supabase.mjs warns when
+// a later config.toml change leaves them stale.
 function laneEnv(config) {
-  const { siteUrl, redirectUrls } = laneAuthUrls(config);
+  const authUrls = laneAuthUrls(config, devPort);
+  if (!authUrls) fail("expected site_url and additional_redirect_urls in config.toml's [auth] section");
   return {
     NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${port(SUPABASE_PORTS.api)}`,
     DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:${port(SUPABASE_PORTS.db)}/postgres`,
     LANE_DEV_PORT: String(devPort),
     SUPABASE_PROJECT_ID: worktreeName,
     ...Object.fromEntries(Object.values(SUPABASE_PORTS).map((p) => [p.env, String(port(p))])),
-    SUPABASE_AUTH_SITE_URL: siteUrl,
-    SUPABASE_AUTH_ADDITIONAL_REDIRECT_URLS: redirectUrls,
+    ...authUrls,
   };
 }
 
 // --- apply ------------------------------------------------------------------
-const config = committedConfig();
-assertBasePorts(config);
-const env = laneEnv(config);
-
 const envPath = resolve(repoRoot, ".env.local");
 if (!existsSync(envPath)) {
   fail(".env.local is missing — run `npm run setup` in this worktree first, then re-run this script.");
 }
 const legacy = hasLegacyLaneConfig();
+if (legacy) assertOnlyLegacyRewrite();
+
+// The working config.toml, so an uncommitted edit counts; a legacy lane's
+// working file is the old rewrite, so it reads HEAD, which it restores to.
+const config = legacy ? committedConfig() : readFileSync(configPath, "utf8");
+assertBasePorts(config);
+const env = laneEnv(config);
 
 const apiPort = port(SUPABASE_PORTS.api);
 const studioPort = port(SUPABASE_PORTS.studio);

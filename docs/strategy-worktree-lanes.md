@@ -69,9 +69,9 @@ sets:
 - `SUPABASE_PROJECT_ID`, every `SUPABASE_*_PORT`, and
   `SUPABASE_AUTH_SITE_URL` / `SUPABASE_AUTH_ADDITIONAL_REDIRECT_URLS`. The
   Supabase CLI loads `.env.local` itself and applies `SUPABASE_<SECTION>_<KEY>`
-  variables over `supabase/config.toml`. Supabase doesn't document this; it was
-  verified on CLI v2.122.0, so re-check a lane's ports with `npx supabase
-  status` after a CLI upgrade;
+  variables over `supabase/config.toml`. Supabase doesn't document this (it
+  was verified on CLI v2.122.0), so `npm run dev:db` stops in a lane whose
+  running stack reports a different API URL than `.env.local` expects;
 - the Supabase API + `DATABASE_URL` ports for the app, and
   `LANE_DEV_PORT`, read by both the `npm run dev` wrapper
   (`scripts/dev-server.mjs`) and `playwright.config.ts`, so the dev server lands
@@ -79,9 +79,25 @@ sets:
   the port from `.env` directly — it binds before env files load — hence the
   wrapper.
 
-Re-running the script is idempotent. On a lane made by an earlier version,
-which rewrote `config.toml` under `--skip-worktree`, it also clears the flag
-and restores the committed file.
+Re-running the script is idempotent, and reads the working `config.toml`, so
+uncommitted edits count. `npm run dev:db` warns when `config.toml`'s auth
+URLs no longer match what the script wrote; re-run it, then restart the stack.
+
+**A lane made by an earlier version** rewrote `config.toml` under
+`--skip-worktree`, and a pull or rebase that changes `config.toml` stops on
+that file. Convert it in this order, from the lane:
+
+```sh
+npm run dev:db:stop
+git update-index --no-skip-worktree supabase/config.toml
+git diff supabase/config.toml        # expect only project_id, ports and :3000 URLs
+git restore supabase/config.toml
+git switch --detach origin/main      # or pull / rebase your branch
+npm run make_lane_inside_worktree
+```
+
+Run on a still-flagged lane, the script does the restore itself, and stops
+instead when the file holds edits beyond that rewrite.
 
 Local Supabase keys are identical across stacks (fixed demo JWT secret), so
 only URLs/ports change. Preview a lane without writing anything:
@@ -136,4 +152,4 @@ session _and_ an e2e run at once, use two lanes (each lane is one Supabase stack
 - **If a base port in `config.toml` changes:** the script derives lane ports
   from fixed base values and stops with an error when `config.toml` no longer
   matches them. Update `SUPABASE_PORTS` in the script, then re-run it in each
-  lane. A change to `site_url` or the redirect list also needs a re-run.
+  lane.
