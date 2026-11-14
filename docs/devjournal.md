@@ -8,7 +8,7 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ## 2026-11-12 | James (with Opus 5.5) | Base worktree is lane 1 (+100 ports)
 
-Running `npm run make_lane_inside_worktree` in the main checkout moves it to +100 ports (API 54421, dev 3100), which frees the Supabase defaults for other Supabase projects. A checkout that never runs it keeps the defaults. Local stacks also no longer run analytics/vector or the edge runtime. Reference: docs/strategy-worktree-lanes.md.
+Running `npm run make_lane_inside_worktree` in the main checkout moves it to +100 ports (API 54421, dev 3100), which frees the Supabase defaults for other Supabase projects. Lane ports now live in `.env.local`, so re-run the script in existing lanes. Local stacks no longer run analytics/vector or the edge runtime. Reference: docs/strategy-worktree-lanes.md.
 
 ---
 

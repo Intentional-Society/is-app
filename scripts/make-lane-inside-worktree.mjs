@@ -22,13 +22,12 @@
 // (54321…, dev 3000). Making the base worktree lane 1 frees those defaults
 // for other Supabase projects.
 //
-// What it rewrites IN THIS WORKTREE ONLY (git worktrees have their own
-// checked-out files and their own index):
-//   - supabase/config.toml : project_id + every port + auth redirect URLs,
-//     then `git update-index --skip-worktree` so the local edit never shows
-//     as a diff or gets committed. The base text is taken from `git show
-//     HEAD:supabase/config.toml`, so re-running always re-derives cleanly.
-//   - .env.local           : the Supabase API + DATABASE_URL ports, plus
+// It writes only this worktree's .env.local (gitignored), so no tracked file
+// changes:
+//   - SUPABASE_PROJECT_ID, the SUPABASE_*_PORT values and the two auth URLs.
+//     The Supabase CLI applies SUPABASE_<SECTION>_<KEY> env vars over
+//     supabase/config.toml and loads .env.local itself.
+//   - NEXT_PUBLIC_SUPABASE_URL and DATABASE_URL for the app, plus
 //     LANE_DEV_PORT — the port `npm run dev` binds, which the e2e suite reuses
 //     (playwright.config.ts targets it instead of starting a second server).
 //
@@ -48,17 +47,19 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const nameOverride = args.find((a) => a.startsWith("--name="))?.slice("--name=".length);
 
-// Base port assignments straight out of supabase/config.toml + the app's
-// dev (3000) port. Lane N adds N*100.
+// Base ports as committed in supabase/config.toml, each with the env var the
+// CLI reads in its place. The env mapping is the CLI's config loader, not
+// documented by Supabase: verified on CLI v2.122.0, so re-check it on a CLI
+// upgrade. The CLI reads [inbucket] as [local_smtp], hence that env name.
 const SUPABASE_PORTS = {
-  api: { key: "port", base: 54321 },
-  db: { key: "port", base: 54322 },
-  shadow: { key: "shadow_port", base: 54320 },
-  pooler: { key: "port", base: 54329 },
-  studio: { key: "port", base: 54323 },
-  inbucket: { key: "port", base: 54324 },
-  analytics: { key: "port", base: 54327 },
-  inspector: { key: "inspector_port", base: 8083 },
+  api: { env: "SUPABASE_API_PORT", key: "port", base: 54321 },
+  db: { env: "SUPABASE_DB_PORT", key: "port", base: 54322 },
+  shadow: { env: "SUPABASE_DB_SHADOW_PORT", key: "shadow_port", base: 54320 },
+  pooler: { env: "SUPABASE_DB_POOLER_PORT", key: "port", base: 54329 },
+  studio: { env: "SUPABASE_STUDIO_PORT", key: "port", base: 54323 },
+  inbucket: { env: "SUPABASE_LOCAL_SMTP_PORT", key: "port", base: 54324 },
+  analytics: { env: "SUPABASE_ANALYTICS_PORT", key: "port", base: 54327 },
+  inspector: { env: "SUPABASE_EDGE_RUNTIME_INSPECTOR_PORT", key: "inspector_port", base: 8083 },
 };
 const APP_PORTS = { dev: 3000 };
 const LANE_STRIDE = 100;
@@ -67,6 +68,10 @@ const MAX_LANE = 9; // N*100 keeps the 5432x block inside 543xx–544xx..552xx
 function fail(msg) {
   process.stderr.write(`make-lane-inside-worktree: ${msg}\n`);
   process.exit(1);
+}
+
+function git(gitArgs) {
+  return spawnSync("git", gitArgs, { cwd: repoRoot, encoding: "utf8" });
 }
 
 // `name` is the project name in package.json (the base worktree's dir name
@@ -96,46 +101,57 @@ function parseLane(dirName) {
 
 const lane = parseLane(worktreeName);
 const off = lane * LANE_STRIDE;
-
 const port = (p) => p.base + off;
-const apiPort = port(SUPABASE_PORTS.api);
-const dbPort = port(SUPABASE_PORTS.db);
-const studioPort = port(SUPABASE_PORTS.studio);
-const inbucketPort = port(SUPABASE_PORTS.inbucket);
 const devPort = APP_PORTS.dev + off;
 
-// --- supabase/config.toml -------------------------------------------------
-// Re-derive from the committed version so repeated runs are idempotent and
-// never compound on an already-laned file.
-function pristineConfig() {
-  const res = spawnSync("git", ["show", "HEAD:supabase/config.toml"], { cwd: repoRoot, encoding: "utf8" });
+// --- supabase/config.toml (read only) --------------------------------------
+function committedConfig() {
+  const res = git(["show", "HEAD:supabase/config.toml"]);
   if (res.status !== 0) fail(`could not read HEAD:supabase/config.toml (${(res.stderr ?? "").trim()})`);
   return res.stdout;
 }
 
-function setPort(text, { key, base }) {
-  // The (key, value) pair is unique per line — value disambiguates the
-  // several `port = …` keys — so this targets exactly one line. Throwing on
-  // a miss surfaces config.toml drift instead of silently producing a lane
-  // that overlaps the base ports.
-  const re = new RegExp(`^(\\s*${key}\\s*=\\s*)${base}\\b`, "m");
-  if (!re.test(text)) fail(`expected "${key} = ${base}" in config.toml — has the stack config changed?`);
-  return text.replace(re, `$1${base + off}`);
+// Offsets are relative to these base ports, so a base port that changed in
+// config.toml must change here too. The (key, value) pair is unique per line.
+function assertBasePorts(text) {
+  for (const { key, base } of Object.values(SUPABASE_PORTS)) {
+    if (!new RegExp(`^\\s*${key}\\s*=\\s*${base}\\b`, "m").test(text)) {
+      fail(`expected "${key} = ${base}" in config.toml — has the stack config changed?`);
+    }
+  }
 }
 
-function buildConfig() {
-  let text = pristineConfig();
-  text = text.replace(/^(\s*project_id\s*=\s*)"[^"]*"/m, `$1"${worktreeName}"`);
-  for (const def of Object.values(SUPABASE_PORTS)) text = setPort(text, def);
-  // Auth redirect allow-list + site_url point at the dev server; shift them
-  // to this lane's dev port so interactive auth flows resolve. (e2e reuses
-  // that same dev server and doesn't depend on the allow-list for the
-  // password-login flows the suite exercises.)
-  text = text.replaceAll(":3000", `:${devPort}`);
-  return text;
+// site_url and the redirect allow-list point at the dev server; shift them to
+// this lane's dev port so interactive auth flows resolve. (e2e reuses that
+// same dev server and doesn't depend on the allow-list for the password-login
+// flows the suite exercises.)
+function laneAuthUrls(text) {
+  const site = text.match(/^site_url\s*=\s*"([^"]*)"/m);
+  const list = text.match(/^additional_redirect_urls\s*=\s*\[([^\]]*)\]/m);
+  if (!site || !list) fail("expected site_url and additional_redirect_urls in config.toml's [auth] section");
+  const shift = (url) => url.replace(":3000", `:${devPort}`);
+  const redirects = [...list[1].matchAll(/"([^"]*)"/g)].map((m) => shift(m[1]));
+  return { siteUrl: shift(site[1]), redirectUrls: redirects.join(",") };
 }
 
-// --- .env.local -----------------------------------------------------------
+// Lanes configured before the .env.local overrides had a rewritten
+// config.toml hidden with --skip-worktree. Clearing the flag and restoring
+// the committed file converts them in place.
+function hasLegacyLaneConfig() {
+  return git(["ls-files", "-v", "supabase/config.toml"]).stdout?.startsWith("S ") ?? false;
+}
+
+function restoreCommittedConfig() {
+  for (const gitArgs of [
+    ["update-index", "--no-skip-worktree", "supabase/config.toml"],
+    ["restore", "supabase/config.toml"],
+  ]) {
+    const res = git(gitArgs);
+    if (res.status !== 0) fail(`git ${gitArgs.join(" ")} failed (${(res.stderr ?? "").trim()})`);
+  }
+}
+
+// --- .env.local -------------------------------------------------------------
 function setEnvLine(text, key, value) {
   const line = `${key}=${value}`;
   const re = new RegExp(`^${key}=.*$`, "m");
@@ -144,28 +160,37 @@ function setEnvLine(text, key, value) {
   return `${text}${sep}${line}\n`;
 }
 
-function buildEnv() {
-  const envPath = resolve(repoRoot, ".env.local");
-  if (!existsSync(envPath)) {
-    fail(".env.local is missing — run `npm run setup` in this worktree first, then re-run this script.");
-  }
-  let text = readFileSync(envPath, "utf8");
-  text = setEnvLine(text, "NEXT_PUBLIC_SUPABASE_URL", `http://127.0.0.1:${apiPort}`);
-  text = setEnvLine(text, "DATABASE_URL", `postgresql://postgres:postgres@127.0.0.1:${dbPort}/postgres`);
-  text = setEnvLine(text, "LANE_DEV_PORT", String(devPort));
-  return { envPath, text };
+function laneEnv(config) {
+  const { siteUrl, redirectUrls } = laneAuthUrls(config);
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${port(SUPABASE_PORTS.api)}`,
+    DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:${port(SUPABASE_PORTS.db)}/postgres`,
+    LANE_DEV_PORT: String(devPort),
+    SUPABASE_PROJECT_ID: worktreeName,
+    ...Object.fromEntries(Object.values(SUPABASE_PORTS).map((p) => [p.env, String(port(p))])),
+    SUPABASE_AUTH_SITE_URL: siteUrl,
+    SUPABASE_AUTH_ADDITIONAL_REDIRECT_URLS: redirectUrls,
+  };
 }
 
-// --- apply ----------------------------------------------------------------
-const configText = buildConfig();
-const { envPath, text: envText } = buildEnv();
-const configPath = resolve(repoRoot, "supabase", "config.toml");
+// --- apply ------------------------------------------------------------------
+const config = committedConfig();
+assertBasePorts(config);
+const env = laneEnv(config);
 
+const envPath = resolve(repoRoot, ".env.local");
+if (!existsSync(envPath)) {
+  fail(".env.local is missing — run `npm run setup` in this worktree first, then re-run this script.");
+}
+const legacy = hasLegacyLaneConfig();
+
+const apiPort = port(SUPABASE_PORTS.api);
+const studioPort = port(SUPABASE_PORTS.studio);
 const portRows = [
   ["Supabase API / Kong", apiPort],
-  ["Postgres", dbPort],
+  ["Postgres", port(SUPABASE_PORTS.db)],
   ["Studio", studioPort],
-  ["Inbucket (email)", inbucketPort],
+  ["Inbucket (email)", port(SUPABASE_PORTS.inbucket)],
   ["next dev", devPort],
 ];
 const summary =
@@ -176,51 +201,27 @@ const summary =
   `\n  e2e:           npm run test:e2e   (reuses the dev server on ${devPort})`;
 
 if (dryRun) {
-  process.stdout.write(`[dry-run] ${summary}\n\n[dry-run] would rewrite supabase/config.toml and ${envPath}\n`);
+  process.stdout.write(
+    `[dry-run] ${summary}\n\n[dry-run] would set in ${envPath}:\n` +
+      Object.entries(env)
+        .map(([k, v]) => `  ${k}=${v}`)
+        .join("\n") +
+      (legacy ? "\n[dry-run] would clear --skip-worktree on supabase/config.toml and restore the committed file" : "") +
+      "\n",
+  );
   process.exit(0);
 }
 
-// The rewrite re-derives config.toml from HEAD, so uncommitted edits to it
-// would be lost. Once the file is --skip-worktree (an already-configured
-// lane) git can't tell lane edits from real ones, so this guards only the
-// first run.
-function assertNoUncommittedConfigEdits() {
-  const flags = spawnSync("git", ["ls-files", "-v", "supabase/config.toml"], { cwd: repoRoot, encoding: "utf8" });
-  if (flags.stdout?.startsWith("S ")) return;
-  const diff = spawnSync("git", ["diff", "--quiet", "HEAD", "--", "supabase/config.toml"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  if (diff.status === 1) {
-    fail(
-      "supabase/config.toml has uncommitted changes, and this script rewrites it from HEAD. Commit or stash them first.",
-    );
-  }
-  if (diff.status !== 0) fail(`could not diff supabase/config.toml against HEAD (${(diff.stderr ?? "").trim()})`);
-}
-assertNoUncommittedConfigEdits();
-
-writeFileSync(configPath, configText);
+let envText = readFileSync(envPath, "utf8");
+for (const [key, value] of Object.entries(env)) envText = setEnvLine(envText, key, value);
 writeFileSync(envPath, envText);
-
-// Keep the local config.toml edit out of git: this worktree's index only.
-const skip = spawnSync("git", ["update-index", "--skip-worktree", "supabase/config.toml"], {
-  cwd: repoRoot,
-  encoding: "utf8",
-});
-if (skip.status !== 0) {
-  process.stderr.write(
-    `  warning: could not set --skip-worktree on supabase/config.toml (${(skip.stderr ?? "").trim()}).\n` +
-      `  The lane still works, but git will show config.toml as modified. Run manually:\n` +
-      `    git update-index --skip-worktree supabase/config.toml\n`,
-  );
-}
+if (legacy) restoreCommittedConfig();
 
 process.stdout.write(
-  `${summary}\n\nConfigured. Start it with:  npm run dev\n` +
+  `${summary}\n\nConfigured${legacy ? " (and restored the committed supabase/config.toml)" : ""}. Start it with:  npm run dev\n` +
     `If this worktree's stack is already running on other ports, restart it first:  npm run dev:db:stop\n`,
 );
 process.stdout.write(
   `Windows only — reserve this lane's Supabase ports (admin shell, once):\n` +
-    `  netsh int ipv4 add excludedportrange protocol=tcp startport=${SUPABASE_PORTS.api.base + off} numberofports=7\n`,
+    `  netsh int ipv4 add excludedportrange protocol=tcp startport=${apiPort} numberofports=7\n`,
 );

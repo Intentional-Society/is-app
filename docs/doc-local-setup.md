@@ -80,6 +80,8 @@ Supabase containers keep running after Ctrl+C. The Next.js server does not.
 | Supabase API    | http://localhost:54321 | Auth and PostgREST endpoints (used internally by the app)                       |
 | Postgres        | localhost:54322        | Direct database connection (user: `postgres`, pass: `postgres`, db: `postgres`) |
 
+These are the default ports. A worktree lane shifts each one by N×100 (lane 1: app 3100, Inbucket 54424); see [strategy-worktree-lanes.md](strategy-worktree-lanes.md).
+
 **Inbucket** is the local email inbox. Any email Supabase Auth sends during local development (magic links, email verification, password reset) is captured here instead of being delivered to a real address. Open http://localhost:54324 and click the recipient address to read it.
 
 **Supabase Studio** provides a full database browser. Use it to inspect tables, run SQL queries, manage auth users, and browse logs during development.

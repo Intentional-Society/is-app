@@ -25,8 +25,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 // Inbucket listens three ports above the Supabase API (54321 → 54324) in
 // supabase/config.toml, and each worktree lane shifts both by the same offset.
 function localInbucketUrl() {
-  const api = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321");
-  return `${api.protocol}//${api.hostname}:${Number(api.port) + 3}`;
+  const api = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321");
+  return `${api.protocol}//${api.hostname}:${Number(api.port || 54321) + 3}`;
 }
 
 type SigninPageProps = {

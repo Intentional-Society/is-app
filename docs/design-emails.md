@@ -92,7 +92,7 @@ content_path = "./supabase/templates/recovery.html"
 `config.toml` or any referenced template.
 
 Outbound mail on the local stack still lands in Inbucket
-(`http://localhost:54324`); Resend is production-only.
+(`http://localhost:54324`, plus N×100 in a worktree lane); Resend is production-only.
 
 The subjects and paths are duplicated between `config.toml` and
 `templates.manifest.mjs`. Keeping them in step is a manual discipline; a

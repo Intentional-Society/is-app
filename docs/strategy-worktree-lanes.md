@@ -61,19 +61,27 @@ its stack (`npm run dev:db:stop`), then run `npm run make_lane_inside_worktree`
 in `C:\All\code\is-app`. Its `project_id` stays `is-app`, so the database
 volume and its data carry over to the new ports.
 
-`make_lane_inside_worktree` reads the lane from the directory name and, in
-this worktree only:
+`make_lane_inside_worktree` reads the lane from the directory name and writes
+this worktree's `.env.local` (gitignored) only. No tracked file changes, so
+pulls, branch switches and `config.toml` edits work as in any checkout. It
+sets:
 
-- rewrites `supabase/config.toml` — `project_id` + every port + the auth
-  redirect URLs — re-deriving from the committed version each run (idempotent),
-  then sets `git update-index --skip-worktree` so the edit never shows as a
-  diff or gets committed;
-- rewrites `.env.local` — the Supabase API + `DATABASE_URL` ports — and adds
+- `SUPABASE_PROJECT_ID`, every `SUPABASE_*_PORT`, and
+  `SUPABASE_AUTH_SITE_URL` / `SUPABASE_AUTH_ADDITIONAL_REDIRECT_URLS`. The
+  Supabase CLI loads `.env.local` itself and applies `SUPABASE_<SECTION>_<KEY>`
+  variables over `supabase/config.toml`. Supabase doesn't document this; it was
+  verified on CLI v2.122.0, so re-check a lane's ports with `npx supabase
+  status` after a CLI upgrade;
+- the Supabase API + `DATABASE_URL` ports for the app, and
   `LANE_DEV_PORT`, read by both the `npm run dev` wrapper
   (`scripts/dev-server.mjs`) and `playwright.config.ts`, so the dev server lands
   on this lane's port and the e2e suite targets that same port. Next can't take
   the port from `.env` directly — it binds before env files load — hence the
   wrapper.
+
+Re-running the script is idempotent. On a lane made by an earlier version,
+which rewrote `config.toml` under `--skip-worktree`, it also clears the flag
+and restores the committed file.
 
 Local Supabase keys are identical across stacks (fixed demo JWT secret), so
 only URLs/ports change. Preview a lane without writing anything:
@@ -125,13 +133,7 @@ session _and_ an e2e run at once, use two lanes (each lane is one Supabase stack
 - **Windows port grabbing:** reserve a lane's Supabase ports once in an admin
   shell (the script prints the exact command — lane 2 shown):
   `netsh int ipv4 add excludedportrange protocol=tcp startport=54521 numberofports=7`.
-- **If `config.toml` changes upstream:** because the file is `--skip-worktree`
-  in lanes, a pull won't update it there. Run `git update-index
-  --no-skip-worktree supabase/config.toml`, pull, then re-run
-  `npm run make_lane_inside_worktree` (it re-derives from the new base).
-- **Changing `config.toml` from a lane:** git ignores edits to a
-  `--skip-worktree` file, so they never reach a commit. Run `git update-index
-  --no-skip-worktree supabase/config.toml` and `git restore
-  supabase/config.toml` (back to the default ports), make and commit the edit,
-  then re-run `npm run make_lane_inside_worktree`. The script refuses to run
-  over uncommitted edits to an unflagged `config.toml`.
+- **If a base port in `config.toml` changes:** the script derives lane ports
+  from fixed base values and stops with an error when `config.toml` no longer
+  matches them. Update `SUPABASE_PORTS` in the script, then re-run it in each
+  lane. A change to `site_url` or the redirect list also needs a re-run.

@@ -124,11 +124,12 @@ function isBaseWorktree() {
   return basename(repoRoot) === baseName;
 }
 
-// make_lane_inside_worktree marks config.toml --skip-worktree, so the flag
-// means this checkout (the base worktree included, as lane 1) is on lane ports.
+// make_lane_inside_worktree writes LANE_DEV_PORT into .env.local, so its
+// presence means this checkout (the base worktree included, as lane 1) is on
+// lane ports.
 function isLaneConfigured() {
-  const res = spawnSync("git", ["ls-files", "-v", "supabase/config.toml"], { cwd: repoRoot, encoding: "utf8" });
-  return res.stdout?.startsWith("S ") ?? false;
+  const envPath = resolve(repoRoot, ".env.local");
+  return existsSync(envPath) && /^LANE_DEV_PORT=/m.test(readFileSync(envPath, "utf8"));
 }
 
 function checkWindowsSupabasePortReservation() {
