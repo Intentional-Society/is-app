@@ -177,7 +177,7 @@ Same silent-fallback semantics as prod: if `emailRedirectTo` from the client isn
 
 ### Inbucket (local email catcher)
 
-`supabase start` also spins up Inbucket at **http://localhost:54324**. All outbound email — magic links, invites, any future notifications — lands there instead of real inboxes. Open the URL, click the mailbox matching your email's local-part, open the most recent message, click the link. No external SMTP is configured for local dev.
+`supabase start` also spins up Inbucket at **http://localhost:54324** (a worktree lane adds N×100; see [strategy-worktree-lanes.md](strategy-worktree-lanes.md)). All outbound email — magic links, invites, any future notifications — lands there instead of real inboxes. Open the URL, click the mailbox matching your email's local-part, open the most recent message, click the link. No external SMTP is configured for local dev.
 
 ### API keys
 

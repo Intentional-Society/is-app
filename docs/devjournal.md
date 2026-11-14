@@ -6,6 +6,12 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-12 | James (with Opus 5.5) | Base worktree is lane 1 (+100 ports)
+
+Running `npm run make_lane_inside_worktree` in the main checkout moves it to +100 ports (API 54421, dev 3100), which frees the Supabase defaults for other Supabase projects. Lane ports now live in `.env.local`, so convert existing lanes per the doc. Local stacks no longer run analytics/vector or the edge runtime. Reference: docs/strategy-worktree-lanes.md.
+
+---
+
 ## 2026-11-10 | James (with Opus 5.5) | The reviewer sees its earlier threads
 
 Claude review now gives the reviewer its earlier threads on the PR, with replies from owners, members and collaborators, so later rounds don't re-raise a finding that was fixed or declined; a by-design reply settles it. The summary drops the turn count, which always read 0.

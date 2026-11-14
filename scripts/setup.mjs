@@ -105,13 +105,14 @@ function ensureLocalEnv() {
   console.log("  created .env.local from .env.local.example");
 }
 
-// The base Supabase stack binds 7 contiguous host ports, 54321–54327 (API,
-// Postgres, Studio, Inbucket, and analytics at 54327; 54325/54326 are unused
-// gaps). The shadow DB (54320) is only spun up transiently for `db diff` and
-// the pooler (54329) is disabled, so neither is host-bound and neither needs
-// reserving. Lanes shift this span by N*100 and get their reservation reminder
-// from make_lane_inside_worktree (it knows the lane's ports at assignment), so
-// this check runs in the base worktree only.
+// The default Supabase stack binds up to 7 contiguous host ports, 54321–54327
+// (API, Postgres, Studio, Inbucket, and analytics at 54327 when enabled;
+// 54325/54326 are unused gaps). The shadow DB (54320) is only spun up
+// transiently for `db diff` and the pooler (54329) is disabled, so neither is
+// host-bound and neither needs reserving. Lanes shift this span by N*100 and
+// get their reservation reminder from make_lane_inside_worktree (it knows the
+// lane's ports at assignment), so this check runs only in a checkout still on
+// the default ports.
 const SUPABASE_API_PORT = 54321;
 const SUPABASE_BLOCK_SIZE = 7;
 
@@ -121,6 +122,14 @@ const SUPABASE_BLOCK_SIZE = 7;
 function isBaseWorktree() {
   const baseName = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")).name;
   return basename(repoRoot) === baseName;
+}
+
+// make_lane_inside_worktree writes LANE_DEV_PORT into .env.local, so its
+// presence means this checkout (the base worktree included, as lane 1) is on
+// lane ports.
+function isLaneConfigured() {
+  const envPath = resolve(repoRoot, ".env.local");
+  return existsSync(envPath) && /^LANE_DEV_PORT=/m.test(readFileSync(envPath, "utf8"));
 }
 
 function checkWindowsSupabasePortReservation() {
@@ -188,7 +197,7 @@ function main() {
 
   if (process.platform === "win32") {
     console.log("\n5. Windows Supabase port reservation (advisory)");
-    if (isBaseWorktree()) {
+    if (isBaseWorktree() && !isLaneConfigured()) {
       checkWindowsSupabasePortReservation();
     } else {
       console.log("  lane worktree — `npm run make_lane_inside_worktree` prints this lane's reservation command.");

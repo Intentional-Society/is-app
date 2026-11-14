@@ -80,6 +80,8 @@ Supabase containers keep running after Ctrl+C. The Next.js server does not.
 | Supabase API    | http://localhost:54321 | Auth and PostgREST endpoints (used internally by the app)                       |
 | Postgres        | localhost:54322        | Direct database connection (user: `postgres`, pass: `postgres`, db: `postgres`) |
 
+These are the default ports. A worktree lane shifts each one by N×100 (lane 1: app 3100, Inbucket 54424); see [strategy-worktree-lanes.md](strategy-worktree-lanes.md).
+
 **Inbucket** is the local email inbox. Any email Supabase Auth sends during local development (magic links, email verification, password reset) is captured here instead of being delivered to a real address. Open http://localhost:54324 and click the recipient address to read it.
 
 **Supabase Studio** provides a full database browser. Use it to inspect tables, run SQL queries, manage auth users, and browse logs during development.
@@ -126,7 +128,7 @@ Stopping is optional — the containers are lightweight and persist safely betwe
 : Docker Desktop must be running. Check `docker ps` to confirm it's up.
 
 **Port conflicts**
-: Ports 54321–54327 and 3000 must be free. Stop other Supabase projects or local Postgres instances that may be using them. On Windows, a `supabase start` `Error status 404` rollback usually means a process grabbed `54321` from the ephemeral range — reserve the span once (see [setup-dev-machine.md](setup-dev-machine.md#windows-reserve-the-local-supabase-ports)).
+: Ports 54321–54327 and 3000 must be free. Stop other Supabase projects or local Postgres instances that may be using them, or move this checkout to lane 1's ports (see [strategy-worktree-lanes.md](strategy-worktree-lanes.md)). On Windows, a `supabase start` `Error status 404` rollback usually means a process grabbed `54321` from the ephemeral range — reserve the span once (see [setup-dev-machine.md](setup-dev-machine.md#windows-reserve-the-local-supabase-ports)).
 
 **Migration errors on startup**
 : The `dev:db` script treats migration failures as non-fatal (`|| true`). If you see schema-related errors in the app, run `npx drizzle-kit migrate` manually to see the error output.

@@ -42,7 +42,7 @@ Docker Desktop must be **running** before `npm run dev` — the dev script start
 
 ### Windows: reserve the local Supabase ports
 
-The local Supabase stack binds a fixed span of 7 ports, `54321–54327` (API gateway, Postgres, Studio, Inbucket, and analytics at `54327`; `54325`/`54326` are unused gaps). On Windows these fall inside the _ephemeral_ range (`49152–65535`), so another process can be auto-assigned one — `54321` (the API gateway / Kong) in particular — before Docker binds it. (Nothing else needs reserving: the dev server `3000` and inspector `8083` sit below the ephemeral range — a `3000` clash is instead a visible "port in use" from a server you started — and the shadow DB `54320` and pooler `54329` are in-range but not host-bound.) `supabase start` then health-checks the squatter, gets an `Error status 404`, and rolls the whole stack back. Every container was healthy; the rollback killed them. `--ignore-health-check` does not bypass it (the failing call is in post-start setup, not the health loop).
+The local Supabase stack binds a fixed span of 7 ports, `54321–54327` (API gateway, Postgres, Studio, Inbucket, and analytics at `54327` when enabled; `54325`/`54326` are unused gaps). On Windows these fall inside the _ephemeral_ range (`49152–65535`), so another process can be auto-assigned one — `54321` (the API gateway / Kong) in particular — before Docker binds it. (Nothing else needs reserving: the dev server `3000` and inspector `8083` sit below the ephemeral range — a `3000` clash is instead a visible "port in use" from a server you started — and the shadow DB `54320` and pooler `54329` are in-range but not host-bound.) `supabase start` then health-checks the squatter, gets an `Error status 404`, and rolls the whole stack back. Every container was healthy; the rollback killed them. `--ignore-health-check` does not bypass it (the failing call is in post-start setup, not the health loop).
 
 Reserve the block once so Windows never hands those ports out. With the stack stopped (`npm run dev:db:stop`) and any port holder closed, in an **elevated** PowerShell:
 
@@ -64,7 +64,7 @@ Explicit Docker binds still succeed on reserved ports; only automatic ephemeral 
 Get-Process -Id (Get-NetTCPConnection -LocalPort 54321 -State Listen).OwningProcess
 ```
 
-**Worktree lanes** shift the span by `N×100` (lane 2 → `54521–54527`, lane 3 → `54621–54627`, …) and each need their own reservation; `npm run make_lane_inside_worktree` prints the exact `netsh` command for the lane. See [strategy-worktree-lanes.md](strategy-worktree-lanes.md).
+**Worktree lanes** shift the span by `N×100` (lane 1, the base worktree → `54421–54427`, lane 2 → `54521–54527`, lane 3 → `54621–54627`, …) and each need their own reservation; `npm run make_lane_inside_worktree` prints the exact `netsh` command for the lane. See [strategy-worktree-lanes.md](strategy-worktree-lanes.md).
 
 ## Git
 

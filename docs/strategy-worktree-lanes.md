@@ -18,20 +18,25 @@ worktree** — a _lane_.
 A lane is just a port offset + a renamed Supabase project, derived from the
 worktree's directory name:
 
-| Dir name   | Lane | Offset                |
-| ---------- | ---- | --------------------- |
-| `is-app`   | 0    | base ports, untouched |
-| `is-app-2` | 2    | +200                  |
-| `is-app-3` | 3    | +300                  |
+| Dir name   | Lane | Offset |
+| ---------- | ---- | ------ |
+| `is-app`   | 1    | +100   |
+| `is-app-2` | 2    | +200   |
+| `is-app-3` | 3    | +300   |
 
-| Service                     | Base              | Lane 2 | Lane 3 |
-| --------------------------- | ----------------- | ------ | ------ |
-| Supabase API / Kong         | 54321             | 54521  | 54621  |
-| Postgres                    | 54322             | 54522  | 54622  |
-| Studio                      | 54323             | 54523  | 54623  |
-| Inbucket (email)            | 54324             | 54524  | 54624  |
-| shadow / analytics / pooler | 54320/54327/54329 | +200   | +300   |
-| `next dev`                  | 3000              | 3200   | 3300   |
+| Service                     | Default           | Lane 1 | Lane 2 | Lane 3 |
+| --------------------------- | ----------------- | ------ | ------ | ------ |
+| Supabase API / Kong         | 54321             | 54421  | 54521  | 54621  |
+| Postgres                    | 54322             | 54422  | 54522  | 54622  |
+| Studio                      | 54323             | 54423  | 54523  | 54623  |
+| Inbucket (email)            | 54324             | 54424  | 54524  | 54624  |
+| shadow / analytics / pooler | 54320/54327/54329 | +100   | +200   | +300   |
+| `next dev`                  | 3000              | 3100   | 3200   | 3300   |
+
+A checkout where `make_lane_inside_worktree` never ran stays on the Supabase
+defaults (the "Default" column). That's the single-checkout setup in
+[doc-local-setup.md](doc-local-setup.md). Make the base worktree lane 1 when
+you run lanes, or to free the defaults for other Supabase projects.
 
 The e2e suite has no port of its own — it reuses the lane's `next dev` server
 (see [Running in a lane](#running-in-a-lane)).
@@ -51,19 +56,50 @@ npm run setup                                     # generates this worktree's .e
 npm run make_lane_inside_worktree                 # converts THIS worktree into lane 2
 ```
 
-`make_lane_inside_worktree` reads the lane from the directory name and, in
-this worktree only:
+The base worktree becomes lane 1 the same way, minus the `worktree add`: stop
+its stack (`npm run dev:db:stop`), then run `npm run make_lane_inside_worktree`
+in `C:\All\code\is-app`. Its `project_id` stays `is-app`, so the database
+volume and its data carry over to the new ports.
 
-- rewrites `supabase/config.toml` — `project_id` + every port + the auth
-  redirect URLs — re-deriving from the committed version each run (idempotent),
-  then sets `git update-index --skip-worktree` so the edit never shows as a
-  diff or gets committed;
-- rewrites `.env.local` — the Supabase API + `DATABASE_URL` ports — and adds
+`make_lane_inside_worktree` reads the lane from the directory name and writes
+this worktree's `.env.local` (gitignored) only. No tracked file changes, so
+pulls, branch switches and `config.toml` edits work as in any checkout. It
+sets:
+
+- `SUPABASE_PROJECT_ID`, every `SUPABASE_*_PORT`, and
+  `SUPABASE_AUTH_SITE_URL` / `SUPABASE_AUTH_ADDITIONAL_REDIRECT_URLS`. The
+  Supabase CLI loads `.env.local` itself and applies `SUPABASE_<SECTION>_<KEY>`
+  variables over `supabase/config.toml`. Supabase doesn't document this (it
+  was verified on CLI v2.122.0), so in a lane `npm run dev:db` stops when the
+  CLI's resolved API URL differs from `.env.local`, which means the CLI ignored
+  the overrides. That URL comes from config, not from the ports the containers
+  bound, so it doesn't catch a stack still running on old ports: stop the
+  stack before re-running the script;
+- the Supabase API + `DATABASE_URL` ports for the app, and
   `LANE_DEV_PORT`, read by both the `npm run dev` wrapper
   (`scripts/dev-server.mjs`) and `playwright.config.ts`, so the dev server lands
   on this lane's port and the e2e suite targets that same port. Next can't take
   the port from `.env` directly — it binds before env files load — hence the
   wrapper.
+
+Re-running the script is idempotent, and reads the working `config.toml`, so
+uncommitted edits count. `npm run dev:db` warns when `config.toml`'s auth
+URLs no longer match what the script wrote; re-run it, then restart the stack.
+
+**A lane made by an earlier version** rewrote `config.toml` under
+`--skip-worktree`, and a pull or rebase that changes `config.toml` stops on
+that file. Convert it in this order, from the lane:
+
+```sh
+npm run dev:db:stop
+git update-index --no-skip-worktree supabase/config.toml
+git diff supabase/config.toml        # expect only project_id, ports and :3000 URLs
+git restore supabase/config.toml
+git switch --detach origin/main      # or pull / rebase your branch
+npm run make_lane_inside_worktree
+```
+
+Run on a still-flagged lane, the script stops and prints these steps.
 
 Local Supabase keys are identical across stacks (fixed demo JWT secret), so
 only URLs/ports change. Preview a lane without writing anything:
@@ -85,7 +121,7 @@ npm run test:functional         # isolated DB
 starts its own `npm run dev` on that port when none is. Two `next dev` instances
 can't share one worktree's `.next` anyway, so a single server per lane is the
 only workable shape; concurrent isolated dev+e2e is what separate _lanes_ are
-for. The base worktree (no lane vars) falls back to port 3000.
+for. A checkout that isn't a lane (no lane vars) falls back to port 3000.
 
 **Tradeoff:** an e2e run resets and drives the seeded `@testfake.local` users in
 the lane's dev DB (not your real account), so a manual dev session's test-user
@@ -115,7 +151,7 @@ session _and_ an e2e run at once, use two lanes (each lane is one Supabase stack
 - **Windows port grabbing:** reserve a lane's Supabase ports once in an admin
   shell (the script prints the exact command — lane 2 shown):
   `netsh int ipv4 add excludedportrange protocol=tcp startport=54521 numberofports=7`.
-- **If `config.toml` changes upstream:** because the file is `--skip-worktree`
-  in lanes, a pull won't update it there. Run `git update-index
-  --no-skip-worktree supabase/config.toml`, pull, then re-run
-  `npm run make_lane_inside_worktree` (it re-derives from the new base).
+- **If a base port in `config.toml` changes:** the script derives lane ports
+  from fixed base values and stops with an error when `config.toml` no longer
+  matches them. Update `SUPABASE_PORTS` in the script, then re-run it in each
+  lane.

@@ -12,8 +12,8 @@ const isCI = !!process.env.CI;
 // Target the local dev server's port so `reuseExistingServer` finds a running
 // `npm run dev` and runs against it, rather than starting a second `next dev`
 // (two can't coexist in one worktree — they'd share one `.next`). A lane writes
-// LANE_DEV_PORT into its .env.local; the base worktree has neither var and falls
-// back to 3000, matching plain `npm run dev`. E2E_PORT stays as an explicit
+// LANE_DEV_PORT into its .env.local; a checkout that isn't a lane has neither
+// var and falls back to 3000, matching plain `npm run dev`. E2E_PORT stays as an explicit
 // override. See docs/strategy-worktree-lanes.md.
 const e2ePort = process.env.LANE_DEV_PORT || process.env.E2E_PORT || "3000";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${e2ePort}`;
