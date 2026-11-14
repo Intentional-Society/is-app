@@ -39,7 +39,7 @@
 //   --name=<dirname>  pretend the worktree is named <dirname> (preview/testing)
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
 import { laneAuthUrls } from "./lib/lane.mjs";
@@ -110,12 +110,6 @@ const devPort = APP_PORTS.dev + off;
 // --- supabase/config.toml (read only) --------------------------------------
 const configPath = resolve(repoRoot, "supabase", "config.toml");
 
-function committedConfig() {
-  const res = git(["show", "HEAD:supabase/config.toml"]);
-  if (res.status !== 0) fail(`could not read HEAD:supabase/config.toml (${(res.stderr ?? "").trim()})`);
-  return res.stdout;
-}
-
 // Offsets are relative to these base ports, so a base port that changed in
 // config.toml must change here too. The (key, value) pair is unique per line.
 function assertBasePorts(text) {
@@ -127,39 +121,19 @@ function assertBasePorts(text) {
 }
 
 // Lanes configured before the .env.local overrides had a rewritten
-// config.toml hidden with --skip-worktree. Clearing the flag and restoring
-// the committed file converts them in place.
-function hasLegacyLaneConfig() {
-  return git(["ls-files", "-v", "supabase/config.toml"]).stdout?.startsWith("S ") ?? false;
-}
-
-// The earlier rewrite: HEAD's config.toml with project_id, each base port and
-// the :3000 dev URLs shifted to this lane. Anything else in the flagged file
-// is a real edit that restoring would discard, so stop instead.
-function assertOnlyLegacyRewrite() {
-  let expected = committedConfig().replace(/^(\s*project_id\s*=\s*)"[^"]*"/m, `$1"${worktreeName}"`);
-  for (const { key, base } of Object.values(SUPABASE_PORTS)) {
-    expected = expected.replace(new RegExp(`^(\\s*${key}\\s*=\\s*)${base}\\b`, "m"), `$1${base + off}`);
-  }
-  expected = expected.replaceAll(":3000", `:${devPort}`);
-  const normalize = (t) => t.replace(/\r\n/g, "\n");
-  if (normalize(readFileSync(configPath, "utf8")) !== normalize(expected)) {
-    fail(
-      "supabase/config.toml is flagged --skip-worktree and has edits beyond the earlier lane rewrite, which restoring would discard.\n" +
-        "  Inspect them:  git update-index --no-skip-worktree supabase/config.toml && git diff supabase/config.toml\n" +
-        "  Keep what you need, run `git restore supabase/config.toml`, then re-run this script.",
-    );
-  }
-}
-
-function restoreCommittedConfig() {
-  for (const gitArgs of [
-    ["update-index", "--no-skip-worktree", "supabase/config.toml"],
-    ["restore", "supabase/config.toml"],
-  ]) {
-    const res = git(gitArgs);
-    if (res.status !== 0) fail(`git ${gitArgs.join(" ")} failed (${(res.stderr ?? "").trim()})`);
-  }
+// config.toml hidden with --skip-worktree. Only the developer can tell that
+// rewrite from real edits, so the conversion is the manual steps in
+// docs/strategy-worktree-lanes.md, and this script stops until they're done.
+function assertNoLegacyLaneConfig() {
+  if (!git(["ls-files", "-v", "supabase/config.toml"]).stdout?.startsWith("S ")) return;
+  fail(
+    "supabase/config.toml is still flagged --skip-worktree from the earlier lane setup.\n" +
+      "  npm run dev:db:stop\n" +
+      "  git update-index --no-skip-worktree supabase/config.toml\n" +
+      "  git diff supabase/config.toml     # keep any edits beyond project_id, ports and :3000 URLs\n" +
+      "  git restore supabase/config.toml\n" +
+      "  Then update the branch and re-run this script. See docs/strategy-worktree-lanes.md.",
+  );
 }
 
 // --- .env.local -------------------------------------------------------------
@@ -189,16 +163,19 @@ function laneEnv(config) {
 }
 
 // --- apply ------------------------------------------------------------------
+assertNoLegacyLaneConfig();
+
 const envPath = resolve(repoRoot, ".env.local");
-if (!existsSync(envPath)) {
+let envText;
+try {
+  envText = readFileSync(envPath, "utf8");
+} catch (err) {
+  if (err.code !== "ENOENT") throw err;
   fail(".env.local is missing — run `npm run setup` in this worktree first, then re-run this script.");
 }
-const legacy = hasLegacyLaneConfig();
-if (legacy) assertOnlyLegacyRewrite();
 
-// The working config.toml, so an uncommitted edit counts; a legacy lane's
-// working file is the old rewrite, so it reads HEAD, which it restores to.
-const config = legacy ? committedConfig() : readFileSync(configPath, "utf8");
+// The working config.toml, so an uncommitted edit counts.
+const config = readFileSync(configPath, "utf8");
 assertBasePorts(config);
 const env = laneEnv(config);
 
@@ -224,19 +201,16 @@ if (dryRun) {
       Object.entries(env)
         .map(([k, v]) => `  ${k}=${v}`)
         .join("\n") +
-      (legacy ? "\n[dry-run] would clear --skip-worktree on supabase/config.toml and restore the committed file" : "") +
       "\n",
   );
   process.exit(0);
 }
 
-let envText = readFileSync(envPath, "utf8");
 for (const [key, value] of Object.entries(env)) envText = setEnvLine(envText, key, value);
 writeFileSync(envPath, envText);
-if (legacy) restoreCommittedConfig();
 
 process.stdout.write(
-  `${summary}\n\nConfigured${legacy ? " (and restored the committed supabase/config.toml)" : ""}. Start it with:  npm run dev\n` +
+  `${summary}\n\nConfigured. Start it with:  npm run dev\n` +
     `If this worktree's stack is already running on other ports, restart it first:  npm run dev:db:stop\n`,
 );
 process.stdout.write(

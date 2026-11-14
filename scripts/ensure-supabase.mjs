@@ -26,11 +26,15 @@ const POLL_INTERVAL_MS = 3_000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const statusOk = () =>
-  spawnSync("npx", ["supabase", "status"], {
-    stdio: "ignore",
-    shell: true,
-  }).status === 0;
+// The output of the last successful `supabase status -o env`, which checkLane
+// reuses so a lane start doesn't pay for a second CLI call.
+let lastStatusEnv = "";
+
+const statusOk = () => {
+  const res = spawnSync("npx", ["supabase", "status", "-o", "env"], { shell: true, encoding: "utf8" });
+  lastStatusEnv = res.status === 0 ? (res.stdout ?? "") : "";
+  return res.status === 0;
+};
 
 const pollUntilReady = async (budgetMs) => {
   const deadline = Date.now() + budgetMs;
@@ -81,8 +85,9 @@ const clearDanglingSupabaseContainers = () => {
 
 // A lane's project id and ports reach the CLI only as SUPABASE_* lines in
 // .env.local, which the CLI applies over config.toml without Supabase
-// documenting it. If a CLI version stops doing that, the stack above would be
-// the default `is-app` one, so stop when the CLI's API URL isn't this lane's.
+// documenting it. `supabase status` builds API_URL from that resolved config,
+// not from the ports the containers bound, so a mismatch with .env.local means
+// the CLI ignored the overrides; a stack still running on old ports passes.
 // Also warn when config.toml's auth URLs changed after
 // make_lane_inside_worktree wrote them.
 const checkLane = () => {
@@ -90,8 +95,9 @@ const checkLane = () => {
   const env = parse(readFileSync(".env.local"));
   if (!env.LANE_DEV_PORT) return;
 
-  const status = spawnSync("npx", ["supabase", "status", "-o", "env"], { shell: true, encoding: "utf8" });
-  const apiUrl = status.stdout?.match(/^API_URL="?([^"\r\n]*)"?/m)?.[1];
+  // After a fresh `supabase start` no status has succeeded yet.
+  if (!lastStatusEnv) statusOk();
+  const apiUrl = lastStatusEnv.match(/^API_URL="?([^"\r\n]*)"?/m)?.[1];
   if (apiUrl !== env.NEXT_PUBLIC_SUPABASE_URL) {
     process.stderr.write(
       `This lane expects the Supabase API at ${env.NEXT_PUBLIC_SUPABASE_URL}, but the CLI reports ${apiUrl ?? "nothing"}.\n` +

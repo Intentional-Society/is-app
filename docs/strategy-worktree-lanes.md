@@ -70,8 +70,11 @@ sets:
   `SUPABASE_AUTH_SITE_URL` / `SUPABASE_AUTH_ADDITIONAL_REDIRECT_URLS`. The
   Supabase CLI loads `.env.local` itself and applies `SUPABASE_<SECTION>_<KEY>`
   variables over `supabase/config.toml`. Supabase doesn't document this (it
-  was verified on CLI v2.122.0), so `npm run dev:db` stops in a lane whose
-  running stack reports a different API URL than `.env.local` expects;
+  was verified on CLI v2.122.0), so in a lane `npm run dev:db` stops when the
+  CLI's resolved API URL differs from `.env.local`, which means the CLI ignored
+  the overrides. That URL comes from config, not from the ports the containers
+  bound, so it doesn't catch a stack still running on old ports: stop the
+  stack before re-running the script;
 - the Supabase API + `DATABASE_URL` ports for the app, and
   `LANE_DEV_PORT`, read by both the `npm run dev` wrapper
   (`scripts/dev-server.mjs`) and `playwright.config.ts`, so the dev server lands
@@ -96,8 +99,7 @@ git switch --detach origin/main      # or pull / rebase your branch
 npm run make_lane_inside_worktree
 ```
 
-Run on a still-flagged lane, the script does the restore itself, and stops
-instead when the file holds edits beyond that rewrite.
+Run on a still-flagged lane, the script stops and prints these steps.
 
 Local Supabase keys are identical across stacks (fixed demo JWT secret), so
 only URLs/ports change. Preview a lane without writing anything:
