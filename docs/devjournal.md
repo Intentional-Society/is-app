@@ -6,6 +6,10 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-15 | James (with Opus 5.5) | Node 26 LTS upgrade
+
+`.nvmrc`, `engines.node`, the CI workflows and `@types/node` move to Node 26, the Active LTS since October; Node 24 is in maintenance. On 26, server-side `fetch` uses HTTP/2, where `statusText` is empty, so check `res.status`.
+
 ## 2026-11-12 | James (with Opus 5.5) | Base worktree is lane 1 (+100 ports)
 
 Running `npm run make_lane_inside_worktree` in the main checkout moves it to +100 ports (API 54421, dev 3100), which frees the Supabase defaults for other Supabase projects. Lane ports now live in `.env.local`, so convert existing lanes per the doc. Local stacks no longer run analytics/vector or the edge runtime. Reference: docs/strategy-worktree-lanes.md.
