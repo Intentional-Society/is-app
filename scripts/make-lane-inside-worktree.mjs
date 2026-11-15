@@ -51,9 +51,8 @@ const nameOverride = args.find((a) => a.startsWith("--name="))?.slice("--name=".
 
 // Base ports as committed in supabase/config.toml, each with the env var the
 // CLI reads in its place. The env mapping is the CLI's config loader, not
-// documented by Supabase (verified on CLI v2.122.0); ensure-supabase.mjs stops
-// a lane whose running stack doesn't match it. The CLI reads [inbucket] as
-// [local_smtp], hence that env name.
+// documented by Supabase (verified on CLI v3.1.0); ensure-supabase.mjs stops
+// a lane whose running stack doesn't match it.
 const SUPABASE_PORTS = {
   api: { env: "SUPABASE_API_PORT", key: "port", base: 54321 },
   db: { env: "SUPABASE_DB_PORT", key: "port", base: 54322 },
