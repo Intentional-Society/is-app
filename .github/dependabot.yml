@@ -15,7 +15,7 @@ updates:
     cooldown:
       default-days: 3
     ignore:
-      # Keep @types/node aligned with the Node 24 runtime (.nvmrc, CI
+      # Keep @types/node aligned with the Node 26 runtime (.nvmrc, CI
       # workflows). Major bumps run ahead of the runtime and type-check
       # against APIs that don't exist in production.
       - dependency-name: "@types/node"

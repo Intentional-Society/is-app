@@ -78,7 +78,7 @@ if (download) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    console.error(`GET failed: ${res.status} ${res.statusText}`);
+    console.error(`GET failed: ${res.status}`);
     console.error(await res.text());
     process.exit(1);
   }
@@ -160,7 +160,7 @@ const res = await fetch(API_URL, {
 });
 
 if (!res.ok) {
-  console.error(`PATCH failed: ${res.status} ${res.statusText}`);
+  console.error(`PATCH failed: ${res.status}`);
   console.error(await res.text());
   process.exit(1);
 }

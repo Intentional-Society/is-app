@@ -14,7 +14,7 @@ export function assertNodeEngine() {
   if (Number.isNaN(runningMajor) || runningMajor < floorMajor) {
     throw new Error(
       `skill-evals harness requires Node >= ${NODE_ENGINE_FLOOR}, but this process is running ${process.version}. ` +
-        "Upgrade Node (the repo pins 24.x) and re-run.",
+        "Upgrade Node (the repo pins 26.x) and re-run.",
     );
   }
 }

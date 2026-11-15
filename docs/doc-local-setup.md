@@ -6,14 +6,14 @@ Install these once. See [setup-dev-machine.md](setup-dev-machine.md) for detaile
 
 | Tool           | Minimum version | Notes                                                   |
 | -------------- | --------------- | ------------------------------------------------------- |
-| Node.js        | 22+             | Install via `nvm`; the repo's `.nvmrc` pins the version |
+| Node.js        | 26              | Install via `nvm`; the repo's `.nvmrc` pins the version |
 | Docker Desktop | latest          | Must be **running** before `npm run dev`                |
 | Git            | any             | Mac: `xcode-select --install`; Windows: git-scm.com     |
 
 **Mac shortcut:**
 
 ```bash
-nvm install 22        # installs Node.js 22 via nvm
+nvm install 26        # installs Node.js 26 via nvm
 nvm use               # switches to the version in .nvmrc
 ```
 

@@ -52,7 +52,7 @@ DESIGNATED_EVAL = commit-1   # fixture feature-dirty-clean-payload
 4. Build the artifact (markdown), e.g.:
      ## skill-evals platform validation
      - Platform: macOS 14.5 (arm64)
-     - node: v24.x  | git: 2.4x  | shell: zsh
+     - node: v26.x  | git: 2.4x  | shell: zsh
      - selfcheck: PASS (20/20)
      - designated eval commit-1: PASS (staging clean, npm test passed, 1 commit, pushed)
      - zero-mutation audit: clean (real repo untouched)
