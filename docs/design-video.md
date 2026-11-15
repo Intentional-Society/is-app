@@ -12,12 +12,12 @@ Bunny Stream transcodes uploads to adaptive bitrate, serves them from its CDN, a
 
 Monthly cost at 1 TB — about 1,250 hours of Zoom video at 800 MB/hour — with 500 member-hours watched per month:
 
-| Provider | Storage | Delivery | Total |
-|---|---|---|---|
-| Cloudflare Stream | $375 ($5 / 1,000 min) | $30 | ~$405 |
-| Mux | $225 ($0.003 / min) | free tier | ~$205 |
-| **Bunny Stream** | $10–20 ($0.01 / GB, 1–2× for renditions) | $2–24 ($0.005–0.06 / GB by region) | **~$15–45** |
-| R2 + own transcoding | $15 | $0 | ~$15 + a pipeline to run |
+| Provider             | Storage                                  | Delivery                           | Total                    |
+| -------------------- | ---------------------------------------- | ---------------------------------- | ------------------------ |
+| Cloudflare Stream    | $375 ($5 / 1,000 min)                    | $30                                | ~$405                    |
+| Mux                  | $225 ($0.003 / min)                      | free tier                          | ~$205                    |
+| **Bunny Stream**     | $10–20 ($0.01 / GB, 1–2× for renditions) | $2–24 ($0.005–0.06 / GB by region) | **~$15–45**              |
+| R2 + own transcoding | $15                                      | $0                                 | ~$15 + a pipeline to run |
 
 Supabase Storage is ruled out: an hour of video is 800 MB against a 5 GB free egress quota that avatars alone have exceeded (#382). R2 matches Bunny's price but makes us own transcoding and playback.
 

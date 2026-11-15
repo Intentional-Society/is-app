@@ -6,7 +6,7 @@ Status: **draft**, captured 2026-09-26 from a design conversation; nothing imple
 
 Participants in a program should find that program's events on their own calendar without doing anything. Joining a program puts its upcoming events on your calendar; adding an event to a program puts it on every current participant's calendar; changes and cancellations follow automatically.
 
-Calendaring owns *delivery*: getting each event onto the right people's calendars as a real calendar invite, and keeping those invites in step with the app. It reads events and program participation, and never writes to either. What an event *is* — title, description, time, location/link, which program it belongs to, and how it is created and edited in the app — belongs to the [Events design](design-events.md).
+Calendaring owns _delivery_: getting each event onto the right people's calendars as a real calendar invite, and keeping those invites in step with the app. It reads events and program participation, and never writes to either. What an event _is_ — title, description, time, location/link, which program it belongs to, and how it is created and edited in the app — belongs to the [Events design](design-events.md).
 
 ## Basic design
 
@@ -24,11 +24,89 @@ Rationale:
 - Google handles the calendaring standards (iCalendar, iMIP, time zones, recurrence, update sequencing) and invite deliverability. The app implements none of it.
 - RSVPs from every recipient flow back into Google, where the app can read them per attendee.
 
-Alternatives considered:
+## Alternatives
 
-- iCalendar invites sent through Resend
-- per-participant subscription feeds
-- a free Google account
+### iCalendar invites sent through Resend
+
+- The app emails `METHOD:REQUEST` iCalendar invites itself, and every major client renders them as native invites.
+- The app owns the iCalendar lifecycle: stable UIDs, a SEQUENCE bump on every update, `METHOD:CANCEL` for removals, and recurrence exceptions.
+- RSVPs return as `METHOD:REPLY` emails to the organizer address, so the app needs inbound mail handling and a parser.
+- A new sending address has the same [known-sender](#sender-and-known-senders) cold start as a new Workspace account.
+
+### Per-participant subscription feeds
+
+- Each participant gets a private, tokened ICS URL covering their programs' events, and subscribes to it once.
+- No organizer account and no invite emails; leaving a program drops its events from the feed.
+- Google Calendar refreshes subscribed feeds on its own unpublished schedule, often hours later, which is too slow for last-minute changes.
+- Subscribed events take no RSVP, and a leaked URL exposes the feed until its token rotates.
+
+### Add-to-calendar links
+
+- Each event page offers an "Add to Google Calendar" template link and an `.ics` download.
+- No infrastructure, so it ships with the first event UI whatever the delivery mechanism.
+- Changes and cancellations never reach the copy on the participant's calendar.
+
+### Nylas Agent Accounts
+
+- A Nylas-hosted mailbox and calendar on a domain IS controls, such as `calendar@events.intentionalsociety.org`, driven through the Nylas API, which sends standard iCalendar invites ([docs](https://developer.nylas.com/docs/v3/agent-accounts/)).
+- Replaces Workspace as the organizer: no Google account, delegation, or GCP project.
+- The free plan includes 3 agent accounts on a Nylas trial domain; a custom sending domain needs Essentials, $15/month ([pricing](https://www.nylas.com/pricing/), November 2026).
+- Not stated in Nylas's docs: whether outside attendees' RSVPs flow back to the event, recurring-event support, and whether the product is generally available.
+
+### Cronofy Smart Invites
+
+- Cronofy generates the iCalendar invite, the app sends it (through Resend), and Cronofy reports each recipient's response to a webhook. No calendar account is involved ([docs](https://docs.cronofy.com/api-reference/calendar-control/smart-invites/index.md)).
+- This is the Resend alternative with Cronofy handling UIDs, sequencing, and reply parsing.
+- Removing a recipient or cancelling returns updated ICS attachments, which the app sends itself.
+- Cronofy's API plans start at $819/month ([pricing](https://www.cronofy.com/pricing), November 2026); whether Smart Invites come on a cheaper plan is not published.
+
+### Writing to each member's own calendar
+
+- Nylas, Cronofy, Merge and similar unified APIs connect each member's Google or Microsoft calendar with that member's consent, and write events into it directly.
+- Events appear without invites or known-sender filtering, and members' free/busy becomes readable.
+- Every member must connect a calendar, the vendor stores calendar data, and pricing is per connected account (Nylas: $1.35–2.25 per account per month).
+- Building it without a vendor means passing Google's verification for the sensitive Calendar scope and a separate Microsoft integration.
+
+## Workspace or a free account
+
+The organizer can be IS's existing free Google account, which sends today's manual invites, or a new Google Workspace account. Both deliver identical invites through the same API calls. They differ in how the app authenticates, who the invites appear to come from, who owns the account, and cost. This doc proposes Workspace ([setup](#google-account-setup)).
+
+|                   | Free account                                                                   | Workspace, Business Starter                                                                             |
+| ----------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| App credential    | OAuth refresh token for the account, stored as a Vercel secret                 | Service account with domain-wide delegation; keyless from Vercel, or a JSON key                         |
+| Google app review | None: a personal-use app under 100 users is exempt; one "unverified app" click | None: service-account access needs no consent screen                                                    |
+| Sender            | The existing address, which members already have history with                  | `calendar@events.intentionalsociety.org`, new to every recipient                                        |
+| Owner             | Whoever holds the password and recovery factors                                | IS, through the super admin, with recovery through the domain                                           |
+| Cost (US list)    | $0                                                                             | $7/month on an annual plan, $8.40 flexible; $0 through Google for Nonprofits if IS qualifies            |
+| Setup             | GCP project, consent screen, one consent                                       | Workspace signup, subdomain DNS, GCP project, service account, delegation, Workload Identity Federation |
+
+### Credential durability
+
+**Free.** The OAuth consent screen must be published as "In production": an External app left in "Testing" issues refresh tokens that expire after 7 days. A production app requesting the sensitive Calendar scope would normally need Google's verification, but [personal-use apps with fewer than 100 users are exempt](https://support.google.com/cloud/answer/13464323); the account owner clicks through the "unverified app" warning once. After that, the [documented ways the refresh token stops working](https://developers.google.com/identity/protocols/oauth2#expiration) are: the owner revokes access, the token goes unused for six months, the account exceeds 100 live refresh tokens for the client, or the owner granted time-limited access at consent. A password change revokes only tokens carrying Gmail scopes, so it leaves a Calendar-only token alone. The reconcile cron keeps the token in use. When the token does fail, sync stops until someone re-consents, so the cron must report auth errors, not swallow them.
+
+**Workspace.** Domain-wide delegation mints a short-lived token per request from the service account; there is no user token to expire or revoke. The keyless path leaves no long-lived Google secret in Vercel at all. The JSON-key fallback is blocked by default in a new GCP organization: the [secure-by-default policies](https://cloud.google.com/resource-manager/docs/secure-by-default-organizations) on organizations created since May 2024 forbid service account key creation until an admin lifts `iam.managed.disableServiceAccountKeyCreation`.
+
+Both credentials reach the organizer's whole calendar. On a free account that is also someone's personal calendar, the app's token reaches that person's own events too.
+
+### Sender and known senders
+
+Google Calendar [auto-adds an invitation only from a known sender](https://support.google.com/calendar/answer/13159188) when the recipient's setting is "Only if the sender is known": someone in their contacts, in their organization, or someone they have interacted with. Other invitations arrive as email only, until the recipient responds. Google moved most personal accounts to a restrictive default in 2023 ([report](https://www.theregister.com/2023/05/11/google_calendar_default_settings/)); the help page does not state the current default. Workspace recipients get whatever their admin set.
+
+The free account starts with history: members who receive today's manual invites have interacted with it. A new Workspace address starts with none, so the first invites reach many Gmail users as email only, which breaks "without doing anything" for them. Mitigations: a welcome-flow step asking members to add the organizer address to their contacts, and an announcement before the switch telling members to accept the first invite. Switching organizers later is not cheap either way: Google events keep their organizer, so a switch cancels and re-issues every upcoming invite.
+
+### Account ownership
+
+A free account belongs to whoever controls its password, recovery phone, and recovery email. If that person leaves IS or loses access, recovery goes through Google's consumer account recovery, with no admin to appeal to. Workspace ties the account to the domain: a super admin resets the organizer's password, and control of DNS proves ownership if the admin is lost. The super admin is the organizer user itself unless IS pays for a second seat, so the organizer's credentials and 2FA still need a documented owner.
+
+### Limits
+
+Google publishes Calendar limits for Workspace ([use limits](https://knowledge.workspace.google.com/admin/calendar/avoid-calendar-use-limits)): about 10,000 invites to external guests in a short period, and 2,000 guest emails a day. IS sends a few hundred. Trial accounts, accounts within 60 days of their first payment, and Google for Nonprofits accounts get stricter, unpublished limits, so the first full sync should not run on a trial account. The same page does not cover free accounts.
+
+### Decision inputs
+
+- Is the existing free account dedicated to IS, and who controls its recovery factors? A shared or personal account rules it out.
+- Is IS eligible for [Google for Nonprofits](https://support.google.com/nonprofits/answer/3215869) (registered charity, verified by Goodstack)? Eligibility makes Workspace free, at the cost of the stricter calendar limits.
+- How many members rely on auto-added invites today? A large count raises the cost of a new sender address.
 
 ## Google account setup
 
@@ -39,7 +117,7 @@ IS email runs on Zoho (`intentionalsociety.org` MX → `mx.zoho.com`), so the or
 - **Organizer inbox:** unmonitored, with no auto-reply. RSVPs need no human: Google Calendar processes them automatically, including the reply emails from Outlook and Apple clients, as long as the subdomain's mail lands at Google. Free-text replies to invites go unread; each event's description points people to the app or a contact instead ([Events](design-events.md#event-content)).
 - **DNS:** MX, SPF and DKIM records for the subdomain only. The apex domain's Zoho setup is untouched.
 - **API access:** a GCP service account with **domain-wide delegation** for the `https://www.googleapis.com/auth/calendar` scope, impersonating `calendar@`. Delegation is required: a service account on its own gets `403 Service accounts cannot invite attendees without Domain-Wide Delegation of Authority`.
-- **Credentials from Vercel:** keyless, via Vercel OIDC → GCP Workload Identity Federation. The federated identity calls IAM `signJwt` on the service account to mint the delegated (`sub = calendar@…`) token ([pattern](https://blog.salrashid.dev/articles/2021/impersonation_and_domain_delegation/)). A JSON key in an env var is the simpler fallback.
+- **Credentials from Vercel:** keyless, via Vercel OIDC → GCP Workload Identity Federation. The federated identity calls IAM `signJwt` on the service account to mint the delegated (`sub = calendar@…`) token ([pattern](https://blog.salrashid.dev/articles/2021/impersonation_and_domain_delegation/)). A JSON key in an env var is the simpler fallback, once an admin lifts the organization's default ban on key creation ([credential durability](#credential-durability)).
 
 Keeping Workspace off the apex domain also avoids Google "conflicting accounts" for any existing consumer Google accounts registered with `@intentionalsociety.org` addresses (inferred, not verified).
 
@@ -103,3 +181,4 @@ To verify: how series-level attendee changes propagate to instances that carry o
 
 - Domain-wide delegation works on Business Starter (no edition restriction found; confirm during the free trial).
 - The Workload Identity Federation + `signJwt` delegation path works from a Vercel function.
+- How an invite from the new organizer lands at a Gmail account that has never contacted it: on the calendar, or email only.
