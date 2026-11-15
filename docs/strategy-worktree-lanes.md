@@ -139,13 +139,14 @@ session _and_ an e2e run at once, use two lanes (each lane is one Supabase stack
   on 16 GB+; beyond that, push e2e to CI (which already runs against per-branch
   Vercel previews) instead of adding local stacks.
 - **Looping e2e (running the suite many times):** keep ONE `npm run dev` up and
-  the loop reuses it automatically (that's the default now — see [Running in a
-  lane](#running-in-a-lane)). Don't loop in a way that cold-starts the server
-  each run: that tree-kills `next dev` between runs, and repeated kill-mid-compile
-  corrupts the Turbopack `.next` cache until first-request route compilation
-  outruns Playwright's `webServer` timeout (socket bound, never serving — the run
-  fails before any test). One reused server ran 20 cycles clean; the cold-start
-  loop cliffs after ~5. If a lane's `.next` wedges, delete it to rebuild.
+  the loop reuses it automatically (that's the default now — see
+  [Running in a lane](#running-in-a-lane)). Don't loop in a way that cold-starts
+  the server each run: that tree-kills `next dev` between runs, and repeated
+  kill-mid-compile corrupts the Turbopack `.next` cache until first-request
+  route compilation outruns Playwright's `webServer` timeout (socket bound,
+  never serving — the run fails before any test). One reused server ran 20
+  cycles clean; the cold-start loop cliffs after ~5. If a lane's `.next`
+  wedges, delete it to rebuild.
 - **Stop a lane's stack:** `npm run dev:db:stop` from that worktree.
 - **Remove a lane:** `git worktree remove ../is-app-worktrees/is-app-2`.
 - **Windows port grabbing:** reserve a lane's Supabase ports once in an admin

@@ -857,9 +857,9 @@ substitute** for a sandbox batch run — if the batch can cover it, the batch is
 6. **Clean up (owed) — the checklist you pasted up front:**
    - [ ] Close and delete any PR the smoke opened (`gh pr close <N> --delete-branch`).
    - [ ] Delete the scratch branch locally and on the remote (`git switch main`, then
-     `git branch -D smoke/…` and `git push origin --delete smoke/…`).
+         `git branch -D smoke/…` and `git push origin --delete smoke/…`).
    - [ ] Revert or drop any commit that reached `main` (this smoke should never target
-     `main`, but audit anyway).
+         `main`, but audit anyway).
    - [ ] Delete any throwaway issue/PR comment the smoke posted.
    - [ ] Confirm `git status` is clean and `git branch` shows no stray `smoke/…` branch.
    - [ ] Tick this checklist on the driving PR/issue.
