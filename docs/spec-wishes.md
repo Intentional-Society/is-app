@@ -1,7 +1,7 @@
 # IS Wishes — Feature Specification & Design
 
 **Status:** Draft  
-**Related GitHub Issue:** [Link]  
+**Related GitHub Issue:** #656  
 **Owner:** Alexis  
 **Last Updated:** 2026-10-28
 
@@ -92,7 +92,7 @@ The Wishes tab is read-only for visitors. `/wishes` is the primary place for cre
 2. User selects "Discover Wishes."
 3. The system presents a small, randomly selected set of member profiles that have at least one active wish (excluding the current user).
 4. User selects a profile.
-5. User is directed to that person's profile, where they can open the Wishes tab.
+5. User is directed to that person's wishes page.
 6. User can view and interact with that person's wishes.
 
 Similarity-based matching is deferred.
@@ -142,9 +142,9 @@ Define precise behavior for:
 
 Specify the required entities and fields.
 
-- **Wish:** ID, author ID, title, description, status (`active` | `archived` | `fulfilled`), timestamps
-- **Reaction:** ID, wish ID, user ID, emoji
-- **Comment:** ID, wish ID, author ID, content, timestamps
+- **Wish:** ID, author ID, title, description, status (`active` | `archived` | `fulfilled` — mutually exclusive), timestamps
+- **Reaction:** ID, `reactable_table`, `reactable_id`, user ID, emoji, `createdAt`
+- **Comment:** ID, `commentable_table`, `commentable_id`, author ID, content, timestamps
 
 Define relationships and constraints.
 
