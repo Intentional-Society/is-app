@@ -26,6 +26,7 @@ export const PAGE_TITLES = {
   "/invites": { title: "Invites" },
   "/about": { title: "About" },
   "/intentions": { title: "Current intentions" },
+  "/wishes": { title: "Wishes" },
   "/admin": { title: "Admin" },
   "/admin/members": { title: "Admin · Members", crumb: "Admin members" },
   "/admin/programs": { title: "Admin · Programs", crumb: "Admin programs" },

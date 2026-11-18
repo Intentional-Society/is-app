@@ -9,6 +9,7 @@ import { QueryProvider } from "@/components/query-provider";
 import { requireUser, serverApiClient } from "@/lib/api-server";
 import type { MemberProfile } from "@/lib/api-types";
 
+import { MemberWishesList } from "./member-wishes";
 import { ProfileMiniMap } from "./profile-mini-map";
 import { MemberRelationControl } from "./relation-control";
 
@@ -123,6 +124,8 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
             {profile.supplementaryInfo && <Markdown>{profile.supplementaryInfo}</Markdown>}
           </Field>
         </dl>
+
+        <MemberWishesList profileId={profile.id} isOwnProfile={isOwnProfile} />
 
         {profile.email && (
           <a

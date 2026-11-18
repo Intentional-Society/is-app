@@ -240,6 +240,29 @@ export const messageBoxSettings = pgTable(
   (table) => [check("message_box_settings_visibility", sql`${table.visibility} IN ('members', 'admins')`)],
 ).enableRLS();
 
+export const wishes = pgTable(
+  "wishes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    // active | archived | fulfilled — mutually exclusive; enforced by check constraint below.
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    check("wishes_status", sql`${table.status} IN ('active', 'archived', 'fulfilled')`),
+    index("wishes_author_status_idx").on(table.authorId, table.status),
+  ],
+).enableRLS();
+
 // Messages left in a program's message box. Both FKs cascade: deleting a
 // program or a member's account removes their messages with it.
 export const messageBoxMessages = pgTable(

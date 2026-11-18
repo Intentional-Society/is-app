@@ -108,6 +108,16 @@ import { profiles } from "./schema";
 import { listSigninsAdmin } from "./signins-admin";
 import { getSystemMetrics } from "./system-metrics";
 import { parseResetRequest, resetE2EUsers } from "./test-reset";
+import {
+  createWish,
+  deleteWish,
+  discoverWishes,
+  listActiveWishesForMember,
+  listMyWishes,
+  parseWishCreate,
+  parseWishUpdate,
+  updateWish,
+} from "./wishes";
 
 // Admin-only sub-router. requireAdmin runs after the main api's
 // requireAuth (mounted via .route() below), so handlers here can
@@ -829,6 +839,59 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .get("/intentions", async (c) => {
     const intentions = await listCurrentIntentions();
     return c.json({ intentions });
+  })
+  .get("/wishes", async (c) => {
+    const user = c.get("user");
+    const wishList = await listMyWishes(user.id);
+    return c.json({ wishes: wishList });
+  })
+  .post("/wishes", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    const parsed = parseWishCreate(body);
+    if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+    const user = c.get("user");
+    const result = await createWish({ authorId: user.id, ...parsed });
+    return c.json({ wish: result.wish }, 201);
+  })
+  .patch(
+    "/wishes/:id",
+    validator("json", (body, c) => {
+      const parsed = parseWishUpdate(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const id = c.req.param("id");
+      if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+      const result = await updateWish({ id, authorId: user.id, ...c.req.valid("json") });
+      if ("error" in result) return c.json({ error: result.error }, 404);
+      return c.json({ wish: result.wish });
+    },
+  )
+  .delete("/wishes/:id", async (c) => {
+    const user = c.get("user");
+    const id = c.req.param("id");
+    if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+    const result = await deleteWish({ id, authorId: user.id });
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ ok: true });
+  })
+  .get("/wishes/discover", async (c) => {
+    const user = c.get("user");
+    const discovered = await discoverWishes(user.id);
+    return c.json({ profiles: discovered });
+  })
+  .get("/members/:id/wishes", async (c) => {
+    const memberId = c.req.param("id");
+    if (!isUuid(memberId)) return c.json({ error: "not_found" }, 404);
+    const wishList = await listActiveWishesForMember(memberId);
+    return c.json({ wishes: wishList });
   })
   .get("/programs", async (c) => {
     const user = c.get("user");

@@ -102,6 +102,7 @@ function LoggedInHome({ displayName }: { displayName: string | null }) {
               title="Current intentions"
               description="See what the whole network is working toward."
             />
+            <NavCard href="/wishes" title="Wishes" description="Share what you're wishing for and discover others'." />
           </div>
         </section>
 
