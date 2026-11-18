@@ -1,22 +1,13 @@
 import { expect, test } from "./helpers/fixtures";
-import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { TIMEOUT_MS } from "./helpers/session";
 
 // The /me page (#376): anchor-linked Profile/Settings tabs, the
 // light/dark/system theme selector, and the editable profile URL
 // (#188 — slugs are stable, changed only here).
 
-test.describe.configure({ mode: "serial" });
-
-test.beforeEach(async ({ baseURL }) => {
-  if (!baseURL) throw new Error("me.spec.ts: baseURL is not configured");
-  await resetSeededUsers(baseURL);
-});
+test.use({ user: "member" });
 
 test("tabs switch between profile and settings, and a theme choice persists", async ({ page }) => {
-  await signInAs(page, "regular");
-  // Distinct bio per completeWelcome caller — see the reset tripwire.
-  await completeWelcome(page, { bio: "e2e bio · me.spec · tabs-theme" });
-
   await page.goto("/me");
   await page.waitForURL((u) => u.pathname === "/me", { timeout: TIMEOUT_MS });
 
@@ -42,27 +33,63 @@ test("tabs switch between profile and settings, and a theme choice persists", as
 });
 
 // We don't visit the public /members/[slug] page to confirm the change: the
-// seeded accounts are hidden on the prod DB that previews share, and a hidden
-// profile 404s from /members/:id for everyone (admins included), so that page
-// is unviewable in CI. Instead, a full reload proves the slug persisted —
-// the settings form re-hydrates from the saved value.
-test("a member can change their profile URL from settings", async ({ page }) => {
-  await signInAs(page, "regular");
-  // Distinct bio per completeWelcome caller — see the reset tripwire.
-  await completeWelcome(page, { displayName: "Slug Tester", bio: "e2e bio · me.spec · slug" });
+// seeded accounts are hidden, and a hidden profile 404s from /members/:id
+// for everyone (admins included), so that page is unviewable. Instead, a
+// full reload proves the slug persisted — the settings form re-hydrates
+// from the saved value.
+test("a member can change their profile URL from settings", async ({ page, account }) => {
+  // Slugs are unique across profiles, so each account picks its own: a
+  // retry can land on the other worker while the first attempt's slug
+  // is still on the first account.
+  const slug = `e2e-slug-tester-${account.key}`;
 
   await page.goto("/me#settings");
   await expect(page.getByRole("heading", { name: "Profile URL" })).toBeVisible();
 
-  await page.getByLabel("Profile URL").fill("E2E Slug Tester!");
+  await page.getByLabel("Profile URL").fill(`E2E Slug Tester ${account.key}!`);
   // The helper text previews the server-side normalization live.
-  await expect(page.getByText("/members/e2e-slug-tester")).toBeVisible();
+  await expect(page.getByText(`/members/${slug}`)).toBeVisible();
   await page.getByRole("button", { name: "Update URL" }).click();
   await expect(page.getByText("Profile URL updated")).toBeVisible();
 
   // A full reload re-fetches the profile, so the form re-hydrates with the
   // saved slug — the field and the live preview both reflect it.
   await page.reload();
-  await expect(page.getByLabel("Profile URL")).toHaveValue("e2e-slug-tester");
-  await expect(page.getByText("/members/e2e-slug-tester")).toBeVisible();
+  await expect(page.getByLabel("Profile URL")).toHaveValue(slug);
+  await expect(page.getByText(`/members/${slug}`)).toBeVisible();
+});
+
+// The profile form on /me, after onboarding: plain inputs and the
+// rich-text editors both save and come back on a fresh load.
+test("a member can edit their profile, and the changes survive a reload", async ({ page }) => {
+  await page.goto("/me");
+
+  await page.getByLabel("Location").fill("Porto");
+  await page.getByLabel("Keywords (comma-separated)").fill("gardening, jazz");
+  await page.getByLabel("Current intention").fill("Listen before answering.");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Profile saved.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Location")).toHaveValue("Porto");
+  await expect(page.getByLabel("Keywords (comma-separated)")).toHaveValue("gardening, jazz");
+  await expect(page.getByLabel("Current intention")).toContainText("Listen before answering.");
+});
+
+test("a member can deactivate their account and reactivate it", async ({ page }) => {
+  await page.goto("/me#settings");
+
+  // The destructive button stays disabled until the confirm word is typed.
+  await page.getByRole("button", { name: "Deactivate account" }).click();
+  const confirm = page.getByRole("button", { name: "Yes, deactivate my account" });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel("Type DEACTIVATE to confirm").fill("DEACTIVATE");
+  await confirm.click();
+  await expect(page.getByText("Your account is currently deactivated.")).toBeVisible();
+
+  // Reactivating works straight away, on the page as the deactivation
+  // left it.
+  await page.getByRole("button", { name: "Reactivate account" }).click();
+  await expect(page.getByRole("button", { name: "Deactivate account" })).toBeVisible();
+  await expect(page.getByText("Your account is currently deactivated.")).toBeHidden();
 });

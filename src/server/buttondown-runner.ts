@@ -19,7 +19,8 @@ import {
 } from "./buttondown-sync";
 import { acquireLock, releaseLock } from "./sync-locks";
 
-const LOCK_NAME = "buttondown";
+// The sync_locks row every Buttondown sync run holds while it works.
+export const BUTTONDOWN_LOCK_NAME = "buttondown";
 
 export type RunButtondownSyncOptions = {
   // Identifier for this run, recorded on the lock and in every log
@@ -83,12 +84,12 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
   const lockRetryDelayMs = options.lockRetryDelayMs ?? 0;
   let attempts = 1;
   let waitedMs = 0;
-  let got = await acquireLock(LOCK_NAME, runId);
+  let got = await acquireLock(BUTTONDOWN_LOCK_NAME, runId);
   while (!got && attempts <= lockRetries) {
     await new Promise((resolve) => setTimeout(resolve, lockRetryDelayMs));
     waitedMs += lockRetryDelayMs;
     attempts++;
-    got = await acquireLock(LOCK_NAME, runId);
+    got = await acquireLock(BUTTONDOWN_LOCK_NAME, runId);
   }
   if (!got) {
     log.warn("buttondown sync", {
@@ -160,7 +161,7 @@ export const runButtondownSyncForServer = async (options: RunButtondownSyncOptio
 
     return { status: "ok", summary };
   } finally {
-    await releaseLock(LOCK_NAME, runId);
+    await releaseLock(BUTTONDOWN_LOCK_NAME, runId);
   }
 };
 

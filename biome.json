@@ -136,14 +136,6 @@
           }
         }
       }
-    },
-    {
-      "includes": ["docs/old-archive/spec-skill-evals-baseline.md"],
-      "markdown": {
-        "formatter": {
-          "enabled": false
-        }
-      }
     }
   ]
 }

@@ -1,17 +1,15 @@
 import { expect, test } from "./helpers/fixtures";
-import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { TIMEOUT_MS } from "./helpers/session";
 
 // Exercises the history-aware breadcrumb back link from #274. /me
 // is one of the multi-entry pages: reachable from /, /myweb, the nav
 // menu, etc. The back link should follow the user's actual route when
 // an in-app referrer exists, and fall back to the per-page default
 // when it doesn't.
-test.describe.configure({ mode: "serial" });
+test.use({ user: "member" });
 
 test.describe("/me — breadcrumb back link", () => {
-  test.beforeEach(async ({ page, baseURL }) => {
-    if (!baseURL) throw new Error("breadcrumb.spec.ts: baseURL is not configured");
-    await resetSeededUsers(baseURL);
+  test.beforeEach(async ({ page }) => {
     // Pre-dismiss the /myweb welcome tour so it doesn't intercept
     // navigation in the /myweb → /me flow below.
     await page.addInitScript(() => {
@@ -20,10 +18,6 @@ test.describe("/me — breadcrumb back link", () => {
   });
 
   test("/myweb → /me renders '← My web' and returns there", async ({ page }) => {
-    await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the reset tripwire.
-    await completeWelcome(page, { bio: "e2e bio · breadcrumb.spec · myweb-to-me" });
-
     await page.goto("/myweb");
     await page.waitForURL((u) => u.pathname === "/myweb", { timeout: TIMEOUT_MS });
     await expect(page.getByRole("heading", { name: "My web" })).toBeVisible();
@@ -39,14 +33,8 @@ test.describe("/me — breadcrumb back link", () => {
   });
 
   test("direct landing on /me falls back to '← Home'", async ({ page }) => {
-    await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the reset tripwire.
-    await completeWelcome(page, { bio: "e2e bio · breadcrumb.spec · direct-me" });
-
-    // Drop the welcome-flow history so this navigation is the user's
-    // only in-app entry, simulating a deep link from outside the app.
-    await page.evaluate(() => window.sessionStorage.removeItem("isweb-nav-history"));
-
+    // The page's first navigation, so /me is the member's only in-app
+    // entry — a deep link from outside the app.
     await page.goto("/me");
     await page.waitForURL((u) => u.pathname === "/me", { timeout: TIMEOUT_MS });
 

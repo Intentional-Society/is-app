@@ -41,9 +41,12 @@ import {
   createMessage,
   deleteMessage,
   getSettings,
+  listArchivedMessages,
   listMessages,
+  parseArchiveUpdate,
   parseMessageBody,
   parseSettingsUpdate,
+  setMessageArchived,
   updateMessage,
   updateSettings,
 } from "./message-box";
@@ -104,7 +107,7 @@ import { getPersonalWeb } from "./relations-personal";
 import { profiles } from "./schema";
 import { listSigninsAdmin } from "./signins-admin";
 import { getSystemMetrics } from "./system-metrics";
-import { resetE2EUsers } from "./test-reset";
+import { parseResetRequest, resetE2EUsers } from "./test-reset";
 
 // Admin-only sub-router. requireAdmin runs after the main api's
 // requireAuth (mounted via .route() below), so handlers here can
@@ -238,6 +241,30 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
       const result = await updateSettings(c.req.param("id"), c.req.valid("json"));
       if ("error" in result) return c.json({ error: result.error }, 404);
       return c.json({ ok: true });
+    },
+  )
+  .get("/programs/:id/message-box/archived", async (c) => {
+    const programId = c.req.param("id");
+    if (!isUuid(programId)) return c.json({ error: "not_found" }, 404);
+    return c.json({ messages: await listArchivedMessages(programId) });
+  })
+  // validator-typed body, same path-param + JSON inference reason as the
+  // PATCH routes above.
+  .patch(
+    "/programs/:id/message-box/messages/:messageId",
+    validator("json", (body, c) => {
+      const parsed = parseArchiveUpdate(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      const result = await setMessageArchived(
+        c.req.param("id"),
+        c.req.param("messageId"),
+        c.req.valid("json").archived,
+      );
+      if ("error" in result) return c.json({ error: result.error }, 404);
+      return c.json({ ok: true, changed: result.changed });
     },
   )
   .delete("/programs/:id/message-box/messages/:messageId", async (c) => {
@@ -392,8 +419,8 @@ const adminRoutes = new Hono<{ Variables: ApiVariables }>()
 // middleware answers 404 for a program that is archived or doesn't have the
 // feature attached (docs/design-programs.md, "Access rule"). Any signed-in
 // member may read when the program's visibility is "members"; admins may
-// always read; only active participants may post. Moderation (delete) is in
-// the admin routes.
+// always read; only active participants may post, and authors may edit their
+// own messages. Moderation (archive, restore, delete) is in the admin routes.
 const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
   .use("*", requireProgramFeature(MESSAGE_BOX_FEATURE))
   .get("/", async (c) => {
@@ -402,7 +429,7 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
     // The seeded e2e admin is a real admin row whose password sits in CI
     // secrets used by unreviewed branch code, so its admin powers are capped
     // (E2E_ADMIN_READS in auth-middleware.ts). Treat it as a plain member here:
-    // no admins-only messages, no hidden or deactivated authors, no delete.
+    // no admins-only messages, no hidden or deactivated authors, no moderation.
     const [settings, adminFlag] = await Promise.all([getSettings(programId), isAdmin(user.id)]);
     const { visibility, prompt } = settings;
     const admin = adminFlag && !isE2EAccount(user);
@@ -413,7 +440,7 @@ const messageBoxRoutes = new Hono<{ Variables: FeatureVariables }>()
       prompt,
       canRead,
       canPost: c.get("featureParticipant"),
-      canDelete: admin,
+      canModerate: admin,
       messages,
     });
   })
@@ -995,16 +1022,34 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .route("/programs/:id/message-box", messageBoxRoutes)
   .route("/admin", adminRoutes);
 
-// CI-only reset for the two seeded e2e users. Token header is the only
+// CI-only reset for the seeded e2e users. Token header is the only
 // gate — preview and prod share the same Supabase, so a VERCEL_ENV gate
 // here would be theatre against a token that already mutates prod data.
 // 404s on missing/wrong token to avoid advertising the endpoint.
+//
+// An optional JSON body narrows the reset to one account and picks the
+// state it is left in: { account?: "regular" | "admin", state?: "fresh" |
+// "onboarded" }. No body resets every account to fresh. See
+// src/server/test-reset.ts.
 api.post("/_test/reset", async (c) => {
   const token = c.req.header("x-ci-reset-token");
   if (!token || token !== process.env.CI_RESET_TOKEN) {
     return c.json({ error: "not_found" }, 404);
   }
-  const result = await resetE2EUsers();
+  let body: unknown;
+  const raw = await c.req.text();
+  if (raw.trim() !== "") {
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+  }
+  const request = parseResetRequest(body);
+  if ("error" in request) {
+    return c.json({ error: request.error }, 400);
+  }
+  const result = await resetE2EUsers(request);
   return c.json(result);
 });
 

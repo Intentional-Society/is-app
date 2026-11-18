@@ -22,6 +22,13 @@ const ERROR_MESSAGES: Record<string, string> = {
     "That invite code was already used, revoked, or expired by the time you clicked the link. Ask the member who invited you for a new one.",
 };
 
+// Inbucket listens three ports above the Supabase API (54321 → 54324) in
+// supabase/config.toml, and each worktree lane shifts both by the same offset.
+function localInbucketUrl() {
+  const api = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321");
+  return `${api.protocol}//${api.hostname}:${Number(api.port || 54321) + 3}`;
+}
+
 type SigninPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
@@ -45,7 +52,7 @@ export default async function SigninPage({ searchParams }: SigninPageProps) {
         <p className="max-w-sm rounded border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
           <strong>Local dev:</strong> this database is separate from production. Use a seeded email (e.g.{" "}
           <code>aria.chen@example.com</code>) or run <code>npm run seed:dev</code> first. Sign-in links arrive at{" "}
-          <a href="http://localhost:54324" target="_blank" rel="noopener noreferrer" className="underline">
+          <a href={localInbucketUrl()} target="_blank" rel="noopener noreferrer" className="underline">
             Inbucket
           </a>
           .

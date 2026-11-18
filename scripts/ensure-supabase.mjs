@@ -13,7 +13,11 @@
 // that, force-remove the offenders, and retry once.
 
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { parse } from "dotenv";
+
+import { laneAuthUrls } from "./lib/lane.mjs";
 
 const PROJECT_ID = path.basename(process.cwd());
 const GRACE_POLL_MS = 30_000; // wait for auto-starting containers first
@@ -22,11 +26,15 @@ const POLL_INTERVAL_MS = 3_000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const statusOk = () =>
-  spawnSync("npx", ["supabase", "status"], {
-    stdio: "ignore",
-    shell: true,
-  }).status === 0;
+// The output of the last successful `supabase status -o env`, which checkLane
+// reuses so a lane start doesn't pay for a second CLI call.
+let lastStatusEnv = "";
+
+const statusOk = () => {
+  const res = spawnSync("npx", ["supabase", "status", "-o", "env"], { shell: true, encoding: "utf8" });
+  lastStatusEnv = res.status === 0 ? (res.stdout ?? "") : "";
+  return res.status === 0;
+};
 
 const pollUntilReady = async (budgetMs) => {
   const deadline = Date.now() + budgetMs;
@@ -75,7 +83,40 @@ const clearDanglingSupabaseContainers = () => {
   return rm.status === 0;
 };
 
-const main = async () => {
+// A lane's project id and ports reach the CLI only as SUPABASE_* lines in
+// .env.local, which the CLI applies over config.toml without Supabase
+// documenting it. `supabase status` builds API_URL from that resolved config,
+// not from the ports the containers bound, so a mismatch with .env.local means
+// the CLI ignored the overrides; a stack still running on old ports passes.
+// Also warn when config.toml's auth URLs changed after
+// make_lane_inside_worktree wrote them.
+const checkLane = () => {
+  if (!existsSync(".env.local")) return;
+  const env = parse(readFileSync(".env.local"));
+  if (!env.LANE_DEV_PORT) return;
+
+  // After a fresh `supabase start` no status has succeeded yet.
+  if (!lastStatusEnv) statusOk();
+  const apiUrl = lastStatusEnv.match(/^API_URL="?([^"\r\n]*)"?/m)?.[1];
+  if (apiUrl !== env.NEXT_PUBLIC_SUPABASE_URL) {
+    process.stderr.write(
+      `This lane expects the Supabase API at ${env.NEXT_PUBLIC_SUPABASE_URL}, but the CLI reports ${apiUrl ?? "nothing"}.\n` +
+        "The CLI may have ignored the SUPABASE_* overrides in .env.local (check its version), or .env.local changed by hand.\n" +
+        "Re-run `npm run make_lane_inside_worktree`; see docs/strategy-worktree-lanes.md.\n",
+    );
+    process.exit(1);
+  }
+
+  const expected = laneAuthUrls(readFileSync("supabase/config.toml", "utf8"), env.LANE_DEV_PORT);
+  if (expected && Object.entries(expected).some(([key, value]) => env[key] !== value)) {
+    process.stdout.write(
+      "Warning: config.toml's auth URLs changed since this lane was configured.\n" +
+        "  Re-run `npm run make_lane_inside_worktree`, then `npm run dev:db:stop` and `npm run dev`.\n",
+    );
+  }
+};
+
+const ensureStackReady = async () => {
   if (statusOk()) return;
 
   process.stdout.write("Supabase stack not ready — waiting for containers…\n");
@@ -113,4 +154,5 @@ const main = async () => {
   process.exit(1);
 };
 
-main();
+await ensureStackReady();
+checkLane();

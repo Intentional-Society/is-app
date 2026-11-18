@@ -41,11 +41,7 @@ recommended rules.
   GFM splits the cell there, and the formatter pads the extra column. CI skips
   `biome ci` on docs-only PRs, so the lefthook pre-commit hook (which formats
   staged `*.md`) is the only check those get; a doc that lands unformatted
-  fails the next code PR's lint. An override turns Markdown formatting off for
-  `docs/old-archive/spec-skill-evals-baseline.md`: 2.6.4 re-indents a blank `>`
-  line after a list item inside a blockquote on every pass, until the next
-  paragraph leaves the quote (biomejs/biome#12703, fixed after 2.6.4). Drop the
-  override when the Biome bump that includes the fix lands.
+  fails the next code PR's lint.
 - **Excluded paths** — the `files.includes` negations skip generated or vendored
   trees Biome shouldn't touch: `.next`, `next-env.d.ts`, Supabase email
   templates, `docs/_temp-*`, `drizzle/meta`, the functional-test

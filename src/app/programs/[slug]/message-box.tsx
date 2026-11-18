@@ -11,10 +11,14 @@ import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { UndoNotices } from "@/components/undo-notices";
 import { apiClient } from "@/lib/api";
 import type { MessageBoxMessage, MessageBoxResponse } from "@/lib/api-types";
+import { errorFrom, MESSAGE_UNAVAILABLE } from "@/lib/message-box-errors";
 import { MESSAGE_BOX_MAX_LENGTH } from "@/lib/program-features";
+import { useUndoQueue } from "@/lib/use-undo-queue";
 
+import { deleteForever, patchArchived, refreshArchive, refreshMessageBox } from "./message-box-actions";
 import { MESSAGE_BOX_CARD_CLASSNAME } from "./message-box-card";
 import { HYDRATED_STALE_TIME, messageBoxQueryKey } from "./query-keys";
 
@@ -24,16 +28,14 @@ const fetchMessageBox = async (programId: string): Promise<MessageBoxResponse> =
   return res.json();
 };
 
-const errorFrom = async (res: Response, fallback: string): Promise<string> => {
-  const body = (await res.json().catch(() => ({}))) as { error?: string };
-  if (body.error === "not_participant") return "Only participants of this program can leave a message.";
-  if (body.error === "not_found") return "The message box isn't available right now.";
-  return body.error ?? fallback;
-};
+type UndoQueue = ReturnType<typeof useUndoQueue>;
 
-// The message-box program feature: participants leave short messages; who can
-// read them is a per-program admin setting; admins can delete.
+// The message-box program feature: participants leave short messages and can
+// edit their own; who can read them is a per-program admin setting; admins can
+// archive (reversible, with Undo) or delete messages.
 export function MessageBox({ programId }: { programId: string }) {
+  // Archive and Delete each leave an Undo notice for 30 seconds.
+  const undoQueue = useUndoQueue();
   const query = useQuery({
     queryKey: messageBoxQueryKey(programId),
     queryFn: () => fetchMessageBox(programId),
@@ -45,20 +47,35 @@ export function MessageBox({ programId }: { programId: string }) {
       <h3 id="message-box-heading" className="text-base font-semibold uppercase tracking-wide text-muted-foreground">
         Message box
       </h3>
-      {query.isPending ? (
+      {/* When a refetch fails, keep showing the last good data (so an Undo that is
+          still counting down never disappears from under the admin) and say so. */}
+      {query.data && query.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't refresh the message box. What you see may be out of date.
+        </p>
+      )}
+      {query.data ? (
+        <MessageBoxBody programId={programId} data={query.data} undoQueue={undoQueue} />
+      ) : query.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : query.isError ? (
+      ) : (
         <p role="alert" className="text-sm text-destructive">
           Couldn't load the message box.
         </p>
-      ) : (
-        <MessageBoxBody programId={programId} data={query.data} />
       )}
     </section>
   );
 }
 
-function MessageBoxBody({ programId, data }: { programId: string; data: MessageBoxResponse }) {
+function MessageBoxBody({
+  programId,
+  data,
+  undoQueue,
+}: {
+  programId: string;
+  data: MessageBoxResponse;
+  undoQueue: UndoQueue;
+}) {
   return (
     <>
       {data.prompt && <Markdown>{data.prompt}</Markdown>}
@@ -67,8 +84,20 @@ function MessageBoxBody({ programId, data }: { programId: string; data: MessageB
       ) : (
         <p className="text-sm text-muted-foreground">Join this program to leave a message.</p>
       )}
+      <UndoNotices entries={undoQueue.entries} onUndo={(id) => void undoQueue.undo(id)} />
+      {undoQueue.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {undoQueue.error}
+        </p>
+      )}
       {data.canRead ? (
-        <MessageList programId={programId} messages={data.messages} canDelete={data.canDelete} canEdit={data.canPost} />
+        <MessageList
+          programId={programId}
+          messages={data.messages}
+          canModerate={data.canModerate}
+          canEdit={data.canPost}
+          undoQueue={undoQueue}
+        />
       ) : (
         <p className="text-sm text-muted-foreground">Messages sent here are read by the program's admins.</p>
       )}
@@ -142,14 +171,16 @@ function MessageForm({ programId }: { programId: string }) {
 function MessageList({
   programId,
   messages,
-  canDelete,
+  canModerate,
   canEdit,
+  undoQueue,
 }: {
   programId: string;
   messages: MessageBoxMessage[];
-  canDelete: boolean;
+  canModerate: boolean;
   // The viewer may edit their own messages (they are a participant).
   canEdit: boolean;
+  undoQueue: UndoQueue;
 }) {
   if (messages.length === 0) {
     return <p className="text-sm text-muted-foreground">No messages yet.</p>;
@@ -157,7 +188,14 @@ function MessageList({
   return (
     <ul className="flex flex-col gap-3">
       {messages.map((m) => (
-        <MessageItem key={m.id} programId={programId} message={m} canDelete={canDelete} canEdit={canEdit && m.mine} />
+        <MessageItem
+          key={m.id}
+          programId={programId}
+          message={m}
+          canModerate={canModerate}
+          canEdit={canEdit && m.mine}
+          undoQueue={undoQueue}
+        />
       ))}
     </ul>
   );
@@ -166,28 +204,66 @@ function MessageList({
 function MessageItem({
   programId,
   message,
-  canDelete,
+  canModerate,
   canEdit,
+  undoQueue,
 }: {
   programId: string;
   message: MessageBoxMessage;
-  canDelete: boolean;
+  canModerate: boolean;
   canEdit: boolean;
+  undoQueue: UndoQueue;
 }) {
   const queryClient = useQueryClient();
-  const [confirming, setConfirming] = useState(false);
+  // Archive and Delete both ask for a second click first.
+  const [confirming, setConfirming] = useState<"archive" | "delete" | null>(null);
   const [editing, setEditing] = useState(false);
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiClient.api.admin.programs[":id"]["message-box"].messages[":messageId"].$delete({
-        param: { id: programId, messageId: message.id },
-      });
-      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't delete the message."));
-      return res.json();
+  // Both actions hide the message first. Archive is then finished (the message
+  // sits in the admin archive), with an Undo that restores it. Delete waits out
+  // the Undo window and only then deletes for good; leaving the page in that
+  // window leaves the message archived instead (see useUndoQueue). Note the
+  // queue calls outlive this component, which unmounts once the list refetches.
+  const moderateMutation = useMutation({
+    mutationFn: async (intent: "archive" | "delete") => {
+      const changed = await patchArchived(programId, message.id, true);
+      const name = message.author.displayName ?? "A member";
+      const restore = async () => {
+        await patchArchived(programId, message.id, false);
+        await refreshMessageBox(queryClient, programId);
+      };
+      if (intent === "archive") {
+        // Already archived by someone else: nothing of ours to undo, and an Undo
+        // here would bring back a message another admin chose to hide.
+        if (changed) undoQueue.add({ id: message.id, message: `Archived ${name}'s message.`, onUndo: restore });
+      } else {
+        undoQueue.add({
+          id: message.id,
+          message: `Deleting ${name}'s message.`,
+          onUndo: restore,
+          onExpire: async () => {
+            try {
+              await deleteForever(programId, message.id);
+            } catch (error) {
+              // Usually the message was restored meanwhile; show it again.
+              await refreshMessageBox(queryClient, programId);
+              throw error;
+            }
+            // The message was already hidden from the live box; only the archive changed.
+            await refreshArchive(queryClient, programId);
+          },
+        });
+      }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
-    onSettled: () => setConfirming(false),
+    onSuccess: () => refreshMessageBox(queryClient, programId),
+    // If the action failed because the message is already gone (say another admin
+    // removed it), the refresh drops this row, and the row's own error with it. So
+    // the error is reported at the list level, next to the Undo notices.
+    onError: (error) => {
+      undoQueue.reportError(error.message);
+      return refreshMessageBox(queryClient, programId);
+    },
+    onSettled: () => setConfirming(null),
   });
 
   const href: UrlObject = { pathname: `/members/${message.author.slug ?? message.author.id}` };
@@ -206,40 +282,54 @@ function MessageItem({
         <span className="whitespace-nowrap text-xs text-muted-foreground">
           <LocalTime iso={message.createdAt} withTime />
         </span>
-        {!editing && (canEdit || canDelete) && (
+        {!editing && (canEdit || canModerate) && (
           <span className="ml-auto flex items-center gap-2">
-            {canEdit && !confirming && (
-              <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(true)}>
-                Edit
-              </Button>
-            )}
-            {canDelete &&
-              (confirming ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="xs"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => deleteMutation.mutate()}
-                  >
-                    {deleteMutation.isPending ? "Deleting…" : "Confirm delete"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => setConfirming(false)}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button type="button" variant="destructive" size="xs" onClick={() => setConfirming(true)}>
-                  Delete
+            {confirming ? (
+              <>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="xs"
+                  disabled={moderateMutation.isPending}
+                  onClick={() => moderateMutation.mutate(confirming)}
+                >
+                  {moderateMutation.isPending
+                    ? confirming === "archive"
+                      ? "Archiving…"
+                      : "Deleting…"
+                    : confirming === "archive"
+                      ? "Confirm archive"
+                      : "Confirm delete"}
                 </Button>
-              ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={moderateMutation.isPending}
+                  onClick={() => setConfirming(null)}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                {canEdit && (
+                  <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(true)}>
+                    Edit
+                  </Button>
+                )}
+                {canModerate && (
+                  <>
+                    <Button type="button" variant="ghost" size="xs" onClick={() => setConfirming("archive")}>
+                      Archive
+                    </Button>
+                    <Button type="button" variant="destructive" size="xs" onClick={() => setConfirming("delete")}>
+                      Delete
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
           </span>
         )}
       </div>
@@ -247,11 +337,6 @@ function MessageItem({
         <EditForm programId={programId} message={message} onDone={() => setEditing(false)} />
       ) : (
         <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
-      )}
-      {deleteMutation.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          {deleteMutation.error.message}
-        </p>
       )}
     </li>
   );
@@ -278,7 +363,7 @@ function EditForm({
         param: { id: programId, messageId: message.id },
         json: { body },
       });
-      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't save your changes."));
+      if (!res.ok) throw new Error(await errorFrom(res, "Couldn't save your changes.", MESSAGE_UNAVAILABLE));
       return res.json();
     },
     // Wait for the refetch so the list shows the new text before the editor closes.
@@ -286,6 +371,9 @@ function EditForm({
       await queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) });
       onDone();
     },
+    // A 404 usually means an admin archived or deleted the message while the
+    // editor was open. Refetch so the stale message drops out of the list.
+    onError: () => queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(programId) }),
   });
 
   return (

@@ -32,12 +32,14 @@ config migration, no lockfile churn.
 ## Pros and cons of switching
 
 **Pros**
+
 - Fixes the `installChunk` crash we keep hitting on Windows.
 - Faster dev startup and HMR (a few-second-per-change improvement, not
   life-changing but real).
 - Aligns with Next.js's direction — less work when Next 16 lands.
 
 **Cons**
+
 - Sentry can't auto-instrument server actions under Turbopack yet. We
   have one (sign-out); it's trivial.
 - Surfaces noisy `import-in-the-middle` version warnings from Sentry's

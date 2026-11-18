@@ -109,6 +109,7 @@ realistic bug is caught by `ship-2c` but not `ship-2a`. `ship-2b` independently 
 the distinct `troubleshoot` arm.
 
 **Coverage retained (nothing lost):**
+
 - Three-option menu, no `proceed` offered under pending advisories → `ship-2a` + `ship-2b`.
 - `wait+5` re-loop → `ship-2a`.
 - `troubleshoot` exit (surfaces check name + URL) → `ship-2b`.

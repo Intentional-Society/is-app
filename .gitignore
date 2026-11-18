@@ -67,3 +67,6 @@ scripts/*.csv
 
 # Skill-eval workspaces (generated run artifacts; see docs/design-skill-evals-harness.md)
 .claude/skills/*-workspace/
+
+# e2e signed-in browser state (live session tokens until teardown signs out)
+playwright/.auth/

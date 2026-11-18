@@ -188,6 +188,7 @@ Argument is cached for `/pr` and `/ship` in the same session. **(Revised v1.1, #
 **Devjournal trigger list.**
 
 Hard triggers (always draft):
+
 - New or removed dependency in `package.json`.
 - New or changed required environment variable.
 - New required local setup step (new Docker service, new daemon, new auth flow).
@@ -197,11 +198,13 @@ Hard triggers (always draft):
 - Schema migration requiring multi-deploy timing.
 
 Soft triggers (offer to draft; default skip unless human accepts):
+
 - Security-relevant change (auth, permission boundary, session handling) not covered above.
 - Architectural decision affecting future code in the area.
 - Convention-changing refactor visible to anyone editing the area.
 
 Don't trigger:
+
 - Bug fixes.
 - Internal refactors with no API surface change.
 - Performance optimizations.

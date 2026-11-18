@@ -72,7 +72,14 @@ export function SettingsSections({
           title="Deactivate account"
           description="Hides your profile from other members. Some records of past participation may remain visible in other people's history data."
         >
-          <DeactivateAccountForm isDeactivated={!!profile.deactivatedAt} />
+          {/* The form finishes an action with router.refresh(), which
+              re-renders this prop but keeps the form's own state (busy,
+              the confirm panel). The key remounts it when the account
+              flips, so the next action starts from a clean form. */}
+          <DeactivateAccountForm
+            key={profile.deactivatedAt ? "deactivated" : "active"}
+            isDeactivated={!!profile.deactivatedAt}
+          />
         </SettingsSection>
       )}
     </>

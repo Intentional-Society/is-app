@@ -1,12 +1,12 @@
 import { expect, type Page, test } from "./helpers/fixtures";
-import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { TIMEOUT_MS } from "./helpers/session";
 
 // The live-deploy update UX (docs/strategy-deployment.md): the bottom
 // banner for in-app surfaces, and the home page's auto-refresh. We can't
 // produce real version skew against a single deployment, so each test stubs
 // GET /api/version with a payload the running bundle reads as newer.
 
-test.describe.configure({ mode: "serial" });
+test.use({ user: "member" });
 
 const STALE_ID = "e2e-stale-build";
 // Older than any real changelog date, so it never reads as a "feature" on
@@ -21,15 +21,7 @@ type VersionPayload = { id: string; appVersion: string; urgentReleasedAt: string
 const stubVersion = (page: Page, payload: VersionPayload) =>
   page.route("**/api/version", (route) => route.fulfill({ json: payload }));
 
-test.beforeEach(async ({ baseURL }) => {
-  if (!baseURL) throw new Error("version-update.spec.ts: baseURL is not configured");
-  await resetSeededUsers(baseURL);
-});
-
 test("a feature update shows a dismissible banner on an in-app page", async ({ page }) => {
-  await signInAs(page, "regular");
-  await completeWelcome(page, { bio: "e2e bio · version-update · feature" });
-
   // The feature banner holds until the running build is 2h old. A dev server
   // or preview can be any age, so the test brackets the build time instead of
   // knowing it: a clock set before any build reads as a build from the future
@@ -63,9 +55,6 @@ test("a feature update shows a dismissible banner on an in-app page", async ({ p
 });
 
 test("an urgent update shows a non-dismissible banner", async ({ page }) => {
-  await signInAs(page, "regular");
-  await completeWelcome(page, { bio: "e2e bio · version-update · urgent" });
-
   // An urgent marker dated after this build → urgent → non-dismissible.
   await stubVersion(page, { id: STALE_ID, appVersion: OLD_APP_VERSION, urgentReleasedAt: "2999-12-31T00:00:00.000Z" });
 
@@ -77,9 +66,6 @@ test("an urgent update shows a non-dismissible banner", async ({ page }) => {
 });
 
 test("the home page auto-reloads a stale tab on arrival", async ({ page }) => {
-  await signInAs(page, "regular");
-  await completeWelcome(page, { bio: "e2e bio · version-update · home" });
-
   // A patch-level newer deploy: the banner would hold this 6h, but the home
   // safe-refresh reloads regardless of tier.
   await stubVersion(page, { id: STALE_ID, appVersion: OLD_APP_VERSION, urgentReleasedAt: EPOCH });

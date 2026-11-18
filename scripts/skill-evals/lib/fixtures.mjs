@@ -160,13 +160,13 @@ const REVIEW_NOTICE_SUPERSEDED = reviewComment(
 const REVIEW_SUMMARY_CLEAN = reviewComment(
   2000000012,
   "2026-09-20T12:17:00Z",
-  "I reviewed PR #224 and found no issues.\n\n<sub>success, 2.5 min, $0.52, 0 turns (may wrongly read 0), 0 permission denials, models: claude-opus-5-5 · [run](https://github.com/Intentional-Society/is-app/actions/runs/2)</sub>",
+  "I reviewed PR #224 and found no issues.\n\n<sub>success, 2.5 min, $0.52, 0 permission denials, models: claude-opus-5-5 · [run](https://github.com/Intentional-Society/is-app/actions/runs/2)</sub>",
 );
 
 const REVIEW_SUMMARY_WITH_FINDINGS = reviewComment(
   2000000013,
   "2026-09-20T12:17:00Z",
-  "I found 1 issue in PR #225 and posted it as an inline comment.\n\n1. `src/app/flagged.ts:3`: the new handler never awaits the write.\n\n<sub>success, 2.6 min, $0.55, 0 turns (may wrongly read 0), 0 permission denials, models: claude-opus-5-5 · [run](https://github.com/Intentional-Society/is-app/actions/runs/3)</sub>",
+  "I found 1 issue in PR #225 and posted it as an inline comment.\n\n1. `src/app/flagged.ts:3`: the new handler never awaits the write.\n\n<sub>success, 2.6 min, $0.55, 0 permission denials, models: claude-opus-5-5 · [run](https://github.com/Intentional-Society/is-app/actions/runs/3)</sub>",
 );
 
 // The review's inline finding on PR 225 — counts as unanswered (#601, #680). Seeded as the

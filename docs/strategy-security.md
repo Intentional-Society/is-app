@@ -195,9 +195,10 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 
 ## `CI_RESET_TOKEN`
 
-**Impact if leaked:** An attacker can POST to `/api/_test/reset` on and wipe profile fields + invites for the two e2e test accounts.
+**Impact if leaked:** An attacker can POST to `/api/_test/reset` and wipe profile fields + invites for the two e2e test accounts, or put them in the onboarded state.
 
 **To rotate:**
+
 1. Generate a new random string (e.g. `openssl rand -hex 32`)
 2. Update the `CI_RESET_TOKEN` secret in GitHub Actions (Settings → Secrets → Actions)
 3. Update the `CI_RESET_TOKEN` env var in Vercel for Preview and Development environments
@@ -208,9 +209,12 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 **Impact if leaked:** An attacker can sign in as one of two fake e2e accounts (`e2e-regular@testfake.local` / `e2e-admin@testfake.local`). Either one sees what any member sees. `e2e-admin` is a prod admin whose admin access is capped to the reads in `E2E_ADMIN_READS` (`src/server/auth-middleware.ts`): app settings, pending relation hints, hidden members, and the program list.
 
 **To rotate:**
+
 1. Change the password in the Supabase dashboard → Authentication → Users (production project)
 2. Update the corresponding secret in GitHub Actions (Settings → Secrets → Actions)
 3. Update `.env.local.example` if the local default changed (though local values are arbitrary)
+
+**Keeping them out of the e2e report:** `e2e.yml` uploads the Playwright HTML report as an artifact, and artifacts of a public repo can be downloaded by any signed-in GitHub user. Playwright titles a fill step `Fill "<value>"` and a trace records every call's arguments and request bodies, so a password typed with `locator.fill` or under tracing ends up in that artifact. The suite therefore types passwords only through `signInThroughForm` (`tests/e2e/helpers/session.ts`), which sets the field from inside the page, and only in the setup project, which runs with `trace: "off"`. CI records no traces at all (`playwright.config.ts` turns them off when `CI` is set): a trace also holds DOM snapshots and response bodies, and the specs load member pages on a preview that shares prod data. The teardown project signs every account out at the end of the run, so the sessions the run created don't outlive it.
 
 ## `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 

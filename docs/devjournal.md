@@ -6,6 +6,32 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-15 | James (with Opus 5.5) | Node 26 LTS upgrade
+
+`.nvmrc`, `engines.node`, the CI workflows and `@types/node` move to Node 26, the Active LTS since October; Node 24 is in maintenance. On 26, server-side `fetch` uses HTTP/2, where `statusText` is empty, so check `res.status`.
+
+## 2026-11-12 | James (with Opus 5.5) | Base worktree is lane 1 (+100 ports)
+
+Running `npm run make_lane_inside_worktree` in the main checkout moves it to +100 ports (API 54421, dev 3100), which frees the Supabase defaults for other Supabase projects. Lane ports now live in `.env.local`, so convert existing lanes per the doc. Local stacks no longer run analytics/vector or the edge runtime. Reference: docs/strategy-worktree-lanes.md.
+
+---
+
+## 2026-11-10 | James (with Opus 5.5) | The reviewer sees its earlier threads
+
+Claude review now gives the reviewer its earlier threads on the PR, with replies from owners, members and collaborators, so later rounds don't re-raise a finding that was fixed or declined; a by-design reply settles it. The summary drops the turn count, which always read 0.
+
+---
+
+## 2026-11-09 | Benji (with Kiro) | Admins can archive message box messages
+
+Archiving hides a message from the program page for everyone but keeps the row; admins restore or delete it from an archive list on `/admin/programs/[id]`. It adds `message_box_messages.archived_at`, so it needs `npm run prod:db:expand` first. Details in `docs/feature-message-box.md`.
+
+## 2026-11-09 | James (with Fable 5.2) | E2E runs in under a minute, with new rules for specs
+
+E2E specs start from a saved session: set `test.use({ user: "member" })` (or `"new-member"`, `"admin"`), never drive the sign-in form, and never `fill()` a secret, since the report is a public artifact. CI records no traces (reproduce locally with `--trace on`) and installs only what specs import: add a new import to `scripts/e2e-ci-deps.mjs`.
+
+---
+
 ## 2026-11-08 | James (with Opus 5.5) | Fixed claude-review, which had silently stopped reviewing PRs
 
 The code-review plugin had stopped reviewing (#680), so claude-review now runs Claude Code's bundled `/code-review high` on Opus with the job's GITHUB_TOKEN. Every reviewed push ends with one comment: a summary showing time and cost, or a "did not finish" notice. Docs-only PRs skip it; label a PR `skip-claude-review` to stop further reviews.
@@ -145,9 +171,11 @@ Phase 7 (#515) is the right-sizing pass. A per-eval sweep found the suite alread
 ## 2026-07-20 | Blake (with Fable) | Skill-evals Phase 6 — ship merge assertions now discriminate
 
 Phase 6 (#514) closes the two critical-behavior gaps the Phase-3 audit surfaced. **Merge assertions were non-discriminating:** the checked-in `ask` rule on `gh pr merge *` fires at the permission layer before the sandbox `gh` stub can log, so the "no `gh pr merge` in the log" negatives passed vacuously and a `/ship` that wrongly merged could score a false PASS. Merge-adjacent assertions are now graded from the transcript's tool-call record, corroborated by the log and `gh-stub-state.json`; strategy §6 carries the merge-discrimination rule. **Evidence wasn't preserved:** archiving the raw triad into the eval's `outputs/` before teardown is now harness behavior, selfcheck-gated, so grading is executor-independent. No skill content changed. (#507, #514)
+
 ## 2026-07-19 | Blake (with Fable) | Skill-evals wired into the repo — baseline self-hosting
 
 Phase 5 makes the skill-eval system discoverable and self-hosting. `docs/strategy-skill-evals.md` is complete: run instructions in both PowerShell and bash (§6), plus the real-repo exception runbook (§10) — the one sanctioned human-run smoke, gated by a recorded justification and a cleanup-owed checklist so "occasional" can't drift into "whenever convenient." The PR template gained an eval-batch checklist line, and `doc-skill-creator.md` notes that a vendored refresh trips the testing rule. Baseline still owes the macOS validation artifact (#510) and the cloud Layer-C run (#512); neither blocks this wiring. (#507, #513)
+
 ## 2026-07-19 | Blake (with Fable) | Skill-eval sandbox harness landed
 
 `scripts/skill-evals/` now builds throwaway sandboxes (temp git repo + local bare origin + default-deny logging `gh` stub + fake `npm test`) for executing the per-skill evals — never against the real repo; `node scripts/skill-evals/selfcheck.mjs` runs the 20-check safety checklist. The batch + executor prompts under `scripts/skill-evals/prompts/` are the canonical way to run the suite. (#507)

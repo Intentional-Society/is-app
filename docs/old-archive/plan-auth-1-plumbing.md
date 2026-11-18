@@ -132,24 +132,29 @@ Returns `{ id, email, profile: { id, displayName, createdAt } }`. The `profile` 
 ### Functional (Vitest)
 
 **Commit 1c — `tests/functional/auth-middleware.test.ts`:**
+
 - Unauthenticated request → 401 `{ error: "unauthenticated" }`.
 - Authenticated request (mocked server client) → handler runs, returns expected response.
 - `/api/health` reachable without session.
 - Allowlist regression guard: explicitly assert that only `/api/health` is public. A new route must not accidentally bypass auth.
 
 **Commit 1d — `tests/functional/auth-callback.test.ts`:**
+
 - Missing `code` param → redirect to `/login?error=missing_code`.
 - Invalid/expired code (mocked exchange failure) → redirect to `/login?error=exchange_failed`.
 
 **Commit 1d — `tests/functional/profiles.test.ts`:**
+
 - Profile upsert idempotency: double-call with same user id → one row, no errors.
 
 **Commit 1f — `tests/functional/api-me.test.ts`:**
+
 - Response shape: validate that `/api/me` returns exactly `{ id, email, profile: { id, displayName, createdAt } }` — no extra fields. Catches accidental field leakage as Phase 2 adds sensitive columns.
 
 ### E2E (Playwright)
 
 **Commit 1f — `tests/e2e/auth.spec.ts`:**
+
 - Unauthenticated visit to `/` → redirects to `/login` (login page renders with email input visible).
 - Unauthenticated `fetch('/api/hello')` → 401.
 - `/api/health` remains accessible without auth (regression guard).

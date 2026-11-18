@@ -1,22 +1,15 @@
 import { expect, test } from "./helpers/fixtures";
-import { resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { TIMEOUT_MS } from "./helpers/session";
 
 // The multi-step welcome flow (#166): a fresh user is routed through
 // agreements → profile → programs, then handed off to /myweb. Both tests
-// depend on the regular seeded user starting with no welcome markers, so
-// we re-reset per-test to survive CI retries cleanly.
+// need an account with no welcome markers, which the `new-member` reset
+// gives them — on a CI retry too.
 
-test.describe.configure({ mode: "serial" });
+test.use({ user: "new-member" });
 
-test.beforeEach(async ({ baseURL }) => {
-  if (!baseURL) throw new Error("welcome.spec.ts: baseURL is not configured");
-  await resetSeededUsers(baseURL);
-});
-
-// Declared BEFORE the happy-path test so the file's final state leaves
-// the regular user fully onboarded.
 test("welcome profile step surfaces a validation failure instead of getting stuck", async ({ page }) => {
-  await signInAs(page, "regular");
+  await page.goto("/");
 
   // Pass the agreements step to reach the profile form.
   await page.waitForURL((u) => u.pathname === "/welcome/agreements", { timeout: TIMEOUT_MS });
@@ -48,7 +41,9 @@ test("welcome profile step surfaces a validation failure instead of getting stuc
 });
 
 test("fresh user completes the welcome flow end to end", async ({ page }) => {
-  await signInAs(page, "regular");
+  // A member with no welcome markers is sent from the home page into
+  // the flow.
+  await page.goto("/");
 
   // Step 1 — agreements.
   await page.waitForURL((u) => u.pathname === "/welcome/agreements", { timeout: TIMEOUT_MS });

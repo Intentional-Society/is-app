@@ -1,20 +1,13 @@
 import { expect, test } from "./helpers/fixtures";
-import { completeWelcome, resetSeededUsers, signInAs, TIMEOUT_MS } from "./helpers/session";
+import { TIMEOUT_MS } from "./helpers/session";
 
 // Smoke coverage of the /about page: the sidebar link reaches it, and
 // the version line, changelog, and team blurb render.
-test.describe.configure({ mode: "serial" });
+test.use({ user: "member" });
 
 test.describe("/about page", () => {
-  test.beforeEach(async ({ baseURL }) => {
-    if (!baseURL) throw new Error("about.spec.ts: baseURL is not configured");
-    await resetSeededUsers(baseURL);
-  });
-
   test("the menu link opens /about and the changelog renders", async ({ page }) => {
-    await signInAs(page, "regular");
-    // Distinct bio per completeWelcome caller — see the reset tripwire.
-    await completeWelcome(page, { bio: "e2e bio · about.spec · changelog" });
+    await page.goto("/");
 
     // The link lives only in the hamburger menu (no home-page card).
     // Menu items render via SheetClose, which exposes them with

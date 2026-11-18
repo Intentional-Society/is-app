@@ -9,12 +9,14 @@
 ## 1. Goals & non-goals
 
 **Goals:**
+
 - Produce three working Claude Code Skills (`/commit`, `/pr`, `/ship`) under `.claude/skills/` that satisfy spec §4.
 - Apply the seven spec-§3-listed policy-doc edits and one PR-template item.
 - Verify each Skill passes its eval set and a live end-to-end smoke-test.
 - Self-host: the implementation PR ships via the newly-built `/ship` Skill.
 
 **Non-goals:**
+
 - Scope creep beyond spec §3 File layout.
 - Pre-writing SKILL.md body prose in this plan (Phase 7a produces the bodies via `skill-creator`).
 - Sprint-by-sprint scheduling or calendar commitments.
@@ -43,6 +45,7 @@
 | `.gitignore`                                | Add generated-output paths only if they exist and are not committed (do not ignore `evals/evals.json`)                   |
 
 **Out of scope:**
+
 - Any file not listed in spec §3 File layout.
 - Final SKILL.md body prose (produced during Phase 7a, not prescribed here).
 - Verbatim wording for policy-doc sections (drafted in Phase 7b based on the actual Skill bodies).
@@ -121,6 +124,7 @@
 ## 5. Phase 7b — Update policy docs
 
 All 7b edits share the same per-substep fields:
+
 - **Effort:** < 1h per file
 - **Dependencies:** Phase 7a complete (wording can reference Skill names and paths as they actually exist)
 - **Acceptance:** Policy-doc additions are brief, practical, and easy to follow for the intended audience; avoid verbosity unless the added detail materially improves correct use.

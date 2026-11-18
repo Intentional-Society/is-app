@@ -12,7 +12,7 @@ import { createServerClient } from "@supabase/ssr";
 import app from "@/server/api";
 import { db } from "@/server/db";
 import { profilePrograms, profiles, programs } from "@/server/schema";
-import { E2E_EMAILS } from "@/server/test-reset";
+import { E2E_ACCOUNTS, E2E_EMAILS } from "@/server/test-reset";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 
@@ -72,7 +72,7 @@ describe("GET /api/admin/programs/:id/participant-emails", () => {
   // The seeded e2e account may already exist (dev DBs run the e2e seed
   // script; fresh CI DBs don't), so create it only when absent and clean
   // up only what this run created.
-  const E2E_EMAIL = E2E_EMAILS[0];
+  const E2E_EMAIL = E2E_ACCOUNTS.regular;
   let e2eId: string;
   let e2eUserCreated = false;
   let e2eProfileCreated = false;

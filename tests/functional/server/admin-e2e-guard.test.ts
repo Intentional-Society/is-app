@@ -37,12 +37,12 @@ import { runButtondownSyncForServer } from "@/server/buttondown-runner";
 import { db } from "@/server/db";
 import { createInvite } from "@/server/invites";
 import { invites, profiles } from "@/server/schema";
-import { E2E_EMAILS } from "@/server/test-reset";
+import { E2E_ACCOUNTS } from "@/server/test-reset";
 
 const mockCreateServerClient = vi.mocked(createServerClient);
 const mockButtondownSync = vi.mocked(runButtondownSyncForServer);
 
-const E2E_ADMIN_EMAIL = E2E_EMAILS[1];
+const E2E_ADMIN_EMAIL = E2E_ACCOUNTS.admin;
 
 // The session email is the only thing that differs between a guarded
 // request and its control: requireAdmin reads the email from the

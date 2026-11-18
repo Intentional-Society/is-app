@@ -67,6 +67,7 @@ The invite code has to survive the magic-link round-trip. Flow:
 ## Signup page (`src/app/signup/page.tsx` — new)
 
 Two-step client form:
+
 1. Enter code → check → display the inviter's note → continue.
 2. Enter email + display name → send magic link → "check your email".
 
@@ -78,6 +79,7 @@ Two-step client form:
 ## Playwright session-minting helper
 
 `tests/e2e/helpers/session.ts` — new. Uses `@supabase/supabase-js` with the local service-role key to:
+
 1. Create a test user via `supabase.auth.admin.createUser({ email, email_confirm: true })`.
 2. Generate a session directly (or use `generateLink({ type: 'magiclink' })` and consume it server-side).
 3. Set the session cookie on the Playwright browser context so the test starts authenticated.

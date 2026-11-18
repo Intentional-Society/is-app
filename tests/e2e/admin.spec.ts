@@ -1,5 +1,4 @@
 import { expect, type Page, test } from "./helpers/fixtures";
-import { resetSeededUsers, signInAs } from "./helpers/session";
 
 // Smoke test for the admin surface: the seeded admin user can reach the
 // /admin hub and the /admin/programs page, and neither logs a console
@@ -14,10 +13,7 @@ import { resetSeededUsers, signInAs } from "./helpers/session";
 // notFound() and the status assertions below fail fast. See
 // docs/doc-supabase.md.
 
-test.beforeEach(async ({ baseURL }) => {
-  if (!baseURL) throw new Error("admin.spec.ts: baseURL is not configured");
-  await resetSeededUsers(baseURL);
-});
+test.use({ user: "admin" });
 
 // React 19.2's Component Performance Track instruments renders with
 // performance.measure() calls (names prefixed by a U+200B zero-width
@@ -35,8 +31,7 @@ function isReactDevPerfTrackNoise(message: string): boolean {
 }
 
 // Records console errors and uncaught page exceptions from the moment it
-// is attached. Attach it after sign-in so the listener only sees the
-// page under test, not sign-in/redirect noise.
+// is attached.
 function collectPageErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (msg) => {
@@ -53,7 +48,6 @@ function collectPageErrors(page: Page): string[] {
 }
 
 test("admin can open the /admin hub without console errors", async ({ page }) => {
-  await signInAs(page, "admin");
   const errors = collectPageErrors(page);
 
   const response = await page.goto("/admin");
@@ -73,7 +67,6 @@ test("admin can open the /admin hub without console errors", async ({ page }) =>
 });
 
 test("admin can open the /admin/programs page without console errors", async ({ page }) => {
-  await signInAs(page, "admin");
   const errors = collectPageErrors(page);
 
   const response = await page.goto("/admin/programs");
