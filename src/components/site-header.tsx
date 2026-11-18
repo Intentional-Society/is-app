@@ -161,6 +161,8 @@ function MenuSheet({ displayName, isAdmin }: { displayName: string | null; isAdm
             <MenuLink href="/programs">Programs</MenuLink>
             <MenuLink href="/members">Member directory</MenuLink>
             <MenuLink href="/intentions">Current intentions</MenuLink>
+            {/* Route type registered after first dev-server build */}
+            <MenuLink href={"/wishes" as Parameters<typeof MenuLink>[0]["href"]}>Wishes</MenuLink>
             <MenuLink href="/myweb">My web</MenuLink>
             <MenuLink href="/invites">Invite a friend</MenuLink>
             <MenuLink href="/about">About</MenuLink>
