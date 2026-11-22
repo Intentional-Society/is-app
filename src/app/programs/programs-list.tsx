@@ -195,10 +195,11 @@ export function ProgramsList() {
               : "Failed to join program.",
         );
       }
-      await reload();
     } catch {
       setActionError("Network error joining program.");
     } finally {
+      // Whatever happened to the request, the server's state may have changed.
+      await reload();
       setPending(programId, false);
     }
   };
@@ -209,10 +210,10 @@ export function ProgramsList() {
     try {
       const res = await apiClient.api.programs[":id"].leave.$post({ param: { id: programId } });
       if (!res.ok) setActionError("Failed to leave program.");
-      await reload();
     } catch {
       setActionError("Network error leaving program.");
     } finally {
+      await reload();
       setPending(programId, false);
     }
   };

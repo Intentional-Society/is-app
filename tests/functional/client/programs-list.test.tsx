@@ -189,4 +189,24 @@ describe("ProgramsList leave confirmation", () => {
 
     await act(async () => finishJoin({ ok: true, json: async () => ({}) } as never));
   });
+  it("refetches after a request that throws, and only then unlocks the card", async () => {
+    $list.mockResolvedValue(listResponse(false));
+    $join.mockRejectedValue(new Error("network down"));
+    render(<ProgramsList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Join program" }));
+
+    // The POST threw, but the server may have applied it; the list must reload.
+    expect(await screen.findByRole("alert")).toHaveTextContent("Network error joining program.");
+    await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("button", { name: "Join program" })).toBeEnabled();
+  });
+
+  it("refetches after a leave request that throws", async () => {
+    $leave.mockRejectedValue(new Error("network down"));
+    render(<ProgramsList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Leave program" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Network error leaving program.");
+    await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
+  });
 });

@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 // The updater copies the set, so overlapping updates from different rows never
 // overwrite each other.
 export function useIdSet(): [ReadonlySet<string>, (id: string, member: boolean) => void] {
-  const [ids, setIds] = useState<ReadonlySet<string>>(new Set());
+  const [ids, setIds] = useState<ReadonlySet<string>>(() => new Set());
   const setMember = useCallback((id: string, member: boolean) => {
     setIds((prev) => {
       if (prev.has(id) === member) return prev;

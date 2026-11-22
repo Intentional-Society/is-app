@@ -120,4 +120,14 @@ describe("InvitesAdmin delete confirmation", () => {
     fireEvent.click(row("For Ada").getByRole("button", { name: "Confirm" }));
     expect(row("For Ada").queryByRole("alert")).not.toBeInTheDocument();
   });
+  it("refetches after a failed delete, so a stale row goes away instead of asking for a retry", async () => {
+    $delete.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as never);
+    renderAdmin();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    // Another admin already deleted it, so the refetch no longer includes it.
+    $list.mockResolvedValue({ ok: true, json: async () => ({ invites: [] }) } as never);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(await screen.findByText("No invites yet.")).toBeInTheDocument();
+    expect($list).toHaveBeenCalledTimes(2);
+  });
 });

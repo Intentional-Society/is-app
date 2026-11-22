@@ -31,7 +31,9 @@ export function InvitesAdmin() {
       if (!res.ok) throw new Error(`delete failed (${res.status})`);
       return id;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    // After a failure too: a failed delete often means the row is stale (another
+    // admin got there first), and a retry would fail the same way.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 
   return (
