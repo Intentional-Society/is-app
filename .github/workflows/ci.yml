@@ -64,13 +64,20 @@ jobs:
       # SUPABASE_API_PORT / SUPABASE_BLOCK_SIZE in scripts/setup.mjs; change
       # all three together (a newly host-bound port, such as the pooler, goes
       # in here too).
+      # Append to the current list rather than replace it, in case the runner
+      # image ships its own reservations.
       - if: steps.filter.outputs.code == 'true'
-        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=54321-54327
+        run: |
+          current="$(sysctl -n net.ipv4.ip_local_reserved_ports)"
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports="${current:+$current,}54321-54327"
       - if: steps.filter.outputs.code == 'true'
         id: supabase
         run: npx supabase start
-      # If the bind still fails, show who holds the ports. The runner is gone
+      # If the bind still fails, show what holds the ports. The runner is gone
       # by the time anyone reads the failure, so this is the only evidence.
+      # This runs after the CLI has rolled back, so a short-lived socket may
+      # already be closed: a socket listed here is a lasting holder, and empty
+      # output points to a transient one (or to a cause other than the ports).
       # sudo: `ss -p` leaves root-owned sockets (docker-proxy, dockerd) blank.
       - if: failure() && steps.supabase.outcome == 'failure'
         run: |
