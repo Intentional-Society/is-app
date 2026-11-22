@@ -146,8 +146,8 @@ async function fetchPrograms(): Promise<ListState> {
 }
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
-  // Programs with a join or leave in flight. A set, not one slot, so an action
-  // on one card cannot unlock another card that is still mid-request.
+  // Programs with a join or leave in flight, tracked per card so one card's
+  // action never unlocks another card that is still mid-request.
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
   const setPending = (programId: string, on: boolean) =>
     setPendingIds((prev) => {

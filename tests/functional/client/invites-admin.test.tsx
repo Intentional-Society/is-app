@@ -67,7 +67,7 @@ describe("InvitesAdmin delete confirmation", () => {
     renderAdmin();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete the invite");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete this invite");
     expect(await screen.findByRole("button", { name: "Delete" })).toBeEnabled();
   });
   it("reports a row's failure even when another row's delete started after it and succeeded", async () => {
@@ -90,6 +90,34 @@ describe("InvitesAdmin delete confirmation", () => {
 
     // The first row's request fails after the second one started (and succeeded).
     await act(async () => failFirst({ ok: false, status: 500, json: async () => ({}) } as never));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete the invite");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete this invite");
+  });
+  it("keeps one row's failure message when a different row is deleted, and clears it on retry", async () => {
+    const second = { ...invite, id: "i2", note: "For Linus", code: "def456" };
+    $list.mockResolvedValue({ ok: true, json: async () => ({ invites: [invite, second] }) } as never);
+    $delete.mockImplementation((({ param }: { param: { id: string } }) =>
+      Promise.resolve(
+        param.id === "i1" ? { ok: false, status: 500, json: async () => ({}) } : { ok: true, json: async () => ({}) },
+      )) as never);
+    renderAdmin();
+    const row = (note: string) => within(screen.getByText(note).closest("li") as HTMLElement);
+    await screen.findByText("For Ada");
+
+    fireEvent.click(row("For Ada").getByRole("button", { name: "Delete" }));
+    fireEvent.click(row("For Ada").getByRole("button", { name: "Confirm" }));
+    expect(await row("For Ada").findByRole("alert")).toHaveTextContent("Couldn't delete this invite");
+    expect(row("For Linus").queryByRole("alert")).not.toBeInTheDocument();
+
+    // Deleting another invite does not wipe the failed row's message.
+    fireEvent.click(row("For Linus").getByRole("button", { name: "Delete" }));
+    fireEvent.click(row("For Linus").getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect($delete).toHaveBeenCalledTimes(2));
+    expect(row("For Ada").getByRole("alert")).toBeInTheDocument();
+
+    // Retrying the failed invite clears its message while the request runs.
+    $delete.mockReturnValue(new Promise(() => {}) as never);
+    fireEvent.click(row("For Ada").getByRole("button", { name: "Delete" }));
+    fireEvent.click(row("For Ada").getByRole("button", { name: "Confirm" }));
+    expect(row("For Ada").queryByRole("alert")).not.toBeInTheDocument();
   });
 });

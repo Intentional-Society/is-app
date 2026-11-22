@@ -69,7 +69,7 @@ describe("ProgramSlugDetail leave confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
 
     await waitFor(() => expect($leave).toHaveBeenCalledWith({ param: { id: "p1" } }));
-    expect(await screen.findByRole("button", { name: "Leaving…" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Leaving…" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByRole("button", { name: "Leave program" })).not.toBeInTheDocument();
 
     await act(async () => finishRefetch(getResponse(false)));

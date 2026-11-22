@@ -73,8 +73,8 @@ describe("ConfirmButton", () => {
     renderButton({ onConfirm });
     fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
-    expect(screen.getByRole("button", { name: "Leaving…" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Leaving…" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveAttribute("aria-disabled", "true");
     await act(async () => settle());
     expect(screen.getByRole("button", { name: "Leave program" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
@@ -121,5 +121,38 @@ describe("ConfirmButton", () => {
     const trigger = await screen.findByRole("button", { name: "Leave program" });
     expect(trigger).toHaveAttribute("aria-disabled", "true");
     expect(trigger).toHaveFocus();
+  });
+  it("closes the step on Escape and returns focus to the trigger", () => {
+    const { onConfirm } = renderButton();
+    fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "Escape" });
+    expect(screen.getByRole("button", { name: "Leave program" })).toHaveFocus();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("ignores Escape while the request runs, and keeps focus on the button it was on", () => {
+    renderButton({ onConfirm: () => new Promise<void>(() => {}) });
+    fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("aria-disabled", "true");
+    expect(cancel).toHaveFocus();
+    fireEvent.keyDown(cancel, { key: "Escape" });
+    expect(screen.getByRole("button", { name: "Leaving…" })).toBeInTheDocument();
+  });
+
+  it("closes an open step when the action becomes unavailable", () => {
+    const props = {
+      label: "Leave program",
+      confirmLabel: "Yes, leave program",
+      pendingLabel: "Leaving…",
+      onConfirm: vi.fn(),
+    };
+    const { rerender } = render(<ConfirmButton {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
+    expect(screen.getByRole("button", { name: "Yes, leave program" })).toBeInTheDocument();
+    rerender(<ConfirmButton {...props} disabled />);
+    expect(screen.queryByRole("button", { name: "Yes, leave program" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Leave program" })).toHaveAttribute("aria-disabled", "true");
   });
 });

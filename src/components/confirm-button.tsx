@@ -19,11 +19,13 @@ type ButtonProps = ComponentProps<typeof Button>;
 //
 // Focus follows the swap: Cancel takes it when the step opens (the safe
 // default), and the trigger gets it back when the step closes, so keyboard and
-// screen-reader users keep their place. The trigger stays focusable while
-// disabled (`aria-disabled`), because it can come back still locked, for
-// example after a delete that is navigating away. If the caller unmounts this
-// component when the action succeeds (a leave button replaced by a join
-// button), there is no trigger left to refocus, and the caller owns focus.
+// screen-reader users keep their place. Escape closes the step unless a request
+// is running. All three buttons stay focusable while locked (`aria-disabled`),
+// so locking one never throws focus to <body>; the trigger can also come back
+// still locked, for example after a delete that is navigating away. If the
+// caller unmounts this component when the action succeeds (a leave button
+// replaced by a join button), there is no trigger left to refocus, and the
+// caller owns focus.
 export function ConfirmButton({
   label,
   confirmLabel,
@@ -41,12 +43,12 @@ export function ConfirmButton({
   label: string;
   /** Confirm button text, e.g. "Yes, leave program". */
   confirmLabel: string;
-  /** Confirm button text while `pending`, e.g. "Leaving…". */
+  /** Confirm button text while its own request runs, e.g. "Leaving…". */
   pendingLabel: string;
   onConfirm: () => Promise<unknown> | undefined;
-  /** Extra lock held by the caller, on top of the one `onConfirm` sets. */
+  /** Extra lock held by the caller. Locks the buttons; the label changes only for `onConfirm`'s own request. */
   pending?: boolean;
-  /** Disables the trigger only. */
+  /** Disables the trigger, and closes the step if it is open. */
   disabled?: boolean;
   size?: ButtonProps["size"];
   triggerVariant?: ButtonProps["variant"];
@@ -60,6 +62,11 @@ export function ConfirmButton({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
+  // The action became unavailable while the step was open, so confirming it
+  // would only be rejected.
+  useEffect(() => {
+    if (disabled) setConfirming(false);
+  }, [disabled]);
 
   useEffect(() => {
     if (confirming) cancelRef.current?.focus();
@@ -80,6 +87,10 @@ export function ConfirmButton({
     }
   };
 
+  const lockedClass = "aria-disabled:pointer-events-none aria-disabled:opacity-50";
+  const closeOnEscape = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape" && !busy) setConfirming(false);
+  };
   if (!confirming) {
     return (
       <Button
@@ -90,7 +101,7 @@ export function ConfirmButton({
         disabled={disabled || busy}
         focusableWhenDisabled
         onClick={() => setConfirming(true)}
-        className={cn("aria-disabled:pointer-events-none aria-disabled:opacity-50", triggerClassName)}
+        className={cn(lockedClass, triggerClassName)}
       >
         {label}
       </Button>
@@ -103,10 +114,12 @@ export function ConfirmButton({
         variant="destructive"
         size={size}
         disabled={busy}
+        focusableWhenDisabled
         onClick={confirm}
-        className={actionClassName}
+        onKeyDown={closeOnEscape}
+        className={cn(lockedClass, actionClassName)}
       >
-        {busy ? pendingLabel : confirmLabel}
+        {submitting ? pendingLabel : confirmLabel}
       </Button>
       <Button
         ref={cancelRef}
@@ -114,8 +127,10 @@ export function ConfirmButton({
         variant={cancelVariant}
         size={size}
         disabled={busy}
+        focusableWhenDisabled
         onClick={() => setConfirming(false)}
-        className={actionClassName}
+        onKeyDown={closeOnEscape}
+        className={cn(lockedClass, actionClassName)}
       >
         Cancel
       </Button>

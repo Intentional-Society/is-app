@@ -61,4 +61,13 @@ describe("ButtondownSyncButtons", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Sync failed: status 500");
     expect(await screen.findByRole("button", { name: "Sync Buttondown (write)" })).toBeInTheDocument();
   });
+  it("keeps the write confirm labelled as the write while only a dry run is running", async () => {
+    $dryRun.mockReturnValue(new Promise(() => {}) as never);
+    render(<ButtondownSyncButtons />);
+    fireEvent.click(screen.getByRole("button", { name: "Sync Buttondown (write)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sync Buttondown (dry run)" }));
+    const confirm = await screen.findByRole("button", { name: "Yes, write to Buttondown" });
+    expect(confirm).toHaveAttribute("aria-disabled", "true");
+    expect($write).not.toHaveBeenCalled();
+  });
 });

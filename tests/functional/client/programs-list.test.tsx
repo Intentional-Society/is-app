@@ -62,7 +62,7 @@ describe("ProgramsList leave confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
 
     await waitFor(() => expect($leave).toHaveBeenCalledWith({ param: { id: "p1" } }));
-    expect(await screen.findByRole("button", { name: "Leaving…" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Leaving…" })).toHaveAttribute("aria-disabled", "true");
     // The stale `joined` card must not offer a live Leave button mid-refetch.
     expect(screen.queryByRole("button", { name: "Leave program" })).not.toBeInTheDocument();
 
@@ -125,7 +125,7 @@ describe("ProgramsList leave confirmation", () => {
     // Book Club's own refetch lands but is superseded, so the list still shows
     // the old snapshot. The card must not unlock over it.
     await act(async () => finishOlder(listOf(program(false, "p1", "Book Club"), program(false, "p2", "Garden Club"))));
-    expect(card("Book Club").getByRole("button", { name: "Leaving…" })).toBeDisabled();
+    expect(card("Book Club").getByRole("button", { name: "Leaving…" })).toHaveAttribute("aria-disabled", "true");
 
     await act(async () => finishNewer(listOf(program(false, "p1", "Book Club"), program(true, "p2", "Garden Club"))));
     expect(await card("Book Club").findByRole("button", { name: "Join program" })).toBeEnabled();

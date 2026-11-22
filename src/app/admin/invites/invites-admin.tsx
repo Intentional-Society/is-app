@@ -20,10 +20,16 @@ const fetchInvites = async (): Promise<AdminInvite[]> => {
 export function InvitesAdmin() {
   const queryClient = useQueryClient();
 
-  // Rows share one mutation, and its `isError` follows only the latest call, so a
-  // row that fails while another is running would go unreported. Each row's own
-  // promise sets this instead.
-  const [deleteFailed, setDeleteFailed] = useState(false);
+  // Invites whose last delete failed. Each row's own request records its
+  // failure, and the row shows the message until that invite is retried.
+  const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(new Set());
+  const setFailed = (id: string, failed: boolean) =>
+    setFailedIds((prev) => {
+      const next = new Set(prev);
+      if (failed) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   const invitesQuery = useQuery({ queryKey: QUERY_KEY, queryFn: fetchInvites });
 
   const deleteMutation = useMutation<string, Error, string>({
@@ -37,13 +43,6 @@ export function InvitesAdmin() {
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-2">
-      {/* ConfirmButton closes its step when the request ends, so the failure
-          has to show here or the row just snaps back to "Delete". */}
-      {deleteFailed && (
-        <p role="alert" className="text-sm text-destructive">
-          Couldn't delete the invite. Try again.
-        </p>
-      )}
       {invitesQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : invitesQuery.isError ? (
@@ -76,6 +75,11 @@ export function InvitesAdmin() {
                   <span className="text-xs text-muted-foreground">
                     {meta.join(" · ")} · <span className="font-mono">{inv.code}</span>
                   </span>
+                  {failedIds.has(inv.id) && (
+                    <p role="alert" className="text-xs text-destructive">
+                      Couldn't delete this invite. Try again.
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {/* Two-step delete guards an irreversible hard delete against a stray click. */}
@@ -84,10 +88,10 @@ export function InvitesAdmin() {
                     confirmLabel="Confirm"
                     pendingLabel="Deleting…"
                     onConfirm={() => {
-                      setDeleteFailed(false);
+                      setFailed(inv.id, false);
                       return deleteMutation.mutateAsync(inv.id).then(
                         () => undefined,
-                        () => setDeleteFailed(true),
+                        () => setFailed(inv.id, true),
                       );
                     }}
                     size="sm"
