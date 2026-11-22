@@ -209,4 +209,34 @@ describe("ProgramsList leave confirmation", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Network error leaving program.");
     await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
   });
+  it("keeps the programs on screen when the refetch after a failed request also fails", async () => {
+    $leave.mockRejectedValue(new Error("network down"));
+    render(<ProgramsList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Leave program" }));
+    $list.mockRejectedValueOnce(new Error("network down"));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+
+    // The action's own message survives, and the list is not swapped for a load error.
+    expect(await screen.findByRole("alert")).toHaveTextContent("Network error leaving program.");
+    await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("Network error loading programs.")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Book Club" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Leave program" })).toBeEnabled();
+  });
+
+  it("keeps the programs and reports the load failure when the refetch after a successful request fails", async () => {
+    render(<ProgramsList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Leave program" }));
+    $list.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) } as never);
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load programs (503).");
+    expect(screen.getByRole("heading", { name: "Book Club" })).toBeInTheDocument();
+  });
+
+  it("still shows a load error when the first load fails", async () => {
+    $list.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+    render(<ProgramsList />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load programs (500).");
+    expect(screen.queryByRole("heading", { name: "Book Club" })).not.toBeInTheDocument();
+  });
 });

@@ -130,4 +130,33 @@ describe("InvitesAdmin delete confirmation", () => {
     expect(await screen.findByText("No invites yet.")).toBeInTheDocument();
     expect($list).toHaveBeenCalledTimes(2);
   });
+  it("keeps the list and the row's failure message when the refetch after a failed delete also fails", async () => {
+    $delete.mockRejectedValue(new Error("network down"));
+    renderAdmin();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    $list.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as never);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete this invite");
+    await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("For Ada")).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load invites.")).not.toBeInTheDocument();
+  });
+
+  it("does not make a failed delete wait for the refetch", async () => {
+    $delete.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+    renderAdmin();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    $list.mockReturnValue(new Promise(() => {}) as never); // the refetch never returns
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete this invite");
+    expect(await screen.findByRole("button", { name: "Delete" })).toBeEnabled();
+  });
+
+  it("shows a load error when the first load fails", async () => {
+    $list.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+    renderAdmin();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load invites.");
+  });
 });

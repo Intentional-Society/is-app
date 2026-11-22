@@ -162,9 +162,20 @@ export function ProgramsList() {
   // start a second fetch before the first returns, and a slow older response
   // landing last would otherwise roll the list back to a stale snapshot.
   const latestRequest = useRef<Promise<void>>(Promise.resolve());
+  // Once programs have loaded, a failed refetch must not replace them: a dropped
+  // connection would wipe the list along with the message explaining it. Keep
+  // the last good programs and report the failure through `actionError`, unless
+  // an action has already set a more specific message.
+  const hasLoaded = useRef(false);
   const reload = useCallback(async () => {
     const request: Promise<void> = fetchPrograms().then((next) => {
-      if (request === latestRequest.current) setState(next);
+      if (request !== latestRequest.current) return;
+      if (next.kind === "error" && hasLoaded.current) {
+        setActionError((prev) => prev ?? next.message);
+        return;
+      }
+      if (next.kind === "loaded") hasLoaded.current = true;
+      setState(next);
     });
     latestRequest.current = request;
     // A superseded fetch changes nothing, so its caller must wait for the

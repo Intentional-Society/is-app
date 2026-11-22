@@ -32,15 +32,20 @@ export function InvitesAdmin() {
       return id;
     },
     // After a failure too: a failed delete often means the row is stale (another
-    // admin got there first), and a retry would fail the same way.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    // admin got there first), and a retry would fail the same way. A failure is
+    // not awaited, so the row reports it at once instead of waiting on a refetch
+    // that, with the network down, retries for several seconds and fails as well.
+    onSettled: (_id, error) => {
+      const refetch = queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      return error ? undefined : refetch;
+    },
   });
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-2">
       {invitesQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : invitesQuery.isError ? (
+      ) : invitesQuery.data === undefined ? (
         <p role="alert" className="text-sm text-destructive">
           Couldn't load invites.
         </p>
