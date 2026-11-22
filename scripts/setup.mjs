@@ -112,7 +112,8 @@ function ensureLocalEnv() {
 // host-bound and neither needs reserving. Lanes shift this span by N*100 and
 // get their reservation reminder from make_lane_inside_worktree (it knows the
 // lane's ports at assignment), so this check runs only in a checkout still on
-// the default ports.
+// the default ports. CI reserves the same span on Linux runners (the
+// `ip_local_reserved_ports` step in .github/workflows/ci.yml); change both together.
 const SUPABASE_API_PORT = 54321;
 const SUPABASE_BLOCK_SIZE = 7;
 

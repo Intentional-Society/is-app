@@ -59,7 +59,11 @@ jobs:
       # outbound connection, such as the burst of parallel image pulls just
       # before the bind, can be handed one as its source port and make the
       # bind fail with "address already in use". Reserving the span keeps the
-      # kernel from handing it out; explicit binds still succeed.
+      # kernel from handing it out; explicit binds still succeed. The span
+      # mirrors the host-bound ports in supabase/config.toml and
+      # SUPABASE_API_PORT / SUPABASE_BLOCK_SIZE in scripts/setup.mjs; change
+      # all three together (a newly host-bound port, such as the pooler, goes
+      # in here too).
       - if: steps.filter.outputs.code == 'true'
         run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=54321-54327
       - if: steps.filter.outputs.code == 'true'
@@ -67,10 +71,11 @@ jobs:
         run: npx supabase start
       # If the bind still fails, show who holds the ports. The runner is gone
       # by the time anyone reads the failure, so this is the only evidence.
+      # sudo: `ss -p` leaves root-owned sockets (docker-proxy, dockerd) blank.
       - if: failure() && steps.supabase.outcome == 'failure'
         run: |
           sysctl net.ipv4.ip_local_port_range net.ipv4.ip_local_reserved_ports
-          ss -tanp | grep -E ':543[0-9]{2}\b' || true
+          sudo ss -tanp | grep -E ':5432[1-7]\b' || true
           docker ps -a
 
       # `biome ci` == `biome check` plus CI-flavored output (GitHub
