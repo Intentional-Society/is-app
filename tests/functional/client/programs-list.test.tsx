@@ -140,15 +140,29 @@ describe("ProgramsList leave confirmation", () => {
     await screen.findByRole("heading", { name: "Book Club" });
 
     fireEvent.click(card("Garden Club").getByRole("button", { name: "Join program" }));
-    expect(await card("Garden Club").findByRole("button", { name: "Joining…" })).toBeDisabled();
+    expect(await card("Garden Club").findByRole("button", { name: "Joining…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
 
     // Leave Book Club to completion while Garden Club's join is still in flight.
     fireEvent.click(card("Book Club").getByRole("button", { name: "Leave program" }));
     fireEvent.click(card("Book Club").getByRole("button", { name: "Yes, leave program" }));
     await waitFor(() => expect($leave).toHaveBeenCalled());
     await waitFor(() => expect($list.mock.calls.length).toBeGreaterThan(1));
-    expect(card("Garden Club").getByRole("button", { name: "Joining…" })).toBeDisabled();
+    expect(card("Garden Club").getByRole("button", { name: "Joining…" })).toHaveAttribute("aria-disabled", "true");
 
     await act(async () => finishJoin({ ok: true, json: async () => ({}) } as never));
+  });
+  it("keeps keyboard focus on the Join button while the join runs", async () => {
+    $list.mockResolvedValue(listResponse(false));
+    $join.mockReturnValue(new Promise(() => {}) as never);
+    render(<ProgramsList />);
+    const join = await screen.findByRole("button", { name: "Join program" });
+    join.focus();
+    fireEvent.click(join);
+    const joining = await screen.findByRole("button", { name: "Joining…" });
+    expect(joining).toHaveAttribute("aria-disabled", "true");
+    expect(joining).toHaveFocus();
   });
 });

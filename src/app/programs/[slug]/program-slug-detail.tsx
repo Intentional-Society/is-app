@@ -131,7 +131,7 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
             onConfirm={() => leaveMutation.mutateAsync()}
           />
         ) : program.signupsOpen ? (
-          <Button type="button" disabled={pending} onClick={() => joinMutation.mutate()}>
+          <Button type="button" disabled={pending} focusableWhenDisabled onClick={() => joinMutation.mutate()}>
             {joinMutation.isPending ? "Joining…" : "Join program"}
           </Button>
         ) : (

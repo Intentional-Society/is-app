@@ -155,4 +155,24 @@ describe("ConfirmButton", () => {
     expect(screen.queryByRole("button", { name: "Yes, leave program" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Leave program" })).toHaveAttribute("aria-disabled", "true");
   });
+  it("leaves focus alone when the step closes after the user moved to another control", async () => {
+    let settle: () => void = () => {};
+    render(
+      <>
+        <input aria-label="elsewhere" />
+        <ConfirmButton
+          label="Leave program"
+          confirmLabel="Yes, leave program"
+          pendingLabel="Leaving…"
+          onConfirm={() => new Promise<void>((resolve) => (settle = resolve))}
+        />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+    screen.getByLabelText("elsewhere").focus();
+    await act(async () => settle());
+    expect(screen.getByRole("button", { name: "Leave program" })).toBeInTheDocument();
+    expect(screen.getByLabelText("elsewhere")).toHaveFocus();
+  });
 });

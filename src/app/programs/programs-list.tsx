@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { Program } from "@/lib/api-types";
 import { formatDate } from "@/lib/format-date";
+import { useIdSet } from "@/lib/use-id-set";
 
 type ListState = { kind: "loading" } | { kind: "loaded"; programs: Program[] } | { kind: "error"; message: string };
 
@@ -119,7 +120,13 @@ function ProgramCard({
             />
           </div>
         ) : program.signupsOpen ? (
-          <Button type="button" disabled={pending} onClick={() => onJoin(program.id)} className="w-full">
+          <Button
+            type="button"
+            disabled={pending}
+            focusableWhenDisabled
+            onClick={() => onJoin(program.id)}
+            className="w-full"
+          >
             {pending ? "Joining…" : "Join program"}
           </Button>
         ) : (
@@ -148,24 +155,15 @@ export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   // Programs with a join or leave in flight, tracked per card so one card's
   // action never unlocks another card that is still mid-request.
-  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
-  const setPending = (programId: string, on: boolean) =>
-    setPendingIds((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(programId);
-      else next.delete(programId);
-      return next;
-    });
+  const [pendingIds, setPending] = useIdSet();
   const [actionError, setActionError] = useState<string | null>(null);
   // Only the newest fetch may set state. A join or leave on another card can
   // start a second fetch before the first returns, and a slow older response
   // landing last would otherwise roll the list back to a stale snapshot.
-  const latestFetch = useRef(0);
   const latestRequest = useRef<Promise<void>>(Promise.resolve());
   const reload = useCallback(async () => {
-    const mine = ++latestFetch.current;
-    const request = fetchPrograms().then((next) => {
-      if (mine === latestFetch.current) setState(next);
+    const request: Promise<void> = fetchPrograms().then((next) => {
+      if (request === latestRequest.current) setState(next);
     });
     latestRequest.current = request;
     // A superseded fetch changes nothing, so its caller must wait for the
@@ -176,11 +174,11 @@ export function ProgramsList() {
       await waited;
     } while (waited !== latestRequest.current);
   }, []);
-  // Join and leave hold their pending id until `reload` resolves, so a card
-  // never re-enables its button over membership data the action just made stale.
   useEffect(() => {
     void reload();
   }, [reload]);
+  // Join and leave hold their pending id until `reload` resolves, so a card
+  // never re-enables its button over membership data the action just made stale.
   const join = async (programId: string) => {
     setPending(programId, true);
     setActionError(null);

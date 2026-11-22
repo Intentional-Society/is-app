@@ -1,12 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 
 import { ConfirmButton } from "@/components/confirm-button";
 import { apiClient } from "@/lib/api";
 import type { AdminInvite } from "@/lib/api-types";
 import { formatDate } from "@/lib/format-date";
+import { useIdSet } from "@/lib/use-id-set";
 
 const QUERY_KEY = ["admin", "invites"] as const;
 
@@ -22,14 +22,7 @@ export function InvitesAdmin() {
 
   // Invites whose last delete failed. Each row's own request records its
   // failure, and the row shows the message until that invite is retried.
-  const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(new Set());
-  const setFailed = (id: string, failed: boolean) =>
-    setFailedIds((prev) => {
-      const next = new Set(prev);
-      if (failed) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  const [failedIds, setFailed] = useIdSet();
   const invitesQuery = useQuery({ queryKey: QUERY_KEY, queryFn: fetchInvites });
 
   const deleteMutation = useMutation<string, Error, string>({

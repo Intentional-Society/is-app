@@ -2,7 +2,6 @@
 import { type ComponentProps, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 type ButtonProps = ComponentProps<typeof Button>;
 
@@ -19,13 +18,14 @@ type ButtonProps = ComponentProps<typeof Button>;
 //
 // Focus follows the swap: Cancel takes it when the step opens (the safe
 // default), and the trigger gets it back when the step closes, so keyboard and
-// screen-reader users keep their place. Escape closes the step unless a request
-// is running. All three buttons stay focusable while locked (`aria-disabled`),
-// so locking one never throws focus to <body>; the trigger can also come back
-// still locked, for example after a delete that is navigating away. If the
-// caller unmounts this component when the action succeeds (a leave button
-// replaced by a join button), there is no trigger left to refocus, and the
-// caller owns focus.
+// screen-reader users keep their place. The step can close without a user
+// action, so focus returns only if it fell to <body>; a user who has moved on to
+// another control keeps it there. Escape closes the step unless a request is
+// running. All three buttons stay focusable while locked (`aria-disabled`), so
+// locking one never throws focus to <body>; the trigger can also come back still
+// locked, for example after a delete that is navigating away. If the caller
+// unmounts this component when the action succeeds (a leave button replaced by a
+// join button), there is no trigger left to refocus, and the caller owns focus.
 export function ConfirmButton({
   label,
   confirmLabel,
@@ -70,7 +70,11 @@ export function ConfirmButton({
 
   useEffect(() => {
     if (confirming) cancelRef.current?.focus();
-    else if (wasConfirming.current) triggerRef.current?.focus();
+    else if (wasConfirming.current && (!document.activeElement || document.activeElement === document.body)) {
+      // Focus fell to <body> because the step's own button unmounted. If the user
+      // has since moved on (typing elsewhere), leave it there.
+      triggerRef.current?.focus();
+    }
     wasConfirming.current = confirming;
   }, [confirming]);
 
@@ -87,7 +91,6 @@ export function ConfirmButton({
     }
   };
 
-  const lockedClass = "aria-disabled:pointer-events-none aria-disabled:opacity-50";
   const closeOnEscape = (e: React.KeyboardEvent) => {
     if (e.key === "Escape" && !busy) setConfirming(false);
   };
@@ -101,7 +104,7 @@ export function ConfirmButton({
         disabled={disabled || busy}
         focusableWhenDisabled
         onClick={() => setConfirming(true)}
-        className={cn(lockedClass, triggerClassName)}
+        className={triggerClassName}
       >
         {label}
       </Button>
@@ -117,7 +120,7 @@ export function ConfirmButton({
         focusableWhenDisabled
         onClick={confirm}
         onKeyDown={closeOnEscape}
-        className={cn(lockedClass, actionClassName)}
+        className={actionClassName}
       >
         {submitting ? pendingLabel : confirmLabel}
       </Button>
@@ -130,7 +133,7 @@ export function ConfirmButton({
         focusableWhenDisabled
         onClick={() => setConfirming(false)}
         onKeyDown={closeOnEscape}
-        className={cn(lockedClass, actionClassName)}
+        className={actionClassName}
       >
         Cancel
       </Button>
