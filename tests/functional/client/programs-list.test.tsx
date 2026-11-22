@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
@@ -17,11 +17,12 @@ import { apiClient } from "@/lib/api";
 
 const $list = vi.mocked(apiClient.api.programs.$get);
 const $leave = vi.mocked(apiClient.api.programs[":id"].leave.$post);
+const $join = vi.mocked(apiClient.api.programs[":id"].join.$post);
 
-const program = (joined: boolean) => ({
-  id: "p1",
-  slug: "book-club",
-  name: "Book Club",
+const program = (joined: boolean, id = "p1", name = "Book Club") => ({
+  id,
+  slug: id,
+  name,
   blurb: null,
   description: null,
   signupsOpen: true,
@@ -30,7 +31,8 @@ const program = (joined: boolean) => ({
   joined,
   joinedAt: joined ? "2026-01-01T00:00:00.000Z" : null,
 });
-const listResponse = (joined: boolean) => ({ ok: true, json: async () => ({ programs: [program(joined)] }) }) as never;
+const listOf = (...programs: ReturnType<typeof program>[]) => ({ ok: true, json: async () => ({ programs }) }) as never;
+const listResponse = (joined: boolean) => listOf(program(joined));
 
 describe("ProgramsList leave confirmation", () => {
   beforeEach(() => {
@@ -76,5 +78,31 @@ describe("ProgramsList leave confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Failed to leave program.");
     expect(await screen.findByRole("button", { name: "Leave program" })).toBeEnabled();
+  });
+  it("ignores a slower, older refetch that lands after a newer one", async () => {
+    $list.mockResolvedValue(listOf(program(true, "p1", "Book Club"), program(false, "p2", "Garden Club")));
+    $join.mockResolvedValue({ ok: true, json: async () => ({}) } as never);
+    render(<ProgramsList />);
+    const card = (name: string) => within(screen.getByRole("heading", { name }).closest("li") as HTMLElement);
+    await screen.findByRole("heading", { name: "Book Club" });
+
+    // Leave Book Club, then join Garden Club before the first refetch returns.
+    let finishOlder: (value: never) => void = () => {};
+    let finishNewer: (value: never) => void = () => {};
+    $list.mockReturnValueOnce(new Promise<never>((resolve) => (finishOlder = resolve)));
+    $list.mockReturnValueOnce(new Promise<never>((resolve) => (finishNewer = resolve)));
+    fireEvent.click(card("Book Club").getByRole("button", { name: "Leave program" }));
+    fireEvent.click(card("Book Club").getByRole("button", { name: "Yes, leave program" }));
+    await waitFor(() => expect($leave).toHaveBeenCalled());
+    fireEvent.click(card("Garden Club").getByRole("button", { name: "Join program" }));
+    await waitFor(() => expect($join).toHaveBeenCalled());
+
+    // The newer refetch (both changes applied) lands first; the older one, a
+    // snapshot from before Garden Club was joined, lands last.
+    await act(async () => finishNewer(listOf(program(false, "p1", "Book Club"), program(true, "p2", "Garden Club"))));
+    await act(async () => finishOlder(listOf(program(false, "p1", "Book Club"), program(false, "p2", "Garden Club"))));
+
+    expect(card("Garden Club").getByRole("button", { name: "Leave program" })).toBeInTheDocument();
+    expect(card("Garden Club").queryByRole("button", { name: "Join program" })).not.toBeInTheDocument();
   });
 });

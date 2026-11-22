@@ -2,7 +2,7 @@
 
 import type { UrlObject } from "node:url";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -148,18 +148,20 @@ export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void fetchPrograms().then((next) => {
-      if (!cancelled) setState(next);
-    });
-    return () => {
-      cancelled = true;
-    };
+  // Only the newest fetch may set state. A join or leave on another card can
+  // start a second fetch before the first returns, and a slow older response
+  // landing last would otherwise roll the list back to a stale snapshot.
+  const latestFetch = useRef(0);
+  const reload = useCallback(async () => {
+    const mine = ++latestFetch.current;
+    const next = await fetchPrograms();
+    if (mine === latestFetch.current) setState(next);
   }, []);
-  // Join and leave hold `pendingId` until this resolves, so a card never
+  // Join and leave hold `pendingId` until `reload` resolves, so a card never
   // re-enables its button over membership data the action just made stale.
-  const reload = async () => setState(await fetchPrograms());
+  useEffect(() => {
+    void reload();
+  }, [reload]);
   const join = async (programId: string) => {
     setPendingId(programId);
     setActionError(null);

@@ -32,6 +32,13 @@ export function InvitesAdmin() {
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-2">
+      {/* ConfirmButton closes its step when the request ends, so the failure
+          has to show here or the row just snaps back to "Delete". */}
+      {deleteMutation.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't delete the invite. Try again.
+        </p>
+      )}
       {invitesQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : invitesQuery.isError ? (
