@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { ConfirmButton } from "@/components/confirm-button";
 import { MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
@@ -24,7 +25,6 @@ function ProgramCard({
   onLeave: (id: string) => Promise<void>;
   pending: boolean;
 }) {
-  const [confirmingLeave, setConfirmingLeave] = useState(false);
   const cardText = program.blurb ?? program.description ?? "";
   const isOngoing = program.memberCount > 0;
   const isGearingUp = !isOngoing && program.signupsOpen;
@@ -108,35 +108,16 @@ function ProgramCard({
         </Link>
 
         {program.joined ? (
-          confirmingLeave ? (
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={pending}
-                onClick={async () => {
-                  await onLeave(program.id);
-                  setConfirmingLeave(false);
-                }}
-                className="flex-1"
-              >
-                {pending ? "Leaving…" : "Yes, leave program"}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={pending}
-                onClick={() => setConfirmingLeave(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : (
-            <Button type="button" variant="primary" onClick={() => setConfirmingLeave(true)} className="w-full">
-              Leave program
-            </Button>
-          )
+          <div className="flex items-center gap-2">
+            <ConfirmButton
+              label="Leave program"
+              confirmLabel="Yes, leave program"
+              pendingLabel="Leaving…"
+              onConfirm={() => onLeave(program.id)}
+              triggerClassName="w-full"
+              actionClassName="flex-1"
+            />
+          </div>
         ) : program.signupsOpen ? (
           <Button type="button" disabled={pending} onClick={() => onJoin(program.id)} className="w-full">
             {pending ? "Joining…" : "Join program"}
@@ -153,37 +134,32 @@ function ProgramCard({
   );
 }
 
+async function fetchPrograms(): Promise<ListState> {
+  try {
+    const res = await apiClient.api.programs.$get();
+    if (!res.ok) return { kind: "error", message: `Failed to load programs (${res.status}).` };
+    const body = await res.json();
+    return { kind: "loaded", programs: body.programs };
+  } catch {
+    return { kind: "error", message: "Network error loading programs." };
+  }
+}
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a manual refetch trigger; bumping it reruns the effect by design
   useEffect(() => {
     let cancelled = false;
-    async function fetchPrograms() {
-      try {
-        const res = await apiClient.api.programs.$get();
-        if (cancelled) return;
-        if (!res.ok) {
-          setState({ kind: "error", message: `Failed to load programs (${res.status}).` });
-          return;
-        }
-        const body = await res.json();
-        setState({ kind: "loaded", programs: body.programs });
-      } catch {
-        if (!cancelled) setState({ kind: "error", message: "Network error loading programs." });
-      }
-    }
-    void fetchPrograms();
+    void fetchPrograms().then((next) => {
+      if (!cancelled) setState(next);
+    });
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
-
-  const reload = () => setReloadKey((k) => k + 1);
-
+  }, []);
+  // Join and leave hold `pendingId` until this resolves, so a card never
+  // re-enables its button over membership data the action just made stale.
+  const reload = async () => setState(await fetchPrograms());
   const join = async (programId: string) => {
     setPendingId(programId);
     setActionError(null);
@@ -199,7 +175,7 @@ export function ProgramsList() {
               : "Failed to join program.",
         );
       }
-      reload();
+      await reload();
     } catch {
       setActionError("Network error joining program.");
     } finally {
@@ -213,7 +189,7 @@ export function ProgramsList() {
     try {
       const res = await apiClient.api.programs[":id"].leave.$post({ param: { id: programId } });
       if (!res.ok) setActionError("Failed to leave program.");
-      reload();
+      await reload();
     } catch {
       setActionError("Network error leaving program.");
     } finally {

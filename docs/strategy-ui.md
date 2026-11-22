@@ -58,6 +58,14 @@ Button size variants align with the same names: `size="xs"` → `text-xs`, `size
 
 Most buttons in the app are `primary`. Use `secondary` sparingly — it's louder, and stops being emphasis when everything's emphasized.
 
+## Confirming a destructive action
+
+Use `ConfirmButton` (`src/components/confirm-button.tsx`) for a one-click action that is hard to undo (leave a program, delete a record). The trigger swaps for a red "Yes, …" button and a Cancel, in the caller's flex row.
+
+- `onConfirm` returns the request's promise. The step stays locked until it settles, then closes, on success or failure. Resolve it only once the UI reflects the result (after the refetch lands), or the trigger comes back enabled over stale data. The caller shows errors.
+- Focus moves to Cancel when the step opens and back to the trigger when it closes.
+- Actions that need a typed phrase (delete account, delete member), or that share one confirm step across several triggers (message box archive/delete), don't fit this shape and keep their own markup.
+
 ## Buttons vs anchors
 
 Anything that changes the URL is a real `<a>` (rendered via `next/link`), not a `<button onClick={() => router.push(…)}>`. Three reasons:

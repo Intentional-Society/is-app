@@ -3,9 +3,10 @@
 import type { UrlObject } from "node:url";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { ConfirmButton } from "@/components/confirm-button";
 import { LocalTime } from "@/components/local-time";
 import { Markdown, MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
@@ -56,12 +57,14 @@ export function ProgramSlugDetail({ slug, children }: { slug: string; children?:
 
 function ProgramBody({ program, children }: { program: ProgramDetail; children?: ReactNode }) {
   const queryClient = useQueryClient();
-  const [confirmingLeave, setConfirmingLeave] = useState(false);
   // Joining or leaving changes whether the viewer can post to a feature's box.
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) });
-    queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(program.id) });
-  };
+  // Returned to the mutation so it stays pending until the refetch lands.
+  // Otherwise the page briefly shows the old `joined` state with live buttons.
+  const invalidate = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) }),
+      queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(program.id) }),
+    ]);
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -88,7 +91,6 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       return res.json();
     },
     onSuccess: invalidate,
-    onSettled: () => setConfirmingLeave(false),
   });
 
   const actionError =
@@ -121,20 +123,13 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
 
       <div className="flex items-center gap-3">
         {program.joined ? (
-          confirmingLeave ? (
-            <>
-              <Button type="button" variant="destructive" disabled={pending} onClick={() => leaveMutation.mutate()}>
-                {leaveMutation.isPending ? "Leaving…" : "Yes, leave program"}
-              </Button>
-              <Button type="button" variant="secondary" disabled={pending} onClick={() => setConfirmingLeave(false)}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <Button type="button" variant="primary" disabled={pending} onClick={() => setConfirmingLeave(true)}>
-              Leave program
-            </Button>
-          )
+          <ConfirmButton
+            label="Leave program"
+            confirmLabel="Yes, leave program"
+            pendingLabel="Leaving…"
+            disabled={joinMutation.isPending}
+            onConfirm={() => leaveMutation.mutateAsync()}
+          />
         ) : program.signupsOpen ? (
           <Button type="button" disabled={pending} onClick={() => joinMutation.mutate()}>
             {joinMutation.isPending ? "Joining…" : "Join program"}
