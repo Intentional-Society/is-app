@@ -54,6 +54,14 @@ jobs:
       - if: steps.filter.outputs.code == 'true'
         run: npm install
 
+      # This reservation exists because the stack's default host ports sit in
+      # the OS ephemeral range (Windows has the same hazard; see
+      # docs/setup-dev-machine.md). Moving the base ports in
+      # supabase/config.toml below 32768 would remove the race on every
+      # platform and make this step, the Windows reservation and the sync rule
+      # below unnecessary; that trades a one-time port change across
+      # DATABASE_URL, the lane offsets and the docs.
+      #
       # `supabase start` binds a fixed span of host ports, 54321-54327. On
       # Linux they sit inside the ephemeral range (32768-60999), so an
       # outbound connection, such as the burst of parallel image pulls just
