@@ -114,6 +114,7 @@ function ProgramCard({
               label="Leave program"
               confirmLabel="Yes, leave program"
               pendingLabel="Leaving…"
+              pending={pending}
               onConfirm={() => onLeave(program.id)}
               triggerClassName="w-full"
               actionClassName="flex-1"

@@ -165,4 +165,28 @@ describe("ProgramsList leave confirmation", () => {
     expect(joining).toHaveAttribute("aria-disabled", "true");
     expect(joining).toHaveFocus();
   });
+  it("keeps Leave locked on a card whose own join is still running when another card's refetch shows it joined", async () => {
+    $list.mockResolvedValue(listOf(program(false, "p1", "Book Club"), program(true, "p2", "Garden Club")));
+    let finishJoin: (value: never) => void = () => {};
+    $join.mockReturnValueOnce(new Promise<never>((resolve) => (finishJoin = resolve)));
+    render(<ProgramsList />);
+    const card = (name: string) => within(screen.getByRole("heading", { name }).closest("li") as HTMLElement);
+    await screen.findByRole("heading", { name: "Book Club" });
+
+    fireEvent.click(card("Book Club").getByRole("button", { name: "Join program" }));
+    await waitFor(() => expect($join).toHaveBeenCalled());
+
+    // Leaving Garden Club triggers a refetch that already shows Book Club as joined.
+    $list.mockResolvedValueOnce(listOf(program(true, "p1", "Book Club"), program(false, "p2", "Garden Club")));
+    fireEvent.click(card("Garden Club").getByRole("button", { name: "Leave program" }));
+    fireEvent.click(card("Garden Club").getByRole("button", { name: "Yes, leave program" }));
+    expect(await card("Garden Club").findByRole("button", { name: "Join program" })).toBeInTheDocument();
+
+    const leave = card("Book Club").getByRole("button", { name: "Leave program" });
+    expect(leave).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(leave);
+    expect(card("Book Club").queryByRole("button", { name: "Yes, leave program" })).not.toBeInTheDocument();
+
+    await act(async () => finishJoin({ ok: true, json: async () => ({}) } as never));
+  });
 });

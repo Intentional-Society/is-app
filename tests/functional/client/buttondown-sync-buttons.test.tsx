@@ -70,4 +70,14 @@ describe("ButtondownSyncButtons", () => {
     expect(confirm).toHaveAttribute("aria-disabled", "true");
     expect($write).not.toHaveBeenCalled();
   });
+  it("keeps keyboard focus on the dry-run button while it runs", async () => {
+    $dryRun.mockReturnValue(new Promise(() => {}) as never);
+    render(<ButtondownSyncButtons />);
+    const dryRun = screen.getByRole("button", { name: "Sync Buttondown (dry run)" });
+    dryRun.focus();
+    fireEvent.click(dryRun);
+    const running = await screen.findByRole("button", { name: "Running…" });
+    expect(running).toHaveAttribute("aria-disabled", "true");
+    expect(running).toHaveFocus();
+  });
 });

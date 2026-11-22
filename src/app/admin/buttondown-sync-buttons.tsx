@@ -60,7 +60,14 @@ export function ButtondownSyncButtons() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" size="sm" disabled={pending !== null} onClick={runDryRun}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={pending !== null}
+          focusableWhenDisabled
+          onClick={runDryRun}
+        >
           {pending === "dry-run" ? "Running…" : "Sync Buttondown (dry run)"}
         </Button>
 

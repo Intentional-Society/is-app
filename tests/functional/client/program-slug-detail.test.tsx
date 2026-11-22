@@ -19,6 +19,7 @@ import { apiClient } from "@/lib/api";
 
 const $get = vi.mocked(apiClient.api.programs["by-slug"][":slug"].$get);
 const $leave = vi.mocked(apiClient.api.programs[":id"].leave.$post);
+const $join = vi.mocked(apiClient.api.programs[":id"].join.$post);
 
 const program = (joined: boolean) => ({
   id: "p1",
@@ -35,9 +36,9 @@ const program = (joined: boolean) => ({
 const getResponse = (joined: boolean) =>
   ({ ok: true, status: 200, json: async () => ({ program: program(joined) }) }) as never;
 
-const renderDetail = () => {
+const renderDetail = (joined = true) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(programQueryKey("book-club"), program(true));
+  queryClient.setQueryData(programQueryKey("book-club"), program(joined));
   return render(
     <QueryClientProvider client={queryClient}>
       <ProgramSlugDetail slug="book-club" />
@@ -83,5 +84,31 @@ describe("ProgramSlugDetail leave confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Failed to leave program.");
     expect(await screen.findByRole("button", { name: "Leave program" })).toBeEnabled();
+  });
+  it("refetches after a failed leave, so a stale page corrects itself", async () => {
+    $leave.mockResolvedValue({ ok: false, status: 409, json: async () => ({}) } as never);
+    $get.mockResolvedValue(getResponse(false));
+    renderDetail();
+    fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+    expect(await screen.findByRole("button", { name: "Join program" })).toBeInTheDocument();
+    expect($get).toHaveBeenCalled();
+  });
+
+  it("shows the latest action's error, not a stale one from the other action", async () => {
+    $join.mockResolvedValue({ ok: false, status: 409, json: async () => ({ error: "already_joined" }) } as never);
+    $leave.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+    // After the failed join, the refetch shows the user as joined.
+    $get.mockResolvedValue(getResponse(true));
+    renderDetail(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Join program" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("You've already joined this program.");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Leave program" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+    await waitFor(() => expect($leave).toHaveBeenCalled());
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to leave program.");
+    expect(screen.queryByText("You've already joined this program.")).not.toBeInTheDocument();
   });
 });
