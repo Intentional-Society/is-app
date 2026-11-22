@@ -21,9 +21,10 @@ function ProgramCard({
 }: {
   program: Program;
   onJoin: (id: string) => void;
-  onLeave: (id: string) => void;
+  onLeave: (id: string) => Promise<void>;
   pending: boolean;
 }) {
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
   const cardText = program.blurb ?? program.description ?? "";
   const isOngoing = program.memberCount > 0;
   const isGearingUp = !isOngoing && program.signupsOpen;
@@ -107,15 +108,35 @@ function ProgramCard({
         </Link>
 
         {program.joined ? (
-          <Button
-            type="button"
-            variant="primary"
-            disabled={pending}
-            onClick={() => onLeave(program.id)}
-            className="w-full"
-          >
-            {pending ? "Leaving…" : "Leave program"}
-          </Button>
+          confirmingLeave ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={pending}
+                onClick={async () => {
+                  await onLeave(program.id);
+                  setConfirmingLeave(false);
+                }}
+                className="flex-1"
+              >
+                {pending ? "Leaving…" : "Yes, leave program"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={pending}
+                onClick={() => setConfirmingLeave(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button type="button" variant="primary" onClick={() => setConfirmingLeave(true)} className="w-full">
+              Leave program
+            </Button>
+          )
         ) : program.signupsOpen ? (
           <Button type="button" disabled={pending} onClick={() => onJoin(program.id)} className="w-full">
             {pending ? "Joining…" : "Join program"}

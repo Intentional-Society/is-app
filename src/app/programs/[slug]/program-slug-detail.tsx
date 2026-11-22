@@ -3,7 +3,7 @@
 import type { UrlObject } from "node:url";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { LocalTime } from "@/components/local-time";
@@ -56,6 +56,7 @@ export function ProgramSlugDetail({ slug, children }: { slug: string; children?:
 
 function ProgramBody({ program, children }: { program: ProgramDetail; children?: ReactNode }) {
   const queryClient = useQueryClient();
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
   // Joining or leaving changes whether the viewer can post to a feature's box.
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) });
@@ -87,6 +88,7 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       return res.json();
     },
     onSuccess: invalidate,
+    onSettled: () => setConfirmingLeave(false),
   });
 
   const actionError =
@@ -119,9 +121,20 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
 
       <div className="flex items-center gap-3">
         {program.joined ? (
-          <Button type="button" variant="primary" disabled={pending} onClick={() => leaveMutation.mutate()}>
-            {leaveMutation.isPending ? "Leaving…" : "Leave program"}
-          </Button>
+          confirmingLeave ? (
+            <>
+              <Button type="button" variant="destructive" disabled={pending} onClick={() => leaveMutation.mutate()}>
+                {leaveMutation.isPending ? "Leaving…" : "Yes, leave program"}
+              </Button>
+              <Button type="button" variant="secondary" disabled={pending} onClick={() => setConfirmingLeave(false)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button type="button" variant="primary" disabled={pending} onClick={() => setConfirmingLeave(true)}>
+              Leave program
+            </Button>
+          )
         ) : program.signupsOpen ? (
           <Button type="button" disabled={pending} onClick={() => joinMutation.mutate()}>
             {joinMutation.isPending ? "Joining…" : "Join program"}
