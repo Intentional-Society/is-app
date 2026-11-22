@@ -105,4 +105,50 @@ describe("ProgramsList leave confirmation", () => {
     expect(card("Garden Club").getByRole("button", { name: "Leave program" })).toBeInTheDocument();
     expect(card("Garden Club").queryByRole("button", { name: "Join program" })).not.toBeInTheDocument();
   });
+  it("keeps a card locked until the newest refetch lands, even when its own was superseded", async () => {
+    $list.mockResolvedValue(listOf(program(true, "p1", "Book Club"), program(false, "p2", "Garden Club")));
+    $join.mockResolvedValue({ ok: true, json: async () => ({}) } as never);
+    render(<ProgramsList />);
+    const card = (name: string) => within(screen.getByRole("heading", { name }).closest("li") as HTMLElement);
+    await screen.findByRole("heading", { name: "Book Club" });
+
+    let finishOlder: (value: never) => void = () => {};
+    let finishNewer: (value: never) => void = () => {};
+    $list.mockReturnValueOnce(new Promise<never>((resolve) => (finishOlder = resolve)));
+    $list.mockReturnValueOnce(new Promise<never>((resolve) => (finishNewer = resolve)));
+    fireEvent.click(card("Book Club").getByRole("button", { name: "Leave program" }));
+    fireEvent.click(card("Book Club").getByRole("button", { name: "Yes, leave program" }));
+    await waitFor(() => expect($leave).toHaveBeenCalled());
+    fireEvent.click(card("Garden Club").getByRole("button", { name: "Join program" }));
+    await waitFor(() => expect($join).toHaveBeenCalled());
+
+    // Book Club's own refetch lands but is superseded, so the list still shows
+    // the old snapshot. The card must not unlock over it.
+    await act(async () => finishOlder(listOf(program(false, "p1", "Book Club"), program(false, "p2", "Garden Club"))));
+    expect(card("Book Club").getByRole("button", { name: "Leaving…" })).toBeDisabled();
+
+    await act(async () => finishNewer(listOf(program(false, "p1", "Book Club"), program(true, "p2", "Garden Club"))));
+    expect(await card("Book Club").findByRole("button", { name: "Join program" })).toBeEnabled();
+  });
+
+  it("does not unlock a card that is mid-request when another card acts", async () => {
+    $list.mockResolvedValue(listOf(program(true, "p1", "Book Club"), program(false, "p2", "Garden Club")));
+    let finishJoin: (value: never) => void = () => {};
+    $join.mockReturnValueOnce(new Promise<never>((resolve) => (finishJoin = resolve)));
+    render(<ProgramsList />);
+    const card = (name: string) => within(screen.getByRole("heading", { name }).closest("li") as HTMLElement);
+    await screen.findByRole("heading", { name: "Book Club" });
+
+    fireEvent.click(card("Garden Club").getByRole("button", { name: "Join program" }));
+    expect(await card("Garden Club").findByRole("button", { name: "Joining…" })).toBeDisabled();
+
+    // Leave Book Club to completion while Garden Club's join is still in flight.
+    fireEvent.click(card("Book Club").getByRole("button", { name: "Leave program" }));
+    fireEvent.click(card("Book Club").getByRole("button", { name: "Yes, leave program" }));
+    await waitFor(() => expect($leave).toHaveBeenCalled());
+    await waitFor(() => expect($list.mock.calls.length).toBeGreaterThan(1));
+    expect(card("Garden Club").getByRole("button", { name: "Joining…" })).toBeDisabled();
+
+    await act(async () => finishJoin({ ok: true, json: async () => ({}) } as never));
+  });
 });

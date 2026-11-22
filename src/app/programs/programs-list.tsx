@@ -146,24 +146,43 @@ async function fetchPrograms(): Promise<ListState> {
 }
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  // Programs with a join or leave in flight. A set, not one slot, so an action
+  // on one card cannot unlock another card that is still mid-request.
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
+  const setPending = (programId: string, on: boolean) =>
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(programId);
+      else next.delete(programId);
+      return next;
+    });
   const [actionError, setActionError] = useState<string | null>(null);
   // Only the newest fetch may set state. A join or leave on another card can
   // start a second fetch before the first returns, and a slow older response
   // landing last would otherwise roll the list back to a stale snapshot.
   const latestFetch = useRef(0);
+  const latestRequest = useRef<Promise<void>>(Promise.resolve());
   const reload = useCallback(async () => {
     const mine = ++latestFetch.current;
-    const next = await fetchPrograms();
-    if (mine === latestFetch.current) setState(next);
+    const request = fetchPrograms().then((next) => {
+      if (mine === latestFetch.current) setState(next);
+    });
+    latestRequest.current = request;
+    // A superseded fetch changes nothing, so its caller must wait for the
+    // newest one: the data that reflects its action is in that response.
+    let waited: Promise<void>;
+    do {
+      waited = latestRequest.current;
+      await waited;
+    } while (waited !== latestRequest.current);
   }, []);
-  // Join and leave hold `pendingId` until `reload` resolves, so a card never
-  // re-enables its button over membership data the action just made stale.
+  // Join and leave hold their pending id until `reload` resolves, so a card
+  // never re-enables its button over membership data the action just made stale.
   useEffect(() => {
     void reload();
   }, [reload]);
   const join = async (programId: string) => {
-    setPendingId(programId);
+    setPending(programId, true);
     setActionError(null);
     try {
       const res = await apiClient.api.programs[":id"].join.$post({ param: { id: programId } });
@@ -181,12 +200,12 @@ export function ProgramsList() {
     } catch {
       setActionError("Network error joining program.");
     } finally {
-      setPendingId(null);
+      setPending(programId, false);
     }
   };
 
   const leave = async (programId: string) => {
-    setPendingId(programId);
+    setPending(programId, true);
     setActionError(null);
     try {
       const res = await apiClient.api.programs[":id"].leave.$post({ param: { id: programId } });
@@ -195,7 +214,7 @@ export function ProgramsList() {
     } catch {
       setActionError("Network error leaving program.");
     } finally {
-      setPendingId(null);
+      setPending(programId, false);
     }
   };
 
@@ -222,7 +241,7 @@ export function ProgramsList() {
             program={program}
             onJoin={join}
             onLeave={leave}
-            pending={pendingId === program.id}
+            pending={pendingIds.has(program.id)}
           />
         ))}
       </ul>

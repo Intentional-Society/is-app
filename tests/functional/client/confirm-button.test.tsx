@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ConfirmButton } from "@/components/confirm-button";
@@ -17,6 +18,23 @@ const renderButton = (props: Partial<React.ComponentProps<typeof ConfirmButton>>
   render(ui(props));
   return { onConfirm };
 };
+
+// Holds `pending` after the action resolves, like a delete that is navigating away.
+function Harness() {
+  const [locked, setLocked] = useState(false);
+  return (
+    <ConfirmButton
+      label="Leave program"
+      confirmLabel="Yes, leave program"
+      pendingLabel="Leaving…"
+      pending={locked}
+      onConfirm={() => {
+        setLocked(true);
+        return Promise.resolve();
+      }}
+    />
+  );
+}
 
 describe("ConfirmButton", () => {
   it("asks first: the trigger opens the confirm step without firing onConfirm", () => {
@@ -76,13 +94,32 @@ describe("ConfirmButton", () => {
     expect(await screen.findByRole("button", { name: "Leave program" })).toHaveFocus();
   });
 
-  it("keeps the trigger disabled while the caller holds `pending`", () => {
-    renderButton({ pending: true });
-    expect(screen.getByRole("button", { name: "Leave program" })).toBeDisabled();
+  // The trigger uses aria-disabled (not the `disabled` attribute) so it can hold focus.
+  it("keeps the trigger inert while the caller holds `pending`", () => {
+    const { onConfirm } = renderButton({ pending: true });
+    const trigger = screen.getByRole("button", { name: "Leave program" });
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("button", { name: "Yes, leave program" })).not.toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it("disables only the trigger when `disabled` is set", () => {
+  it("makes only the trigger inert when `disabled` is set", () => {
     renderButton({ disabled: true });
-    expect(screen.getByRole("button", { name: "Leave program" })).toBeDisabled();
+    const trigger = screen.getByRole("button", { name: "Leave program" });
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  });
+
+  it("still returns focus to a trigger that comes back locked by the caller", async () => {
+    // Mirrors a delete that succeeded and is navigating away: the step closes,
+    // but the caller keeps `pending` set.
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+    const trigger = await screen.findByRole("button", { name: "Leave program" });
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    expect(trigger).toHaveFocus();
   });
 });

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
@@ -69,5 +69,27 @@ describe("InvitesAdmin delete confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete the invite");
     expect(await screen.findByRole("button", { name: "Delete" })).toBeEnabled();
+  });
+  it("reports a row's failure even when another row's delete started after it and succeeded", async () => {
+    const second = { ...invite, id: "i2", note: "For Linus", code: "def456" };
+    $list.mockResolvedValue({ ok: true, json: async () => ({ invites: [invite, second] }) } as never);
+    let failFirst: (value: never) => void = () => {};
+    $delete.mockImplementation((({ param }: { param: { id: string } }) =>
+      param.id === "i1"
+        ? new Promise<never>((resolve) => (failFirst = resolve))
+        : Promise.resolve({ ok: true, json: async () => ({}) })) as never);
+    renderAdmin();
+    const row = (note: string) => within(screen.getByText(note).closest("li") as HTMLElement);
+    await screen.findByText("For Ada");
+
+    fireEvent.click(row("For Ada").getByRole("button", { name: "Delete" }));
+    fireEvent.click(row("For Ada").getByRole("button", { name: "Confirm" }));
+    fireEvent.click(row("For Linus").getByRole("button", { name: "Delete" }));
+    fireEvent.click(row("For Linus").getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect($delete).toHaveBeenCalledTimes(2));
+
+    // The first row's request fails after the second one started (and succeeded).
+    await act(async () => failFirst({ ok: false, status: 500, json: async () => ({}) } as never));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete the invite");
   });
 });

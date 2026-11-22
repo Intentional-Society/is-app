@@ -63,7 +63,7 @@ Most buttons in the app are `primary`. Use `secondary` sparingly — it's louder
 Use `ConfirmButton` (`src/components/confirm-button.tsx`) for a one-click action that is hard to undo (leave a program, delete a record). The trigger swaps for a red "Yes, …" button and a Cancel, in the caller's flex row.
 
 - `onConfirm` returns the request's promise. The step stays locked until it settles, then closes, on success or failure. Resolve it only once the UI reflects the result (after the refetch lands), or the trigger comes back enabled over stale data. The caller shows errors.
-- Focus moves to Cancel when the step opens and back to the trigger when it closes.
+- Focus moves to Cancel when the step opens and back to the trigger when it closes. The trigger stays focusable while locked (`aria-disabled`), so focus can return to it even when the caller keeps it locked. When a successful action unmounts the component (a Leave button replaced by Join), no trigger is left to refocus; the caller owns focus then, and today the leave buttons don't move it.
 - Actions that need a typed phrase (delete account, delete member), or that share one confirm step across several triggers (message box archive/delete), don't fit this shape and keep their own markup.
 
 ## Buttons vs anchors

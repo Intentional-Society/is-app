@@ -2,6 +2,7 @@
 import { type ComponentProps, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type ButtonProps = ComponentProps<typeof Button>;
 
@@ -18,8 +19,11 @@ type ButtonProps = ComponentProps<typeof Button>;
 //
 // Focus follows the swap: Cancel takes it when the step opens (the safe
 // default), and the trigger gets it back when the step closes, so keyboard and
-// screen-reader users keep their place. If the trigger unmounted meanwhile,
-// there is nothing to restore.
+// screen-reader users keep their place. The trigger stays focusable while
+// disabled (`aria-disabled`), because it can come back still locked, for
+// example after a delete that is navigating away. If the caller unmounts this
+// component when the action succeeds (a leave button replaced by a join
+// button), there is no trigger left to refocus, and the caller owns focus.
 export function ConfirmButton({
   label,
   confirmLabel,
@@ -84,8 +88,9 @@ export function ConfirmButton({
         variant={triggerVariant}
         size={size}
         disabled={disabled || busy}
+        focusableWhenDisabled
         onClick={() => setConfirming(true)}
-        className={triggerClassName}
+        className={cn("aria-disabled:pointer-events-none aria-disabled:opacity-50", triggerClassName)}
       >
         {label}
       </Button>

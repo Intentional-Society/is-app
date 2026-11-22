@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { ConfirmButton } from "@/components/confirm-button";
 import { apiClient } from "@/lib/api";
@@ -19,6 +20,10 @@ const fetchInvites = async (): Promise<AdminInvite[]> => {
 export function InvitesAdmin() {
   const queryClient = useQueryClient();
 
+  // Rows share one mutation, and its `isError` follows only the latest call, so a
+  // row that fails while another is running would go unreported. Each row's own
+  // promise sets this instead.
+  const [deleteFailed, setDeleteFailed] = useState(false);
   const invitesQuery = useQuery({ queryKey: QUERY_KEY, queryFn: fetchInvites });
 
   const deleteMutation = useMutation<string, Error, string>({
@@ -34,7 +39,7 @@ export function InvitesAdmin() {
     <div className="flex w-full max-w-xl flex-col gap-2">
       {/* ConfirmButton closes its step when the request ends, so the failure
           has to show here or the row just snaps back to "Delete". */}
-      {deleteMutation.isError && (
+      {deleteFailed && (
         <p role="alert" className="text-sm text-destructive">
           Couldn't delete the invite. Try again.
         </p>
@@ -78,7 +83,13 @@ export function InvitesAdmin() {
                     label="Delete"
                     confirmLabel="Confirm"
                     pendingLabel="Deleting…"
-                    onConfirm={() => deleteMutation.mutateAsync(inv.id)}
+                    onConfirm={() => {
+                      setDeleteFailed(false);
+                      return deleteMutation.mutateAsync(inv.id).then(
+                        () => undefined,
+                        () => setDeleteFailed(true),
+                      );
+                    }}
                     size="sm"
                     triggerVariant="destructive"
                     cancelVariant="ghost"
