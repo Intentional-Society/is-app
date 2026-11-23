@@ -209,19 +209,22 @@ describe("ProgramsList leave confirmation", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Network error leaving program.");
     await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
   });
-  it("keeps the programs on screen when the refetch after a failed request also fails", async () => {
+  it("keeps the programs on screen when the refetch after a failed request also fails, and offers a retry", async () => {
     $leave.mockRejectedValue(new Error("network down"));
     render(<ProgramsList />);
     fireEvent.click(await screen.findByRole("button", { name: "Leave program" }));
     $list.mockRejectedValueOnce(new Error("network down"));
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
 
-    // The action's own message survives, and the list is not swapped for a load error.
-    expect(await screen.findByRole("alert")).toHaveTextContent("Network error leaving program.");
-    await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText("Network error loading programs.")).not.toBeInTheDocument();
+    // Both messages show: what the action hit, and that the refresh failed.
+    expect(await screen.findByText("Network error leaving program.")).toBeInTheDocument();
+    expect(await screen.findByText("Network error loading programs.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Book Club" })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Leave program" })).toBeEnabled();
+
+    // Retry reloads, and the load message clears once a fetch succeeds.
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByText("Network error loading programs.")).not.toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "Book Club" })).toBeInTheDocument();
   });
 
   it("keeps the programs and reports the load failure when the refetch after a successful request fails", async () => {
@@ -238,5 +241,11 @@ describe("ProgramsList leave confirmation", () => {
     render(<ProgramsList />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load programs (500).");
     expect(screen.queryByRole("heading", { name: "Book Club" })).not.toBeInTheDocument();
+
+    // Retry recovers without a page refresh.
+    $list.mockResolvedValue(listResponse(true));
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("heading", { name: "Book Club" })).toBeInTheDocument();
+    expect(screen.queryByText("Failed to load programs (500).")).not.toBeInTheDocument();
   });
 });

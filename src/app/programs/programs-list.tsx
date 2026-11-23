@@ -152,30 +152,38 @@ async function fetchPrograms(): Promise<ListState> {
     return { kind: "error", message: "Network error loading programs." };
   }
 }
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <p role="alert" className="text-sm text-destructive">
+        {message}
+      </p>
+      <Button type="button" size="sm" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   // Programs with a join or leave in flight, tracked per card so one card's
   // action never unlocks another card that is still mid-request.
   const [pendingIds, setPending] = useIdSet();
   const [actionError, setActionError] = useState<string | null>(null);
+  // Why the last fetch failed, until a later one succeeds.
+  const [loadError, setLoadError] = useState<string | null>(null);
   // Only the newest fetch may set state. A join or leave on another card can
   // start a second fetch before the first returns, and a slow older response
   // landing last would otherwise roll the list back to a stale snapshot.
   const latestRequest = useRef<Promise<void>>(Promise.resolve());
-  // Once programs have loaded, a failed refetch must not replace them: a dropped
-  // connection would wipe the list along with the message explaining it. Keep
-  // the last good programs and report the failure through `actionError`, unless
-  // an action has already set a more specific message.
-  const hasLoaded = useRef(false);
   const reload = useCallback(async () => {
     const request: Promise<void> = fetchPrograms().then((next) => {
       if (request !== latestRequest.current) return;
-      if (next.kind === "error" && hasLoaded.current) {
-        setActionError((prev) => prev ?? next.message);
-        return;
-      }
-      if (next.kind === "loaded") hasLoaded.current = true;
-      setState(next);
+      setLoadError(next.kind === "error" ? next.message : null);
+      // Once programs have loaded, a failed refetch must not replace them: a
+      // dropped connection would wipe the list along with the message explaining
+      // it. Keep the last good programs; `loadError` reports the failure.
+      setState((prev) => (next.kind === "error" && prev.kind === "loaded" ? prev : next));
     });
     latestRequest.current = request;
     // A superseded fetch changes nothing, so its caller must wait for the
@@ -230,12 +238,7 @@ export function ProgramsList() {
   };
 
   if (state.kind === "loading") return <p className="text-sm text-muted-foreground">Loading programs…</p>;
-  if (state.kind === "error")
-    return (
-      <p role="alert" className="text-sm text-destructive">
-        {state.message}
-      </p>
-    );
+  if (state.kind === "error") return <LoadError message={state.message} onRetry={() => void reload()} />;
   if (state.programs.length === 0) return <p className="text-sm text-muted-foreground">No programs available yet.</p>;
 
   return (
@@ -245,6 +248,7 @@ export function ProgramsList() {
           {actionError}
         </p>
       )}
+      {loadError && <LoadError message={loadError} onRetry={() => void reload()} />}
       <ul className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {state.programs.map((program) => (
           <ProgramCard

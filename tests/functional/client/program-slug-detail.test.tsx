@@ -111,4 +111,19 @@ describe("ProgramSlugDetail leave confirmation", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Failed to leave program.");
     expect(screen.queryByText("You've already joined this program.")).not.toBeInTheDocument();
   });
+  it("shows a failed leave at once and holds the buttons until the refetch lands", async () => {
+    $leave.mockResolvedValue({ ok: false, status: 409, json: async () => ({}) } as never);
+    let finishRefetch: (value: never) => void = () => {};
+    $get.mockReturnValue(new Promise<never>((resolve) => (finishRefetch = resolve)));
+    renderDetail();
+    fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
+
+    // The error does not wait on a refetch that, with the network down, retries for seconds.
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to leave program.");
+    expect(await screen.findByRole("button", { name: "Leave program" })).toHaveAttribute("aria-disabled", "true");
+
+    await act(async () => finishRefetch(getResponse(false)));
+    expect(await screen.findByRole("button", { name: "Join program" })).toBeEnabled();
+  });
 });

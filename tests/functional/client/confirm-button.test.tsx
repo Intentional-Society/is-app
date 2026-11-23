@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -91,7 +91,9 @@ describe("ConfirmButton", () => {
     renderButton({ onConfirm: () => Promise.resolve() });
     fireEvent.click(screen.getByRole("button", { name: "Leave program" }));
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
-    expect(await screen.findByRole("button", { name: "Leave program" })).toHaveFocus();
+    const trigger = await screen.findByRole("button", { name: "Leave program" });
+    // Focus moves in an effect that runs after the DOM commit, so wait for it.
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   // The trigger uses aria-disabled (not the `disabled` attribute) so it can hold focus.
@@ -120,7 +122,7 @@ describe("ConfirmButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes, leave program" }));
     const trigger = await screen.findByRole("button", { name: "Leave program" });
     expect(trigger).toHaveAttribute("aria-disabled", "true");
-    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
   it("closes the step on Escape and returns focus to the trigger", () => {
     const { onConfirm } = renderButton();

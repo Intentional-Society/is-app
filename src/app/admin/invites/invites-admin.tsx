@@ -43,6 +43,11 @@ export function InvitesAdmin() {
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-2">
+      {invitesQuery.isError && invitesQuery.data && (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't refresh invites; the list may be out of date.
+        </p>
+      )}
       {invitesQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : invitesQuery.data === undefined ? (
@@ -87,6 +92,9 @@ export function InvitesAdmin() {
                     label="Delete"
                     confirmLabel="Confirm"
                     pendingLabel="Deleting…"
+                    // Held while the list refetches, so a row whose delete failed
+                    // because it was already gone is not offered again over stale data.
+                    pending={invitesQuery.isFetching}
                     onConfirm={() => {
                       setFailed(inv.id, false);
                       return deleteMutation.mutateAsync(inv.id).then(

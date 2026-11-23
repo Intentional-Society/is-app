@@ -137,21 +137,39 @@ describe("InvitesAdmin delete confirmation", () => {
     $list.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as never);
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete this invite");
-    await waitFor(() => expect($list).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Couldn't delete this invite. Try again.")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't refresh invites; the list may be out of date.")).toBeInTheDocument();
     expect(screen.getByText("For Ada")).toBeInTheDocument();
     expect(screen.queryByText("Couldn't load invites.")).not.toBeInTheDocument();
   });
 
-  it("does not make a failed delete wait for the refetch", async () => {
-    $delete.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as never);
+  it("says so when a refetch fails after a successful delete, instead of leaving a silently stale row", async () => {
+    $delete.mockResolvedValue({ ok: true, json: async () => ({}) } as never);
     renderAdmin();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    $list.mockReturnValue(new Promise(() => {}) as never); // the refetch never returns
+    $list.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as never);
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete this invite");
-    expect(await screen.findByRole("button", { name: "Delete" })).toBeEnabled();
+    expect(await screen.findByText("Couldn't refresh invites; the list may be out of date.")).toBeInTheDocument();
+    expect(screen.getByText("For Ada")).toBeInTheDocument();
+  });
+
+  it("reports a failed delete at once, then holds the row until the refetch lands", async () => {
+    $delete.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as never);
+    renderAdmin();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    let finishRefetch: (value: never) => void = () => {};
+    $list.mockReturnValue(new Promise<never>((resolve) => (finishRefetch = resolve)));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    // The failure shows without waiting for the refetch, but the row is not
+    // offered again over data the refetch is about to replace.
+    expect(await screen.findByText("Couldn't delete this invite. Try again.")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Delete" })).toHaveAttribute("aria-disabled", "true");
+
+    // Another admin had already deleted it: the refetch drops the row.
+    await act(async () => finishRefetch({ ok: true, json: async () => ({ invites: [] }) } as never));
+    expect(await screen.findByText("No invites yet.")).toBeInTheDocument();
   });
 
   it("shows a load error when the first load fails", async () => {

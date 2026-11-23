@@ -1,7 +1,7 @@
 "use client";
 
 import type { UrlObject } from "node:url";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -60,8 +60,14 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
   // Joining or leaving changes whether the viewer can post to a feature's box.
   // Runs after a failure too: a failed join or leave usually means the page is
   // stale (another tab, an admin), and a retry would fail the same way.
-  // Returned to the mutation so it stays pending until the refetch lands.
-  // Otherwise the page briefly shows the old `joined` state with live buttons.
+  // A success returns it to the mutation so it stays pending until the refetch
+  // lands; otherwise the page briefly shows the old `joined` state with live
+  // buttons. A failure does not wait: with the network down the refetches retry
+  // for several seconds, and the error should show at once.
+  const refresh = (error: Error | null) => {
+    const refetch = invalidate();
+    return error ? undefined : refetch;
+  };
   const invalidate = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) }),
@@ -83,7 +89,7 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       }
       return res.json();
     },
-    onSettled: invalidate,
+    onSettled: (_data, error) => refresh(error),
   });
 
   const leaveMutation = useMutation({
@@ -92,7 +98,7 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       if (!res.ok) throw new Error("Failed to leave program.");
       return res.json();
     },
-    onSettled: invalidate,
+    onSettled: (_data, error) => refresh(error),
   });
 
   const actionError =
@@ -101,7 +107,10 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       : leaveMutation.error instanceof Error
         ? leaveMutation.error.message
         : null;
-  const pending = joinMutation.isPending || leaveMutation.isPending;
+  // The program refetch after a failure: hold the buttons until it lands, so a
+  // stale page is not offered the same failing action again.
+  const refetching = useIsFetching({ queryKey: programQueryKey(program.slug) }) > 0;
+  const pending = joinMutation.isPending || leaveMutation.isPending || refetching;
   // Each action clears the other's error, so the message always belongs to the
   // latest action.
   const join = () => {
@@ -139,6 +148,7 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
             label="Leave program"
             confirmLabel="Yes, leave program"
             pendingLabel="Leaving…"
+            pending={refetching}
             disabled={joinMutation.isPending}
             onConfirm={leave}
           />
