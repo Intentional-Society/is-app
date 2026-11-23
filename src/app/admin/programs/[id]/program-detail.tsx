@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { ConfirmButton } from "@/components/confirm-button";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { MemberTypeahead } from "@/components/member-typeahead";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,6 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
   const [buttondownTag, setButtondownTag] = useState(program.buttondownTag ?? "");
   const [editError, setEditError] = useState<string | null>(null);
   const [participantError, setParticipantError] = useState<string | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: programQueryKey(program.id) });
@@ -169,7 +169,6 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
     },
     onError: (err) => {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete program.");
-      setConfirmingDelete(false);
     },
   });
 
@@ -383,39 +382,21 @@ function ProgramEditor({ program }: { program: AdminProgramDetail }) {
             ? "Remove every participant before deleting. Programs in real use will get a dedicated retire flow later."
             : "Permanently deletes this empty program. This can't be undone."}
         </p>
-        {confirmingDelete ? (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
-            >
-              {deleteMutation.isPending ? "Deleting…" : "Yes, delete program"}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={deleteMutation.isPending}
-              onClick={() => setConfirmingDelete(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <Button
-            type="button"
-            variant="destructive"
+        <div className="flex items-center gap-2 self-start">
+          <ConfirmButton
+            label="Delete program"
+            confirmLabel="Yes, delete program"
+            pendingLabel="Deleting…"
+            // Locked after success too, through the navigation away.
+            pending={deleteMutation.isSuccess}
             disabled={hasParticipants}
-            onClick={() => {
+            onConfirm={() => {
               setDeleteError(null);
-              setConfirmingDelete(true);
+              return deleteMutation.mutateAsync();
             }}
-            className="self-start"
-          >
-            Delete program
-          </Button>
-        )}
+            triggerVariant="destructive"
+          />
+        </div>
         {deleteError && (
           <p role="alert" className="text-sm text-destructive">
             {deleteError}
