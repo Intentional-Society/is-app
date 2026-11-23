@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ConfirmButton } from "@/components/confirm-button";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 
@@ -25,7 +26,6 @@ export function ButtondownSyncButtons() {
   const [pending, setPending] = useState<null | "dry-run" | "write">(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmingWrite, setConfirmingWrite] = useState(false);
 
   const runDryRun = async () => {
     setError(null);
@@ -46,7 +46,6 @@ export function ButtondownSyncButtons() {
     setError(null);
     setResult(null);
     setPending("write");
-    setConfirmingWrite(false);
     try {
       const res = await apiClient.api.admin["buttondown-sync"].write.$post();
       if (!res.ok) throw new Error(`status ${res.status}`);
@@ -61,40 +60,26 @@ export function ButtondownSyncButtons() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" size="sm" disabled={pending !== null} onClick={runDryRun}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={pending !== null}
+          focusableWhenDisabled
+          onClick={runDryRun}
+        >
           {pending === "dry-run" ? "Running…" : "Sync Buttondown (dry run)"}
         </Button>
 
-        {confirmingWrite ? (
-          <>
-            <Button type="button" variant="destructive" size="sm" disabled={pending !== null} onClick={runWrite}>
-              {pending === "write" ? "Running…" : "Yes, write to Buttondown"}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={pending !== null}
-              onClick={() => setConfirmingWrite(false)}
-            >
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            disabled={pending !== null}
-            onClick={() => {
-              setError(null);
-              setResult(null);
-              setConfirmingWrite(true);
-            }}
-          >
-            Sync Buttondown (write)
-          </Button>
-        )}
+        <ConfirmButton
+          label="Sync Buttondown (write)"
+          confirmLabel="Yes, write to Buttondown"
+          pendingLabel="Running…"
+          pending={pending !== null}
+          onConfirm={runWrite}
+          size="sm"
+          triggerVariant="destructive"
+        />
       </div>
 
       <p className="text-xs text-muted-foreground">

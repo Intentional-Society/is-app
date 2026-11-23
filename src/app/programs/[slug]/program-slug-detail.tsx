@@ -1,11 +1,12 @@
 "use client";
 
 import type { UrlObject } from "node:url";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { ConfirmButton } from "@/components/confirm-button";
 import { LocalTime } from "@/components/local-time";
 import { Markdown, MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
@@ -57,10 +58,21 @@ export function ProgramSlugDetail({ slug, children }: { slug: string; children?:
 function ProgramBody({ program, children }: { program: ProgramDetail; children?: ReactNode }) {
   const queryClient = useQueryClient();
   // Joining or leaving changes whether the viewer can post to a feature's box.
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) });
-    queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(program.id) });
+  // Runs after a failure too: a failed join or leave usually means the page is
+  // stale (another tab, an admin), and a retry would fail the same way.
+  // A success returns it to the mutation so it stays pending until the refetch
+  // lands; otherwise the page briefly shows the old `joined` state with live
+  // buttons. A failure does not wait: with the network down the refetches retry
+  // for several seconds, and the error should show at once.
+  const refresh = (error: Error | null) => {
+    const refetch = invalidate();
+    return error ? undefined : refetch;
   };
+  const invalidate = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: programQueryKey(program.slug) }),
+      queryClient.invalidateQueries({ queryKey: messageBoxQueryKey(program.id) }),
+    ]);
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -77,7 +89,7 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       }
       return res.json();
     },
-    onSuccess: invalidate,
+    onSettled: (_data, error) => refresh(error),
   });
 
   const leaveMutation = useMutation({
@@ -86,7 +98,7 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       if (!res.ok) throw new Error("Failed to leave program.");
       return res.json();
     },
-    onSuccess: invalidate,
+    onSettled: (_data, error) => refresh(error),
   });
 
   const actionError =
@@ -95,7 +107,20 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
       : leaveMutation.error instanceof Error
         ? leaveMutation.error.message
         : null;
-  const pending = joinMutation.isPending || leaveMutation.isPending;
+  // The program refetch after a failure: hold the buttons until it lands, so a
+  // stale page is not offered the same failing action again.
+  const refetching = useIsFetching({ queryKey: programQueryKey(program.slug) }) > 0;
+  const pending = joinMutation.isPending || leaveMutation.isPending || refetching;
+  // Each action clears the other's error, so the message always belongs to the
+  // latest action.
+  const join = () => {
+    leaveMutation.reset();
+    joinMutation.mutate();
+  };
+  const leave = () => {
+    joinMutation.reset();
+    return leaveMutation.mutateAsync();
+  };
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-6">
@@ -119,11 +144,16 @@ function ProgramBody({ program, children }: { program: ProgramDetail; children?:
 
       <div className="flex items-center gap-3">
         {program.joined ? (
-          <Button type="button" variant="primary" disabled={pending} onClick={() => leaveMutation.mutate()}>
-            {leaveMutation.isPending ? "Leaving…" : "Leave program"}
-          </Button>
+          <ConfirmButton
+            label="Leave program"
+            confirmLabel="Yes, leave program"
+            pendingLabel="Leaving…"
+            pending={refetching}
+            disabled={joinMutation.isPending}
+            onConfirm={leave}
+          />
         ) : program.signupsOpen ? (
-          <Button type="button" disabled={pending} onClick={() => joinMutation.mutate()}>
+          <Button type="button" disabled={pending} focusableWhenDisabled onClick={join}>
             {joinMutation.isPending ? "Joining…" : "Join program"}
           </Button>
         ) : (

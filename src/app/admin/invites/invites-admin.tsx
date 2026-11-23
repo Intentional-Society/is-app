@@ -1,12 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/confirm-button";
 import { apiClient } from "@/lib/api";
 import type { AdminInvite } from "@/lib/api-types";
 import { formatDate } from "@/lib/format-date";
+import { useIdSet } from "@/lib/use-id-set";
 
 const QUERY_KEY = ["admin", "invites"] as const;
 
@@ -19,10 +19,10 @@ const fetchInvites = async (): Promise<AdminInvite[]> => {
 
 export function InvitesAdmin() {
   const queryClient = useQueryClient();
-  // Two-step delete: the first click arms a row, the second confirms.
-  // Guards an irreversible hard delete against a stray click.
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
+  // Invites whose last delete failed. Each row's own request records its
+  // failure, and the row shows the message until that invite is retried.
+  const [failedIds, setFailed] = useIdSet();
   const invitesQuery = useQuery({ queryKey: QUERY_KEY, queryFn: fetchInvites });
 
   const deleteMutation = useMutation<string, Error, string>({
@@ -31,17 +31,26 @@ export function InvitesAdmin() {
       if (!res.ok) throw new Error(`delete failed (${res.status})`);
       return id;
     },
-    onSuccess: () => {
-      setConfirmingId(null);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    // After a failure too: a failed delete often means the row is stale (another
+    // admin got there first), and a retry would fail the same way. A failure is
+    // not awaited, so the row reports it at once instead of waiting on a refetch
+    // that, with the network down, retries for several seconds and fails as well.
+    onSettled: (_id, error) => {
+      const refetch = queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      return error ? undefined : refetch;
     },
   });
 
   return (
     <div className="flex w-full max-w-xl flex-col gap-2">
+      {invitesQuery.isError && invitesQuery.data && (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't refresh invites; the list may be out of date.
+        </p>
+      )}
       {invitesQuery.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : invitesQuery.isError ? (
+      ) : invitesQuery.data === undefined ? (
         <p role="alert" className="text-sm text-destructive">
           Couldn't load invites.
         </p>
@@ -50,8 +59,6 @@ export function InvitesAdmin() {
       ) : (
         <ul className="flex flex-col gap-2">
           {invitesQuery.data.map((inv) => {
-            const isConfirming = confirmingId === inv.id;
-            const isDeleting = deleteMutation.isPending && deleteMutation.variables === inv.id;
             const meta = [
               inv.creatorName ? `from ${inv.creatorName}` : "from (unknown)",
               // A redeemed invite always has a redeemer (DB-enforced), so
@@ -73,27 +80,32 @@ export function InvitesAdmin() {
                   <span className="text-xs text-muted-foreground">
                     {meta.join(" · ")} · <span className="font-mono">{inv.code}</span>
                   </span>
+                  {failedIds.has(inv.id) && (
+                    <p role="alert" className="text-xs text-destructive">
+                      Couldn't delete this invite. Try again.
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  {isConfirming ? (
-                    <>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={isDeleting}
-                        onClick={() => deleteMutation.mutate(inv.id)}
-                      >
-                        {isDeleting ? "Deleting…" : "Confirm"}
-                      </Button>
-                      <Button variant="ghost" size="sm" disabled={isDeleting} onClick={() => setConfirmingId(null)}>
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <Button variant="destructive" size="sm" onClick={() => setConfirmingId(inv.id)}>
-                      Delete
-                    </Button>
-                  )}
+                  {/* Two-step delete guards an irreversible hard delete against a stray click. */}
+                  <ConfirmButton
+                    label="Delete"
+                    confirmLabel="Confirm"
+                    pendingLabel="Deleting…"
+                    // Held while the list refetches, so a row whose delete failed
+                    // because it was already gone is not offered again over stale data.
+                    pending={invitesQuery.isFetching}
+                    onConfirm={() => {
+                      setFailed(inv.id, false);
+                      return deleteMutation.mutateAsync(inv.id).then(
+                        () => undefined,
+                        () => setFailed(inv.id, true),
+                      );
+                    }}
+                    size="sm"
+                    triggerVariant="destructive"
+                    cancelVariant="ghost"
+                  />
                 </div>
               </li>
             );

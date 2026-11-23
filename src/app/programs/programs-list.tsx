@@ -2,14 +2,16 @@
 
 import type { UrlObject } from "node:url";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Avatar } from "@/components/avatar";
+import { ConfirmButton } from "@/components/confirm-button";
 import { MarkdownInline } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import type { Program } from "@/lib/api-types";
 import { formatDate } from "@/lib/format-date";
+import { useIdSet } from "@/lib/use-id-set";
 
 type ListState = { kind: "loading" } | { kind: "loaded"; programs: Program[] } | { kind: "error"; message: string };
 
@@ -21,7 +23,7 @@ function ProgramCard({
 }: {
   program: Program;
   onJoin: (id: string) => void;
-  onLeave: (id: string) => void;
+  onLeave: (id: string) => Promise<void>;
   pending: boolean;
 }) {
   const cardText = program.blurb ?? program.description ?? "";
@@ -107,17 +109,25 @@ function ProgramCard({
         </Link>
 
         {program.joined ? (
+          <div className="flex items-center gap-2">
+            <ConfirmButton
+              label="Leave program"
+              confirmLabel="Yes, leave program"
+              pendingLabel="Leaving…"
+              pending={pending}
+              onConfirm={() => onLeave(program.id)}
+              triggerClassName="w-full"
+              actionClassName="flex-1"
+            />
+          </div>
+        ) : program.signupsOpen ? (
           <Button
             type="button"
-            variant="primary"
             disabled={pending}
-            onClick={() => onLeave(program.id)}
+            focusableWhenDisabled
+            onClick={() => onJoin(program.id)}
             className="w-full"
           >
-            {pending ? "Leaving…" : "Leave program"}
-          </Button>
-        ) : program.signupsOpen ? (
-          <Button type="button" disabled={pending} onClick={() => onJoin(program.id)} className="w-full">
             {pending ? "Joining…" : "Join program"}
           </Button>
         ) : (
@@ -132,39 +142,65 @@ function ProgramCard({
   );
 }
 
+async function fetchPrograms(): Promise<ListState> {
+  try {
+    const res = await apiClient.api.programs.$get();
+    if (!res.ok) return { kind: "error", message: `Failed to load programs (${res.status}).` };
+    const body = await res.json();
+    return { kind: "loaded", programs: body.programs };
+  } catch {
+    return { kind: "error", message: "Network error loading programs." };
+  }
+}
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <p role="alert" className="text-sm text-destructive">
+        {message}
+      </p>
+      <Button type="button" size="sm" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
 export function ProgramsList() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  // Programs with a join or leave in flight, tracked per card so one card's
+  // action never unlocks another card that is still mid-request.
+  const [pendingIds, setPending] = useIdSet();
   const [actionError, setActionError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey is a manual refetch trigger; bumping it reruns the effect by design
+  // Why the last fetch failed, until a later one succeeds.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Only the newest fetch may set state. A join or leave on another card can
+  // start a second fetch before the first returns, and a slow older response
+  // landing last would otherwise roll the list back to a stale snapshot.
+  const latestRequest = useRef<Promise<void>>(Promise.resolve());
+  const reload = useCallback(async () => {
+    const request: Promise<void> = fetchPrograms().then((next) => {
+      if (request !== latestRequest.current) return;
+      setLoadError(next.kind === "error" ? next.message : null);
+      // Once programs have loaded, a failed refetch must not replace them: a
+      // dropped connection would wipe the list along with the message explaining
+      // it. Keep the last good programs; `loadError` reports the failure.
+      setState((prev) => (next.kind === "error" && prev.kind === "loaded" ? prev : next));
+    });
+    latestRequest.current = request;
+    // A superseded fetch changes nothing, so its caller must wait for the
+    // newest one: the data that reflects its action is in that response.
+    let waited: Promise<void>;
+    do {
+      waited = latestRequest.current;
+      await waited;
+    } while (waited !== latestRequest.current);
+  }, []);
   useEffect(() => {
-    let cancelled = false;
-    async function fetchPrograms() {
-      try {
-        const res = await apiClient.api.programs.$get();
-        if (cancelled) return;
-        if (!res.ok) {
-          setState({ kind: "error", message: `Failed to load programs (${res.status}).` });
-          return;
-        }
-        const body = await res.json();
-        setState({ kind: "loaded", programs: body.programs });
-      } catch {
-        if (!cancelled) setState({ kind: "error", message: "Network error loading programs." });
-      }
-    }
-    void fetchPrograms();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
-
-  const reload = () => setReloadKey((k) => k + 1);
-
+    void reload();
+  }, [reload]);
+  // Join and leave hold their pending id until `reload` resolves, so a card
+  // never re-enables its button over membership data the action just made stale.
   const join = async (programId: string) => {
-    setPendingId(programId);
+    setPending(programId, true);
     setActionError(null);
     try {
       const res = await apiClient.api.programs[":id"].join.$post({ param: { id: programId } });
@@ -178,35 +214,31 @@ export function ProgramsList() {
               : "Failed to join program.",
         );
       }
-      reload();
     } catch {
       setActionError("Network error joining program.");
     } finally {
-      setPendingId(null);
+      // Whatever happened to the request, the server's state may have changed.
+      await reload();
+      setPending(programId, false);
     }
   };
 
   const leave = async (programId: string) => {
-    setPendingId(programId);
+    setPending(programId, true);
     setActionError(null);
     try {
       const res = await apiClient.api.programs[":id"].leave.$post({ param: { id: programId } });
       if (!res.ok) setActionError("Failed to leave program.");
-      reload();
     } catch {
       setActionError("Network error leaving program.");
     } finally {
-      setPendingId(null);
+      await reload();
+      setPending(programId, false);
     }
   };
 
   if (state.kind === "loading") return <p className="text-sm text-muted-foreground">Loading programs…</p>;
-  if (state.kind === "error")
-    return (
-      <p role="alert" className="text-sm text-destructive">
-        {state.message}
-      </p>
-    );
+  if (state.kind === "error") return <LoadError message={state.message} onRetry={() => void reload()} />;
   if (state.programs.length === 0) return <p className="text-sm text-muted-foreground">No programs available yet.</p>;
 
   return (
@@ -216,6 +248,7 @@ export function ProgramsList() {
           {actionError}
         </p>
       )}
+      {loadError && <LoadError message={loadError} onRetry={() => void reload()} />}
       <ul className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {state.programs.map((program) => (
           <ProgramCard
@@ -223,7 +256,7 @@ export function ProgramsList() {
             program={program}
             onJoin={join}
             onLeave={leave}
-            pending={pendingId === program.id}
+            pending={pendingIds.has(program.id)}
           />
         ))}
       </ul>
