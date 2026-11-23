@@ -54,8 +54,39 @@ jobs:
       - if: steps.filter.outputs.code == 'true'
         run: npm install
 
+      # This reservation exists because the stack's default host ports sit in
+      # the OS ephemeral range (Windows has the same hazard; see
+      # docs/setup-dev-machine.md).
+      #
+      # `supabase start` binds a fixed span of host ports, 54321-54327. On
+      # Linux they sit inside the ephemeral range (32768-60999), so an
+      # outbound connection, such as the burst of parallel image pulls just
+      # before the bind, can be handed one as its source port and make the
+      # bind fail with "address already in use". Reserving the span keeps the
+      # kernel from handing it out; explicit binds still succeed. The span
+      # mirrors the host-bound ports in supabase/config.toml and
+      # SUPABASE_API_PORT / SUPABASE_BLOCK_SIZE in scripts/setup.mjs; change
+      # all three together (a newly host-bound port, such as the pooler, goes
+      # in here too).
+      # Append to the current list rather than replace it, in case the runner
+      # image ships its own reservations.
       - if: steps.filter.outputs.code == 'true'
+        run: |
+          current="$(sysctl -n net.ipv4.ip_local_reserved_ports)"
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports="${current:+$current,}54321-54327"
+      - if: steps.filter.outputs.code == 'true'
+        id: supabase
         run: npx supabase start
+      # If the bind still fails, show what holds the ports. The runner is gone
+      # by the time anyone reads the failure, so this is the only evidence.
+      # This runs after the CLI has rolled back, so a short-lived socket may
+      # already be closed: a socket listed here is a lasting holder, and empty
+      # output points to a transient one (or to a cause other than the ports).
+      # sudo: `ss -p` leaves root-owned sockets (docker-proxy, dockerd) blank.
+      - if: failure() && steps.supabase.outcome == 'failure'
+        run: |
+          sysctl net.ipv4.ip_local_port_range net.ipv4.ip_local_reserved_ports
+          sudo ss -tanp | grep -E ':5432[1-7]\b' || true
 
       # `biome ci` == `biome check` plus CI-flavored output (GitHub
       # annotations, no interactive prompts). Same coverage as
