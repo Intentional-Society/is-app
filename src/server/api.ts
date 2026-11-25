@@ -108,6 +108,23 @@ import { profiles } from "./schema";
 import { listSigninsAdmin } from "./signins-admin";
 import { getSystemMetrics } from "./system-metrics";
 import { parseResetRequest, resetE2EUsers } from "./test-reset";
+import {
+  countActiveWishes,
+  createWish,
+  createWishComment,
+  deleteWish,
+  deleteWishComment,
+  isWishReactionEmoji,
+  listActiveWishesForMember,
+  listAllActiveWishesForDiscover,
+  listMyWishes,
+  listWishComments,
+  listWishReactions,
+  parseWishCreate,
+  parseWishUpdate,
+  toggleWishReaction,
+  updateWish,
+} from "./wishes";
 
 // Admin-only sub-router. requireAdmin runs after the main api's
 // requireAuth (mounted via .route() below), so handlers here can
@@ -829,6 +846,113 @@ const api = new Hono<{ Variables: ApiVariables }>()
   .get("/intentions", async (c) => {
     const intentions = await listCurrentIntentions();
     return c.json({ intentions });
+  })
+  .get("/wishes", async (c) => {
+    const user = c.get("user");
+    const wishList = await listMyWishes(user.id);
+    return c.json({ wishes: wishList });
+  })
+  .post("/wishes", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON" }, 400);
+    }
+    const parsed = parseWishCreate(body);
+    if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+    const user = c.get("user");
+    const activeCount = await countActiveWishes(user.id);
+    if (activeCount >= 30) return c.json({ error: "wish_limit_reached" }, 422);
+    const result = await createWish({ authorId: user.id, ...parsed });
+    return c.json({ wish: result.wish }, 201);
+  })
+  .patch(
+    "/wishes/:id",
+    validator("json", (body, c) => {
+      const parsed = parseWishUpdate(body);
+      if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+      return parsed;
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const id = c.req.param("id");
+      if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+      const result = await updateWish({ id, authorId: user.id, ...c.req.valid("json") });
+      if ("error" in result) return c.json({ error: result.error }, 404);
+      return c.json({ wish: result.wish });
+    },
+  )
+  .delete("/wishes/:id", async (c) => {
+    const user = c.get("user");
+    const id = c.req.param("id");
+    if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+    const result = await deleteWish({ id, authorId: user.id });
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ ok: true });
+  })
+  .get("/wishes/discover", async (c) => {
+    const user = c.get("user");
+    const wishList = await listAllActiveWishesForDiscover(user.id);
+    return c.json({ wishes: wishList });
+  })
+  .get("/wishes/:id/reactions", async (c) => {
+    const id = c.req.param("id");
+    if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+    const user = c.get("user");
+    const result = await listWishReactions(id, user.id);
+    return c.json(result);
+  })
+  .post(
+    "/wishes/:id/reactions",
+    validator("json", (body, c) => {
+      const obj = (body ?? {}) as Record<string, unknown>;
+      if (!isWishReactionEmoji(obj.emoji)) return c.json({ error: "invalid emoji" }, 400);
+      return { emoji: obj.emoji };
+    }),
+    async (c) => {
+      const id = c.req.param("id");
+      if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+      const user = c.get("user");
+      const result = await toggleWishReaction({ wishId: id, authorId: user.id, emoji: c.req.valid("json").emoji });
+      return c.json(result);
+    },
+  )
+  .get("/wishes/:id/comments", async (c) => {
+    const id = c.req.param("id");
+    if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+    const comments = await listWishComments(id);
+    return c.json({ comments });
+  })
+  .post(
+    "/wishes/:id/comments",
+    validator("json", (body, c) => {
+      const obj = (body ?? {}) as Record<string, unknown>;
+      if (typeof obj.body !== "string" || !obj.body.trim()) return c.json({ error: "body is required" }, 400);
+      return { body: obj.body.trim() };
+    }),
+    async (c) => {
+      const id = c.req.param("id");
+      if (!isUuid(id)) return c.json({ error: "not_found" }, 404);
+      const user = c.get("user");
+      const result = await createWishComment({ wishId: id, authorId: user.id, body: c.req.valid("json").body });
+      return c.json({ comment: result.comment }, 201);
+    },
+  )
+  .delete("/wishes/:id/comments/:commentId", async (c) => {
+    const id = c.req.param("id");
+    const commentId = c.req.param("commentId");
+    if (!isUuid(id) || !isUuid(commentId)) return c.json({ error: "not_found" }, 404);
+    const user = c.get("user");
+    const result = await deleteWishComment({ id: commentId, authorId: user.id });
+    if ("error" in result) return c.json({ error: result.error }, 404);
+    return c.json({ ok: true });
+  })
+  .get("/members/:id/wishes", async (c) => {
+    const memberId = c.req.param("id");
+    if (!isUuid(memberId)) return c.json({ error: "not_found" }, 404);
+    const wishList = await listActiveWishesForMember(memberId);
+    return c.json({ wishes: wishList });
   })
   .get("/programs", async (c) => {
     const user = c.get("user");

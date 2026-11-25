@@ -71,6 +71,20 @@ export type AdminProgramFeature = InferResponseType<
   200
 >["features"][number];
 
+export type WishesResponse = InferResponseType<(typeof apiClient.api.wishes)["$get"], 200>;
+export type Wish = WishesResponse["wishes"][number];
+
+export type DiscoverWishesResponse = InferResponseType<(typeof apiClient.api.wishes)["discover"]["$get"], 200>;
+export type DiscoverWish = DiscoverWishesResponse["wishes"][number];
+
+export type MemberWishesResponse = InferResponseType<(typeof apiClient.api.members)[":id"]["wishes"]["$get"], 200>;
+export type MemberWish = MemberWishesResponse["wishes"][number];
+
+export type WishReactionsResponse = InferResponseType<(typeof apiClient.api.wishes)[":id"]["reactions"]["$get"], 200>;
+
+export type WishCommentsResponse = InferResponseType<(typeof apiClient.api.wishes)[":id"]["comments"]["$get"], 200>;
+export type WishComment = WishCommentsResponse["comments"][number];
+
 export type ArchivedMessageBoxMessage = InferResponseType<
   (typeof apiClient.api.admin.programs)[":id"]["message-box"]["archived"]["$get"],
   200

@@ -10,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -238,6 +239,73 @@ export const messageBoxSettings = pgTable(
     prompt: text("prompt"),
   },
   (table) => [check("message_box_settings_visibility", sql`${table.visibility} IN ('members', 'admins')`)],
+).enableRLS();
+
+export const wishes = pgTable(
+  "wishes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    // active | archived | fulfilled — mutually exclusive; enforced by check constraint below.
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    check("wishes_status", sql`${table.status} IN ('active', 'archived', 'fulfilled')`),
+    index("wishes_author_status_idx").on(table.authorId, table.status),
+  ],
+).enableRLS();
+
+// Polymorphic reactions. One row per (reactable_type, reactable_id, author, emoji).
+// reactable_type is the table name of the target resource (e.g. 'wishes').
+// No FK on reactable_id — standard trade-off of a polymorphic join.
+// Authors cannot react to their own content (enforced in the API layer).
+export const reactions = pgTable(
+  "reactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Table name of the target resource, e.g. 'wishes'.
+    reactableType: text("reactable_type").notNull(),
+    reactableId: uuid("reactable_id").notNull(),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    // 'love' | 'me_too' | 'supportive' | 'help' — enforced by check constraint.
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("reactions_target_author_emoji_key").on(table.reactableType, table.reactableId, table.authorId, table.emoji),
+    check("reactions_emoji", sql`${table.emoji} IN ('love', 'me_too', 'supportive', 'help')`),
+    index("reactions_target_idx").on(table.reactableType, table.reactableId),
+  ],
+).enableRLS();
+
+// Polymorphic comments. One row per comment on any resource.
+// commentable_type is the table name of the target resource (e.g. 'wishes').
+// No FK on commentable_id — standard trade-off of a polymorphic join.
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Table name of the target resource, e.g. 'wishes'.
+    commentableType: text("commentable_type").notNull(),
+    commentableId: uuid("commentable_id").notNull(),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("comments_target_created_idx").on(table.commentableType, table.commentableId, table.createdAt)],
 ).enableRLS();
 
 // Messages left in a program's message box. Both FKs cascade: deleting a
