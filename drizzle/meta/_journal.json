@@ -134,6 +134,13 @@
       "when": 1794963525850,
       "tag": "0018_thick_slipstream",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795577362734,
+      "tag": "0019_wish_interactions",
+      "breakpoints": true
     }
   ]
 }

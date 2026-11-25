@@ -125,7 +125,7 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
           </Field>
         </dl>
 
-        <MemberWishesList profileId={profile.id} isOwnProfile={isOwnProfile} />
+        <MemberWishesList profileId={profile.id} isOwnProfile={isOwnProfile} currentUserId={me.id} />
 
         {profile.email && (
           <a

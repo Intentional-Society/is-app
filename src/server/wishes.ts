@@ -1,12 +1,24 @@
-import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
 
 import { db } from "./db";
-import { profiles, wishes } from "./schema";
+import { comments, profiles, reactions, wishes } from "./schema";
 
 export type WishStatus = "active" | "archived" | "fulfilled";
+export type WishReactionEmoji = "love" | "me_too" | "supportive" | "help";
+
+export const REACTION_EMOJIS: { key: WishReactionEmoji; label: string; emoji: string }[] = [
+  { key: "love", label: "Love it!", emoji: "❤️" },
+  { key: "me_too", label: "Me too!", emoji: "🙌" },
+  { key: "supportive", label: "Supportive", emoji: "🌟" },
+  { key: "help", label: "Let me help!", emoji: "🤝" },
+];
 
 function isWishStatus(value: unknown): value is WishStatus {
   return value === "active" || value === "archived" || value === "fulfilled";
+}
+
+export function isWishReactionEmoji(value: unknown): value is WishReactionEmoji {
+  return value === "love" || value === "me_too" || value === "supportive" || value === "help";
 }
 
 export function parseWishCreate(body: unknown): { title: string; description: string | null } | { error: string } {
@@ -67,6 +79,14 @@ export async function listMyWishes(authorId: string) {
   return db.select().from(wishes).where(eq(wishes.authorId, authorId)).orderBy(asc(wishes.createdAt));
 }
 
+export async function countActiveWishes(authorId: string): Promise<number> {
+  const rows = await db
+    .select({ id: wishes.id })
+    .from(wishes)
+    .where(and(eq(wishes.authorId, authorId), eq(wishes.status, "active")));
+  return rows.length;
+}
+
 export async function createWish({
   authorId,
   title,
@@ -124,20 +144,127 @@ export async function listActiveWishesForMember(profileId: string) {
     .orderBy(asc(wishes.createdAt));
 }
 
-// Returns up to 5 random non-hidden, active profiles (excluding the current
-// user) that have at least one active wish. ORDER BY random() is adequate for
-// a small membership.
-export async function discoverWishes(excludeId: string) {
+// Returns up to 50 most recent active wishes from non-hidden, active members
+// other than the current user, with author info.
+export async function listAllActiveWishesForDiscover(excludeId: string) {
   return db
-    .selectDistinct({
-      id: profiles.id,
-      displayName: profiles.displayName,
-      avatarPath: profiles.avatarPath,
-      slug: profiles.slug,
+    .select({
+      id: wishes.id,
+      title: wishes.title,
+      description: wishes.description,
+      createdAt: wishes.createdAt,
+      authorId: profiles.id,
+      authorDisplayName: profiles.displayName,
+      authorSlug: profiles.slug,
     })
-    .from(profiles)
-    .innerJoin(wishes, and(eq(wishes.authorId, profiles.id), eq(wishes.status, "active")))
-    .where(and(ne(profiles.id, excludeId), eq(profiles.hidden, false), isNull(profiles.deactivatedAt)))
-    .orderBy(sql`random()`)
-    .limit(5);
+    .from(wishes)
+    .innerJoin(profiles, eq(wishes.authorId, profiles.id))
+    .where(
+      and(
+        eq(wishes.status, "active"),
+        ne(profiles.id, excludeId),
+        eq(profiles.hidden, false),
+        isNull(profiles.deactivatedAt),
+      ),
+    )
+    .orderBy(desc(wishes.createdAt))
+    .limit(50);
+}
+
+// Returns reaction counts per emoji and which ones the viewer has set.
+export async function listWishReactions(wishId: string, viewerId: string) {
+  const rows = await db
+    .select({ emoji: reactions.emoji, authorId: reactions.authorId })
+    .from(reactions)
+    .where(and(eq(reactions.reactableType, "wishes"), eq(reactions.reactableId, wishId)));
+
+  const counts: Record<WishReactionEmoji, number> = { love: 0, me_too: 0, supportive: 0, help: 0 };
+  const mine = new Set<WishReactionEmoji>();
+  for (const row of rows) {
+    const key = row.emoji as WishReactionEmoji;
+    counts[key] = (counts[key] ?? 0) + 1;
+    if (row.authorId === viewerId) mine.add(key);
+  }
+  return { counts, mine: [...mine] };
+}
+
+// Toggle a reaction: add if absent, remove if present. Returns the new state.
+export async function toggleWishReaction({
+  wishId,
+  authorId,
+  emoji,
+}: {
+  wishId: string;
+  authorId: string;
+  emoji: WishReactionEmoji;
+}) {
+  const existing = await db
+    .select({ id: reactions.id })
+    .from(reactions)
+    .where(
+      and(
+        eq(reactions.reactableType, "wishes"),
+        eq(reactions.reactableId, wishId),
+        eq(reactions.authorId, authorId),
+        eq(reactions.emoji, emoji),
+      ),
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .delete(reactions)
+      .where(
+        and(
+          eq(reactions.reactableType, "wishes"),
+          eq(reactions.reactableId, wishId),
+          eq(reactions.authorId, authorId),
+          eq(reactions.emoji, emoji),
+        ),
+      );
+    return { added: false };
+  }
+  await db.insert(reactions).values({ reactableType: "wishes", reactableId: wishId, authorId, emoji });
+  return { added: true };
+}
+
+export async function listWishComments(wishId: string) {
+  return db
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      authorId: profiles.id,
+      authorDisplayName: profiles.displayName,
+      authorSlug: profiles.slug,
+    })
+    .from(comments)
+    .innerJoin(profiles, eq(comments.authorId, profiles.id))
+    .where(and(eq(comments.commentableType, "wishes"), eq(comments.commentableId, wishId)))
+    .orderBy(asc(comments.createdAt));
+}
+
+export async function createWishComment({
+  wishId,
+  authorId,
+  body,
+}: {
+  wishId: string;
+  authorId: string;
+  body: string;
+}) {
+  const [comment] = await db
+    .insert(comments)
+    .values({ commentableType: "wishes", commentableId: wishId, authorId, body })
+    .returning();
+  return { comment };
+}
+
+export async function deleteWishComment({ id, authorId }: { id: string; authorId: string }) {
+  const [deleted] = await db
+    .delete(comments)
+    .where(and(eq(comments.id, id), eq(comments.authorId, authorId)))
+    .returning();
+  if (!deleted) return { error: "not_found" as const };
+  return { ok: true as const };
 }
