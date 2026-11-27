@@ -56,7 +56,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
    **There is no `proceed` option.** Anything not green blocks the merge.
 
-   Once green, record the head commit the checks ran on (`gh pr view <N> --json headRefOid`); step 11's D5 compares against it.
+   Once green, record the head commit the checks ran on (`gh pr view <N> --json headRefOid`); step 11's D4 compares against it.
 
 9. **Docs-only PR handling.** If the PR is docs-only (`node scripts/docs-only.mjs origin/main` exits 0):
    - `ci.yml`'s `dorny/paths-filter` step skips the test steps but still posts `Lint & Functional Tests` green within seconds (satisfies branch protection).
@@ -92,15 +92,14 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
     On an opted-out machine, typing `/ship` is the merge approval; the doubt checks decide when a human is asked anyway. Do **not** add a conversational Y/n: the gate's prompt is the one confirmation.
 
-    **Doubt checks.** Run every check, opted out or not. D3 and D4 read the PR's changed files from `git diff --name-only origin/main...HEAD` (local, and the same in a sandbox). Each hit is a doubt:
+    **Doubt checks.** Run every check, opted out or not. D3 reads the PR's changed files from `git diff --name-only origin/main...HEAD` (local, and the same in a sandbox). Each hit is a doubt:
     - **D1 Someone else's PR.** The PR author (`gh pr view <N> --json author`) is not the account running `/ship` (`gh api user --jq .login`).
     - **D2 Changes requested.** The PR's `reviewDecision` is `CHANGES_REQUESTED`.
     - **D3 Production database.** The PR adds or changes files under `drizzle/` or changes `src/server/schema.ts` (the production deploy runs `drizzle-kit migrate`), or this run dispatched a schema expand at step 7.
-    - **D4 The guardrails themselves.** The PR changes `.github/workflows/`, `.github/CODEOWNERS`, `.claude/settings.json`, `.claude/hooks/`, or `.claude/skills/ship/`.
-    - **D5 Head moved.** The PR's head commit (`gh pr view <N> --json headRefOid`) differs from the commit whose checks went green at step 8.
-    - **D6 `main` is red.** The latest production deploy or `e2e.yml` run on `main` failed, so the merge would land on a broken production.
-    - **D7 Inferred target.** The PR was resolved from an issue number or plain-language context, not from a PR number, a PR URL, or the current branch's own PR.
-    - **D8 Another specific anomaly.** A concrete observation from this run that D1–D7 don't cover, such as a diff carrying changes unrelated to the PR's title. Name the observation; general unease is not a doubt.
+    - **D4 Head moved.** The PR's head commit (`gh pr view <N> --json headRefOid`) differs from the commit whose checks went green at step 8.
+    - **D5 `main` is red.** The latest production deploy or `e2e.yml` run on `main` failed, so the merge would land on a broken production.
+    - **D6 Inferred target.** The PR was resolved from an issue number or plain-language context, not from a PR number, a PR URL, or the current branch's own PR.
+    - **D7 Anything else.** Anything about this run that makes you want a human to look before the merge, even if it fits none of the checks above and you can't pin it down, such as a diff carrying changes unrelated to the PR's title. Asking costs the human one click, so when in doubt, ask. Say in the doubt line what gave you pause.
 
     **Authorize or ask.**
     - **Opted out, no doubt:** immediately before step 12's merge command, write `.claude/.ship-merge-authorized` at the repo root as `ship\t<current ISO-8601 UTC>\t<N>`. The gate allows that one merge within 120 seconds and deletes the marker.

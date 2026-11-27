@@ -279,7 +279,7 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
   typing `/ship` was already the decision. The checked‑in `ask` rule is replaced by a PreToolUse hook
   (`.claude/hooks/ship-merge-gate.mjs`, `onFailure: "block"`) that asks for every `gh pr merge`
   unless the per‑machine `.claude/skip-merge-confirm.local` exists and `/ship` wrote a fresh,
-  single‑use, PR‑matched authorization marker after its doubt checks (D1–D8, step 11) passed.
+  single‑use, PR‑matched authorization marker after its doubt checks (D1–D7, step 11) passed.
   Headless probes on 2026‑11‑24: the hook's `ask` held in default, `auto` and `bypassPermissions` and
   over a local `allow`; a crashing hook blocked the call.
 - Prior context: PRs #304/#305 shipped the Skills; explicit‑only invocation was P0.4 from PR #133 —

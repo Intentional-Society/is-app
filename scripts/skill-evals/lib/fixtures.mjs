@@ -84,7 +84,7 @@ function existingPr(number, headRefName, title) {
     title,
     url: prLink(number),
     // /ship step 11's doubt checks: the running account's own PR (D1), no review decision
-    // (D2). `headRefOid` (D5) is filled in by buildSandbox() from the branch's real head.
+    // (D2). `headRefOid` (D4) is filled in by buildSandbox() from the branch's real head.
     author: { login: SELF },
     reviewDecision: "",
     // The conversation /ship step 10 reads: nothing by default.

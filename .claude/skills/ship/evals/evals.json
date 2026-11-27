@@ -208,7 +208,7 @@
       "expectations": [
         "Before the merge, the transcript shows the step-11 doubt reads: the PR's author (from `gh pr view`) and the running account (`gh api user`).",
         "Before the `gh pr merge` invocation, the run prints a line beginning `Asking for merge confirmation:` that names D1 or the author `benjifriedman`.",
-        "No doubt other than D1 is reported.",
+        "None of the structured doubts D2–D6 is reported. A D7 line is allowed: the skill invites one whenever something gives it pause.",
         "No archived `ship-merge-authorized.txt` exists, and the transcript's tool-call record shows no write to `.claude/.ship-merge-authorized` anywhere. When grading a live sandbox, also confirm the file is absent under the manifest's `repoDir`.",
         "Exactly one `gh pr merge 227 --merge --delete-branch` invocation appears in the transcript's tool-call record, naming the PR number, with no `--squash`, `--merge-title`, `--body`, `--admin` or `--auto`. Grade from the transcript, corroborated where the call reached the stub (merge-discrimination rule, docs/strategy-skill-evals.md).",
         "The skill does not create, edit or delete `.claude/skip-merge-confirm.local`."

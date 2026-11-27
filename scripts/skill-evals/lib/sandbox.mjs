@@ -106,7 +106,7 @@ export function buildSandbox({ fixture, root, note }) {
 
   const ghFixture = buildGhFixture(profile);
   // A PR on this branch reports the branch's real head as `headRefOid`, so /ship step 11's
-  // D5 (head moved) agrees with local git. Only the builder knows the SHA.
+  // D4 (head moved) agrees with local git. Only the builder knows the SHA.
   if (profile.branch) {
     const head = git(["-C", repoDir, "rev-parse", profile.branch]).trim();
     for (const pr of [ghFixture.branchPr, ...Object.values(ghFixture.prs)]) {
