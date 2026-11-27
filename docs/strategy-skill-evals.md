@@ -408,6 +408,8 @@ Every eval run archives the **raw evidence triad** into the eval's workspace `ou
 - `git-state.txt` — a raw dump of the sandbox repo + bare origin (status, log, branches,
   reflog, staged/unstaged diffs).
 - `gh-stub-state.json` — the stub's durable state, including any `gh pr merge` records.
+- `ship-merge-authorized.txt` — only when `/ship` step 11 wrote its merge authorization
+  marker in the sandbox repo (gitignored, so `git-state.txt` can't show it).
 - `archive-manifest.json` — provenance and which legs were captured.
 
 The grader reads those **raw files** (plus the executor's transcript), never a prose

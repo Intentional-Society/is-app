@@ -83,6 +83,10 @@ function existingPr(number, headRefName, title) {
     isDraft: false,
     title,
     url: prLink(number),
+    // /ship step 11's doubt checks: the running account's own PR (D1), no review decision
+    // (D2). `headRefOid` (D5) is filled in by buildSandbox() from the branch's real head.
+    author: { login: SELF },
+    reviewDecision: "",
     // The conversation /ship step 10 reads: nothing by default.
     comments: [],
     reviews: [],
@@ -288,7 +292,7 @@ function featureModule(slug) {
 
 // `/handoff` writes its doc to `.scratch/<slug>-bootstrap.md` and its SKILL.md promises that
 // path is already gitignored. The shared baseline does not ignore it, so the handoff profiles
-// extend the baseline rather than changing `.gitignore` for all twenty-one profiles.
+// extend the baseline rather than changing `.gitignore` for every profile.
 const HANDOFF_GITIGNORE = `${BASE_GITIGNORE}# agent scratch notes — where /handoff writes its hand-off doc
 .scratch/
 `;
@@ -393,8 +397,13 @@ const MEMBERS_PAGE_TEAMMATE_WIP = MEMBERS_PAGE_BASE.replace(
       <ul data-testid="member-list" />`,
 );
 
+// The per-machine merge opt-out (ship-10, ship-11), with the contents /ship step 11 specifies.
+// Gitignored by BASE_GITIGNORE, so it never dirties the tree.
+const MERGE_OPT_OUT_NOTE =
+  "Lets /ship merge without the merge-gate prompt when its doubt checks pass. Merges outside /ship still prompt. Delete this file to re-enable.\n";
+
 // ---------------------------------------------------------------------------------------
-// The 21 profiles.
+// The 23 profiles.
 // ---------------------------------------------------------------------------------------
 
 /** @type {Record<string, object>} */
@@ -816,6 +825,50 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
     },
   },
 
+  // ship-10 — as ship-1, on a machine that opted out of the merge prompt; no doubt applies,
+  // so /ship step 11 writes the authorization marker before the merge.
+  "feature-open-pr-merge-opt-out": {
+    summary:
+      "Pre-existing open PR by the running account; clean; all checks green; `.claude/skip-merge-confirm.local` present; no doubt applies; merges with an authorization marker.",
+    branch: "feature-trusted",
+    branchCommits: [{ message: "feat: trusted feature", write: { "src/app/trusted.ts": featureModule("trusted") } }],
+    openPr: true,
+    working: { write: { ".claude/skip-merge-confirm.local": MERGE_OPT_OUT_NOTE } },
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      branchPr: existingPr(226, "feature-trusted", "feat: trusted feature"),
+      prs: { 226: existingPr(226, "feature-trusted", "feat: trusted feature") },
+      checks: checksAllGreen(226),
+      runs: POST_MERGE_RUNS,
+      vercelProductionUrl: VERCEL_PROD_URL,
+    },
+  },
+
+  // ship-11 — as ship-10, but a teammate authored the PR (doubt D1), so step 11 writes no
+  // marker, names the doubt, and leaves the merge to the gate's prompt.
+  "feature-open-pr-other-author-opt-out": {
+    summary:
+      "Pre-existing open PR authored by another collaborator; clean; all checks green; `.claude/skip-merge-confirm.local` present; doubt D1 applies; merges through the gate's prompt with no marker.",
+    branch: "feature-borrowed",
+    branchCommits: [{ message: "feat: borrowed feature", write: { "src/app/borrowed.ts": featureModule("borrowed") } }],
+    openPr: true,
+    working: { write: { ".claude/skip-merge-confirm.local": MERGE_OPT_OUT_NOTE } },
+    gh: {
+      owner: OWNER,
+      repo: REPO,
+      auth: AUTH_OK,
+      self: SELF,
+      branchPr: otherAuthorPr(227, "feature-borrowed", "feat: borrowed feature"),
+      prs: { 227: otherAuthorPr(227, "feature-borrowed", "feat: borrowed feature") },
+      checks: checksAllGreen(227),
+      runs: POST_MERGE_RUNS,
+      vercelProductionUrl: VERCEL_PROD_URL,
+    },
+  },
+
   // handoff-1 (reused by handoff-6) — the fix is still in the working tree, nothing committed
   "feature-uncommitted-fix-no-pr": {
     summary:
@@ -986,6 +1039,11 @@ function restIssueComments(number, specs) {
 function prWithComments(number, headRefName, title, specs) {
   const pr = { ...existingPr(number, headRefName, title), comments: viewComments(number, specs) };
   return { branchPr: pr, prs: { [number]: pr }, issueComments: restIssueComments(number, specs) };
+}
+
+// ship-11's PR: authored by a teammate, not the running account (/ship step 11, D1).
+function otherAuthorPr(number, headRefName, title) {
+  return { ...existingPr(number, headRefName, title), author: { login: "benjifriedman" } };
 }
 
 // ship-7's PR: one plain top-level comment, not a review — the shape of the PR #578 miss.

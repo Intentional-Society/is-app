@@ -141,9 +141,19 @@ function handlePrView(fx) {
   // /ship step 4 (#597): the last-push cutoff, `--json commits --jq '.commits[-1].committedDate'`.
   // Only this one expression is answered, printed bare the way real gh prints a jq string;
   // every other form still gets the full object.
+  // /ship step 11's doubt checks read single fields (`.author.login`, `.reviewDecision`,
+  // `.headRefOid`); a plain dotted path is answered the way real gh prints it (strings bare,
+  // anything else as JSON). Every other form still gets the full object.
   const jq = flagValue("--jq");
-  if (jq != null && HEAD_COMMIT_DATE_JQ.has(stripSurroundingQuotes(jq))) {
+  const expr = jq == null ? null : stripSurroundingQuotes(jq);
+  if (expr != null && HEAD_COMMIT_DATE_JQ.has(expr)) {
     stdout(pr.commits?.at(-1)?.committedDate ?? "null");
+  } else if (expr != null && DOTTED_PATH_JQ.test(expr)) {
+    const value = expr
+      .replace(/^\./, "")
+      .split(".")
+      .reduce((obj, key) => (obj == null ? undefined : obj[key]), pr);
+    stdout(typeof value === "string" ? value : JSON.stringify(value ?? null));
   } else {
     emitObject(pr);
   }
@@ -151,6 +161,7 @@ function handlePrView(fx) {
   return 0;
 }
 const HEAD_COMMIT_DATE_JQ = new Set([".commits[-1].committedDate", "commits[-1].committedDate"]);
+const DOTTED_PATH_JQ = /^\.?[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
 
 function handlePrList(fx) {
   const list = fx.branchPr ? [fx.branchPr] : [];

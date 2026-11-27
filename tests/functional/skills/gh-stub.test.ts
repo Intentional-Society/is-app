@@ -402,3 +402,46 @@ describe("gh stub — pr view --json commits --jq '.commits[-1].committedDate' (
     expect(JSON.parse(out.stdout).number).toBe(220);
   });
 });
+
+describe("gh stub — pr view --jq <dotted path> (/ship step 11 doubt checks)", () => {
+  const fx = (name: string) => buildGhFixture(getFixture(name));
+
+  it.each([
+    ["feature-open-pr-merge-opt-out", "226", ".author.login", "NorsemanSpiff\n"],
+    ["feature-open-pr-other-author-opt-out", "227", ".author.login", "benjifriedman\n"],
+    ["feature-open-pr-other-author-opt-out", "227", "author.login", "benjifriedman\n"],
+    ["feature-open-pr-merge-opt-out", "226", ".reviewDecision", "\n"],
+    ["feature-open-pr-merge-opt-out", "226", ".author", '{"login":"NorsemanSpiff"}\n'],
+    ["feature-open-pr-merge-opt-out", "226", ".nope.deeper", "null\n"],
+  ])("%s: `pr view %s --jq %s`", (name, n, expr, expected) => {
+    const out = gh(layout(fx(name)), ["pr", "view", n, "--json", "author,reviewDecision", "--jq", expr]);
+    expect(out.code).toBe(0);
+    expect(out.stdout).toBe(expected);
+  });
+});
+
+describe("fixtures — the merge-gate opt-out worlds (ship-10, ship-11)", () => {
+  it.each([
+    ["feature-open-pr-merge-opt-out", "NorsemanSpiff"],
+    ["feature-open-pr-other-author-opt-out", "benjifriedman"],
+  ])("%s writes the opt-out file and names the PR author %s", (name, author) => {
+    const profile = getFixture(name) as ReturnType<typeof getFixture> & {
+      working: { write: Record<string, string> };
+    };
+    expect(profile.working.write[".claude/skip-merge-confirm.local"]).toMatch(/^Lets \/ship merge/);
+    const fx = buildGhFixture(profile);
+    expect(fx.branchPr.author.login).toBe(author);
+    expect(fx.prs[String(fx.branchPr.number)].author.login).toBe(author);
+    expect(fx.self).toBe("NorsemanSpiff");
+  });
+
+  it("every other PR fixture is authored by the running account", () => {
+    for (const name of listFixtures()) {
+      if (name === "feature-open-pr-other-author-opt-out") continue;
+      const fx = buildGhFixture(getFixture(name));
+      for (const pr of [fx.branchPr, ...Object.values(fx.prs)] as { author?: { login: string } }[]) {
+        if (pr?.author) expect(pr.author.login, name).toBe(fx.self);
+      }
+    }
+  });
+});
