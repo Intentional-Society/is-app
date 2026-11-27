@@ -230,4 +230,8 @@ If a secret is suspected compromised, rotate it immediately using the steps belo
 
 # Agent merge guardrail
 
-A checked-in `.claude/settings.json` Claude Code permission rule (`ask` on `Bash(gh pr merge *)` and `PowerShell(gh pr merge *)`) forces a human to approve any PR merge an agent attempts. Permission rules evaluate deny→ask→allow (first match) across all scopes, so this `ask` cannot be weakened by a local `.claude/settings.local.json` `allow` or by `bypassPermissions` mode — merging to `main` (production) always prompts a human. It is a tripwire on the normal `gh pr merge` path, not a hermetic seal (a raw `gh api …/merge` call isn't matched); GitHub branch protection is the hard backstop. Added with the `/ship` natural-language-invocation work (#353); see [plan-skill-nl-invocation.md](plan-skill-nl-invocation.md).
+A checked-in Claude Code PreToolUse hook (`.claude/hooks/ship-merge-gate.mjs`, registered in `.claude/settings.json` for the Bash and PowerShell tools) asks a human to approve any `gh pr merge` an agent attempts. The prompt holds in every permission mode, `bypassPermissions` included, and over a local `allow` rule. The hook is registered with `onFailure: "block"`, so a crash or a missing script blocks the command instead of letting it run.
+
+One exception: a machine with the gitignored `.claude/skip-merge-confirm.local` lets `/ship` merge without the prompt, but only for the PR named in a single-use marker `/ship` writes after its doubt checks pass (`.claude/skills/ship/SKILL.md` step 11). Merges outside `/ship` still prompt. A local `disableAllHooks` setting also turns the gate off.
+
+It is a tripwire on the normal `gh pr merge` path, not a hermetic seal (a raw `gh api …/merge` call isn't matched); GitHub branch protection is the hard backstop. See [plan-skill-nl-invocation.md](plan-skill-nl-invocation.md).

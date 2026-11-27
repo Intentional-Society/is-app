@@ -258,6 +258,8 @@ const BASE_GITIGNORE = `node_modules/
 .skill-eval-fail-test
 .claude/.nl-delegation-active
 .claude/skip-nl-confirm-commit-pr.local
+.claude/skip-merge-confirm.local
+.claude/.ship-merge-authorized
 .claude/skills/**/.team-cache.json
 `;
 

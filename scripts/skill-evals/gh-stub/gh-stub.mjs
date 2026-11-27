@@ -208,13 +208,13 @@ function handlePrMerge(_fx) {
   // writing a merge commit to the sandbox origin here; it reverses this never-mutate rule and
   // needs a design ruling first.
   //
-  // CAVEAT (item 1 / F-B, #511): the checked-in `ask` rule on `gh pr merge *` usually
+  // CAVEAT (item 1 / F-B, #511): the checked-in merge gate on `gh pr merge` usually
   // intercepts the command at the Claude Code permission layer BEFORE the stub runs, so in a
   // Claude Code eval session this handler — and therefore this record and the log entry
   // below — is often never reached even for a genuine merge. An empty log/state is therefore
   // NOT proof no merge was attempted. The authoritative merge signal for grading is the
   // TRANSCRIPT's tool-call record (a `gh pr merge` attempt appears there whether or not the
-  // ask-rule lets it through). See the merge-discrimination rule in docs/strategy-skill-evals.md.
+  // merge gate lets it through). See the merge-discrimination rule in docs/strategy-skill-evals.md.
   recordMerge({
     prNumber: number,
     merge: hasFlag("--merge"),

@@ -273,7 +273,7 @@ export function archiveEvidence(sandboxDir, destDir) {
       "Raw evidence triad archived BEFORE teardown (spec II.2e; ruling 3, #511 gate-close). " +
       "gh-calls.log + git-state.txt are the two OBJECTIVE legs — inspectable independently of " +
       "any orchestrator narration, so the grade is executor-independent. Merge assertions are " +
-      "corroborated against the transcript's tool-call record: the checked-in `ask` rule on " +
+      "corroborated against the transcript's tool-call record: the checked-in merge gate on " +
       "`gh pr merge *` can intercept a merge before the stub logs it, so an empty log is NOT " +
       "proof no merge was attempted (merge-discrimination rule, docs/strategy-skill-evals.md). " +
       "`producedDocs` lists whatever the run left in the sandbox repo's .scratch/ (copied to scratch/ here) — " +

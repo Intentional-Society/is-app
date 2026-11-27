@@ -329,8 +329,8 @@ function checkEvidenceArchive() {
   // Item 1 + item 2 (#514): prove the stub leaves a durable merge record AND that the raw
   // evidence triad is archived into a workspace dir BEFORE teardown (ruling 3, #511
   // gate-close). Exercise the stub DIRECTLY (node gh-stub.mjs), which bypasses the Claude
-  // Code `ask` rule that would gate `gh pr merge` in a real session — so this deterministic
-  // check can verify the merge-capture + archive plumbing without depending on the ask-rule.
+  // Code merge gate (PreToolUse hook) that would gate `gh pr merge` in a real session — so this deterministic
+  // check can verify the merge-capture + archive plumbing without depending on the merge gate.
   const m = buildSandbox({ fixture: "feature-open-pr-all-green", note: "selfcheck-archive" });
   built.push(m.sandboxDir);
   runStub(m.binDir, m.repoDir, ["auth", "status"]);

@@ -26,8 +26,9 @@ Finding 2, both resolved before merge.
    announcement placement — see PR3 Design.)_
 2. **Permission rules evaluate deny → ask → allow across ALL settings scopes and modes** (incl.
    `bypassPermissions`). A checked‑in `ask` rule can't be weakened locally — why PR2's `gh pr merge`
-   `ask` is an un‑weakenable merge guard in every permission mode, `auto` included (verified
-   2026‑09‑23/24, #599; the 2026‑06‑26 `auto` caveat in Decision log, Thread 15 no longer holds).
+   `ask` was an un‑weakenable merge guard in every permission mode, `auto` included (verified
+   2026‑09‑23/24, #599). Since 2026‑11‑24 a PreToolUse hook replaces that rule so a machine can opt
+   out for `/ship`'s own merges (see Decision log).
 3. **Removing `disable-model-invocation` puts the Skill's `description` into every session's context**
    — a permanent token cost and the NL‑matching surface. _(PR3 uses the description as the
    announcement's primary home — see PR3 Design.)_
@@ -36,10 +37,10 @@ Finding 2, both resolved before merge.
 
 ## Design (two‑tier, all phases)
 
-| Tier        | Skills           | NL‑invocable               | Gate                                           | Enforcement                     |
-| ----------- | ---------------- | -------------------------- | ---------------------------------------------- | ------------------------------- |
-| Lower risk  | `/commit`, `/pr` | Yes                        | Step‑0 intent prompt; local opt‑out file       | Model‑level (in‑Skill)          |
-| Higher risk | `/ship`          | No — explicit `/ship` only | Harness permission prompt on the merge command | Harness‑level (flag + ask‑rule) |
+| Tier        | Skills           | NL‑invocable               | Gate                                           | Enforcement                            |
+| ----------- | ---------------- | -------------------------- | ---------------------------------------------- | -------------------------------------- |
+| Lower risk  | `/commit`, `/pr` | Yes                        | Step‑0 intent prompt; local opt‑out file       | Model‑level (in‑Skill)                 |
+| Higher risk | `/ship`          | No — explicit `/ship` only | Harness permission prompt on the merge command | Harness‑level (flag + merge‑gate hook) |
 
 **Problem this solves:** contributors who don't know the Skills exist express commit/PR/ship intent
 in natural language, and agents approximate the workflow instead of routing through the official
@@ -274,5 +275,12 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
   mode, `auto` included: seven real merges and every sandbox merge prompted once on 2026‑09‑23/24, and
   Claude Code's docs list `ask` rules among the actions no mode auto‑approves. Thread 15's `auto`
   caveat (2026‑06‑26) is withdrawn; `ship/SKILL.md` step 12 was corrected in #600, shared fact 2 here in #609.
+- 2026‑11‑24 (merge gate → hook) — in about six months the merge prompt never changed an outcome:
+  typing `/ship` was already the decision. The checked‑in `ask` rule is replaced by a PreToolUse hook
+  (`.claude/hooks/ship-merge-gate.mjs`, `onFailure: "block"`) that asks for every `gh pr merge`
+  unless the per‑machine `.claude/skip-merge-confirm.local` exists and `/ship` wrote a fresh,
+  single‑use, PR‑matched authorization marker after its doubt checks (D1–D8, step 11) passed.
+  Headless probes on 2026‑11‑24: the hook's `ask` held in default, `auto` and `bypassPermissions` and
+  over a local `allow`; a crashing hook blocked the call.
 - Prior context: PRs #304/#305 shipped the Skills; explicit‑only invocation was P0.4 from PR #133 —
   this is a deliberate, dated revision of it.

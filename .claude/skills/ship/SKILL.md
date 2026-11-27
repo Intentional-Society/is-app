@@ -56,6 +56,8 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
    **There is no `proceed` option.** Anything not green blocks the merge.
 
+   Once green, record the head commit the checks ran on (`gh pr view <N> --json headRefOid`); step 11's D5 compares against it.
+
 9. **Docs-only PR handling.** If the PR is docs-only (`node scripts/docs-only.mjs origin/main` exits 0):
    - `ci.yml`'s `dorny/paths-filter` step skips the test steps but still posts `Lint & Functional Tests` green within seconds (satisfies branch protection).
    - Vercel preview is skipped per `vercel.json`'s `ignoreCommand`, so no preview `deployment_status` event fires and preview `e2e.yml` does not run.
@@ -82,12 +84,34 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
     List each item once, even when it matches both rules. If nothing is unanswered, print `Conversation: nothing unanswered since the last push (<time>).` and continue. Otherwise list each item — author, time (UTC), first line of its text (`(no text)` if empty), and the file for inline items — then **STOP** and ask `N unanswered since the last push — merge anyway?`. Continue to the merge only on an explicit yes; any other reply ends the run without merging, with the PR URL surfaced. If any read above fails, or `hasNextPage` is true, the conversation is not proven clear: say which read failed and ask the same question. Never treat a failed read as nothing unanswered.
 
-    This stop is about the conversation, not the merge command, and fires only when something is unanswered or unread. It does not replace or duplicate step 11's merge confirmation; the harness `ask` prompt still fires at step 12.
+    This stop is about the conversation, not the merge command, and fires only when something is unanswered or unread. An explicit yes here is the human's decision on those items; it is not a step 11 doubt.
 
-11. **Merge confirmation policy.** The checked-in `.claude/settings.json` `ask` rule on `gh pr merge` (step 12) is the merge confirmation in every case — whether `/ship` opened the PR during this run or the PR pre-existed — **in every permission mode, including `auto`** (see step 12's note on what can and cannot silence it). Do **not** add a separate conversational Y/n; the required one-line pre-merge narration (step 12) supplies the harness prompt's context. _(History: a path-dependent Y/n for the PR-created-this-run case was kept additively until the Thread-14 actual-`/ship`-path proof passed on 2026-06-24; removed here so the harness prompt is the one confirmation and that path no longer double-prompts. See `docs/plan-skill-nl-invocation.md`.)_
+11. **Merge authorization.** The merge confirmation is the checked-in merge gate: a PreToolUse hook (`.claude/hooks/ship-merge-gate.mjs`, registered in `.claude/settings.json`) that asks a human to approve every `gh pr merge`, in every permission mode, unless both of these hold:
+    - the per-machine opt-out file `.claude/skip-merge-confirm.local` exists, and
+    - this step wrote a fresh authorization marker for this PR (below).
+
+    On an opted-out machine, typing `/ship` is the merge approval; the doubt checks decide when a human is asked anyway. Do **not** add a conversational Y/n: the gate's prompt is the one confirmation.
+
+    **Doubt checks.** Run every check, opted out or not. Each hit is a doubt:
+    - **D1 Someone else's PR.** The PR author (`gh pr view <N> --json author`) is not the account running `/ship` (`gh api user --jq .login`).
+    - **D2 Changes requested.** The PR's `reviewDecision` is `CHANGES_REQUESTED`.
+    - **D3 Production database.** The PR adds or changes files under `drizzle/` or changes `src/server/schema.ts` (the production deploy runs `drizzle-kit migrate`), or this run dispatched a schema expand at step 7.
+    - **D4 The guardrails themselves.** The PR changes `.github/workflows/`, `.github/CODEOWNERS`, `.claude/settings.json`, `.claude/hooks/`, or `.claude/skills/ship/`.
+    - **D5 Head moved.** The PR's head commit (`gh pr view <N> --json headRefOid`) differs from the commit whose checks went green at step 8.
+    - **D6 `main` is red.** The latest production deploy or `e2e.yml` run on `main` failed, so the merge would land on a broken production.
+    - **D7 Inferred target.** The PR was resolved from an issue number or plain-language context, not from a PR number, a PR URL, or the current branch's own PR.
+    - **D8 Another specific anomaly.** A concrete observation from this run that D1–D7 don't cover, such as a diff carrying changes unrelated to the PR's title. Name the observation; general unease is not a doubt.
+
+    **Authorize or ask.**
+    - **Opted out, no doubt:** immediately before step 12's merge command, write `.claude/.ship-merge-authorized` at the repo root as `ship\t<current ISO-8601 UTC>\t<N>`. The gate allows that one merge within 120 seconds and deletes the marker.
+    - **Opted out, any doubt:** write no marker. Print `Asking for merge confirmation: <D#> <one-line reason>` for each doubt, then run step 12; the gate prompts.
+    - **Not opted out:** write no marker. List any doubts the same way, so the gate's prompt has context.
+
+    Never create `.claude/skip-merge-confirm.local` unless the human asks for it, and never write the marker anywhere but here. Standard opt-out file contents: `Lets /ship merge without the merge-gate prompt when its doubt checks pass. Merges outside /ship still prompt. Delete this file to re-enable.`
 
 12. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — then run `gh pr merge <N> --merge --delete-branch`.
-    - **Harness merge confirmation.** A checked-in `.claude/settings.json` `ask` rule on `Bash(gh pr merge *)` / `PowerShell(gh pr merge *)` makes the harness prompt a human to approve this exact command in every session — un-weakenable by a local `allow` or `bypassPermissions` (precedence is deny→ask→allow, first match). The required narration above gives that prompt context. Under default permission mode this is the merge confirmation — but it is **not** an absolute gate (see the caveat below). **Never add `allowed-tools: Bash(gh *)` (or any `gh` grant) to this Skill's frontmatter** — it would let the merge run without the human prompt and silently defeat this gate. **Note (#353 / #463):** step 11's conversational Y/n was removed in the #353 fast-follow, so this harness prompt is the merge confirmation. **It fires per-merge in every permission mode, `auto` included (verified 2026-09-23/24: seven real merges and every sandbox merge prompted once; Claude Code's docs list `ask` rules among the actions no mode auto-approves).** Nothing in the session can silence it: the prompt offers only a one-time approve, and a saved `allow` cannot outrank an `ask` rule. The only ways past it are the human's click or a change to the checked-in rule. (An earlier version of this note said `auto` mode auto-approved it, citing PR #460 on 2026-06-26; that no longer matches the CLI's behaviour and could not be re-verified.) Re-adding a model-level Y/n is an available option (precise recipe in #463) but is **deferred by decision (2026-06-26)** — the default-mode gate is sufficient for normal human-typed use. See `docs/plan-skill-nl-invocation.md` and #463.
+    - **The merge gate.** The hook returns `ask` for every `gh pr merge` it does not allow, and that prompt holds in default, `auto` and `bypassPermissions` modes, over a local `allow` rule (verified 2026-11-24 with headless probes). A crash or a missing script blocks the command (`onFailure: "block"`). Its prompt reason names why it asked. A merge outside `/ship` never has a marker, so it always prompts. **Never add `allowed-tools: Bash(gh *)` (or any `gh` grant) to this Skill's frontmatter**, and never set `disableAllHooks`: either could let a merge run without the gate.
+    - **Always name the PR number** in the command. The gate asks for a merge with no PR number or URL, or for a command holding more than one merge.
     - Do **not** pass `--merge-title` or `--body` flags. GitHub uses the PR title and body verbatim per the repo's `merge_commit_title: PR_TITLE` / `merge_commit_message: PR_BODY` settings; custom flags would override that and create inconsistent history.
     - Never `--admin`, `--auto`, force-merge, `--squash` (repo-disabled), or any branch-protection bypass.
 
@@ -120,6 +144,8 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - **Any pre-merge check is red, pending past wait limits, or missing where it shouldn't be missing.** Refuse and offer the three supervised-handoff options (`wait+5`, `troubleshoot`, `abort`). No `proceed`.
 - **Schema expand required but `npm run prod:db:expand` dispatch fails, maintainer approval is denied, or post-deploy e2e fails.** Refuse; surface the failing run.
 - **Unanswered PR conversation since the last push, or a conversation read that failed (step 10).** List the items (or the failed read) and ask `N unanswered since the last push — merge anyway?`; merge only on an explicit yes.
+- **A doubt check hits (step 11).** Write no authorization marker; print each doubt and let the merge gate prompt.
+- **The merge gate denies the merge.** Report it with the gate's reason and stop; do not rewrite the command to get past it.
 - **`gh pr merge` rejected by branch protection or ruleset enforcement.** Surface the protection rule that blocked the merge (e.g., "Branches must be up to date with `main`"). Do not retry blindly.
 - **Local branch deletion fails.** Report; do not retry blindly.
 - **Post-merge `main` check goes red within the 5-minute watch window.** Alert; suggest hotfix or revert. The watch reports; it does not auto-act.
@@ -135,7 +161,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `docs/strategy-branching.md` (rebase-when-main-moves rule; merge-commit default)
 - `docs/doc-github.md` (PR settings: merge-commit-only; `merge_commit_title`/`merge_commit_message`; `delete_branch_on_merge: true`; `prod-db` environment + required-reviewers gate; docs-only check semantics)
 - `docs/strategy-project-management.md` (PR-merged → board "Done" automation)
-- `.claude/settings.json` (checked-in `ask` rule on `gh pr merge` — the harness merge confirmation)
+- `.claude/settings.json` and `.claude/hooks/ship-merge-gate.mjs` (the PreToolUse merge gate on `gh pr merge`; its opt-out file and marker format are in step 11)
 - `vercel.json` (`ignoreCommand` → `scripts/vercel-ignore-build.mjs` for docs-only PRs and docs-only merges to `main`; `drizzle-kit migrate` ahead of `next build` on production deploys)
 - `scripts/update-main-branch-protection.mjs` (required check name `Lint & Functional Tests`; `strict_required_status_checks_policy: true`)
 - `.github/workflows/ci.yml` (required check; `dorny/paths-filter` docs-only handling)

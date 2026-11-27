@@ -150,15 +150,18 @@ file for the full rules.
   and the child suppresses its own announcement (`.claude/skills/ship/SKILL.md` step 3).
 - **Permission rule (`allow` / `ask` / `deny`)** — an entry in `.claude/settings.json` classifying a
   command pattern. Precedence is **deny → ask → allow, first match**, evaluated by Claude Code
-  _before_ the command runs — so above anything a sandbox controls. This repo checks in one `ask`
-  rule, on `Bash(gh pr merge *)` and the PowerShell equivalent
-  ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
+  _before_ the command runs — so above anything a sandbox controls. This repo checks in no
+  permission rules.
+- **Merge gate** — the checked-in PreToolUse hook `.claude/hooks/ship-merge-gate.mjs`, registered
+  in `.claude/settings.json` for Bash and PowerShell. It returns `ask` for every `gh pr merge`
+  unless the machine has `.claude/skip-merge-confirm.local` and `/ship` wrote a fresh authorization
+  marker for that PR ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
+  Sandboxes never carry the opt-out file, so in an eval every merge asks. Until 2026-11-24 this
+  gate was an `ask` permission rule; older ledger entries below say "`ask` rule" for it.
 - **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
-  how prompts behave. A checked-in `ask` cannot be weakened by a local `allow` or by
-  `bypassPermissions`, and **no mode auto-approves it, `auto` included**: it waits for a human's
-  one-time click in every session (`.claude/skills/ship/SKILL.md` step 12; corrected 2026-09-24
-  from the Claude Code docs and the 2026-09-23/24 batch record — an earlier note claimed `auto`
-  mode auto-approved it). §5 depends on this.
+  how prompts behave. The merge gate's `ask` holds in every mode, `auto` and `bypassPermissions`
+  included, and over a local `allow`: it waits for a human's one-time click
+  (`.claude/skills/ship/SKILL.md` step 12; headless probes 2026-11-24). §5 depends on this.
 - **Untrusted workspace** — a directory in which Claude Code silently ignores local
   `permissions.allow` entries. Every sandbox is one; that is issue #531 (§5, §10).
 - **Hook / `PreToolUse`** — a program Claude Code runs before a matching tool call, whose exit code
@@ -913,17 +916,17 @@ The mechanisms, named to where they live:
 
 ### Above the stub
 
-One gate fires outside all of that: the checked-in `ask` permission rule on `Bash(gh pr merge *)`
-and `PowerShell(gh pr merge *)` in `.claude/settings.json`. It is evaluated at the Claude Code
-permission layer, before any command runs, so it sits **above** the sandbox rather than inside it.
+One gate fires outside all of that: the checked-in merge gate, a PreToolUse hook
+(`.claude/hooks/ship-merge-gate.mjs`) registered for Bash and PowerShell in `.claude/settings.json`.
+It runs at the Claude Code permission layer, before any command runs, so it sits **above** the
+sandbox rather than inside it.
 
 That has two consequences the harness is built around. First, it is the sturdiest gate C8 can point
-to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` step 12, which is the source of
-record for this rule's behavior: precedence is deny → ask → allow, first match, so the checked-in
-`ask` cannot be weakened by a local `allow` or by `bypassPermissions`, and **no permission mode
-auto-approves it: in every session, `auto` included, it waits for a human's one-time click** (corrected
-2026-09-24; the earlier claim that `auto` mode auto-approved it did not survive the docs or the
-2026-09-23/24 record, where two sandbox merges waited 6 h 52 min for the maintainer). A batch therefore
+to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` steps 11–12, the source of record
+for its behavior: a sandbox has no `.claude/skip-merge-confirm.local`, so the gate returns `ask` for
+every merge, and **that `ask` waits for a human's one-time click in every permission mode, `auto`
+and `bypassPermissions` included, over a local `allow`** (headless probes 2026-11-24; on 2026-09-24,
+under the `ask` rule the hook replaced, two sandbox merges waited 6 h 52 min for the maintainer). A batch therefore
 needs a reachable human for its three positive `/ship` merges, or grades them as intercepted —
 `strategy-skill-evals.md` §6 "What you will be asked to approve" and #599. Second, it
 breaks naive merge grading — an intercepted `gh pr merge` never reaches the stub, so it is never
@@ -937,7 +940,7 @@ its home.
 ### What is not protected
 
 - **Sandbox `permissions.allow` entries are silently ignored.** An untrusted workspace does not
-  honor them, with no error. So the `ask` rule copied into a sandbox by `populateRoutingContext()`
+  honor them, with no error. So the merge gate copied into a sandbox by `populateRoutingContext()`
   cannot be locally relaxed for a headless run, and a future attempt to permit something inside a
   sandbox by settings alone will fail quietly. Tracked as **#531**.
 - **Nothing inside `.claude/` can be deleted headless.** Built-in Claude Code protection refuses

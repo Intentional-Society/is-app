@@ -203,8 +203,9 @@ marker-bearing sandbox. In the real repo, every approval checkpoint always comes
 actual human — a `human_script` string is never a substitute for one outside a sandbox.
 
 **Honest limit (constraint C8):** these layers are prompt-level guidance, not hard enforcement.
-The only gate that fires regardless of what any agent does is the checked-in `ask` permission
-rule on `gh pr merge`. The skills' own human-approval checkpoints are prompt-level too: an agent
+The only gate that fires regardless of what any agent does is the checked-in merge gate on
+`gh pr merge` (a PreToolUse hook; an `ask` permission rule until 2026-11-24, which older entries
+below still name). The skills' own human-approval checkpoints are prompt-level too: an agent
 holding a `human_script` can answer them from the script. The backstop stack — the marker rule,
 the structural sandbox isolation, that hard gate, the CI shape gate, and plain git
 recoverability — means a missed layer degrades to "recoverable and loud," never "silent
@@ -464,8 +465,8 @@ goes into the same PR. (#597, option (b), 2026-09-24.)
 
 ### The merge-discrimination rule (`gh pr merge`-adjacent assertions)
 
-`.claude/settings.json` ships an `ask` permission rule on `gh pr merge *` (and the
-PowerShell equivalent). It fires at the Claude Code permission layer — **before** the
+`.claude/settings.json` registers the merge gate, a PreToolUse hook that asks on every
+`gh pr merge` (Bash and PowerShell) in a sandbox. It fires at the Claude Code permission layer — **before** the
 sandbox `gh` stub ever runs — so in an eval session a `gh pr merge` command is frequently
 intercepted and never reaches the stub to be logged. Consequently:
 
@@ -602,11 +603,14 @@ its wait overlaps the rest of the batch rather than adding serially to the total
 **What you will be asked to approve.** A full execution batch asks a human to approve four
 commands, one each for `ship-1`, `ship-3`, `ship-6` and `ship-8`: a `gh pr merge` whose working
 directory is a folder under `skill-eval-sandboxes`. That folder means the command hits the gh
-stub, never GitHub — approve each once. The `ask` rule waits for that click in every
-permission mode, `auto` included (Claude Code's docs list `ask` rules among the actions no
-mode auto-approves; on 2026-09-24 two such prompts waited 6 h 52 min for a sleeping
-maintainer). The prompt offers only a one-time approve, and a saved `allow` cannot outrank an
-`ask` rule, so nothing in the session can silence it. Plan a batch with a person reachable, or
+stub, never GitHub — approve each once. The merge gate waits for that click in every
+permission mode, `auto` and `bypassPermissions` included (headless probes 2026-11-24; on
+2026-09-24 two such prompts waited 6 h 52 min for a sleeping maintainer). The prompt offers
+only a one-time approve, and a saved `allow` cannot outrank the hook's `ask`. Your own
+`.claude/skip-merge-confirm.local` does not apply. The gate reads both files from the
+session's project directory: a session started in a sandbox has no opt-out file there, and a
+session started in the repo looks for the marker in the repo, not in the sandbox where `/ship`
+writes it. Plan a batch with a person reachable, or
 expect it to pause at the first positive `/ship` merge. The orchestrator runs those executors
 in the background so it can see the hold, pushes a notice within a minute of a prompt
 waiting ("sandbox merge prompt waiting for ship-1 — safe, tap approve"), and after 30 minutes

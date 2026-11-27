@@ -161,7 +161,7 @@ legs the harness owns — `gh-calls.log`, a `git-state.txt` dump, `gh-stub-state
 `archive-manifest.json` — into an eval's `outputs/` dir **before** the sandbox is removed, so
 the grade is independently auditable and **executor-independent** (ruling 3, #511; the
 Phase-3 audit's F-A found these legs were never preserved). Grade merge-adjacent assertions
-from the **transcript's tool-call record**, not the log alone: the checked-in `ask` rule on
+from the **transcript's tool-call record**, not the log alone: the checked-in merge gate on
 `gh pr merge *` can intercept a merge before the stub logs it (the F-B merge-discrimination
 rule — full detail in [`docs/strategy-skill-evals.md`](../../docs/strategy-skill-evals.md) §6).
 

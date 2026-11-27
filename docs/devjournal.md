@@ -6,6 +6,10 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-27 | James (with Opus 5.5) | /ship can merge without the merge prompt
+
+The `gh pr merge` ask rule is now a PreToolUse hook that still prompts by default. Create the gitignored `.claude/skip-merge-confirm.local` and typing `/ship` becomes the approval; `/ship` still asks when a doubt check hits (someone else's PR, changes requested, a migration; ship SKILL.md step 11). Merges outside `/ship` always ask.
+
 ## 2026-11-15 | James (with Opus 5.5) | Node 26 LTS upgrade
 
 `.nvmrc`, `engines.node`, the CI workflows and `@types/node` move to Node 26, the Active LTS since October; Node 24 is in maintenance. On 26, server-side `fetch` uses HTTP/2, where `statusText` is empty, so check `res.status`.
