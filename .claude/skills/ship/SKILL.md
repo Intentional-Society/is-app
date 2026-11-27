@@ -92,7 +92,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
     On an opted-out machine, typing `/ship` is the merge approval; the doubt checks decide when a human is asked anyway. Do **not** add a conversational Y/n: the gate's prompt is the one confirmation.
 
-    **Doubt checks.** Run every check, opted out or not. Each hit is a doubt:
+    **Doubt checks.** Run every check, opted out or not. D3 and D4 read the PR's changed files from `git diff --name-only origin/main...HEAD` (local, and the same in a sandbox). Each hit is a doubt:
     - **D1 Someone else's PR.** The PR author (`gh pr view <N> --json author`) is not the account running `/ship` (`gh api user --jq .login`).
     - **D2 Changes requested.** The PR's `reviewDecision` is `CHANGES_REQUESTED`.
     - **D3 Production database.** The PR adds or changes files under `drizzle/` or changes `src/server/schema.ts` (the production deploy runs `drizzle-kit migrate`), or this run dispatched a schema expand at step 7.
@@ -107,9 +107,11 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     - **Opted out, any doubt:** write no marker. Print `Asking for merge confirmation: <D#> <one-line reason>` for each doubt, then run step 12; the gate prompts.
     - **Not opted out:** write no marker. List any doubts the same way, so the gate's prompt has context.
 
+    Print the doubt lines in a message sent **before** the merge command, not in a summary after it. The gate's prompt shows only a generic reason, so these lines are all the human has to decide on while the prompt is open.
+
     Never create `.claude/skip-merge-confirm.local` unless the human asks for it, and never write the marker anywhere but here. Standard opt-out file contents: `Lets /ship merge without the merge-gate prompt when its doubt checks pass. Merges outside /ship still prompt. Delete this file to re-enable.`
 
-12. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — then run `gh pr merge <N> --merge --delete-branch`.
+12. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — in the same message as any step 11 doubt lines, before the merge command, then run `gh pr merge <N> --merge --delete-branch`.
     - **The merge gate.** The hook returns `ask` for every `gh pr merge` it does not allow, and that prompt holds in default, `auto` and `bypassPermissions` modes, over a local `allow` rule (verified 2026-11-24 with headless probes). A crash or a missing script blocks the command (`onFailure: "block"`). Its prompt reason names why it asked. A merge outside `/ship` never has a marker, so it always prompts. **Never add `allowed-tools: Bash(gh *)` (or any `gh` grant) to this Skill's frontmatter**, and never set `disableAllHooks`: either could let a merge run without the gate.
     - **Always name the PR number** in the command. The gate asks for a merge with no PR number or URL, or for a command holding more than one merge.
     - Do **not** pass `--merge-title` or `--body` flags. GitHub uses the PR title and body verbatim per the repo's `merge_commit_title: PR_TITLE` / `merge_commit_message: PR_BODY` settings; custom flags would override that and create inconsistent history.
