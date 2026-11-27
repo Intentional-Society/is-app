@@ -412,6 +412,11 @@ Every eval run archives the **raw evidence triad** into the eval's workspace `ou
   marker in the sandbox repo (gitignored, so `git-state.txt` can't show it).
 - `archive-manifest.json` — provenance and which legs were captured.
 
+`ship-10` and `ship-11` have a script grader instead of a grader agent, because every one of
+their expectations is mechanical: `node scripts/skill-evals/grade-ship-merge-gate.mjs
+<ship-10|ship-11> --outputs <dir> --agent <agentId>` reads the archive and the executor's JSONL
+transcript, prints `grading.json`, and costs no tokens.
+
 The grader reads those **raw files** (plus the executor's transcript), never a prose
 _summary_ of them. This makes the grade **executor-independent** — reproducible by a third
 party who never watched the run. (This is a hard rule as of the Phase-3 gate-close, #511:
