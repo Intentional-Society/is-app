@@ -177,7 +177,8 @@ export function teardownSandbox(sandboxDir) {
  * preserved, leaving CLEAN verdicts resting on self-graded orchestrator prose):
  *   - `gh-calls.log`   — the primary grading evidence (what the skill asked GitHub to do).
  *   - `git-state.txt`  — a full raw dump of the sandbox repo + bare origin state.
- *   - `gh-stub-state.json` — the stub's durable state (incl. any merge records — item 1). * The transcript (the third leg) is the executor's own output, written to the eval
+ *   - `gh-stub-state.json` — the stub's durable state (incl. any merge records — item 1).
+ * The transcript (the third leg) is the executor's own output, written to the eval
  * workspace separately; this function captures only the legs the harness itself owns.
  *
  * It also copies the sandbox repo's `.scratch/` directory into `scratch/` when one exists:

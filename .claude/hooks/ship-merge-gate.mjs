@@ -29,10 +29,15 @@ const MERGE_RE = /\bgh(?:\.exe)?\s+pr\s+merge\b/i;
 const SHIP_COMMAND = "<command-name>/ship</command-name>";
 export const SAFE_DECLARATION = "Looks safe to me";
 
+// User entries Claude Code writes itself rather than the human: a background task finishing,
+// a system reminder, a local command's output. Stored like typed text, so skipped by prefix.
+const SYSTEM_WRITTEN_RE = /^\s*<(?:task-notification|system-reminder|local-command-[\w-]+)>/;
+
 /**
  * The last message the human typed, from a Claude Code transcript (JSONL). Typed messages
- * are `user` entries that aren't `isMeta` (skill text Claude Code injects) and carry no
- * `tool_result` (tool output, which other parties' text can reach). Returns "" when none.
+ * are `user` entries that aren't `isMeta` (skill text Claude Code injects), aren't a
+ * compaction summary or other system-written text, and carry no `tool_result` (tool output,
+ * which other parties' text can reach). Returns "" when none.
  */
 export function lastTypedMessage(transcriptText) {
   let last = "";
@@ -44,12 +49,14 @@ export function lastTypedMessage(transcriptText) {
     } catch {
       continue;
     }
-    if (entry.type !== "user" || entry.isMeta) continue;
+    if (entry.type !== "user" || entry.isMeta || entry.isCompactSummary) continue;
     const content = entry.message?.content;
-    if (typeof content === "string") last = content;
+    let text = null;
+    if (typeof content === "string") text = content;
     else if (Array.isArray(content) && !content.some((c) => c.type === "tool_result")) {
-      last = content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
+      text = content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
     }
+    if (text !== null && !SYSTEM_WRITTEN_RE.test(text)) last = text;
   }
   return last;
 }

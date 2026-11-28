@@ -284,7 +284,7 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
   each doubt in plain words and the gate's prompt shows it. The hook never allows anything: the
   merge runs under `/ship`'s `allowed-tools` grant for exactly `gh pr merge <N> --merge
   --delete-branch`, which Claude Code applies only during the typed `/ship` turn and checks per
-  subcommand; `ask` rules catch `--admin` and `--auto`. Allow decisions stay with Claude
+  subcommand; `ask` rules catch `--admin`, `--auto` and another repository (`-R`, `--repo`). Allow decisions stay with Claude
   Code's own permission rules, so the hook parses no shell syntax. Headless probes on 2026‑11‑24 and 2026‑11‑28: the hook's `ask` held in default, `auto` and
   `bypassPermissions`, over a local `allow` and over the skill's grant; a crashing hook blocked the
   call; the grant ran the exact merge in default and `auto` and stopped `--admin` and chained commands.

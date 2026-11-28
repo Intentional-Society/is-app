@@ -90,7 +90,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 11. **Merge authorization.** Three pieces decide whether the merge asks a human:
     - **This skill's `allowed-tools`** grants exactly `gh pr merge <N> --merge --delete-branch`, and Claude Code applies that grant only during the turn the human typed `/ship`. Claude Code checks each part of a compound command itself, so anything chained onto the merge still needs its own permission.
     - **The merge gate**, a PreToolUse hook (`.claude/hooks/ship-merge-gate.mjs`, registered in `.claude/settings.json`), asks for every `gh pr merge` unless this machine has the opt-out file `.claude/skip-merge-confirm.local`, the last message the human typed is `/ship`, **and** the merge command's description starts with `Looks safe to me`. It never allows anything itself.
-    - **Checked-in `ask` rules** in `.claude/settings.json` ask for any merge with `--admin` or `--auto`.
+    - **Checked-in `ask` rules** in `.claude/settings.json` ask for any merge with `--admin`, `--auto`, or another repository (`-R`, `--repo`).
 
     So on an opted-out machine, typing `/ship` is the merge approval whenever you can honestly say the merge looks safe. Otherwise the gate's prompt is the question, and the description you write is what the human reads in it.
 
@@ -162,7 +162,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `docs/strategy-branching.md` (rebase-when-main-moves rule; merge-commit default)
 - `docs/doc-github.md` (PR settings: merge-commit-only; `merge_commit_title`/`merge_commit_message`; `delete_branch_on_merge: true`; `prod-db` environment + required-reviewers gate; docs-only check semantics)
 - `docs/strategy-project-management.md` (PR-merged → board "Done" automation)
-- `.claude/settings.json` and `.claude/hooks/ship-merge-gate.mjs` (the merge gate and the `--admin`/`--auto` ask rules; step 11 says how they combine with this skill's `allowed-tools`)
+- `.claude/settings.json` and `.claude/hooks/ship-merge-gate.mjs` (the merge gate and the `--admin`/`--auto`/`-R`/`--repo` ask rules; step 11 says how they combine with this skill's `allowed-tools`)
 - `vercel.json` (`ignoreCommand` → `scripts/vercel-ignore-build.mjs` for docs-only PRs and docs-only merges to `main`; `drizzle-kit migrate` ahead of `next build` on production deploys)
 - `scripts/update-main-branch-protection.mjs` (required check name `Lint & Functional Tests`; `strict_required_status_checks_policy: true`)
 - `.github/workflows/ci.yml` (required check; `dorny/paths-filter` docs-only handling)

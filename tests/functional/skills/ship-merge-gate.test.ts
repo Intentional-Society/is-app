@@ -67,6 +67,16 @@ describe("lastTypedMessage", () => {
     );
   });
 
+  it("skips entries Claude Code writes itself: task notifications, reminders, local output, summaries", () => {
+    const written = [
+      typed("<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n</task-notification>"),
+      typed("<system-reminder>context</system-reminder>"),
+      typed("<local-command-stdout>ok</local-command-stdout>"),
+      { type: "user", isCompactSummary: true, message: { role: "user", content: "summary" } },
+    ];
+    expect(lastTypedMessage(jsonl(typed(SHIP), ...written))).toBe(SHIP);
+  });
+
   it("returns empty for a transcript with no typed message", () => {
     expect(lastTypedMessage(jsonl(meta("x"), toolResult("y")))).toBe("");
   });
@@ -199,14 +209,14 @@ describe("checked-in settings and /ship's grant", () => {
     for (const hook of entry.hooks) expect(hook.if).toBeUndefined();
   });
 
-  it("asks for --admin and --auto merges in both shells", () => {
+  it("asks for --admin, --auto and other-repo merges in both shells", () => {
     expect(settings.permissions.ask).toEqual(
-      expect.arrayContaining([
-        "Bash(gh pr merge *--admin*)",
-        "Bash(gh pr merge *--auto*)",
-        "PowerShell(gh pr merge *--admin*)",
-        "PowerShell(gh pr merge *--auto*)",
-      ]),
+      expect.arrayContaining(
+        ["--admin", "--auto", "-R", "--repo"].flatMap((flag) => [
+          `Bash(gh pr merge *${flag}*)`,
+          `PowerShell(gh pr merge *${flag}*)`,
+        ]),
+      ),
     );
   });
 

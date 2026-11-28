@@ -3,8 +3,12 @@
     "ask": [
       "Bash(gh pr merge *--admin*)",
       "Bash(gh pr merge *--auto*)",
+      "Bash(gh pr merge *-R*)",
+      "Bash(gh pr merge *--repo*)",
       "PowerShell(gh pr merge *--admin*)",
-      "PowerShell(gh pr merge *--auto*)"
+      "PowerShell(gh pr merge *--auto*)",
+      "PowerShell(gh pr merge *-R*)",
+      "PowerShell(gh pr merge *--repo*)"
     ]
   },
   "hooks": {

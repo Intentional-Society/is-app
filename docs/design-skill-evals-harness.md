@@ -150,8 +150,8 @@ file for the full rules.
   and the child suppresses its own announcement (`.claude/skills/ship/SKILL.md` step 3).
 - **Permission rule (`allow` / `ask` / `deny`)** — an entry in `.claude/settings.json` classifying a
   command pattern. Precedence is **deny → ask → allow, first match**, evaluated by Claude Code
-  _before_ the command runs — so above anything a sandbox controls. This repo checks in no
-  permission rules.
+  _before_ the command runs — so above anything a sandbox controls. This repo checks in `ask`
+  rules for any `gh pr merge` with `--admin`, `--auto`, `-R` or `--repo` (Bash and PowerShell).
 - **Merge gate** — the checked-in PreToolUse hook `.claude/hooks/ship-merge-gate.mjs`, registered
   in `.claude/settings.json` for Bash and PowerShell. It returns `ask` for every `gh pr merge`
   unless the machine has `.claude/skip-merge-confirm.local` and the last message the human typed
