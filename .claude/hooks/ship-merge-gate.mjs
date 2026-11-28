@@ -1,144 +1,84 @@
-// PreToolUse gate on `gh pr merge` (registered in .claude/settings.json for Bash and
-// PowerShell). Every merge an agent attempts asks a human, except a merge /ship has
-// authorized on a machine that opted out of the merge confirmation:
+// PreToolUse merge gate (registered in .claude/settings.json for Bash and PowerShell).
 //
-//   1. `.claude/skip-merge-confirm.local` exists (per-machine opt-out, gitignored), and
-//   2. `.claude/.ship-merge-authorized` holds `ship\t<ISO-8601 UTC>\t<PR#>`, written by
-//      /ship step 12 after its doubt checks pass, no older than MARKER_TTL_MS, naming the
-//      same PR as the command.
+// It never allows anything; it only decides whether a `gh pr merge` must ask a human. It
+// asks for every command that mentions `gh pr merge`, unless all three hold:
 //
-// Only a plain merge can skip the prompt: `gh pr merge <N> --merge --delete-branch`,
-// optionally after `cd <this repo or a folder in it> &&`, with no other command, pipe,
-// redirect or substitution. An allowed command skips every permission check (the prompt in
-// default mode, the classifier in auto mode), so nothing may ride along with the merge; and
-// `gh` picks the repository from the working directory, so `cd` may not leave this repo.
-// Any other command mentioning `gh pr merge` asks and leaves the marker alone.
+//   1. `.claude/skip-merge-confirm.local` exists (per-machine opt-out, gitignored),
+//   2. the most recent message the human typed in this session is `/ship`, and
+//   3. the command's description starts with "Looks safe to me", which /ship writes only
+//      when none of its doubt checks hit. Staying silent takes that positive statement, so
+//      a model that skips a step gets a prompt rather than a silent merge.
 //
-// The marker is single-use: a plain merge command deletes it. Merges outside /ship never
-// carry one, so they always ask, opt-out or not.
+// When it stays silent, Claude Code's own permission rules decide. /ship's `allowed-tools`
+// grants exactly `gh pr merge <N> --merge --delete-branch` for the turn the human typed
+// `/ship`, Claude Code checks each part of a compound command itself, and checked-in `ask`
+// rules catch `--admin` and `--auto`. So a mistake here can only add a prompt or fail to add
+// one; it can never grant a command.
 //
-// The hook returns "ask" explicitly instead of staying silent, because a silent hook
-// leaves the call to the permission mode and auto mode's classifier would approve it.
-// settings.json sets `onFailure: "block"`, so a crash or a missing script blocks the
-// tool call; any error this script catches also resolves to "ask".
+// The hook returns "ask" explicitly instead of staying silent, because a silent hook leaves
+// the call to the permission mode, and auto mode's classifier would approve a merge.
+// settings.json sets `onFailure: "block"`, so a crash or a missing script blocks the tool
+// call; any error this script catches also resolves to "ask".
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const OPT_OUT_FILE = path.join(".claude", "skip-merge-confirm.local");
-export const MARKER_FILE = path.join(".claude", ".ship-merge-authorized");
-export const MARKER_TTL_MS = 120_000;
-
 const MERGE_RE = /\bgh(?:\.exe)?\s+pr\s+merge\b/i;
-const PLAIN_MERGE_RE = /^gh(?:\.exe)?\s+pr\s+merge\s+(\d+)\s+(?:--merge\s+--delete-branch|--delete-branch\s+--merge)$/i;
-const CD_RE = /^cd\s+(?:"([^"]+)"|'([^']+)'|(\S+))$/i;
-// Anything that could chain, pipe, redirect or substitute another command. `&&` is the one
-// joiner allowed, so it is removed before this check.
-const SHELL_CONTROL_RE = /[;|<>`&\r\n]|\$\(/;
-// Endings models habitually append to a command, and that can't run anything else: merge
-// stderr into stdout, or echo a fixed label with the exit status. Stripped before the checks.
-const HARMLESS_SUFFIX_RE = /(?:\s+2>&1|\s*;\s*echo\s+"[\w\s=:.-]*\$\?[\w\s=:.-]*")$/;
-const NOT_PLAIN =
-  "only a plain `gh pr merge <N> --merge --delete-branch`, optionally after `cd <this repo> &&`, can skip the prompt.";
-
-const GIT_BASH_DRIVE_RE = /^\/([a-z])(?=\/|$)/i;
-
-function normalizeDir(dir) {
-  if (process.platform !== "win32") return path.resolve(dir);
-  // Git Bash spells C:\x as /c/x.
-  return path.resolve(dir.replace(GIT_BASH_DRIVE_RE, "$1:")).toLowerCase();
-}
-
-function insideProject(dir, projectDir) {
-  const root = normalizeDir(projectDir);
-  const dest = normalizeDir(dir);
-  return dest === root || dest.startsWith(root + path.sep);
-}
-
-/** Whether `cd <target>`, run from `fromDir`, lands inside `projectDir`. */
-function staysInProject(target, fromDir, projectDir) {
-  // A plain path only: the shell would expand anything else (`~`, `-`, `$VAR`, globs,
-  // PowerShell's `(…)`), and the hook can't follow it. A backslash is a separator only on
-  // Windows; elsewhere Bash reads it as an escape (`\.\.` is `..`), so it's refused there.
-  const pathChars = process.platform === "win32" ? /^[\w.\-/\\: ]+$/ : /^[\w.\-/: ]+$/;
-  if (!pathChars.test(target) || target.startsWith("-")) return false;
-  // Git Bash spells C:\x as /c/x.
-  const absolute = process.platform === "win32" ? target.replace(GIT_BASH_DRIVE_RE, "$1:") : target;
-  return insideProject(path.resolve(fromDir, absolute), projectDir);
-}
+const SHIP_COMMAND = "<command-name>/ship</command-name>";
+export const SAFE_DECLARATION = "Looks safe to me";
 
 /**
- * Parse a command as a plain merge. Returns { pr } for `gh pr merge <N> --merge
- * --delete-branch`, optionally after `cd <dir inside projectDir> &&`; else { reason }.
- * `cwd` is the shell's working directory, when the hook input reports it.
+ * The last message the human typed, from a Claude Code transcript (JSONL). Typed messages
+ * are `user` entries that aren't `isMeta` (skill text Claude Code injects) and carry no
+ * `tool_result` (tool output, which other parties' text can reach). Returns "" when none.
  */
-export function parsePlainMerge(command, projectDir, cwd = projectDir) {
-  if (!insideProject(cwd, projectDir)) {
-    return { reason: "the shell is in a directory outside this repo, so `gh` would merge another repo's PR." };
-  }
-  let core = command.trim();
-  while (HARMLESS_SUFFIX_RE.test(core)) core = core.replace(HARMLESS_SUFFIX_RE, "");
-  const segments = core.split(/\s*&&\s*/);
-  if (segments.some((s) => SHELL_CONTROL_RE.test(s)) || segments.length > 2) return { reason: NOT_PLAIN };
-  const merge = PLAIN_MERGE_RE.exec(segments.at(-1));
-  if (!merge) return { reason: NOT_PLAIN };
-  if (segments.length === 2) {
-    const cd = CD_RE.exec(segments[0]);
-    if (!cd) return { reason: NOT_PLAIN };
-    if (!staysInProject(cd[1] ?? cd[2] ?? cd[3], cwd, projectDir)) {
-      return { reason: "the command changes to a directory outside this repo before merging." };
+export function lastTypedMessage(transcriptText) {
+  let last = "";
+  for (const line of transcriptText.split("\n")) {
+    if (!line.trim()) continue;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (entry.type !== "user" || entry.isMeta) continue;
+    const content = entry.message?.content;
+    if (typeof content === "string") last = content;
+    else if (Array.isArray(content) && !content.some((c) => c.type === "tool_result")) {
+      last = content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
     }
   }
-  return { pr: Number(merge[1]) };
-}
-
-function readMarker(markerPath) {
-  let text;
-  try {
-    text = fs.readFileSync(markerPath, "utf8");
-  } catch {
-    return null;
-  }
-  fs.rmSync(markerPath, { force: true });
-  const [owner, iso, pr] = text.replace(/^﻿/, "").trim().split("\t");
-  return { owner, at: Date.parse(iso), pr: Number(pr) };
+  return last;
 }
 
 /**
- * Decide one tool call. Returns null for a command that isn't a merge, else
- * { decision: "ask" | "allow", reason }.
+ * Decide one tool call. Returns null for a command that isn't a merge, or when the gate
+ * stays silent; else { decision: "ask", reason }. `description` is the tool call's own
+ * description, which Claude Code shows above the command in the approval dialog.
  */
-export function decide({ command, projectDir, cwd = projectDir, now = Date.now() }) {
+export function decide({ command, projectDir, transcriptPath, description = "" }) {
   if (typeof command !== "string" || !MERGE_RE.test(command)) return null;
-
   const ask = (reason) => ({ decision: "ask", reason: `Merge gate: ${reason}` });
-  // Not a plain merge (extra commands, other flags, a URL, a mention in an argument, a shell
-  // outside this repo): ask, and leave any marker for the real merge.
-  const plain = parsePlainMerge(command, projectDir, cwd);
-  if (plain.pr == null) return ask(plain.reason);
-  const target = plain.pr;
-  const markerPath = path.join(projectDir, MARKER_FILE);
 
   if (!fs.existsSync(path.join(projectDir, OPT_OUT_FILE))) {
-    fs.rmSync(markerPath, { force: true });
     return ask("merge confirmation is on (no .claude/skip-merge-confirm.local).");
   }
-  const marker = readMarker(markerPath);
-  if (!marker) {
-    return ask("/ship did not authorize this merge (a merge outside /ship, or /ship raised a doubt).");
+  let typed = "";
+  try {
+    typed = lastTypedMessage(fs.readFileSync(transcriptPath, "utf8"));
+  } catch {
+    return ask("could not read this session's transcript to confirm a typed /ship.");
   }
-  const age = now - marker.at;
-  if (marker.owner !== "ship" || Number.isNaN(age) || age < -5_000 || age > MARKER_TTL_MS) {
-    return ask("the /ship authorization is stale or malformed.");
+  if (!typed.includes(SHIP_COMMAND)) {
+    return ask("the last message you typed isn't /ship, so this merge isn't covered by the opt-out.");
   }
-  if (marker.pr !== target) {
-    return ask(`/ship authorized PR #${marker.pr}, but this command merges PR #${target}.`);
+  if (!String(description).trim().startsWith(SAFE_DECLARATION)) {
+    return ask(`/ship didn't say this merge "${SAFE_DECLARATION}"; its description above says why it's asking.`);
   }
-  return {
-    decision: "allow",
-    reason: `Merge gate: /ship authorized PR #${target}; skip-merge-confirm opt-out present.`,
-  };
+  return null;
 }
 
 function emit(result) {
@@ -158,7 +98,12 @@ function main() {
   try {
     const input = JSON.parse(fs.readFileSync(0, "utf8").replace(/^﻿/, ""));
     const projectDir = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
-    result = decide({ command: input.tool_input?.command, projectDir, cwd: input.cwd || projectDir });
+    result = decide({
+      command: input.tool_input?.command,
+      description: input.tool_input?.description,
+      projectDir,
+      transcriptPath: input.transcript_path,
+    });
   } catch (error) {
     result = { decision: "ask", reason: `Merge gate error, asking instead: ${error.message}` };
   }

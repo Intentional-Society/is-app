@@ -4,125 +4,71 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  decide,
-  MARKER_FILE,
-  MARKER_TTL_MS,
-  OPT_OUT_FILE,
-  parsePlainMerge,
-} from "../../../.claude/hooks/ship-merge-gate.mjs";
+import { decide, lastTypedMessage, OPT_OUT_FILE } from "../../../.claude/hooks/ship-merge-gate.mjs";
+
+// The merge gate only ever asks; it never allows. These tests pin when it asks: always,
+// unless the machine opted out and the last message the human typed is `/ship`.
+// Transcript entries mirror Claude Code's JSONL (checked with a headless probe, 2026-11-28):
+// a typed command is a `user` entry with string content; skill text Claude Code injects is
+// `isMeta: true`; tool output is a `user` entry whose content holds `tool_result` parts.
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const HOOK = path.join(REPO_ROOT, ".claude", "hooks", "ship-merge-gate.mjs");
-const NOW = Date.parse("2026-11-24T12:00:00Z");
+const SHIP =
+  "<command-message>ship</command-message>\n<command-name>/ship</command-name>\n<command-args>717</command-args>";
 
 let dir: string;
-
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "merge-gate-"));
   fs.mkdirSync(path.join(dir, ".claude"));
 });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
+const typed = (content: unknown) => ({ type: "user", message: { role: "user", content } });
+const meta = (text: string) => ({
+  type: "user",
+  isMeta: true,
+  message: { role: "user", content: [{ type: "text", text }] },
+});
+const toolResult = (text: string) => ({
+  type: "user",
+  message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: text }] },
+});
+const assistant = (text: string) => ({
+  type: "assistant",
+  message: { role: "assistant", content: [{ type: "text", text }] },
+});
+const jsonl = (...entries: object[]) => `${entries.map((e) => JSON.stringify(e)).join("\n")}\n`;
+
+function transcript(...entries: object[]) {
+  const file = path.join(dir, "transcript.jsonl");
+  fs.writeFileSync(file, jsonl(...entries));
+  return file;
+}
 const optOut = () => fs.writeFileSync(path.join(dir, OPT_OUT_FILE), "opt-out\n");
-const authorize = (pr: number, at = NOW, owner = "ship") =>
-  fs.writeFileSync(path.join(dir, MARKER_FILE), `${owner}\t${new Date(at).toISOString()}\t${pr}\n`);
-const markerExists = () => fs.existsSync(path.join(dir, MARKER_FILE));
-const run = (command: string) => decide({ command, projectDir: dir, now: NOW });
+const SAFE = 'Looks safe to me. Merging PR #12 "feat: x" — required green.';
+const run = (command: string, transcriptPath?: string, description = SAFE) =>
+  decide({ command, projectDir: dir, transcriptPath, description });
 
-describe("parsePlainMerge", () => {
-  const pr = (command: string) => parsePlainMerge(command, dir).pr ?? null;
-
-  it.each([
-    ["gh pr merge 123 --merge --delete-branch", 123],
-    ["gh.exe pr merge 7 --delete-branch --merge", 7],
-    ["  gh pr merge 5 --merge --delete-branch  ", 5],
-  ])("plain: %s → %s", (command, expected) => {
-    expect(pr(command)).toBe(expected);
+describe("lastTypedMessage", () => {
+  it("returns the typed /ship command, skipping injected skill text and tool output after it", () => {
+    expect(
+      lastTypedMessage(jsonl(typed("hi"), typed(SHIP), meta("Base directory for this skill"), toolResult("ok"))),
+    ).toBe(SHIP);
   });
 
-  it.each([
-    "gh pr merge 5 --merge --delete-branch 2>&1",
-    'gh pr merge 5 --merge --delete-branch; echo "exit $?"',
-    'gh pr merge 5 --merge --delete-branch 2>&1; echo "merge exit=$?"',
-  ])("tolerates a harmless ending: %s", (command) => {
-    expect(pr(command)).toBe(5);
+  it("does not count /ship text that arrives as tool output or injected text", () => {
+    expect(lastTypedMessage(jsonl(typed("merge it"), toolResult(SHIP), meta(SHIP), assistant(SHIP)))).toBe("merge it");
   });
 
-  it.each([
-    'gh pr merge 5 --merge --delete-branch; echo "$(id) $?"',
-    'gh pr merge 5 --merge --delete-branch; echo "$HOME $?"',
-    "gh pr merge 5 --merge --delete-branch; echo `id`",
-    'gh pr merge 5 --merge --delete-branch; echo "done"; rm -rf x',
-    "gh pr merge 5 --merge --delete-branch 2>/tmp/err",
-    "gh pr merge 5 --merge --delete-branch 1>&2 2>&1",
-  ])("still refuses: %s", (command) => {
-    expect(pr(command)).toBeNull();
+  it("reads a typed message sent as text parts, and skips lines that aren't JSON", () => {
+    expect(lastTypedMessage(`${jsonl(typed(SHIP))}not json\n${jsonl(typed([{ type: "text", text: "yes" }]))}`)).toBe(
+      "yes",
+    );
   });
 
-  it("allows `cd` into the repo or a folder inside it", () => {
-    fs.mkdirSync(path.join(dir, "sub"));
-    expect(pr(`cd ${dir} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
-    expect(pr(`cd "${dir}" && gh pr merge 5 --merge --delete-branch`)).toBe(5);
-    expect(pr(`cd ${path.join(dir, "sub")} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
-    expect(pr("cd . && gh pr merge 5 --merge --delete-branch")).toBe(5);
-    expect(pr("cd sub && gh pr merge 5 --merge --delete-branch")).toBe(5);
-  });
-
-  it.runIf(process.platform === "win32")("accepts the Git Bash spelling of this repo's path", () => {
-    const gitBash = dir.replace(/^([A-Za-z]):/, (_m, d: string) => `/${d.toLowerCase()}`).replace(/\\/g, "/");
-    expect(pr(`cd ${gitBash} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
-    expect(pr(`cd ${dir.toUpperCase()} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
-  });
-
-  it.each([
-    "gh pr merge 5 --merge --delete-branch && rm -rf ~",
-    "gh pr merge 5 --merge --delete-branch; echo done",
-    "gh pr merge 5 --merge --delete-branch | tee log",
-    "gh pr merge 5 --merge --delete-branch > log",
-    "gh pr merge 5 --merge --delete-branch &",
-    "gh pr merge $(echo 5) --merge --delete-branch",
-    "gh pr merge 5 --merge --delete-branch --repo other/repo",
-    "gh pr merge 5 --merge --delete-branch --admin",
-    "gh pr merge 5 --squash --delete-branch",
-    "gh pr merge 5 --merge",
-    "gh pr merge https://github.com/o/r/pull/5 --merge --delete-branch",
-    "gh pr merge --merge --delete-branch",
-    "cd .. && gh pr merge 5 --merge --delete-branch",
-    "cd ~ && gh pr merge 5 --merge --delete-branch",
-    "cd - && gh pr merge 5 --merge --delete-branch",
-    "cd $HOME && gh pr merge 5 --merge --delete-branch",
-    "cd /tmp && gh pr merge 5 --merge --delete-branch",
-    "git status && gh pr merge 5 --merge --delete-branch",
-    "cd . && cd . && gh pr merge 5 --merge --delete-branch",
-    "cd (Stop-Process) && gh pr merge 5 --merge --delete-branch",
-    "cd @(Get-Location) && gh pr merge 5 --merge --delete-branch",
-    'grep -rn "gh pr merge" docs',
-  ])("not plain: %s", (command) => {
-    expect(pr(command)).toBeNull();
-  });
-
-  it.skipIf(process.platform === "win32")(
-    "refuses a backslash in a `cd` target off Windows, where Bash reads it as an escape",
-    () => {
-      expect(pr("cd \\.\\./other && gh pr merge 5 --merge --delete-branch")).toBeNull();
-      expect(pr("cd sub\\dir && gh pr merge 5 --merge --delete-branch")).toBeNull();
-    },
-  );
-
-  it("allows a quoted folder name with a space", () => {
-    fs.mkdirSync(path.join(dir, "my dir"));
-    expect(pr('cd "my dir" && gh pr merge 5 --merge --delete-branch')).toBe(5);
-  });
-
-  it("resolves a relative `cd` from the shell's directory, and asks when the shell is outside the repo", () => {
-    const sub = path.join(dir, "sub");
-    fs.mkdirSync(sub);
-    expect(parsePlainMerge("cd .. && gh pr merge 5 --merge --delete-branch", dir, sub).pr).toBe(5);
-    expect(parsePlainMerge("gh pr merge 5 --merge --delete-branch", dir, sub).pr).toBe(5);
-    const outside = parsePlainMerge("gh pr merge 5 --merge --delete-branch", dir, path.dirname(dir));
-    expect(outside.pr).toBeUndefined();
-    expect(outside.reason).toMatch(/outside this repo/);
+  it("returns empty for a transcript with no typed message", () => {
+    expect(lastTypedMessage(jsonl(meta("x"), toolResult("y")))).toBe("");
   });
 });
 
@@ -130,104 +76,77 @@ describe("decide", () => {
   it("ignores commands that are not merges", () => {
     expect(run("gh pr view 12")).toBeNull();
     expect(run("git merge origin/main")).toBeNull();
-    expect(run("gh pr checks 12 --watch")).toBeNull();
   });
 
-  it("asks when the machine has not opted out, and clears any marker", () => {
-    authorize(12);
-    expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("ask");
-    expect(markerExists()).toBe(false);
-  });
-
-  it("asks on an opted-out machine when /ship wrote no marker", () => {
-    optOut();
-    const result = run("gh pr merge 12 --merge --delete-branch");
-    expect(result?.decision).toBe("ask");
-    expect(result?.reason).toMatch(/did not authorize/);
-  });
-
-  it("accepts a marker that starts with a byte-order mark", () => {
-    optOut();
-    fs.writeFileSync(path.join(dir, MARKER_FILE), `﻿ship\t${new Date(NOW).toISOString()}\t12\r\n`);
-    expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("allow");
-  });
-
-  it("allows a fresh /ship authorization for the same PR, once", () => {
-    optOut();
-    authorize(12);
-    expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("allow");
-    expect(markerExists()).toBe(false);
-    expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("ask");
-  });
-
-  it("allows a plain merge after `cd` into this repo", () => {
-    optOut();
-    authorize(12);
-    expect(run(`cd ${dir} && gh pr merge 12 --merge --delete-branch`)?.decision).toBe("allow");
-  });
-
-  it("asks for a merge with something riding along, and keeps the marker for the real merge", () => {
-    optOut();
-    authorize(12);
-    const result = run("gh pr merge 12 --merge --delete-branch && rm -rf ~");
-    expect(result?.decision).toBe("ask");
-    expect(result?.reason).toMatch(/only a plain/);
-    expect(markerExists()).toBe(true);
-    expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("allow");
-  });
-
-  it("asks when a command only mentions `gh pr merge`, without consuming the marker", () => {
-    optOut();
-    authorize(12);
-    expect(run('git commit -m "run gh pr merge after review"')?.decision).toBe("ask");
-    expect(markerExists()).toBe(true);
-  });
-
-  it("asks for a `cd` out of this repo, naming the reason", () => {
-    optOut();
-    authorize(12);
-    expect(run("cd .. && gh pr merge 12 --merge --delete-branch")?.reason).toMatch(/outside this repo/);
-  });
-
-  it.each([
-    ["a stale marker", () => authorize(12, NOW - MARKER_TTL_MS - 1), /stale/],
-    ["a future-dated marker", () => authorize(12, NOW + 60_000), /stale/],
-    ["a marker from another owner", () => authorize(12, NOW, "pr"), /stale or malformed/],
-    ["a marker for another PR", () => authorize(99), /#99.*#12/],
-  ])("asks on %s and consumes it", (_label, setup, reason) => {
-    optOut();
-    setup();
-    const result = run("gh pr merge 12 --merge --delete-branch");
-    expect(result?.decision).toBe("ask");
-    expect(result?.reason).toMatch(reason);
-    expect(markerExists()).toBe(false);
-  });
-
-  it("asks when the command names no PR", () => {
-    optOut();
-    authorize(12);
-    expect(run("gh pr merge --merge --delete-branch")?.decision).toBe("ask");
-  });
-
-  it("asks when one command holds two merges", () => {
-    optOut();
-    authorize(12);
-    expect(run("gh pr merge 12 --merge --delete-branch && gh pr merge 13 --merge --delete-branch")?.decision).toBe(
-      "ask",
+  it("asks when the machine has not opted out, even inside /ship", () => {
+    expect(run("gh pr merge 12 --merge --delete-branch", transcript(typed(SHIP)))?.reason).toMatch(
+      /merge confirmation is on/,
     );
+  });
+
+  it('stays silent on an opted-out machine after a typed /ship, when the merge says "Looks safe to me"', () => {
+    optOut();
+    expect(
+      run("gh pr merge 12 --merge --delete-branch", transcript(typed(SHIP), meta("skill"), toolResult("ok"))),
+    ).toBeNull();
+    expect(run("gh pr merge 12 --merge --delete-branch", transcript(typed(SHIP)), `  ${SAFE}`)).toBeNull();
+  });
+
+  it('asks when the merge doesn\'t say "Looks safe to me": a doubt, a missing description, or the words later on', () => {
+    optOut();
+    const ship = transcript(typed(SHIP));
+    const doubt = "Asking for merge confirmation: someone else's PR — PR 12 is by a teammate.";
+    expect(run("gh pr merge 12 --merge --delete-branch", ship, doubt)?.reason).toMatch(
+      /didn't say this merge "Looks safe to me"/,
+    );
+    expect(run("gh pr merge 12 --merge --delete-branch", ship, "")?.decision).toBe("ask");
+    expect(run("gh pr merge 12 --merge --delete-branch", ship, `Merging. ${SAFE}`)?.decision).toBe("ask");
+  });
+
+  it("asks on an opted-out machine when the human typed something after /ship", () => {
+    optOut();
+    const result = run("gh pr merge 12 --merge --delete-branch", transcript(typed(SHIP), typed("yes, merge anyway")));
+    expect(result?.decision).toBe("ask");
+    expect(result?.reason).toMatch(/isn't \/ship/);
+  });
+
+  it("asks on an opted-out machine when /ship only appears in tool output", () => {
+    optOut();
+    expect(
+      run("gh pr merge 12 --merge --delete-branch", transcript(typed("please merge"), toolResult(SHIP)))?.decision,
+    ).toBe("ask");
+  });
+
+  it("asks when the transcript is missing or unreadable", () => {
+    optOut();
+    expect(run("gh pr merge 12 --merge --delete-branch")?.reason).toMatch(/could not read/);
+    expect(run("gh pr merge 12 --merge --delete-branch", path.join(dir, "nope.jsonl"))?.reason).toMatch(
+      /could not read/,
+    );
+  });
+
+  it("asks for any command that mentions a merge, whatever its shape", () => {
+    expect(run('grep -rn "gh pr merge" docs')?.decision).toBe("ask");
+    expect(run("cd x && gh pr merge 12 --merge --delete-branch && rm -rf ~")?.decision).toBe("ask");
   });
 });
 
 describe("hook process", () => {
-  const spawn = (stdin: string) =>
-    spawnSync(process.execPath, [HOOK], {
+  const spawn = (stdin: string, hook = HOOK) =>
+    spawnSync(process.execPath, [hook], {
       input: stdin,
       env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
       encoding: "utf8",
     });
+  const mergeInput = (transcriptPath?: string) =>
+    JSON.stringify({
+      tool_name: "Bash",
+      transcript_path: transcriptPath,
+      tool_input: { command: "gh pr merge 5 --merge --delete-branch", description: SAFE },
+    });
 
   it("prints an ask decision for a merge and exits 0", () => {
-    const out = spawn(JSON.stringify({ tool_name: "Bash", tool_input: { command: "gh pr merge 5 --merge" } }));
+    const out = spawn(mergeInput());
     expect(out.status).toBe(0);
     expect(JSON.parse(out.stdout).hookSpecificOutput).toMatchObject({
       hookEventName: "PreToolUse",
@@ -235,23 +154,19 @@ describe("hook process", () => {
     });
   });
 
-  it("prints nothing for an ordinary command", () => {
-    const out = spawn(JSON.stringify({ tool_name: "PowerShell", tool_input: { command: "Get-ChildItem" } }));
-    expect(out.status).toBe(0);
-    expect(out.stdout).toBe("");
-  });
-
-  it("asks when its input cannot be parsed", () => {
-    const out = spawn("not json");
-    expect(out.status).toBe(0);
-    expect(JSON.parse(out.stdout).hookSpecificOutput.permissionDecision).toBe("ask");
-  });
-
-  it("reads input that starts with a byte-order mark", () => {
-    const out = spawn(
-      `﻿${JSON.stringify({ tool_name: "Bash", tool_input: { command: "gh pr merge 5 --merge --delete-branch" } })}`,
+  it("prints nothing when it stays silent, and for an ordinary command", () => {
+    optOut();
+    expect(spawn(mergeInput(transcript(typed(SHIP)))).stdout).toBe("");
+    expect(spawn(JSON.stringify({ tool_name: "PowerShell", tool_input: { command: "Get-ChildItem" } })).stdout).toBe(
+      "",
     );
-    expect(JSON.parse(out.stdout).hookSpecificOutput.permissionDecisionReason).toMatch(/merge confirmation is on/);
+  });
+
+  it("asks when its input cannot be parsed, and reads input that starts with a byte-order mark", () => {
+    expect(JSON.parse(spawn("not json").stdout).hookSpecificOutput.permissionDecision).toBe("ask");
+    expect(JSON.parse(spawn(`﻿${mergeInput()}`).stdout).hookSpecificOutput.permissionDecisionReason).toMatch(
+      /merge confirmation is on/,
+    );
   });
 
   it("still runs when reached through a symlinked folder", () => {
@@ -261,21 +176,16 @@ describe("hook process", () => {
     } catch {
       return; // symlinks unavailable here; nothing to test
     }
-    const out = spawnSync(process.execPath, [path.join(link, path.basename(HOOK))], {
-      input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "gh pr merge 5 --merge --delete-branch" } }),
-      env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
-      encoding: "utf8",
-    });
-    expect(out.status).toBe(0);
+    const out = spawn(mergeInput(), path.join(link, path.basename(HOOK)));
     expect(JSON.parse(out.stdout).hookSpecificOutput.permissionDecision).toBe("ask");
   });
 });
 
-describe("checked-in settings", () => {
+describe("checked-in settings and /ship's grant", () => {
   const settings = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, ".claude", "settings.json"), "utf8"));
+  const entry = settings.hooks.PreToolUse.find((e: { matcher: string }) => e.matcher === "Bash|PowerShell");
 
-  it("registers the gate for Bash and PowerShell, failing closed", () => {
-    const entry = settings.hooks.PreToolUse.find((e: { matcher: string }) => e.matcher === "Bash|PowerShell");
+  it("registers the gate for Bash and PowerShell, failing closed, with no `if` filter", () => {
     expect(entry.hooks).toContainEqual(
       expect.objectContaining({
         type: "command",
@@ -286,10 +196,30 @@ describe("checked-in settings", () => {
         onFailure: "block",
       }),
     );
+    for (const hook of entry.hooks) expect(hook.if).toBeUndefined();
   });
 
-  it("keeps no `if` filter, so the script sees every shell command", () => {
-    const entry = settings.hooks.PreToolUse.find((e: { matcher: string }) => e.matcher === "Bash|PowerShell");
-    for (const hook of entry.hooks) expect(hook.if).toBeUndefined();
+  it("asks for --admin and --auto merges in both shells", () => {
+    expect(settings.permissions.ask).toEqual(
+      expect.arrayContaining([
+        "Bash(gh pr merge *--admin*)",
+        "Bash(gh pr merge *--auto*)",
+        "PowerShell(gh pr merge *--admin*)",
+        "PowerShell(gh pr merge *--auto*)",
+      ]),
+    );
+  });
+
+  it("/ship grants exactly the merge command it runs, and nothing broader", () => {
+    const skill = fs.readFileSync(path.join(REPO_ROOT, ".claude", "skills", "ship", "SKILL.md"), "utf8");
+    const front = skill.split(/^---$/m)[1];
+    // A one-line YAML flow list, which is also valid JSON.
+    const line = /^allowed-tools:\s*(\[.*\])\s*$/m.exec(front);
+    expect(line, "allowed-tools must be a one-line list").not.toBeNull();
+    const grants = JSON.parse(line?.[1] ?? "[]");
+    expect(grants).toEqual([
+      "Bash(gh pr merge * --merge --delete-branch)",
+      "PowerShell(gh pr merge * --merge --delete-branch)",
+    ]);
   });
 });

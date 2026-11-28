@@ -408,8 +408,6 @@ Every eval run archives the **raw evidence triad** into the eval's workspace `ou
 - `git-state.txt` — a raw dump of the sandbox repo + bare origin (status, log, branches,
   reflog, staged/unstaged diffs).
 - `gh-stub-state.json` — the stub's durable state, including any `gh pr merge` records.
-- `ship-merge-authorized.txt` — only when `/ship` step 11 wrote its merge authorization
-  marker in the sandbox repo (gitignored, so `git-state.txt` can't show it).
 - `archive-manifest.json` — provenance and which legs were captured.
 
 `ship-10` and `ship-11` have a script grader instead of a grader agent, because every one of
@@ -614,10 +612,8 @@ stub, never GitHub — approve each once. The merge gate waits for that click in
 permission mode, `auto` and `bypassPermissions` included (headless probes 2026-11-24; on
 2026-09-24 two such prompts waited 6 h 52 min for a sleeping maintainer). The prompt offers
 only a one-time approve, and a saved `allow` cannot outrank the hook's `ask`. Your own
-`.claude/skip-merge-confirm.local` does not apply. The gate reads both files from the
-session's project directory: a session started in a sandbox has no opt-out file there, and a
-session started in the repo looks for the marker in the repo, not in the sandbox where `/ship`
-writes it. Plan a batch with a person reachable, or
+`.claude/skip-merge-confirm.local` does not apply: the gate stays silent only right after a
+human typed `/ship`, and an executor's session never starts that way. Plan a batch with a person reachable, or
 expect it to pause at the first positive `/ship` merge. The orchestrator runs those executors
 in the background so it can see the hold, pushes a notice within a minute of a prompt
 waiting ("sandbox merge prompt waiting for ship-1 — safe, tap approve"), and after 30 minutes

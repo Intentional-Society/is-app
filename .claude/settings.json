@@ -1,4 +1,12 @@
 {
+  "permissions": {
+    "ask": [
+      "Bash(gh pr merge *--admin*)",
+      "Bash(gh pr merge *--auto*)",
+      "PowerShell(gh pr merge *--admin*)",
+      "PowerShell(gh pr merge *--auto*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

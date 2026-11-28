@@ -278,9 +278,15 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
 - 2026‑11‑24 (merge gate → hook) — in about six months the merge prompt never changed an outcome:
   typing `/ship` was already the decision. The checked‑in `ask` rule is replaced by a PreToolUse hook
   (`.claude/hooks/ship-merge-gate.mjs`, `onFailure: "block"`) that asks for every `gh pr merge`
-  unless the per‑machine `.claude/skip-merge-confirm.local` exists and `/ship` wrote a fresh,
-  single‑use, PR‑matched authorization marker after its doubt checks (D1–D7, step 11) passed.
-  Headless probes on 2026‑11‑24: the hook's `ask` held in default, `auto` and `bypassPermissions` and
-  over a local `allow`; a crashing hook blocked the call.
+  unless the per‑machine `.claude/skip-merge-confirm.local` exists, the last message the human
+  typed is `/ship`, and the merge command's description starts with "Looks safe to me", which
+  `/ship` writes only when its doubt checks (step 11) all pass; otherwise the description names
+  each doubt in plain words and the gate's prompt shows it. The hook never allows anything: the
+  merge runs under `/ship`'s `allowed-tools` grant for exactly `gh pr merge <N> --merge
+  --delete-branch`, which Claude Code applies only during the typed `/ship` turn and checks per
+  subcommand; `ask` rules catch `--admin` and `--auto`. Allow decisions stay with Claude
+  Code's own permission rules, so the hook parses no shell syntax. Headless probes on 2026‑11‑24 and 2026‑11‑28: the hook's `ask` held in default, `auto` and
+  `bypassPermissions`, over a local `allow` and over the skill's grant; a crashing hook blocked the
+  call; the grant ran the exact merge in default and `auto` and stopped `--admin` and chained commands.
 - Prior context: PRs #304/#305 shipped the Skills; explicit‑only invocation was P0.4 from PR #133 —
   this is a deliberate, dated revision of it.

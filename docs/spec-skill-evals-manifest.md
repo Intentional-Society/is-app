@@ -460,12 +460,12 @@ manifest.
 ## 2026-11 amendment — `ship-10` and `ship-11` added for the merge-gate opt-out (2026-11-27)
 
 **Status:** two net-new execution evals for `/ship` step 11, where a machine with
-`.claude/skip-merge-confirm.local` lets `/ship` authorize its own merge when no doubt check hits.
+`.claude/skip-merge-confirm.local` merges without asking unless a doubt check hits.
 
-| Resulting | Kind      | Fixture                                      | Notes                                                                                                                                                                                                              |
-| --------- | --------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ship-10   | execution | `feature-open-pr-merge-opt-out` (new)        | Green control: opted out, the running account's own PR, no doubt; asserts the authorization marker `ship\t<ISO>\t226` is written in the sandbox before the one merge, and no `Asking for merge confirmation:` line |
-| ship-11   | execution | `feature-open-pr-other-author-opt-out` (new) | Red control: opted out, but the PR's author is a teammate (D1); asserts the doubt is named, no marker is written, and the merge still runs through the gate's prompt                                               |
+| Resulting | Kind      | Fixture                                      | Notes                                                                                                                                                                                                                                  |
+| --------- | --------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ship-10   | execution | `feature-open-pr-merge-opt-out` (new)        | Green control: opted out, the running account's own PR, no doubt; asserts the merge's description starts with "Looks safe to me" and the one merge is exactly `gh pr merge 226 --merge --delete-branch`, the form /ship's grant covers |
+| ship-11   | execution | `feature-open-pr-other-author-opt-out` (new) | Red control: opted out, but the PR's author is a teammate; asserts the merge's description names that doubt in plain words instead of "Looks safe to me", so the gate asks                                                             |
 
 **Totals:** **30 entries = 21 execution + 9 routing** for `/commit`, `/pr` and `/ship` (ship: 10
 execution, 2 routing); with `/handoff`, **40 entries = 31 execution + 9 routing** and **23** fixture
@@ -474,7 +474,7 @@ profiles.
 **Files updated in lockstep:** `.claude/skills/ship/evals/evals.json`,
 `scripts/skill-evals/lib/fixtures.mjs` (the two profiles; every PR fixture now carries `author`
 and `reviewDecision`), `scripts/skill-evals/lib/sandbox.mjs` (`headRefOid` filled from the
-branch's real head; `ship-merge-authorized.txt` archived when present),
+branch's real head),
 `scripts/skill-evals/gh-stub/gh-stub.mjs` (dotted-path `--jq` on `pr view`),
 `tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
 `tests/functional/skills/gh-stub.test.ts`, `docs/design-skill-evals-harness.md`,

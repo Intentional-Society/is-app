@@ -154,11 +154,11 @@ file for the full rules.
   permission rules.
 - **Merge gate** — the checked-in PreToolUse hook `.claude/hooks/ship-merge-gate.mjs`, registered
   in `.claude/settings.json` for Bash and PowerShell. It returns `ask` for every `gh pr merge`
-  unless the machine has `.claude/skip-merge-confirm.local` and `/ship` wrote a fresh authorization
-  marker for that PR ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
-  In an eval every merge still asks: the gate reads both files from the session's project
-  directory, never the sandbox, so the opt-out file and marker that `ship-10`/`ship-11` put in
-  their sandboxes never reach it. Until 2026-11-24 this
+  unless the machine has `.claude/skip-merge-confirm.local` and the last message the human typed
+  is `/ship` ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail"). In an eval
+  every merge still asks: an executor's session never starts with a typed `/ship`, and the gate
+  reads the opt-out file from the session's project directory, not from the sandbox that
+  `ship-10`/`ship-11` put one in. Until 2026-11-24 this
   gate was an `ask` permission rule; older ledger entries below say "`ask` rule" for it.
 - **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
   how prompts behave. The merge gate's `ask` holds in every mode, `auto` and `bypassPermissions`
@@ -502,8 +502,8 @@ The first four columns are generated; the last is written by hand from each eval
 | `ship-7`     | execution | ship    | `feature-open-pr-unanswered-comment`     | A comment posted after the last push: it lists it, asks `1 unanswered since the last push — merge anyway?`, and does not merge on `no` |
 | `ship-8`     | execution | ship    | `feature-open-pr-bot-cards-only`         | Only a Vercel card, a clean Claude review and its own `/pr` note follow the push: all three are excluded, so it merges                 |
 | `ship-9`     | execution | ship    | `feature-open-pr-review-with-findings`   | A Claude review that reports issues after the push still counts: it lists it, asks, and does not merge on `no`                         |
-| `ship-10`    | execution | ship    | `feature-open-pr-merge-opt-out`          | Opted out of the merge prompt with no doubt: it writes the merge authorization marker before merging                                   |
-| `ship-11`    | execution | ship    | `feature-open-pr-other-author-opt-out`   | Opted out, but a teammate's PR (D1): it names the doubt, writes no marker, and the gate prompts                                        |
+| `ship-10`    | execution | ship    | `feature-open-pr-merge-opt-out`          | Opted out of the merge prompt with no doubt: it says "Looks safe to me" and merges with exactly the command its grant covers           |
+| `ship-11`    | execution | ship    | `feature-open-pr-other-author-opt-out`   | Opted out, but a teammate's PR: the merge's description names that doubt instead of "Looks safe to me", so the gate asks               |
 | `handoff-1`  | execution | handoff | `feature-uncommitted-fix-no-pr`          | It reports the fix as uncommitted, contradicting the human's belief that it landed                                                     |
 | `handoff-2`  | execution | handoff | `feature-one-commit-clean-no-pr`         | An existing hand-off doc is updated in place, with the old state kept under `Historical`                                               |
 | `handoff-3`  | execution | handoff | `feature-one-commit-clean-no-pr`         | Nothing in flight: it asks what the hand-off is for instead of inventing work                                                          |
@@ -846,10 +846,8 @@ its three wrappers), `gh-config/` (the isolated `GH_CONFIG_DIR`), `gh-fixture.js
 and a root-level marker so an audit or sweep can identify the directory even if `repo/` is gone.
 
 **Archived into an eval's `outputs/`** — `gh-calls.log`, `gh-stub-state.json`, `gh-fixture.json`,
-`manifest.json`, `sandbox-marker.json`, `git-state.txt`, `archive-manifest.json`, `scratch/`
-when the run left anything in the sandbox repo's `.scratch/`, and `ship-merge-authorized.txt`
-when `/ship` step 11 wrote its authorization marker (the merge gate reads markers from the
-session's project directory, never the sandbox, so this one survives the run). `git-state.txt`
+`manifest.json`, `sandbox-marker.json`, `git-state.txt`, `archive-manifest.json`, and `scratch/`
+when the run left anything in the sandbox repo's `.scratch/`. `git-state.txt`
 is a labelled dump of `rev-parse HEAD`, `status --porcelain=v1 -b`, `log --oneline --all -n 50`,
 `branch -avv`, `reflog -n 50`, unstaged and staged diffs, plus the bare origin's log and branch
 list. Every command runs through `gitSafe()`, so a failure becomes a bracketed note in the dump
@@ -930,8 +928,8 @@ sandbox rather than inside it.
 
 That has two consequences the harness is built around. First, it is the sturdiest gate C8 can point
 to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` steps 11–12, the source of record
-for its behavior: the gate reads the opt-out file and the marker from the session's project
-directory, never the sandbox, so it returns `ask` for every sandbox merge, and **that `ask` waits for a human's one-time click in every permission mode, `auto`
+for its behavior: an executor's session never starts with a typed `/ship`, so the gate returns
+`ask` for every sandbox merge, and **that `ask` waits for a human's one-time click in every permission mode, `auto`
 and `bypassPermissions` included, over a local `allow`** (headless probes 2026-11-24; on 2026-09-24,
 under the `ask` rule the hook replaced, two sandbox merges waited 6 h 52 min for the maintainer). A batch therefore
 needs a reachable human for its three positive `/ship` merges, or grades them as intercepted —

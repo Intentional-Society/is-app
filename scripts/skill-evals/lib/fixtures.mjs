@@ -83,8 +83,8 @@ function existingPr(number, headRefName, title) {
     isDraft: false,
     title,
     url: prLink(number),
-    // /ship step 11's doubt checks: the running account's own PR (D1), no review decision
-    // (D2). `headRefOid` (D4) is filled in by buildSandbox() from the branch's real head.
+    // /ship step 11's doubt checks: the running account's own PR, no review decision.
+    // `headRefOid` (the head-moved check) is filled in by buildSandbox() from the branch's real head.
     author: { login: SELF },
     reviewDecision: "",
     // The conversation /ship step 10 reads: nothing by default.
@@ -263,7 +263,6 @@ const BASE_GITIGNORE = `node_modules/
 .claude/.nl-delegation-active
 .claude/skip-nl-confirm-commit-pr.local
 .claude/skip-merge-confirm.local
-.claude/.ship-merge-authorized
 .claude/skills/**/.team-cache.json
 `;
 
@@ -826,10 +825,10 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
   },
 
   // ship-10 — as ship-1, on a machine that opted out of the merge prompt; no doubt applies,
-  // so /ship step 11 writes the authorization marker before the merge.
+  // so /ship merges without asking.
   "feature-open-pr-merge-opt-out": {
     summary:
-      "Pre-existing open PR by the running account; clean; all checks green; `.claude/skip-merge-confirm.local` present; no doubt applies; merges with an authorization marker.",
+      "Pre-existing open PR by the running account; clean; all checks green; `.claude/skip-merge-confirm.local` present; no doubt applies; merges without asking.",
     branch: "feature-trusted",
     branchCommits: [{ message: "feat: trusted feature", write: { "src/app/trusted.ts": featureModule("trusted") } }],
     openPr: true,
@@ -847,11 +846,11 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
     },
   },
 
-  // ship-11 — as ship-10, but a teammate authored the PR (doubt D1), so step 11 writes no
-  // marker, names the doubt, and leaves the merge to the gate's prompt.
+  // ship-11 — as ship-10, but a teammate authored the PR (the someone-else's-PR doubt), so
+  // /ship's merge description names the doubt instead of "Looks safe to me", and the gate asks.
   "feature-open-pr-other-author-opt-out": {
     summary:
-      "Pre-existing open PR authored by another collaborator; clean; all checks green; `.claude/skip-merge-confirm.local` present; doubt D1 applies; merges through the gate's prompt with no marker.",
+      "Pre-existing open PR authored by another collaborator; clean; all checks green; `.claude/skip-merge-confirm.local` present; the someone-else's-PR doubt applies; the merge asks.",
     branch: "feature-borrowed",
     branchCommits: [{ message: "feat: borrowed feature", write: { "src/app/borrowed.ts": featureModule("borrowed") } }],
     openPr: true,
@@ -1041,7 +1040,7 @@ function prWithComments(number, headRefName, title, specs) {
   return { branchPr: pr, prs: { [number]: pr }, issueComments: restIssueComments(number, specs) };
 }
 
-// ship-11's PR: authored by a teammate, not the running account (/ship step 11, D1).
+// ship-11's PR: authored by a teammate, not the running account (/ship step 11's someone-else's-PR doubt).
 function otherAuthorPr(number, headRefName, title) {
   return { ...existingPr(number, headRefName, title), author: { login: "benjifriedman" } };
 }

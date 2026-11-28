@@ -106,7 +106,7 @@ export function buildSandbox({ fixture, root, note }) {
 
   const ghFixture = buildGhFixture(profile);
   // A PR on this branch reports the branch's real head as `headRefOid`, so /ship step 11's
-  // D4 (head moved) agrees with local git. Only the builder knows the SHA.
+  // head-moved doubt agrees with local git. Only the builder knows the SHA.
   if (profile.branch) {
     const head = git(["-C", repoDir, "rev-parse", profile.branch]).trim();
     for (const pr of [ghFixture.branchPr, ...Object.values(ghFixture.prs)]) {
@@ -177,9 +177,7 @@ export function teardownSandbox(sandboxDir) {
  * preserved, leaving CLEAN verdicts resting on self-graded orchestrator prose):
  *   - `gh-calls.log`   — the primary grading evidence (what the skill asked GitHub to do).
  *   - `git-state.txt`  — a full raw dump of the sandbox repo + bare origin state.
- *   - `gh-stub-state.json` — the stub's durable state (incl. any merge records — item 1).
- *   - `ship-merge-authorized.txt` — /ship step 11's authorization marker, when it wrote one.
- * The transcript (the third leg) is the executor's own output, written to the eval
+ *   - `gh-stub-state.json` — the stub's durable state (incl. any merge records — item 1). * The transcript (the third leg) is the executor's own output, written to the eval
  * workspace separately; this function captures only the legs the harness itself owns.
  *
  * It also copies the sandbox repo's `.scratch/` directory into `scratch/` when one exists:
@@ -250,15 +248,6 @@ export function archiveEvidence(sandboxDir, destDir) {
     }
     fs.writeFileSync(path.join(destDir, "git-state.txt"), `${sections.join("\n\n")}\n`);
     captured.push("git-state.txt");
-  }
-
-  // --- /ship step 11's merge authorization marker (gitignored, so git-state can't show it) ---
-  // The merge gate reads markers from the session's project dir, never the sandbox, so a
-  // marker /ship writes here is never consumed and records what step 11 decided.
-  const authSrc = path.join(repoDir, ".claude", ".ship-merge-authorized");
-  if (fs.existsSync(authSrc)) {
-    fs.copyFileSync(authSrc, path.join(destDir, "ship-merge-authorized.txt"));
-    captured.push("ship-merge-authorized.txt");
   }
 
   // --- produced artifacts: the doc a file-producing skill wrote ------------------------
