@@ -41,6 +41,25 @@ describe("parsePlainMerge", () => {
     expect(pr(command)).toBe(expected);
   });
 
+  it.each([
+    "gh pr merge 5 --merge --delete-branch 2>&1",
+    'gh pr merge 5 --merge --delete-branch; echo "exit $?"',
+    'gh pr merge 5 --merge --delete-branch 2>&1; echo "merge exit=$?"',
+  ])("tolerates a harmless ending: %s", (command) => {
+    expect(pr(command)).toBe(5);
+  });
+
+  it.each([
+    'gh pr merge 5 --merge --delete-branch; echo "$(id) $?"',
+    'gh pr merge 5 --merge --delete-branch; echo "$HOME $?"',
+    "gh pr merge 5 --merge --delete-branch; echo `id`",
+    'gh pr merge 5 --merge --delete-branch; echo "done"; rm -rf x',
+    "gh pr merge 5 --merge --delete-branch 2>/tmp/err",
+    "gh pr merge 5 --merge --delete-branch 1>&2 2>&1",
+  ])("still refuses: %s", (command) => {
+    expect(pr(command)).toBeNull();
+  });
+
   it("allows `cd` into the repo or a folder inside it", () => {
     fs.mkdirSync(path.join(dir, "sub"));
     expect(pr(`cd ${dir} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
@@ -83,6 +102,14 @@ describe("parsePlainMerge", () => {
     expect(pr(command)).toBeNull();
   });
 
+  it.skipIf(process.platform === "win32")(
+    "refuses a backslash in a `cd` target off Windows, where Bash reads it as an escape",
+    () => {
+      expect(pr("cd \\.\\./other && gh pr merge 5 --merge --delete-branch")).toBeNull();
+      expect(pr("cd sub\\dir && gh pr merge 5 --merge --delete-branch")).toBeNull();
+    },
+  );
+
   it("allows a quoted folder name with a space", () => {
     fs.mkdirSync(path.join(dir, "my dir"));
     expect(pr('cd "my dir" && gh pr merge 5 --merge --delete-branch')).toBe(5);
@@ -117,6 +144,12 @@ describe("decide", () => {
     const result = run("gh pr merge 12 --merge --delete-branch");
     expect(result?.decision).toBe("ask");
     expect(result?.reason).toMatch(/did not authorize/);
+  });
+
+  it("accepts a marker that starts with a byte-order mark", () => {
+    optOut();
+    fs.writeFileSync(path.join(dir, MARKER_FILE), `﻿ship\t${new Date(NOW).toISOString()}\t12\r\n`);
+    expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("allow");
   });
 
   it("allows a fresh /ship authorization for the same PR, once", () => {

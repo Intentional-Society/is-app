@@ -102,7 +102,11 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     - **D7 Anything else.** Anything about this run that makes you want a human to look before the merge, even if it fits none of the checks above and you can't pin it down, such as a diff carrying changes unrelated to the PR's title. Asking costs the human one click, so when in doubt, ask. Say in the doubt line what gave you pause.
 
     **Authorize or ask.**
-    - **Opted out, no doubt:** immediately before step 12's merge command, write `.claude/.ship-merge-authorized` at the repo root as `ship\t<current ISO-8601 UTC>\t<N>`. The gate allows that one merge within 120 seconds and deletes the marker.
+    - **Opted out, no doubt:** immediately before step 12's merge command, write the marker at the repo root **in its own shell command**, taking the time from the clock rather than estimating it:
+      - Bash: `printf 'ship\t%s\t<N>\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .claude/.ship-merge-authorized`
+      - PowerShell: ``"ship`t$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))`t<N>" | Set-Content -Encoding ascii .claude/.ship-merge-authorized``
+
+      Then run the merge as a **separate** command. The gate checks a command before it runs, so a marker written in the same command as the merge doesn't exist yet when the gate looks, and the redirect makes the command not a plain merge; either way the gate asks. The gate allows the next plain merge of that PR within 120 seconds and deletes the marker.
     - **Opted out, any doubt:** write no marker. Print `Asking for merge confirmation: <D#> <one-line reason>` for each doubt, then run step 12; the gate prompts.
     - **Not opted out:** write no marker. List any doubts the same way, so the gate's prompt has context.
 

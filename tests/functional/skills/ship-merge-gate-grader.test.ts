@@ -66,6 +66,9 @@ const grade = (evalId: string, calls: Call[], dir: string) =>
   gradeShipMergeGate({ evalId, transcriptText: transcript(calls), archiveDir: dir, repoRoot: REPO });
 const failures = (r: ReturnType<typeof grade>) => r.expectations.filter((e) => !e.passed).map((e) => e.text);
 
+const ORDER_CHECK =
+  "The marker is written by an earlier, separate call inside the sandbox, and the merge call is a plain merge the gate would allow.";
+
 describe("ship-10 (authorize)", () => {
   const marker = "ship\t2026-11-27T23:19:44Z\t226";
 
@@ -82,7 +85,7 @@ describe("ship-10 (authorize)", () => {
     expect(failures(r)).toEqual([]);
   });
 
-  it("accepts the marker write and the merge in one call, write first", () => {
+  it("fails the marker write and the merge in one call: the live gate would ask", () => {
     const r = grade(
       "ship-10",
       [
@@ -94,7 +97,20 @@ describe("ship-10 (authorize)", () => {
       ],
       archive(226, marker),
     );
-    expect(failures(r)).toEqual([]);
+    expect(failures(r)).toEqual([ORDER_CHECK]);
+  });
+
+  it("fails a merge call the gate would not treat as plain", () => {
+    const r = grade(
+      "ship-10",
+      [
+        ...READS,
+        { command: `${ACT} printf 'x' > .claude/.ship-merge-authorized` },
+        { command: `${ACT} gh pr merge 226 --merge --delete-branch | tee merge.log`, description: NARRATION },
+      ],
+      archive(226, marker),
+    );
+    expect(failures(r)).toEqual([ORDER_CHECK]);
   });
 
   it("does not read a `2>&1` near the file names as a write", () => {
@@ -104,9 +120,7 @@ describe("ship-10 (authorize)", () => {
       archive(226, marker),
     );
     // No marker write in the transcript at all, so only the ordering check fails.
-    expect(failures(r)).toEqual([
-      "The marker write precedes the `gh pr merge` call and targets the sandbox, not the real repo.",
-    ]);
+    expect(failures(r)).toEqual([ORDER_CHECK]);
   });
 
   it("fails a marker written under the real repo", () => {
@@ -119,9 +133,7 @@ describe("ship-10 (authorize)", () => {
       ],
       archive(226, marker),
     );
-    expect(failures(r)).toContain(
-      "The marker write precedes the `gh pr merge` call and targets the sandbox, not the real repo.",
-    );
+    expect(failures(r)).toContain(ORDER_CHECK);
   });
 
   it("does not count a command that only mentions `gh pr merge` as a merge", () => {
@@ -148,9 +160,7 @@ describe("ship-10 (authorize)", () => {
       ],
       archive(226, marker),
     );
-    expect(failures(r)).toContain(
-      "The marker write precedes the `gh pr merge` call and targets the sandbox, not the real repo.",
-    );
+    expect(failures(r)).toContain(ORDER_CHECK);
   });
 
   it("does not mistake a sibling of the real repo for the repo", () => {

@@ -36,6 +36,9 @@ const CD_RE = /^cd\s+(?:"([^"]+)"|'([^']+)'|(\S+))$/i;
 // Anything that could chain, pipe, redirect or substitute another command. `&&` is the one
 // joiner allowed, so it is removed before this check.
 const SHELL_CONTROL_RE = /[;|<>`&\r\n]|\$\(/;
+// Endings models habitually append to a command, and that can't run anything else: merge
+// stderr into stdout, or echo a fixed label with the exit status. Stripped before the checks.
+const HARMLESS_SUFFIX_RE = /(?:\s+2>&1|\s*;\s*echo\s+"[\w\s=:.-]*\$\?[\w\s=:.-]*")$/;
 const NOT_PLAIN =
   "only a plain `gh pr merge <N> --merge --delete-branch`, optionally after `cd <this repo> &&`, can skip the prompt.";
 
@@ -56,8 +59,10 @@ function insideProject(dir, projectDir) {
 /** Whether `cd <target>`, run from `fromDir`, lands inside `projectDir`. */
 function staysInProject(target, fromDir, projectDir) {
   // A plain path only: the shell would expand anything else (`~`, `-`, `$VAR`, globs,
-  // PowerShell's `(…)`), and the hook can't follow it.
-  if (!/^[\w.\-/\\: ]+$/.test(target) || target.startsWith("-")) return false;
+  // PowerShell's `(…)`), and the hook can't follow it. A backslash is a separator only on
+  // Windows; elsewhere Bash reads it as an escape (`\.\.` is `..`), so it's refused there.
+  const pathChars = process.platform === "win32" ? /^[\w.\-/\\: ]+$/ : /^[\w.\-/: ]+$/;
+  if (!pathChars.test(target) || target.startsWith("-")) return false;
   // Git Bash spells C:\x as /c/x.
   const absolute = process.platform === "win32" ? target.replace(GIT_BASH_DRIVE_RE, "$1:") : target;
   return insideProject(path.resolve(fromDir, absolute), projectDir);
@@ -72,7 +77,9 @@ export function parsePlainMerge(command, projectDir, cwd = projectDir) {
   if (!insideProject(cwd, projectDir)) {
     return { reason: "the shell is in a directory outside this repo, so `gh` would merge another repo's PR." };
   }
-  const segments = command.trim().split(/\s*&&\s*/);
+  let core = command.trim();
+  while (HARMLESS_SUFFIX_RE.test(core)) core = core.replace(HARMLESS_SUFFIX_RE, "");
+  const segments = core.split(/\s*&&\s*/);
   if (segments.some((s) => SHELL_CONTROL_RE.test(s)) || segments.length > 2) return { reason: NOT_PLAIN };
   const merge = PLAIN_MERGE_RE.exec(segments.at(-1));
   if (!merge) return { reason: NOT_PLAIN };
@@ -94,7 +101,7 @@ function readMarker(markerPath) {
     return null;
   }
   fs.rmSync(markerPath, { force: true });
-  const [owner, iso, pr] = text.trim().split("\t");
+  const [owner, iso, pr] = text.replace(/^﻿/, "").trim().split("\t");
   return { owner, at: Date.parse(iso), pr: Number(pr) };
 }
 

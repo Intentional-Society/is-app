@@ -11,7 +11,20 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { parsePlainMerge } from "../../../.claude/hooks/ship-merge-gate.mjs";
 import { REPO_ROOT } from "./paths.mjs";
+
+// Executors prefix every command with the sandbox activation; the real gate never sees it.
+const ACTIVATION_PREFIX =
+  /^\s*(?:source|\.)\s+(?:"[^"]*activate\.(?:sh|ps1)"|'[^']*activate\.(?:sh|ps1)'|\S*activate\.(?:sh|ps1))\s*(?:&&|;)\s*/i;
+
+/** Whether the real merge gate would treat `command` as a plain merge (activation prefix removed). */
+function gateSeesPlainMerge(command) {
+  const stripped = command.replace(ACTIVATION_PREFIX, "");
+  // Shape only: where a `cd` lands is the live gate's job, not something a transcript shows.
+  const root = path.parse(process.cwd()).root;
+  return parsePlainMerge(stripped, root, root).pr != null;
+}
 
 export const SHIP_MERGE_GATE_EVALS = {
   "ship-10": "authorize", // opted out, no doubt: marker written, no doubt line
@@ -142,17 +155,17 @@ export function gradeShipMergeGate({ evalId, transcriptText, archiveDir, repoRoo
       m && /Z$/.test(m[1]) && !Number.isNaN(Date.parse(m[1])),
       authBody == null ? "file absent" : JSON.stringify(authBody),
     );
+    // The live gate checks the merge command before it runs, so the marker must already exist:
+    // written by an earlier, separate call, with the merge itself a plain command the gate
+    // would allow. A marker written in the merge's own call never skips the prompt.
     const firstWrite = events.findIndex((e) => writesFile(e, "\\.ship-merge-authorized"));
-    // `printf … > marker && gh pr merge …` in one call: compare positions inside the command.
-    const ordered =
-      firstWrite >= 0 && firstWrite === mergeIdx
-        ? events[mergeIdx].command.search(/\.ship-merge-authorized/) < events[mergeIdx].command.search(MERGE)
-        : firstWrite >= 0 && mergeIdx >= 0 && firstWrite < mergeIdx;
+    const separateEarlier = firstWrite >= 0 && mergeIdx >= 0 && firstWrite < mergeIdx;
+    const plainMerge = merges.length > 0 && gateSeesPlainMerge(merges[0].command);
     const realRepoWrite = markerWrites.some((e) => writesOutsideSandbox(e, repoRoot));
     check(
-      "The marker write precedes the `gh pr merge` call and targets the sandbox, not the real repo.",
-      ordered && !realRepoWrite,
-      `first marker write at event ${firstWrite}, merge at ${mergeIdx}; real-repo write: ${realRepoWrite}`,
+      "The marker is written by an earlier, separate call inside the sandbox, and the merge call is a plain merge the gate would allow.",
+      separateEarlier && plainMerge && !realRepoWrite,
+      `first marker write at event ${firstWrite}, merge at ${mergeIdx}; plain merge: ${plainMerge}; real-repo write: ${realRepoWrite}`,
     );
   } else {
     check(

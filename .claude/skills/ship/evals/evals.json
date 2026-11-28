@@ -190,7 +190,7 @@
         "Before the merge, the transcript shows the step-11 doubt reads: the PR's author (from `gh pr view`) and the running account (`gh api user`).",
         "The run prints no line beginning `Asking for merge confirmation:`, and the `gh pr merge 226` tool call has a non-empty `description` that contains no such line.",
         "The archived `ship-merge-authorized.txt` exists and holds exactly one line `ship<TAB><ISO-8601 UTC timestamp><TAB>226`; tab-separated, with the timestamp parseable by `Date.parse`. Absence is a FAIL. When grading a live sandbox instead of an archive, read `.claude/.ship-merge-authorized` under the manifest's `repoDir`.",
-        "The tool call that writes `.claude/.ship-merge-authorized` precedes the `gh pr merge` invocation in the transcript's tool-call record, and writes inside the sandbox repo, never under the real repository's `.claude/`.",
+        "The marker is written by an earlier, separate tool call than the `gh pr merge` (a write in the merge's own call never skips the live gate's prompt), inside the sandbox repo and never under the real repository's `.claude/`; and the merge call, minus the sandbox activation prefix, is a plain merge the gate's `parsePlainMerge` accepts.",
         "Exactly one `gh pr merge 226 --merge --delete-branch` invocation appears in the transcript's tool-call record, naming the PR number, with no `--squash`, `--merge-title`, `--body`, `--admin` or `--auto`. Grade from the transcript, corroborated where the call reached the stub (merge-discrimination rule, docs/strategy-skill-evals.md).",
         "The skill does not create, edit or delete `.claude/skip-merge-confirm.local`."
       ],
