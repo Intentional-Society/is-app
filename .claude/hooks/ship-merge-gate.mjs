@@ -42,26 +42,36 @@ const NOT_PLAIN =
 const GIT_BASH_DRIVE_RE = /^\/([a-z])(?=\/|$)/i;
 
 function normalizeDir(dir) {
-  const p = path.resolve(dir);
-  return process.platform === "win32" ? p.toLowerCase() : p;
+  if (process.platform !== "win32") return path.resolve(dir);
+  // Git Bash spells C:\x as /c/x.
+  return path.resolve(dir.replace(GIT_BASH_DRIVE_RE, "$1:")).toLowerCase();
 }
 
-/** Whether `cd <target>`, run from `projectDir`, stays inside `projectDir`. */
-function staysInProject(target, projectDir) {
-  // The shell expands these (home, previous dir, variables, globs); the hook can't follow.
-  if (/^-|[~$*?]/.test(target)) return false;
+function insideProject(dir, projectDir) {
+  const root = normalizeDir(projectDir);
+  const dest = normalizeDir(dir);
+  return dest === root || dest.startsWith(root + path.sep);
+}
+
+/** Whether `cd <target>`, run from `fromDir`, lands inside `projectDir`. */
+function staysInProject(target, fromDir, projectDir) {
+  // A plain path only: the shell would expand anything else (`~`, `-`, `$VAR`, globs,
+  // PowerShell's `(…)`), and the hook can't follow it.
+  if (!/^[\w.\-/\\: ]+$/.test(target) || target.startsWith("-")) return false;
   // Git Bash spells C:\x as /c/x.
   const absolute = process.platform === "win32" ? target.replace(GIT_BASH_DRIVE_RE, "$1:") : target;
-  const root = normalizeDir(projectDir);
-  const dest = normalizeDir(path.resolve(projectDir, absolute));
-  return dest === root || dest.startsWith(root + path.sep);
+  return insideProject(path.resolve(fromDir, absolute), projectDir);
 }
 
 /**
  * Parse a command as a plain merge. Returns { pr } for `gh pr merge <N> --merge
  * --delete-branch`, optionally after `cd <dir inside projectDir> &&`; else { reason }.
+ * `cwd` is the shell's working directory, when the hook input reports it.
  */
-export function parsePlainMerge(command, projectDir) {
+export function parsePlainMerge(command, projectDir, cwd = projectDir) {
+  if (!insideProject(cwd, projectDir)) {
+    return { reason: "the shell is in a directory outside this repo, so `gh` would merge another repo's PR." };
+  }
   const segments = command.trim().split(/\s*&&\s*/);
   if (segments.some((s) => SHELL_CONTROL_RE.test(s)) || segments.length > 2) return { reason: NOT_PLAIN };
   const merge = PLAIN_MERGE_RE.exec(segments.at(-1));
@@ -69,7 +79,7 @@ export function parsePlainMerge(command, projectDir) {
   if (segments.length === 2) {
     const cd = CD_RE.exec(segments[0]);
     if (!cd) return { reason: NOT_PLAIN };
-    if (!staysInProject(cd[1] ?? cd[2] ?? cd[3], projectDir)) {
+    if (!staysInProject(cd[1] ?? cd[2] ?? cd[3], cwd, projectDir)) {
       return { reason: "the command changes to a directory outside this repo before merging." };
     }
   }
@@ -92,13 +102,13 @@ function readMarker(markerPath) {
  * Decide one tool call. Returns null for a command that isn't a merge, else
  * { decision: "ask" | "allow", reason }.
  */
-export function decide({ command, projectDir, now = Date.now() }) {
+export function decide({ command, projectDir, cwd = projectDir, now = Date.now() }) {
   if (typeof command !== "string" || !MERGE_RE.test(command)) return null;
 
   const ask = (reason) => ({ decision: "ask", reason: `Merge gate: ${reason}` });
-  // Not a plain merge (extra commands, other flags, a URL, a mention in an argument): ask,
-  // and leave any marker for the real merge.
-  const plain = parsePlainMerge(command, projectDir);
+  // Not a plain merge (extra commands, other flags, a URL, a mention in an argument, a shell
+  // outside this repo): ask, and leave any marker for the real merge.
+  const plain = parsePlainMerge(command, projectDir, cwd);
   if (plain.pr == null) return ask(plain.reason);
   const target = plain.pr;
   const markerPath = path.join(projectDir, MARKER_FILE);
@@ -139,17 +149,26 @@ function emit(result) {
 function main() {
   let result;
   try {
-    const input = JSON.parse(fs.readFileSync(0, "utf8"));
+    const input = JSON.parse(fs.readFileSync(0, "utf8").replace(/^﻿/, ""));
     const projectDir = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
-    result = decide({ command: input.tool_input?.command, projectDir });
+    result = decide({ command: input.tool_input?.command, projectDir, cwd: input.cwd || projectDir });
   } catch (error) {
     result = { decision: "ask", reason: `Merge gate error, asking instead: ${error.message}` };
   }
   if (result) emit(result);
 }
 
-const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
-const ownPath = fileURLToPath(import.meta.url);
+// Run main() only when executed, not when imported by tests. Node resolves symlinks in its
+// own module path, so compare real paths: a symlinked checkout must not skip the gate.
+function realPath(p) {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+const invokedPath = process.argv[1] ? realPath(process.argv[1]) : "";
+const ownPath = realPath(fileURLToPath(import.meta.url));
 const same =
   process.platform === "win32" ? invokedPath.toLowerCase() === ownPath.toLowerCase() : invokedPath === ownPath;
 if (same) main();

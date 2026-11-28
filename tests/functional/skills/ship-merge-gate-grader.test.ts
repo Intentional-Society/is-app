@@ -124,6 +124,20 @@ describe("ship-10 (authorize)", () => {
     );
   });
 
+  it("does not count a command that only mentions `gh pr merge` as a merge", () => {
+    const r = grade(
+      "ship-10",
+      [
+        ...READS,
+        { command: `${ACT} grep -n "gh pr merge" .claude/skills/ship/SKILL.md` },
+        { command: `${ACT} printf 'x' > .claude/.ship-merge-authorized` },
+        { command: `${ACT} gh pr merge 226 --merge --delete-branch`, description: NARRATION },
+      ],
+      archive(226, marker),
+    );
+    expect(failures(r)).toEqual([]);
+  });
+
   it("fails a relative marker write that never entered the sandbox", () => {
     const r = grade(
       "ship-10",

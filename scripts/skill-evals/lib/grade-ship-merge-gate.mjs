@@ -18,7 +18,10 @@ export const SHIP_MERGE_GATE_EVALS = {
   "ship-11": "doubt", // opted out, D1 hit: doubt in the merge call's description, no marker
 };
 
-const MERGE = /\bgh(?:\.exe)?\s+pr\s+merge\b/;
+// A merge call: `gh pr merge` at the start of the command or of a chained step (after the
+// sandbox activation prefix, for one). A mention inside an argument, such as
+// `grep "gh pr merge" SKILL.md`, is not a merge.
+const MERGE = /(?:^|&&|;|\|\|)\s*gh(?:\.exe)?\s+pr\s+merge\b/;
 const FORBIDDEN_FLAGS = /--squash|--merge-title|--body|--admin|--auto\b/;
 const DOUBT = /Asking for merge confirmation:[^\n"']*/g;
 

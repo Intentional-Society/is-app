@@ -76,9 +76,26 @@ describe("parsePlainMerge", () => {
     "cd /tmp && gh pr merge 5 --merge --delete-branch",
     "git status && gh pr merge 5 --merge --delete-branch",
     "cd . && cd . && gh pr merge 5 --merge --delete-branch",
+    "cd (Stop-Process) && gh pr merge 5 --merge --delete-branch",
+    "cd @(Get-Location) && gh pr merge 5 --merge --delete-branch",
     'grep -rn "gh pr merge" docs',
   ])("not plain: %s", (command) => {
     expect(pr(command)).toBeNull();
+  });
+
+  it("allows a quoted folder name with a space", () => {
+    fs.mkdirSync(path.join(dir, "my dir"));
+    expect(pr('cd "my dir" && gh pr merge 5 --merge --delete-branch')).toBe(5);
+  });
+
+  it("resolves a relative `cd` from the shell's directory, and asks when the shell is outside the repo", () => {
+    const sub = path.join(dir, "sub");
+    fs.mkdirSync(sub);
+    expect(parsePlainMerge("cd .. && gh pr merge 5 --merge --delete-branch", dir, sub).pr).toBe(5);
+    expect(parsePlainMerge("gh pr merge 5 --merge --delete-branch", dir, sub).pr).toBe(5);
+    const outside = parsePlainMerge("gh pr merge 5 --merge --delete-branch", dir, path.dirname(dir));
+    expect(outside.pr).toBeUndefined();
+    expect(outside.reason).toMatch(/outside this repo/);
   });
 });
 
@@ -193,6 +210,29 @@ describe("hook process", () => {
 
   it("asks when its input cannot be parsed", () => {
     const out = spawn("not json");
+    expect(out.status).toBe(0);
+    expect(JSON.parse(out.stdout).hookSpecificOutput.permissionDecision).toBe("ask");
+  });
+
+  it("reads input that starts with a byte-order mark", () => {
+    const out = spawn(
+      `﻿${JSON.stringify({ tool_name: "Bash", tool_input: { command: "gh pr merge 5 --merge --delete-branch" } })}`,
+    );
+    expect(JSON.parse(out.stdout).hookSpecificOutput.permissionDecisionReason).toMatch(/merge confirmation is on/);
+  });
+
+  it("still runs when reached through a symlinked folder", () => {
+    const link = path.join(dir, "linked-hooks");
+    try {
+      fs.symlinkSync(path.dirname(HOOK), link, "junction");
+    } catch {
+      return; // symlinks unavailable here; nothing to test
+    }
+    const out = spawnSync(process.execPath, [path.join(link, path.basename(HOOK))], {
+      input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "gh pr merge 5 --merge --delete-branch" } }),
+      env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+      encoding: "utf8",
+    });
     expect(out.status).toBe(0);
     expect(JSON.parse(out.stdout).hookSpecificOutput.permissionDecision).toBe("ask");
   });
