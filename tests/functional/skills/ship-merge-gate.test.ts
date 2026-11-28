@@ -120,6 +120,13 @@ describe("decide", () => {
     expect(result?.reason).toMatch(/isn't \/shipit/);
   });
 
+  it("asks on an opted-out machine when the typed message only contains the /shipit tag, as pasted text would", () => {
+    optOut();
+    expect(
+      run("gh pr merge 12 --merge --delete-branch", transcript(typed(`here is the log:\n${SHIP}`)))?.decision,
+    ).toBe("ask");
+  });
+
   it("asks on an opted-out machine when /shipit only appears in tool output", () => {
     optOut();
     expect(
@@ -135,9 +142,17 @@ describe("decide", () => {
     );
   });
 
+  // settings.json's `if` rule keeps a mere mention from reaching the hook; once it runs, any
+  // mention asks.
   it("asks for any command that mentions a merge, whatever its shape", () => {
     expect(run('grep -rn "gh pr merge" docs')?.decision).toBe("ask");
     expect(run("cd x && gh pr merge 12 --merge --delete-branch && rm -rf ~")?.decision).toBe("ask");
+  });
+
+  it("recognizes gh.exe and a quoted full path to it as merges", () => {
+    for (const command of ["gh.exe pr merge 12 --merge", "& 'C:\\Program Files\\GitHub CLI\\gh.exe' pr merge 12"]) {
+      expect(run(command, transcript(typed(SHIP)))?.reason, command).toMatch(/merge confirmation is on/);
+    }
   });
 });
 
@@ -193,43 +208,55 @@ describe("hook process", () => {
 
 describe("checked-in settings and /shipit's grant", () => {
   const settings = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, ".claude", "settings.json"), "utf8"));
-  const entry = settings.hooks.PreToolUse.find((e: { matcher: string }) => e.matcher === "Bash|PowerShell");
+  const SHELLS = ["Bash", "PowerShell"];
+  const ifRule = (shell: string) => `${shell}(gh pr merge *)`;
+  const gate = (rule: string) =>
+    expect.objectContaining({
+      type: "command",
+      if: rule,
+      command: "node",
+      // A Claude Code path placeholder, not a JS template.
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: literal settings.json value
+      args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
+      onFailure: "block",
+    });
 
-  it("registers the gate for Bash and PowerShell, failing closed, with no `if` filter", () => {
-    expect(entry.hooks).toContainEqual(
-      expect.objectContaining({
-        type: "command",
-        command: "node",
-        // A Claude Code path placeholder, not a JS template.
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: literal settings.json value
-        args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
-        onFailure: "block",
-      }),
-    );
-    for (const hook of entry.hooks) expect(hook.if).toBeUndefined();
+  it("registers the gate per shell, failing closed, only for a `gh` or `gh.exe` merge subcommand", () => {
+    for (const shell of SHELLS) {
+      const entry = settings.hooks.PreToolUse.find((e: { matcher: string }) => e.matcher === shell);
+      expect(entry?.hooks).toEqual([gate(ifRule(shell)), gate(`${shell}(*gh.exe* pr merge *)`)]);
+    }
   });
 
-  it("asks for --admin, --auto and other-repo merges in both shells", () => {
+  it("asks for --admin, --auto, other-repo merges and flags before `pr` in both shells", () => {
     expect(settings.permissions.ask).toEqual(
       expect.arrayContaining(
-        ["--admin", "--auto", "-R", "--repo"].flatMap((flag) => [
-          `Bash(gh pr merge *${flag}*)`,
-          `PowerShell(gh pr merge *${flag}*)`,
+        SHELLS.flatMap((shell) => [
+          ...["--admin", "--auto", "-R", "--repo"].map((flag) => `${shell}(gh pr merge *${flag}*)`),
+          `${shell}(gh -* pr merge *)`,
         ]),
       ),
     );
   });
 
+  const skill = fs.readFileSync(path.join(REPO_ROOT, ".claude", "skills", "shipit", "SKILL.md"), "utf8");
+  const front = skill.split(/^---$/m)[1];
+  // A one-line YAML flow list, which is also valid JSON.
+  const line = /^allowed-tools:\s*(\[.*\])\s*$/m.exec(front);
+  const grants: string[] = JSON.parse(line?.[1] ?? "[]");
+
   it("/shipit grants exactly the merge command it runs, and nothing broader", () => {
-    const skill = fs.readFileSync(path.join(REPO_ROOT, ".claude", "skills", "shipit", "SKILL.md"), "utf8");
-    const front = skill.split(/^---$/m)[1];
-    // A one-line YAML flow list, which is also valid JSON.
-    const line = /^allowed-tools:\s*(\[.*\])\s*$/m.exec(front);
     expect(line, "allowed-tools must be a one-line list").not.toBeNull();
-    const grants = JSON.parse(line?.[1] ?? "[]");
     expect(grants).toEqual([
       "Bash(gh pr merge * --merge --delete-branch)",
       "PowerShell(gh pr merge * --merge --delete-branch)",
     ]);
+  });
+
+  it("every /shipit grant falls inside its shell's `if` rule, so a granted merge always reaches the hook", () => {
+    for (const grant of grants) {
+      const shell = grant.slice(0, grant.indexOf("("));
+      expect(grant.startsWith(ifRule(shell).slice(0, -2))).toBe(true);
+    }
   });
 });

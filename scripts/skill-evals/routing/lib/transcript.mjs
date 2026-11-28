@@ -213,6 +213,10 @@ export function routingObservables(events, { skill, ghCallLog } = {}) {
     .filter((t) => t.name === "Skill")
     .map((t) => String(t.input?.skill ?? t.input?.command ?? ""));
   const invokedThisSkill = skillInvocations.some((s) => new RegExp(`(^|[^a-z])${skill}([^a-z]|$)`, "i").test(s));
+  // Claude Code's bundled ship / ship-local / steward own those names (why this skill is
+  // /shipit), so a /shipit-domain turn that calls one is the over-trigger the controls catch.
+  const invokedBundledShip =
+    skill === "shipit" && skillInvocations.some((s) => /^\/?(ship|ship-local|steward)$/i.test(s.trim()));
 
   const announce = { commit: "Using /commit", pr: "Using /pr", shipit: "Using /shipit" }[skill];
   // At the start of a line, plain or bold (`**Using /commit**`); a quoted mention inside a
@@ -253,6 +257,7 @@ export function routingObservables(events, { skill, ghCallLog } = {}) {
     announcementIsFirstLine,
     skillInvocations,
     invokedThisSkill,
+    invokedBundledShip,
     mutatingBashCmds,
     askUserQuestionUsed,
     ghLog,

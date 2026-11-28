@@ -410,6 +410,29 @@ describe("routingObservables announcementPresent (#608 A2)", () => {
   });
 });
 
+// Claude Code's bundled ship / ship-local / steward take precedence over a project skill with
+// those names, so a "ship it" turn that calls one must still register as an invocation.
+describe("routingObservables invokedBundledShip", () => {
+  const turn = (skill: string) => [
+    { type: "system", subtype: "init" },
+    { type: "assistant", message: { content: [{ type: "tool_use", id: "s1", name: "Skill", input: { skill } }] } },
+  ];
+  const obs = (called: string, skill = "shipit") => routingObservables(turn(called), { skill });
+
+  it("flags a call to the bundled ship, ship-local or steward on a /shipit query", () => {
+    for (const called of ["ship", "ship-local", "steward", "/ship"]) {
+      expect(obs(called).invokedBundledShip, called).toBe(true);
+      expect(obs(called).invokedThisSkill, called).toBe(false);
+    }
+  });
+
+  it("does not flag the team skill itself, or other skills' queries", () => {
+    expect(obs("shipit").invokedBundledShip).toBe(false);
+    expect(obs("shipit").invokedThisSkill).toBe(true);
+    expect(obs("ship", "commit").invokedBundledShip).toBe(false);
+  });
+});
+
 // #608 A3: the pass rate came from the grader's own summary block, which can disagree with its
 // per-expectation verdicts (commit-6: 22/24 by verdicts, 23/24 by summary). Only `passed === true`
 // counts as a pass.

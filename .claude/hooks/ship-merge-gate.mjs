@@ -1,7 +1,12 @@
 // PreToolUse merge gate (registered in .claude/settings.json for Bash and PowerShell).
 //
-// It never allows anything; it only decides whether a `gh pr merge` must ask a human. It
-// asks for every command that mentions `gh pr merge`, unless all three hold:
+// It never allows anything; it only decides whether a `gh pr merge` must ask a human.
+// settings.json runs it only for a command with a `gh pr merge` or `…gh.exe… pr merge`
+// subcommand (each handler's `if` rule, which Claude Code matches per subcommand; a handler
+// takes one rule, so each shell has two), so a command that only mentions the
+// words, such as a grep for them, never reaches it. Every grant in /shipit's `allowed-tools`
+// falls inside that `if` rule, so a merge the grant would allow always reaches this hook.
+// Once it runs, it asks unless all three hold:
 //
 //   1. `.claude/skip-merge-confirm.local` exists (per-machine opt-out, gitignored),
 //   2. the most recent message the human typed in this session is `/shipit`, and
@@ -12,8 +17,8 @@
 // When it stays silent, Claude Code's own permission rules decide. /shipit's `allowed-tools`
 // grants exactly `gh pr merge <N> --merge --delete-branch` for the turn the human typed
 // `/shipit`, Claude Code checks each part of a compound command itself, and checked-in `ask`
-// rules catch `--admin` and `--auto`. So a mistake here can only add a prompt or fail to add
-// one; it can never grant a command.
+// rules catch `--admin`, `--auto`, another repository, and any flag before `pr`. So a
+// mistake here can only add a prompt or fail to add one; it can never grant a command.
 //
 // The hook returns "ask" explicitly instead of staying silent, because a silent hook leaves
 // the call to the permission mode, and auto mode's classifier would approve a merge.
@@ -25,8 +30,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const OPT_OUT_FILE = path.join(".claude", "skip-merge-confirm.local");
-const MERGE_RE = /\bgh(?:\.exe)?\s+pr\s+merge\b/i;
-const SHIP_COMMAND = "<command-name>/shipit</command-name>";
+// `gh`, `gh.exe`, or a quoted full path ending in either (`& 'C:\…\gh.exe' pr merge`).
+const MERGE_RE = /\bgh(?:\.exe)?["']?\s+pr\s+merge\b/i;
+// A typed /shipit: Claude Code stores it as `<command-message>shipit</command-message>` then
+// `<command-name>/shipit</command-name>`. Anchored, so pasted text that merely contains the
+// tag doesn't count.
+const SHIP_COMMAND_RE = /^\s*(?:<command-message>[^<]*<\/command-message>\s*)?<command-name>\/shipit<\/command-name>/;
 export const SAFE_DECLARATION = "Looks safe to me";
 
 // User entries Claude Code writes itself rather than the human: a background task finishing,
@@ -79,7 +88,7 @@ export function decide({ command, projectDir, transcriptPath, description = "" }
   } catch {
     return ask("could not read this session's transcript to confirm a typed /shipit.");
   }
-  if (!typed.includes(SHIP_COMMAND)) {
+  if (!SHIP_COMMAND_RE.test(typed)) {
     return ask("the last message you typed isn't /shipit, so this merge isn't covered by the opt-out.");
   }
   if (!String(description).trim().startsWith(SAFE_DECLARATION)) {
