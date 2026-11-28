@@ -70,11 +70,11 @@ drizzle/            Database migration files
 
 ## Working with AI assistants
 
-Claude Code Skills under [.claude/skills/](.claude/skills/) encode the team's check-in workflow. `/commit` and `/pr` fire on a typed slash command **or** on plain-language intent ("commit this", "open a PR") — including a bare "yes" to an assistant's own offer; when one fires from plain language it announces `Using /commit` or `Using /pr` first, so you can see it. `/ship` is explicit-only: type it.
+Claude Code Skills under [.claude/skills/](.claude/skills/) encode the team's check-in workflow. `/commit` and `/pr` fire on a typed slash command **or** on plain-language intent ("commit this", "open a PR") — including a bare "yes" to an assistant's own offer; when one fires from plain language it announces `Using /commit` or `Using /pr` first, so you can see it. `/shipit` is explicit-only: type it.
 
 - `/commit [issue-or-context]` — stage, test, draft a Conventional Commit-style message, bundled human approval, push.
 - `/pr [PR#|URL|issue-or-context]` — fetch + rebase if needed, push, open or update the PR.
-- `/ship [PR#|URL|issue-or-context]` — orchestrates the full chain (`/pr` → `/commit` as needed), waits for CI green, merges, watches `main`.
+- `/shipit [PR#|URL|issue-or-context]` — orchestrates the full chain (`/pr` → `/commit` as needed), waits for CI green, merges, watches `main`.
 
 Design rationale and the full step lists are in [docs/spec-portable-ai-procedures.md](docs/spec-portable-ai-procedures.md).
 

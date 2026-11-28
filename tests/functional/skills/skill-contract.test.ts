@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // Deterministic structural gate for the team's four Skills — the three
-// portable-procedure ones (/commit, /pr, /ship) plus /handoff, which joined when
+// portable-procedure ones (/commit, /pr, /shipit) plus /handoff, which joined when
 // its evals were migrated into the sandbox harness (#585). It encodes
 // docs/spec-portable-ai-procedures.md §2 (Tool/platform assumptions, L52–61) and
 // §3 (Architecture, L79–117) as assertions that run inside the already-required
@@ -18,19 +18,19 @@ import { describe, expect, it } from "vitest";
 // Deliberately NOT asserted (judgment / LLM territory, spec §3 L115): description
 // quality, `## Depends on` accuracy, "passes its eval set", self-hosting.
 
-const SKILLS = ["commit", "pr", "ship", "handoff"] as const;
+const SKILLS = ["commit", "pr", "shipit", "handoff"] as const;
 type SkillName = (typeof SKILLS)[number];
 
 // Post-NL-revision invocation policy (#353, confirmed on main after #484):
 // /commit and /pr omit `disable-model-invocation` (natural-language-invocable);
-// /ship keeps it `true` (explicit-only). /handoff omits it too — it only writes a
+// /shipit keeps it `true` (explicit-only). /handoff omits it too — it only writes a
 // gitignored scratch file, so it carries no announce/confirm gate (its SKILL.md
 // Invocation section says so). The key is per-skill, never uniform —
 // spec §2 L55 / L58, §3 L92.
 const EXPLICIT_ONLY: Record<SkillName, boolean> = {
   commit: false,
   pr: false,
-  ship: true,
+  shipit: true,
   handoff: false,
 };
 
@@ -71,7 +71,7 @@ function readSkill(name: SkillName) {
   return { path, raw, ...parseFrontmatter(raw) };
 }
 
-describe("skill contract — .claude/skills/{commit,pr,ship,handoff}", () => {
+describe("skill contract — .claude/skills/{commit,pr,shipit,handoff}", () => {
   describe.each(SKILLS)("%s/SKILL.md", (name) => {
     it("exists with parseable frontmatter carrying name + description", () => {
       const { keys } = readSkill(name);
@@ -131,7 +131,7 @@ describe("skill contract — .claude/skills/{commit,pr,ship,handoff}", () => {
   //  - `evals/skill-creator.evals.json` — the vendored copy's OWN acceptance evals
   //    (C1: the vendored dir stays verbatim upstream, so this file stays at repo root,
   //    in the original multi-skill `{ skills: [...] }` wrapper shape).
-  //  - `.claude/skills/{commit,pr,ship,handoff}/evals/evals.json` — the team Skills'
+  //  - `.claude/skills/{commit,pr,shipit,handoff}/evals/evals.json` — the team Skills'
   //    runnable eval definitions, split per-skill at Phase 1 into upstream's own documented
   //    per-skill location. Root `evals/evals.json` no longer exists (deleted at Phase 1
   //    completion). Schema reference: docs/strategy-skill-evals.md §3.
@@ -177,7 +177,7 @@ describe("skill contract — .claude/skills/{commit,pr,ship,handoff}", () => {
     const EXPECTED_EXECUTION_IDS: Record<SkillName, string[]> = {
       commit: ["commit-1", "commit-2", "commit-3a", "commit-3b"],
       pr: ["pr-1", "pr-2", "pr-3", "pr-4", "pr-5", "pr-6", "pr-7"],
-      ship: ["ship-1", "ship-2a", "ship-2b", "ship-3", "ship-6", "ship-7", "ship-8", "ship-9", "ship-10", "ship-11"],
+      shipit: ["ship-1", "ship-2a", "ship-2b", "ship-3", "ship-6", "ship-7", "ship-8", "ship-9", "ship-10", "ship-11"],
       handoff: [
         "handoff-1",
         "handoff-2",

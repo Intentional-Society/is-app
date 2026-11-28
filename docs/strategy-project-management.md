@@ -55,7 +55,7 @@ The rest of GitHub's built-in automations are off.
 
 ### Related Skills
 
-`/pr` (`.claude/skills/pr/SKILL.md`) opens PRs (triggering the **PR Linked → In progress** automation when the PR body has `Closes #N`); `/ship` (`.claude/skills/ship/SKILL.md`) merges them (triggering the **PR Merged → Done** automation).
+`/pr` (`.claude/skills/pr/SKILL.md`) opens PRs (triggering the **PR Linked → In progress** automation when the PR body has `Closes #N`); `/shipit` (`.claude/skills/shipit/SKILL.md`) merges them (triggering the **PR Merged → Done** automation).
 
 ## Quests
 

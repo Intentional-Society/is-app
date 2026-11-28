@@ -8,7 +8,7 @@ repetitions.
 
 - **Design & rationale:** [`docs/design-skill-evals-harness.md`](../../../docs/design-skill-evals-harness.md) — §4.4 (this runner's module map), §4.6 (the routing flow), §6 (why `expectationsOverride` and `graderHint` exist), risks R4/R8 in §9.
 - **How routing evals fit the workflow:** [`docs/strategy-skill-evals.md`](../../../docs/strategy-skill-evals.md) §6.
-- The nine evals themselves live at `.claude/skills/{commit,pr,ship}/evals/evals.json` (`kind: routing`).
+- The nine evals themselves live at `.claude/skills/{commit,pr,shipit}/evals/evals.json` (`kind: routing`).
 
 ## The idea
 

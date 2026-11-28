@@ -32,11 +32,11 @@
       "fixture": "feature-x-with-pr-on-feature-y",
       "preconditions": "Current checkout is on branch `feature-x`. PR 145 is on branch `feature-y`. Tree clean; gh authenticated.",
       "human_script": "None — the skill refuses before any interactive checkpoint is reached; no scripted reply is required.",
-      "expected_output": "Skill resolves the argument to PR 145 via `gh pr view 145`, detects the branch mismatch, refuses to switch (per `/pr` policy), names both branches in the refusal, and suggests `/ship 145` for switching. No fetch, no push, no PR-side mutation.",
+      "expected_output": "Skill resolves the argument to PR 145 via `gh pr view 145`, detects the branch mismatch, refuses to switch (per `/pr` policy), names both branches in the refusal, and suggests `/shipit 145` for switching. No fetch, no push, no PR-side mutation.",
       "expectations": [
         "`gh pr view 145` appears in the gh call log",
         "The response names both branches (`feature-x` and `feature-y`) in the refusal",
-        "The response suggests `/ship 145` as the switching path",
+        "The response suggests `/shipit 145` as the switching path",
         "The command/gh call log contains no `git fetch`, no `git push`, and no PR-mutating call (no `gh pr create`, no PR comment, no body update)"
       ]
     },

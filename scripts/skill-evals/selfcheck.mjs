@@ -453,7 +453,7 @@ function referencedFixtureNames() {
   // Every skill whose evals.json can name a fixture. A skill missing from this list has its
   // fixtures escape the completeness check silently, which is why `handoff` joined it when its
   // evals were migrated into the harness schema (#585).
-  for (const skill of ["commit", "pr", "ship", "handoff"]) {
+  for (const skill of ["commit", "pr", "shipit", "handoff"]) {
     const p = path.join(REPO_ROOT, ".claude", "skills", skill, "evals", "evals.json");
     const j = JSON.parse(fs.readFileSync(p, "utf8"));
     for (const e of j.evals) if (e.kind === "execution" && e.fixture) names.add(e.fixture);

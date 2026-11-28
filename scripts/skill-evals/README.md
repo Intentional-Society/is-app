@@ -1,7 +1,7 @@
 # skill-evals sandbox harness
 
 A disposable sandbox harness for **executing** this repo's Claude Code skill evals
-(`/commit`, `/pr`, `/ship`) without ever touching the real repo or real GitHub. It builds a
+(`/commit`, `/pr`, `/shipit`) without ever touching the real repo or real GitHub. It builds a
 throwaway git repo per named fixture, shadows `gh` with a logging **default-deny** stub,
 fakes `npm test`, and scrubs credentials — so a skill eval can stage, commit, push, open a
 PR, and "merge" against a world that is physically separate from your checkout.
@@ -86,7 +86,7 @@ from `gh-fixture.json`, and **logs every call**. Any subcommand outside that sur
 **hard-fails** (non-zero exit, logged) — it never passes through to the real `gh`. It also
 refuses entirely if the sandbox marker is missing ("no marker, no run").
 
-Stubbed surface (traced from `.claude/skills/{commit,pr,ship}/SKILL.md`):
+Stubbed surface (traced from `.claude/skills/{commit,pr,shipit}/SKILL.md`):
 
 | Subcommand                                                                      | Used by          | Notes                                                                                                                                                                                                                            |
 | ------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

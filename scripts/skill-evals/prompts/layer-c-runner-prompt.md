@@ -16,7 +16,7 @@ subprocess pipe, which raises `OSError [WinError 10093]` on Windows (spec C2, re
 | **Cowork**                    | Works per the vendored SKILL.md's Cowork section. Run the block below.                                                                               |
 | **Windows**                   | **Never natively.** Hand this prompt to a cloud/Cowork session (or a Mac/Linux teammate), let it run, and take back the reported `best_description`. |
 
-**Scope:** only `/commit` and `/pr` — the two natural-language-invocable skills. `/ship` is
+**Scope:** only `/commit` and `/pr` — the two natural-language-invocable skills. `/shipit` is
 `disable-model-invocation: true` (explicit-only), so description optimization does not apply
 to it; its should-NOT-trigger behavior is covered by routing evals ship-4 / ship-5.
 

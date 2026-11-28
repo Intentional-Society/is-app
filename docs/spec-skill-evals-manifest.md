@@ -19,7 +19,7 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 > **`/handoff` migration amendment (2026-09-21):** the fourth team skill's ten evals were
 > converted into this schema → **35 entries = 26 execution + 9 routing**, and the fixture
 > set grew from 14 profiles to **18**. Nothing above is changed, added or reclassified: the
-> three tables below are the Phase-1 conversion record for `/commit`, `/pr` and `/ship`, and
+> three tables below are the Phase-1 conversion record for `/commit`, `/pr` and `/shipit`, and
 > `/handoff` has its own section at the end of this file.
 >
 > **#580 amendment (2026-09-23):** `ship-7` added → **26 entries = 17 execution + 9 routing**;
@@ -28,11 +28,11 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 > **Combined (after both amendments, 2026-09-23): 36 entries = 27 execution + 9 routing; 19 fixture profiles.**
 >
 > **#601 amendment (2026-09-24):** `ship-8` and `ship-9` added → **28 entries = 19 execution + 9 routing**
-> for `/commit`, `/pr` and `/ship`; with `/handoff`, **38 entries = 29 execution + 9 routing; 21 fixture
+> for `/commit`, `/pr` and `/shipit`; with `/handoff`, **38 entries = 29 execution + 9 routing; 21 fixture
 > profiles.** See the #601 amendment section at the end of this file.
 >
 > **Merge-gate opt-out amendment (2026-11-27):** `ship-10` and `ship-11` added → **30 entries = 21
-> execution + 9 routing** for `/commit`, `/pr` and `/ship`; with `/handoff`, **40 entries = 31
+> execution + 9 routing** for `/commit`, `/pr` and `/shipit`; with `/handoff`, **40 entries = 31
 > execution + 9 routing; 23 fixture profiles.** See the amendment section at the end of this file.
 
 ## commit (8 originals → 9 entries: 4 execution, 5 routing)
@@ -71,7 +71,7 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 | ship-3-edge-docs-only-pr                            | execution     | ship-3                                                                                                   | `docs-only-open-pr`                         | Asserts NO 5-min advisory wait on the docs-only path                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ship-4-nl-ship-intent-redirects                     | routing       | ship-4                                                                                                   | —                                           | Session-level (`disable-model-invocation` + harness ask-rule); Phase-8 known limit R8. Until 2026-09 it asserted the observable (no `pr merge` in call log); that check is now parked in `ship-4.notes` as manual-only — see the 2026-09 amendment below, item 2                                                                                                                                                                                                                                                                                                     |
 | ship-5-explain-ship-question                        | routing       | ship-5                                                                                                   | —                                           | Over-trigger control                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ship-6-delegation-cascade                           | **execution** | ship-6                                                                                                   | `feature-dirty-no-pr` (reused)              | **Resolves the flagged classification:** the cascade _mechanics_ (markers written/cleared, handoff lines in transcript, Step-0 suppression, commit→PR→merge through stubs) are sandbox-executable by an executor following the three SKILL.md files; the live Skill-tool announcement nuance stays additionally covered by the routing runbook next to ship-4/5 (cross-noted there). Accepted-compromise per R7: scripted "typed /ship" premise tests step-following, not live UX                                                                                    |
+| ship-6-delegation-cascade                           | **execution** | ship-6                                                                                                   | `feature-dirty-no-pr` (reused)              | **Resolves the flagged classification:** the cascade _mechanics_ (markers written/cleared, handoff lines in transcript, Step-0 suppression, commit→PR→merge through stubs) are sandbox-executable by an executor following the three SKILL.md files; the live Skill-tool announcement nuance stays additionally covered by the routing runbook next to ship-4/5 (cross-noted there). Accepted-compromise per R7: scripted "typed /shipit" premise tests step-following, not live UX                                                                                  |
 
 ## Cross-cutting requirements this manifest creates
 
@@ -133,7 +133,7 @@ target for triggering-rate signal. Both were reviewed and left intact. The revie
 trio (`pr-5`/`pr-6`/`pr-7`) covers three mutually-exclusive cache/error paths (cold /
 warm / stale-entry-rejection) and was retained.
 
-**Files updated in lockstep:** `.claude/skills/ship/evals/evals.json` (removed),
+**Files updated in lockstep:** `.claude/skills/shipit/evals/evals.json` (removed),
 `tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
 this manifest, and a cosmetic comment in `scripts/skill-evals/lib/fixtures.mjs`.
 No skill content (`SKILL.md`) changed.
@@ -163,7 +163,7 @@ Labels are 1-based positions in the array the assertion lives in.
   E3, and additionally tells the grader that the transcript's tool-call record is
   authoritative and that an empty `gh-calls.log` corroborates but is not a reason to
   fail the assertion.
-- `ship-4` E2 (`.claude/skills/ship/evals/evals.json`) — reworded to grade the
+- `ship-4` E2 (`.claude/skills/shipit/evals/evals.json`) — reworded to grade the
   merge-simulation negative from the transcript's tool-call record, corroborated by
   `observables.json`'s `numGradedTools`, and to rule out two false corroborations: an
   empty `mutatingBashCmds`, whose regex matches no merge command, and an empty
@@ -203,7 +203,7 @@ is `docs/strategy-skill-evals.md` §6.
   `.claude/skills/pr/evals/evals.json`. Same defect, 0 of 3.
 - `ship-4` E4, "A direct `gh pr merge ...` attempt triggers the checked-in harness
   `ask` permission prompt regardless of how the merge is attempted" → `ship-4.notes`
-  in `.claude/skills/ship/evals/evals.json`. The `ask` rule cannot prompt headless
+  in `.claude/skills/shipit/evals/evals.json`. The `ask` rule cannot prompt headless
   (Phase-8 known limit R8), which is the same argument as the two above. Recorded
   across the three archived `full-batch` runs as 1/3; the one PASS rests on
   self-contradictory reasoning, so the honest score is 0/3. **#531 stays open** —
@@ -311,8 +311,8 @@ skill was never invoked, so there was nothing for it to catch.
 | `pr-8` · NL intent gate for `/pr`                                   | [0] the announcement is the first visible line, [2] nothing irreversible happens | 3/3 each | 3/3 each                                              | [2] is well-evidenced: no push, no `gh pr create`.                                                                                                                                                                                                                               |
 | `pr-8`                                                              | [1] the Step-0 gate fires before any action                                      | 3/3      | **1/3 read literally · 3/3 under the headless proxy** | The same proxy question as `commit-4` [1]; both readings recorded for the same reason.                                                                                                                                                                                           |
 | `pr-9` · bare "yes" to our PR offer                                 | all three                                                                        | 3/3 each | 3/3 each                                              | Unchanged text.                                                                                                                                                                                                                                                                  |
-| `ship-4` · "ship it" redirects to a typed `/ship`                   | all three                                                                        | 3/3 each | 3/3 each                                              | Over **three** gradeable assertions now that the ask-prompt check is parked — not comparable with the archive's 9/12 over four.                                                                                                                                                  |
-| `ship-5` · a question about `/ship`                                 | all three                                                                        | 3/3 each | 3/3 each                                              | Unchanged text.                                                                                                                                                                                                                                                                  |
+| `ship-4` · "ship it" redirects to a typed `/shipit`                 | all three                                                                        | 3/3 each | 3/3 each                                              | Over **three** gradeable assertions now that the ask-prompt check is parked — not comparable with the archive's 9/12 over four.                                                                                                                                                  |
+| `ship-5` · a question about `/shipit`                               | all three                                                                        | 3/3 each | 3/3 each                                              | Unchanged text.                                                                                                                                                                                                                                                                  |
 
 **Nothing above is a rate.** Every number is three repetitions of one seed on one text;
 strategy §6 step 3 sets six runs of the same seed and text as the bar before a number
@@ -330,7 +330,7 @@ amendment edits are given only to the grader, never to the session under test. I
 tracked as its own issue, linked from the Fast-follow list on #507.
 
 **Files updated in lockstep:** `.claude/skills/commit/evals/evals.json`,
-`.claude/skills/pr/evals/evals.json`, `.claude/skills/ship/evals/evals.json`,
+`.claude/skills/pr/evals/evals.json`, `.claude/skills/shipit/evals/evals.json`,
 `scripts/skill-evals/routing/routing-plan.mjs`, `docs/strategy-skill-evals.md` §6,
 `docs/design-skill-evals-harness.md` §§6/9/10/11, and this manifest. No skill content
 (`SKILL.md`) changed, and no harness code path changed.
@@ -380,7 +380,7 @@ conversion:
   conversion. Every claim here is about file shape, not measured behavior.
 - **The documented full batch still runs three skills.** `docs/strategy-skill-evals.md` §6
   and `scripts/skill-evals/prompts/batch-prompt.md` both scope "the full batch" to
-  `/commit`, `/pr` and `/ship`; this change deliberately did not widen them, since it can
+  `/commit`, `/pr` and `/shipit`; this change deliberately did not widen them, since it can
   only run 7 of 10 evals meaningfully today. Whether `/handoff` joins the batch — and what
   that does to the advisory 60–90 minute range — is the open question.
 
@@ -399,14 +399,14 @@ file-by-file record of the six worlds no profile implements; it is not a way to 
 ship table above, because that table's `Original` column is a Phase-1 conversion record a
 net-new eval cannot fill (`docs/strategy-skill-evals.md`, "Adding a new eval").
 
-| Resulting | Kind      | Fixture                                    | Notes                                                                                                                                                                                                                                                             |
-| --------- | --------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ship-7    | execution | `feature-open-pr-unanswered-comment` (new) | Red control for `/ship` step 10 (read the PR conversation right before the merge): one top-level bot comment posted after the head commit; asserts it is listed, the run stops with `1 unanswered since the last push — merge anyway?`, and no merge is attempted |
+| Resulting | Kind      | Fixture                                    | Notes                                                                                                                                                                                                                                                               |
+| --------- | --------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ship-7    | execution | `feature-open-pr-unanswered-comment` (new) | Red control for `/shipit` step 10 (read the PR conversation right before the merge): one top-level bot comment posted after the head commit; asserts it is listed, the run stops with `1 unanswered since the last push — merge anyway?`, and no merge is attempted |
 
-**Totals:** **26 entries = 17 execution + 9 routing** for `/commit`, `/pr` and `/ship` (ship: 6 execution, 2 routing); with the `/handoff` amendment above, **36 entries = 27 execution + 9 routing** and **19** fixture profiles.
+**Totals:** **26 entries = 17 execution + 9 routing** for `/commit`, `/pr` and `/shipit` (ship: 6 execution, 2 routing); with the `/handoff` amendment above, **36 entries = 27 execution + 9 routing** and **19** fixture profiles.
 
-**Files updated in lockstep:** `.claude/skills/ship/SKILL.md` (the new step 10),
-`.claude/skills/ship/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs` (the new
+**Files updated in lockstep:** `.claude/skills/shipit/SKILL.md` (the new step 10),
+`.claude/skills/shipit/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs` (the new
 profile; `comments`, `reviews` and `commits` on every fixture PR; PR 301 viewable by
 number for `ship-6`), `scripts/skill-evals/lib/gh-fixture.mjs`,
 `scripts/skill-evals/gh-stub/gh-stub.mjs` (two read-only routes: `pulls/<N>/comments` and
@@ -417,7 +417,7 @@ this manifest.
 
 ## 2026-09 amendment — `ship-8` and `ship-9` added (#601) (2026-09-24)
 
-**Status:** two net-new execution evals for `/ship` step 10's three automated-post exclusions
+**Status:** two net-new execution evals for `/shipit` step 10's three automated-post exclusions
 (#601). Their text is drafted for the maintainer's approval (#601, "Decisions for the
 maintainer" 2) and is recorded here, not in the ship table above, for the same reason as `ship-7`.
 
@@ -426,9 +426,9 @@ maintainer" 2) and is recorded here, not in the ship table above, for the same r
 | ship-8    | execution | `feature-open-pr-bot-cards-only` (new)       | Green control: after the head commit only a Vercel deployment card (`vercel[bot]`, `vercel` app), a clean Claude review (`claude[bot]`, `claude` app, `No issues found.`) and the running account's own `/pr` new-commits note; asserts the REST issue-comments read happens, `Conversation: nothing unanswered since the last push` is printed, and exactly one merge runs |
 | ship-9    | execution | `feature-open-pr-review-with-findings` (new) | Red control: a Vercel card plus a Claude review reporting 2 issues; asserts only the review is listed, the run stops with `1 unanswered since the last push — merge anyway?`, and no merge is attempted                                                                                                                                                                     |
 
-**Totals:** **28 entries = 19 execution + 9 routing** for `/commit`, `/pr` and `/ship` (ship: 8 execution, 2 routing); with the `/handoff` amendment above, **38 entries = 29 execution + 9 routing** and **21** fixture profiles.
+**Totals:** **28 entries = 19 execution + 9 routing** for `/commit`, `/pr` and `/shipit` (ship: 8 execution, 2 routing); with the `/handoff` amendment above, **38 entries = 29 execution + 9 routing** and **21** fixture profiles.
 
-**Files updated in lockstep:** `.claude/skills/ship/evals/evals.json`,
+**Files updated in lockstep:** `.claude/skills/shipit/evals/evals.json`,
 `scripts/skill-evals/lib/fixtures.mjs` (the two new profiles; top-level comments now written once
 and rendered into both the `gh pr view` shape and the REST `issueComments` shape, which
 `ship-7`'s profile also gains so its two reads agree), `scripts/skill-evals/lib/gh-fixture.mjs`
@@ -436,7 +436,7 @@ and rendered into both the `gh pr view` shape and the REST `issueComments` shape
 route: `issues/<N>/comments`), `scripts/skill-evals/README.md`,
 `tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
 `tests/functional/skills/gh-stub.test.ts`, `docs/design-skill-evals-harness.md`, and this
-manifest. The `/ship` and `/pr` SKILL.md changes and `docs/spec-portable-ai-procedures.md`
+manifest. The `/shipit` and `/pr` SKILL.md changes and `docs/spec-portable-ai-procedures.md`
 land with the maintainer-approved wording.
 
 ## 2026-11 amendment — `ship-8` and `ship-9` reseeded for the bundled review (#680) (2026-11-08)
@@ -452,26 +452,26 @@ land with the maintainer-approved wording.
 
 **Totals:** unchanged.
 
-**Files updated in lockstep:** `.claude/skills/ship/SKILL.md`,
-`.claude/skills/ship/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs`,
+**Files updated in lockstep:** `.claude/skills/shipit/SKILL.md`,
+`.claude/skills/shipit/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs`,
 `tests/functional/skills/gh-stub.test.ts`, `docs/spec-portable-ai-procedures.md`, and this
 manifest.
 
 ## 2026-11 amendment — `ship-10` and `ship-11` added for the merge-gate opt-out (2026-11-27)
 
-**Status:** two net-new execution evals for `/ship` step 11, where a machine with
+**Status:** two net-new execution evals for `/shipit` step 11, where a machine with
 `.claude/skip-merge-confirm.local` merges without asking unless a doubt check hits.
 
-| Resulting | Kind      | Fixture                                      | Notes                                                                                                                                                                                                                                  |
-| --------- | --------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ship-10   | execution | `feature-open-pr-merge-opt-out` (new)        | Green control: opted out, the running account's own PR, no doubt; asserts the merge's description starts with "Looks safe to me" and the one merge is exactly `gh pr merge 226 --merge --delete-branch`, the form /ship's grant covers |
-| ship-11   | execution | `feature-open-pr-other-author-opt-out` (new) | Red control: opted out, but the PR's author is a teammate; asserts the merge's description names that doubt in plain words instead of "Looks safe to me", so the gate asks                                                             |
+| Resulting | Kind      | Fixture                                      | Notes                                                                                                                                                                                                                                    |
+| --------- | --------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ship-10   | execution | `feature-open-pr-merge-opt-out` (new)        | Green control: opted out, the running account's own PR, no doubt; asserts the merge's description starts with "Looks safe to me" and the one merge is exactly `gh pr merge 226 --merge --delete-branch`, the form /shipit's grant covers |
+| ship-11   | execution | `feature-open-pr-other-author-opt-out` (new) | Red control: opted out, but the PR's author is a teammate; asserts the merge's description names that doubt in plain words instead of "Looks safe to me", so the gate asks                                                               |
 
-**Totals:** **30 entries = 21 execution + 9 routing** for `/commit`, `/pr` and `/ship` (ship: 10
+**Totals:** **30 entries = 21 execution + 9 routing** for `/commit`, `/pr` and `/shipit` (ship: 10
 execution, 2 routing); with `/handoff`, **40 entries = 31 execution + 9 routing** and **23** fixture
 profiles.
 
-**Files updated in lockstep:** `.claude/skills/ship/evals/evals.json`,
+**Files updated in lockstep:** `.claude/skills/shipit/evals/evals.json`,
 `scripts/skill-evals/lib/fixtures.mjs` (the two profiles; every PR fixture now carries `author`
 and `reviewDecision`), `scripts/skill-evals/lib/sandbox.mjs` (`headRefOid` filled from the
 branch's real head),

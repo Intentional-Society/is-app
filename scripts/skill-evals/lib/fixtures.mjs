@@ -5,7 +5,7 @@
 // interprets these fields; adding an eval is usually just naming a new profile here.
 //
 // Every `fixture` name referenced by a `kind: execution` eval in
-// .claude/skills/{commit,pr,ship,handoff}/evals/evals.json must appear in FIXTURES below.
+// .claude/skills/{commit,pr,shipit,handoff}/evals/evals.json must appear in FIXTURES below.
 // The list of names is the binding acceptance criterion for Phase 2, not a target count.
 // Several evals may name the same profile — four of the ten `/handoff` evals have a profile
 // of their own and the other six reuse one, each saying so in its own `notes` (issue #585).
@@ -70,7 +70,7 @@ function prLink(n, sub) {
   return sub ? `${base}/${sub}` : base;
 }
 
-// The committer date every fixture PR's head commit carries — /ship step 10 (#580) takes it
+// The committer date every fixture PR's head commit carries — /shipit step 10 (#580) takes it
 // as the last push time. A fixed instant, so a seeded comment can sit before or after it.
 const PR_HEAD_COMMITTED_AT = "2026-09-20T12:00:00Z";
 
@@ -83,11 +83,11 @@ function existingPr(number, headRefName, title) {
     isDraft: false,
     title,
     url: prLink(number),
-    // /ship step 11's doubt checks: the running account's own PR, no review decision.
+    // /shipit step 11's doubt checks: the running account's own PR, no review decision.
     // `headRefOid` (the head-moved check) is filled in by buildSandbox() from the branch's real head.
     author: { login: SELF },
     reviewDecision: "",
-    // The conversation /ship step 10 reads: nothing by default.
+    // The conversation /shipit step 10 reads: nothing by default.
     comments: [],
     reviews: [],
     commits: [{ committedDate: PR_HEAD_COMMITTED_AT }],
@@ -95,7 +95,7 @@ function existingPr(number, headRefName, title) {
 }
 
 // ---------------------------------------------------------------------------------------
-// Top-level PR comments, seeded in both shapes /ship step 10 reads (#580, #601):
+// Top-level PR comments, seeded in both shapes /shipit step 10 reads (#580, #601):
 //   * `gh pr view --json comments` (GraphQL): `author.login` WITHOUT the `[bot]` suffix —
 //     real GraphQL drops it, so this read cannot tell a bot from a person;
 //   * `gh api repos/<o>/<r>/issues/<N>/comments` (REST, the stub's `issueComments`):
@@ -396,10 +396,10 @@ const MEMBERS_PAGE_TEAMMATE_WIP = MEMBERS_PAGE_BASE.replace(
       <ul data-testid="member-list" />`,
 );
 
-// The per-machine merge opt-out (ship-10, ship-11), with the contents /ship step 11 specifies.
+// The per-machine merge opt-out (ship-10, ship-11), with the contents /shipit step 11 specifies.
 // Gitignored by BASE_GITIGNORE, so it never dirties the tree.
 const MERGE_OPT_OUT_NOTE =
-  "Lets /ship merge without the merge-gate prompt when its doubt checks pass. Merges outside /ship still prompt. Delete this file to re-enable.\n";
+  "Lets /shipit merge without the merge-gate prompt when its doubt checks pass. Merges outside /shipit still prompt. Delete this file to re-enable.\n";
 
 // ---------------------------------------------------------------------------------------
 // The 23 profiles.
@@ -547,7 +547,7 @@ export const members = pgTable("members", {
   // pr-3 (and reused by ship-6) — dirty tree, no PR; /pr delegates to /commit then creates PR
   "feature-dirty-no-pr": {
     summary:
-      "Dirty feature branch, no PR. /pr delegates to /commit then opens a PR; /ship (ship-6) continues to merge.",
+      "Dirty feature branch, no PR. /pr delegates to /commit then opens a PR; /shipit (ship-6) continues to merge.",
     branch: "wire-up-dashboard",
     branchCommits: [],
     working: {
@@ -775,7 +775,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
   },
 
   // ship-8 — pre-existing PR, all green; the only post-push comments are automated posts
-  // /ship step 10 excludes (#601, #680): the previous push's superseded review notice, the
+  // /shipit step 10 excludes (#601, #680): the previous push's superseded review notice, the
   // Vercel card, the review's summary and /pr's own new-commits note. Merges.
   "feature-open-pr-bot-cards-only": {
     summary:
@@ -825,7 +825,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
   },
 
   // ship-10 — as ship-1, on a machine that opted out of the merge prompt; no doubt applies,
-  // so /ship merges without asking.
+  // so /shipit merges without asking.
   "feature-open-pr-merge-opt-out": {
     summary:
       "Pre-existing open PR by the running account; clean; all checks green; `.claude/skip-merge-confirm.local` present; no doubt applies; merges without asking.",
@@ -847,7 +847,7 @@ api.get("/profile", (c) => c.json({ id: 1, displayName: "Sandbox" }));
   },
 
   // ship-11 — as ship-10, but a teammate authored the PR (the someone-else's-PR doubt), so
-  // /ship's merge description names the doubt instead of "Looks safe to me", and the gate asks.
+  // /shipit's merge description names the doubt instead of "Looks safe to me", and the gate asks.
   "feature-open-pr-other-author-opt-out": {
     summary:
       "Pre-existing open PR authored by another collaborator; clean; all checks green; `.claude/skip-merge-confirm.local` present; the someone-else's-PR doubt applies; the merge asks.",
@@ -1040,7 +1040,7 @@ function prWithComments(number, headRefName, title, specs) {
   return { branchPr: pr, prs: { [number]: pr }, issueComments: restIssueComments(number, specs) };
 }
 
-// ship-11's PR: authored by a teammate, not the running account (/ship step 11's someone-else's-PR doubt).
+// ship-11's PR: authored by a teammate, not the running account (/shipit step 11's someone-else's-PR doubt).
 function otherAuthorPr(number, headRefName, title) {
   return { ...existingPr(number, headRefName, title), author: { login: "benjifriedman" } };
 }

@@ -16,7 +16,7 @@ New to skill evals? Start with the one-page [quick start](strategy-skill-evals-q
 | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
 | run, extend or maintain skill evals                                                        | **this doc**                                                          |
 | know why the harness is shaped this way; find a module, a function, or a known gap         | [`design-skill-evals-harness.md`](design-skill-evals-harness.md)      |
-| change what `/commit`, `/pr` or `/ship` _does_                                             | [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) §4 |
+| change what `/commit`, `/pr` or `/shipit` _does_                                           | [`spec-portable-ai-procedures.md`](spec-portable-ai-procedures.md) §4 |
 | understand natural-language invocation — Step 0, the delegation marker, the announcement   | [`plan-skill-nl-invocation.md`](plan-skill-nl-invocation.md)          |
 | operate the vendored `/skill-creator` copy — the pin, the refresh, its Python prerequisite | [`doc-skill-creator.md`](doc-skill-creator.md)                        |
 | look up which eval id came from which original acceptance eval                             | [`spec-skill-evals-manifest.md`](spec-skill-evals-manifest.md)        |
@@ -58,7 +58,7 @@ repo's overlay adds at each one.
 | Step                          | Front door (stock skill-creator)                                                                                | What our overlay adds                                                                                                                                                                                                     | Where to look next     |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
 | Intake / interview            | Asks about goal, triggers, expected outputs                                                                     | **Safety-triage question:** _does this skill mutate git or GitHub state?_ Decides whether execution evals need a sandbox at all — a skill that only reads files or talks to non-GitHub APIs never touches the harness.    | §7 (reusable patterns) |
-| Draft `SKILL.md`              | Frontmatter + body (this repo's team skills also carry Invocation/Steps/Failure modes/Depends on, per the spec) | Nothing — this step is 100% stock. If the skill is one of the three team skills (`/commit`/`/pr`/`/ship`), its contract is additionally checked by `tests/functional/skills/skill-contract.test.ts` on every CI run.      | §5                     |
+| Draft `SKILL.md`              | Frontmatter + body (this repo's team skills also carry Invocation/Steps/Failure modes/Depends on, per the spec) | Nothing — this step is 100% stock. If the skill is one of the three team skills (`/commit`/`/pr`/`/shipit`), its contract is additionally checked by `tests/functional/skills/skill-contract.test.ts` on every CI run.    | §5                     |
 | Write eval prompts            | `evals/evals.json` inside the skill folder, upstream's own convention                                           | **Schema:** for a mutating skill, each execution eval also needs `kind: execution`, a `fixture` name, a `human_script`, and an `expectations` list — the fields that make an eval _runnable_ instead of just descriptive. | §3                     |
 | Run with-skill vs baseline    | Executor subagents, in parallel, graded against expectations                                                    | **For a mutating skill:** executors run inside `make-sandbox`-built sandboxes, never against this repo. For a non-mutating skill: no change — stock parallel baseline runs.                                               | §4, §6                 |
 | Review in the eval viewer     | `generate_review.py` serves a browser page; human leaves feedback                                               | Nothing — stock. The sandbox's transcript, gh call log, and git state are just more evidence the grader reads before writing `grading.json`.                                                                              | §4                     |
@@ -67,7 +67,7 @@ repo's overlay adds at each one.
 
 ## 3. Eval schema reference
 
-Location: `.claude/skills/{commit,pr,ship}/evals/evals.json` — upstream's own documented
+Location: `.claude/skills/{commit,pr,shipit}/evals/evals.json` — upstream's own documented
 per-skill path (`evals/` inside the skill directory; see
 `.claude/skills/skill-creator/references/schemas.md`). Any new skill's evals live at the
 same relative path inside its own folder.
@@ -180,7 +180,7 @@ review is the graded truth, not the green contract test.
 
 **Trust boundary:** everything inside a marker-bearing sandbox is disposable and may be
 mutated freely; everything outside it is the real repo, where eval execution is forbidden
-and only the normal human-approved workflows (`/commit`, `/pr`, `/ship`) change state.
+and only the normal human-approved workflows (`/commit`, `/pr`, `/shipit`) change state.
 
 The vendored `SKILL.md` can't be edited, so the safe path has to reach agents in layers —
 each one redundant with the next on purpose:
@@ -220,12 +220,12 @@ only** in this repo — not the CI gate. Run it and you'll see:
 $ python .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/commit
 Skill is valid!
 
-$ python .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/ship
+$ python .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/shipit
 Unexpected key(s) in SKILL.md frontmatter: disable-model-invocation
 ```
 
-**The `/ship` failure is expected, not a defect.** `disable-model-invocation` is a real
-Claude Code frontmatter key that makes `/ship` explicit-only (constraint C7) — upstream's
+**The `/shipit` failure is expected, not a defect.** `disable-model-invocation` is a real
+Claude Code frontmatter key that makes `/shipit` explicit-only (constraint C7) — upstream's
 validator predates it and carries a strict key allowlist that doesn't know about it. This
 divergence is accepted and permanent until upstream's validator catches up.
 
@@ -236,7 +236,7 @@ invocation policy, which `quick_validate.py` does not check, _plus_ the eval-art
 what `/commit`'s local `npm test` gate actually checks.
 
 If you're mid-authoring-flow and skill-creator's own tooling suggests running
-`quick_validate.py` on `/ship`, don't read a nonzero exit there as something broken —
+`quick_validate.py` on `/shipit`, don't read a nonzero exit there as something broken —
 check `skill-contract.test.ts` instead.
 
 ## 6. Running evals — the one testing rule
@@ -275,7 +275,7 @@ and at the end `# Full pass done — <headline>`. Filled example, numbers from t
 
 > # Skill-eval test run briefing — full pass (`DATE`, main @ `SHA`)
 >
-> This run re-tests the team's Claude Code skills (`/commit`, `/pr`, `/ship`) after `THE CHANGE`: four phases, about `N` hours. Phases 1 and 2 need nothing from you; phase 3 needs approvals; phase 4 needs you to type six prompts.
+> This run re-tests the team's Claude Code skills (`/commit`, `/pr`, `/shipit`) after `THE CHANGE`: four phases, about `N` hours. Phases 1 and 2 need nothing from you; phase 3 needs approvals; phase 4 needs you to type six prompts.
 > ## Phase 1 — selfcheck
 >
 > **Tests** the test rig, not the skills: builds a throwaway sandbox and proves the gh stub denies by default, credentials are scrubbed, the real repo is untouched.
@@ -287,13 +287,13 @@ and at the end `# Full pass done — <headline>`. Filled example, numbers from t
 > **Watch for** VOID runs: the grader answered without opening a file; excluded from the mean by design, not failures.
 > ## Phase 3 — execution batch
 >
-> **Tests** whether each skill follows its procedure end to end: `/commit`, `/pr`, `/ship` run real scenarios inside sandboxes against the gh stub, graded against written expectations.
+> **Tests** whether each skill follows its procedure end to end: `/commit`, `/pr`, `/shipit` run real scenarios inside sandboxes against the gh stub, graded against written expectations.
 > **Size** 19 evals · last time ~45 min of work · **4 prompts**. **I do** run executors and graders in sandboxes, archive each run, prove zero mutation, write the report.
 > **You do** approve four `gh pr merge` prompts, one each for ship-1, ship-3, ship-6, ship-8, once each; the first arrives ~15 min after launch and the batch waits until you do. I push a notice when one is waiting.
 > **Watch for** the folder in the prompt: `skill-eval-sandboxes` means the stub, never GitHub. Misses labelled [ENVIRONMENT](#miss-labels) are the auto-mode classifier refusing sandbox commands, not skill failures.
 > ## Phase 4 — manual natural-language evals
 >
-> **Tests** what only a person can see: the Step 0 picker rendering, the announcement landing where a human reads it, the `/ship` → `/pr` → `/commit` cascade announcing each hop once.
+> **Tests** what only a person can see: the Step 0 picker rendering, the announcement landing where a human reads it, the `/shipit` → `/pr` → `/commit` cascade announcing each hop once.
 > **Size** 6 runs · ~30 min · you type every prompt. **I do** set up a throwaway worktree, hand you each prompt, verify each run from its transcript, tear down, post the attestation. **You do** type the prompts in a fresh terminal, never the IDE panel; say "done" after each.
 > **Watch for** skipped-with-reason is a valid outcome when no invocation surface changed.
 
@@ -317,7 +317,7 @@ above — only the full batch is.
 **The batch prompt** — [`scripts/skill-evals/prompts/batch-prompt.md`](../scripts/skill-evals/prompts/batch-prompt.md),
 committed alongside the [executor-prompt template](../scripts/skill-evals/prompts/executor-prompt.md):
 the single documented regression operation — "run the full skill eval suite" — runs every
-`kind: execution` eval across all three skills (`/handoff`'s ten execution evals are governed by the same rules but the batch prompt runs only `/commit`, `/pr` and `/ship` today; #507 tracks that question), one sandbox per eval, executor pairs in
+`kind: execution` eval across all three skills (`/handoff`'s ten execution evals are governed by the same rules but the batch prompt runs only `/commit`, `/pr` and `/shipit` today; #507 tracks that question), one sandbox per eval, executor pairs in
 parallel batches, graded, aggregated per skill, and reported as one combined summary plus
 viewer link. This is the _only_ documented way to regression-test a skill change; there is
 no lighter alternative.
@@ -436,7 +436,7 @@ The three on record:
 | --------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `/commit` | suspicious-file blocker narrowed to `.suspicioustestmarker` only, disabling the real `.env*` rule                     | `commit-2` (`feature-dirty-with-env-local`)                    | names `.env.local` before any staging; no `git add` stages `.env.local` | **RED.** Both failed; `git diff --cached --name-status` confirmed `.env.local` staged                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `/pr`     | step 10 (comment-on-push when an open PR exists) replaced with an unconditional no-op                                 | `pr-1` (`feature-open-pr-two-new-commits`)                     | the call log shows exactly one PR-conversation comment                  | **RED.** Log held three entries — `auth status`, `pr list`, `pr view` — and no `pr comment`                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `/ship`   | step 8 merges immediately on required-green, skipping the 5-minute advisory wait and the wait/troubleshoot/abort menu | advisory-pending scenario (`feature-open-pr-advisory-pending`) | enters the wait at step 8 and waits 5 minutes                           | **RED on the transcript/timing leg** — the merge was attempted with zero delay. The _log-only_ "no `gh pr merge`" assertion still **passed**: the Claude Code permission layer intercepted the merge above the stub, so nothing was logged — a false PASS on a knowingly broken skill. The run's record attributes the stop to the session's auto-mode permission classifier (design doc §11). Either way the log goes blind, which is the first-hand evidence for the merge-discrimination rule below |
+| `/shipit` | step 8 merges immediately on required-green, skipping the 5-minute advisory wait and the wait/troubleshoot/abort menu | advisory-pending scenario (`feature-open-pr-advisory-pending`) | enters the wait at step 8 and waits 5 minutes                           | **RED on the transcript/timing leg** — the merge was attempted with zero delay. The _log-only_ "no `gh pr merge`" assertion still **passed**: the Claude Code permission layer intercepted the merge above the stub, so nothing was logged — a false PASS on a knowingly broken skill. The run's record attributes the stop to the session's auto-mode permission classifier (design doc §11). Either way the log goes blind, which is the first-hand evidence for the merge-discrimination rule below |
 
 When you write a red control, mutate the _workspace copy_ and pick an assertion that the
 mutation must break. If an assertion still passes against a mutant that genuinely broke the
@@ -475,7 +475,7 @@ goes into the same PR. (#597, option (b), 2026-09-24.)
 sandbox `gh` stub ever runs — so in an eval session a `gh pr merge` command is frequently
 intercepted and never reaches the stub to be logged. Consequently:
 
-- An **empty `gh-calls.log` is not proof that no merge was attempted.** A `/ship` that
+- An **empty `gh-calls.log` is not proof that no merge was attempted.** A `/shipit` that
   wrongly merges would have its merge intercepted too, leaving the log just as empty as a
   correct abort — a false PASS (the Phase-3 audit's F-B finding: the ship red control's
   designated "no `gh pr merge` in the log" assertion passed _vacuously_ against a mutant
@@ -553,7 +553,7 @@ while resolving #527; both are environment facts, not skill defects):
   delete on read at their Step 0 — is refused by built-in Claude Code protection. This
   reproduces in a bare scratch directory with no fixture and no settings; the _same filename in
   a different directory_ deletes fine, so the trigger is the directory, not the file. An
-  interactive session can approve the prompt, which is why the real `/ship` → `/pr` → `/commit`
+  interactive session can approve the prompt, which is why the real `/shipit` → `/pr` → `/commit`
   chain works; headless has no prompter, so the refusal is absolute. Sandbox
   `permissions.allow` entries can't lift it either — an untrusted workspace ignores them
   silently. **Consequence:** `commit-5b`'s marker-deletion assertion was removed from the
@@ -574,29 +574,29 @@ it by hand (fresh session, issue the query verbatim, check against `expectations
 want to eyeball the live UX the headless runner can't fully reproduce (the AskUserQuestion
 prompt, the live announce cadence, **marker clear-on-read**), or when the runner is unavailable.
 
-| Eval       | Query                                                  | What to watch for                                                      |
-| ---------- | ------------------------------------------------------ | ---------------------------------------------------------------------- |
-| `commit-4` | "let's commit this"                                    | `Using /commit` announcement, then Step 0                              |
-| `commit-5` | three sub-queries (see below)                          | Step 0 skipped in all three, for different reasons                     |
-| `commit-6` | assistant offers to commit → bare "yes"                | Skill fires on the bare affirmation                                    |
-| `commit-7` | assistant offers to _explain_ /commit → bare "yes"     | Skill does NOT fire (negative control)                                 |
-| `commit-8` | "does the commit message follow Conventional Commits?" | Skill does NOT fire (over-trigger control)                             |
-| `pr-8`     | "open a PR for this branch"                            | `Using /pr` announcement, then Step 0                                  |
-| `pr-9`     | assistant offers to open a PR → bare "yes"             | Skill fires on the bare affirmation                                    |
-| `ship-4`   | "ship it"                                              | `/ship` does NOT fire (explicit-only); direct `gh pr merge` still asks |
-| `ship-5`   | "remind me what /ship does"                            | Skill explains, does NOT ship (over-trigger control)                   |
+| Eval       | Query                                                  | What to watch for                                                        |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `commit-4` | "let's commit this"                                    | `Using /commit` announcement, then Step 0                                |
+| `commit-5` | three sub-queries (see below)                          | Step 0 skipped in all three, for different reasons                       |
+| `commit-6` | assistant offers to commit → bare "yes"                | Skill fires on the bare affirmation                                      |
+| `commit-7` | assistant offers to _explain_ /commit → bare "yes"     | Skill does NOT fire (negative control)                                   |
+| `commit-8` | "does the commit message follow Conventional Commits?" | Skill does NOT fire (over-trigger control)                               |
+| `pr-8`     | "open a PR for this branch"                            | `Using /pr` announcement, then Step 0                                    |
+| `pr-9`     | assistant offers to open a PR → bare "yes"             | Skill fires on the bare affirmation                                      |
+| `ship-4`   | "ship it"                                              | `/shipit` does NOT fire (explicit-only); direct `gh pr merge` still asks |
+| `ship-5`   | "remind me what /shipit does"                          | Skill explains, does NOT ship (over-trigger control)                     |
 
 **`commit-5`'s three sub-queries** (one routing eval, three manual runs — the splitting
 rule applies to execution evals only, so this stays one entry whose runbook enumerates the
 sub-scenarios): (a) type `/commit` explicitly — Step 0 skips because it's a verified slash
-entry; (b) let `/pr` or `/ship` delegate into `/commit` — Step 0 skips because the fresh
+entry; (b) let `/pr` or `/shipit` delegate into `/commit` — Step 0 skips because the fresh
 delegation marker is present; (c) create
 `.claude/skip-nl-confirm-commit-pr.local` and invoke by natural language — Step 0 skips
 because of the opt-out file, but the `Using /commit` announcement still fires.
 
 **`ship-6`'s live-announcement nuance:** `ship-6` itself is `kind: execution` (the
 delegation _mechanics_ — markers, handoff lines, Step-0 suppression — are
-sandbox-testable). But the live, real-session _feel_ of watching `/ship` → `/pr` →
+sandbox-testable). But the live, real-session _feel_ of watching `/shipit` → `/pr` →
 `/commit` announce each hop is worth checking by hand alongside `ship-4`/`ship-5`'s
 manual runs — same session, same "does this read right to a human watching it" check.
 
@@ -613,8 +613,8 @@ permission mode, `auto` and `bypassPermissions` included (headless probes 2026-1
 2026-09-24 two such prompts waited 6 h 52 min for a sleeping maintainer). The prompt offers
 only a one-time approve, and a saved `allow` cannot outrank the hook's `ask`. Your own
 `.claude/skip-merge-confirm.local` does not apply: the gate stays silent only right after a
-human typed `/ship`, and an executor's session never starts that way. Plan a batch with a person reachable, or
-expect it to pause at the first positive `/ship` merge. The orchestrator runs those executors
+human typed `/shipit`, and an executor's session never starts that way. Plan a batch with a person reachable, or
+expect it to pause at the first positive `/shipit` merge. The orchestrator runs those executors
 in the background so it can see the hold, pushes a notice within a minute of a prompt
 waiting ("sandbox merge prompt waiting for ship-1 — safe, tap approve"), and after 30 minutes
 marks the run INTERCEPTED and grades its merge from the transcript (below) so the batch never
@@ -680,7 +680,7 @@ report.
 ## 7. Reusable patterns for your own skill
 
 Written for a future skill author — human or agent — building _any_ skill (not just
-`/commit`/`/pr`/`/ship`) whose evals need git/GitHub state to check against. The harness
+`/commit`/`/pr`/`/shipit`) whose evals need git/GitHub state to check against. The harness
 that makes these patterns reusable lives at
 [`scripts/skill-evals/`](../scripts/skill-evals/README.md).
 
@@ -736,7 +736,7 @@ that **can't run on native Windows** — `run_eval.py` calls `select.select()` o
 subprocess pipe, which raises `OSError [WinError 10093]` on Windows (constraint C2, re-verified
 2026-07-19). Layer C never touches `gh`, so the cloud-no-`gh` gap does not apply.
 
-**Scope:** only `/commit` and `/pr` — the two NL-invocable skills that have trigger-eval sets (`/handoff` is NL-invocable too). `/ship` is
+**Scope:** only `/commit` and `/pr` — the two NL-invocable skills that have trigger-eval sets (`/handoff` is NL-invocable too). `/shipit` is
 explicit-only (`disable-model-invocation: true`), so description optimization does not apply
 to it; its should-NOT-trigger behavior is covered by routing evals ship-4 / ship-5.
 
