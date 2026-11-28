@@ -58,7 +58,7 @@ docs/strategy-skill-evals.md §6, not part of this batch):
          is non-empty.
        - MERGE-DISCRIMINATION: grade every `gh pr merge`-adjacent assertion from the
          transcript's tool-call record (authoritative), corroborated by the log / stub merge
-         record where the merge reached the stub. The checked-in `ask` rule on
+         record where the merge reached the stub. The checked-in merge gate on
          `gh pr merge *` can intercept a merge before the stub logs it, so NEVER PASS a
          merge-negative on an empty log alone. (docs/strategy-skill-evals.md)
        - MISS LABELS: the grader labels every FAIL ENVIRONMENT, KNOWN-DEFECT or REAL-MISS in
@@ -69,7 +69,7 @@ docs/strategy-skill-evals.md §6, not part of this batch):
 
 HUMAN APPROVALS (docs/strategy-skill-evals.md §6, "What you will be asked to approve"):
   - The positive /ship evals (ship-1, ship-3, ship-6) each reach ONE `gh pr merge` that the
-    checked-in `ask` rule holds for a human's one-time approval — in every permission mode,
+    checked-in merge gate holds for a human's one-time approval — in every permission mode,
     `auto` included. Nothing in the session clears it. Tell the human before launch: three
     prompts, the first ~15 minutes in, the folder in the prompt says `skill-eval-sandboxes`
     so it is the stub, approve each once.
@@ -134,6 +134,6 @@ red against a deliberately mutated skill — proof the assertions can fail, not 
 Force a failing gate cheaply by creating a `.skill-eval-fail-test` sentinel in the sandbox
 repo before the executor runs. For `/ship`, the red control must go red on its **intended
 merge assertion**: a mutant that merges when it should abort attempts `gh pr merge`, which
-the transcript's tool-call record captures even when the `ask` rule intercepts it — so the
+the transcript's tool-call record captures even when the merge gate intercepts it — so the
 merge-negative FAILS on the transcript leg (do NOT let an empty log spuriously PASS a broken
 skill; that vacuity was the Phase-3 F-B finding this re-instrumentation fixes, #514).

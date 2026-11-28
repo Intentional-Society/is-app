@@ -30,6 +30,10 @@ No original is dropped or semantically rewritten (I.4 full-fidelity Must); split
 > **#601 amendment (2026-09-24):** `ship-8` and `ship-9` added → **28 entries = 19 execution + 9 routing**
 > for `/commit`, `/pr` and `/ship`; with `/handoff`, **38 entries = 29 execution + 9 routing; 21 fixture
 > profiles.** See the #601 amendment section at the end of this file.
+>
+> **Merge-gate opt-out amendment (2026-11-27):** `ship-10` and `ship-11` added → **30 entries = 21
+> execution + 9 routing** for `/commit`, `/pr` and `/ship`; with `/handoff`, **40 entries = 31
+> execution + 9 routing; 23 fixture profiles.** See the amendment section at the end of this file.
 
 ## commit (8 originals → 9 entries: 4 execution, 5 routing)
 
@@ -452,3 +456,26 @@ land with the maintainer-approved wording.
 `.claude/skills/ship/evals/evals.json`, `scripts/skill-evals/lib/fixtures.mjs`,
 `tests/functional/skills/gh-stub.test.ts`, `docs/spec-portable-ai-procedures.md`, and this
 manifest.
+
+## 2026-11 amendment — `ship-10` and `ship-11` added for the merge-gate opt-out (2026-11-27)
+
+**Status:** two net-new execution evals for `/ship` step 11, where a machine with
+`.claude/skip-merge-confirm.local` merges without asking unless a doubt check hits.
+
+| Resulting | Kind      | Fixture                                      | Notes                                                                                                                                                                                                                                  |
+| --------- | --------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ship-10   | execution | `feature-open-pr-merge-opt-out` (new)        | Green control: opted out, the running account's own PR, no doubt; asserts the merge's description starts with "Looks safe to me" and the one merge is exactly `gh pr merge 226 --merge --delete-branch`, the form /ship's grant covers |
+| ship-11   | execution | `feature-open-pr-other-author-opt-out` (new) | Red control: opted out, but the PR's author is a teammate; asserts the merge's description names that doubt in plain words instead of "Looks safe to me", so the gate asks                                                             |
+
+**Totals:** **30 entries = 21 execution + 9 routing** for `/commit`, `/pr` and `/ship` (ship: 10
+execution, 2 routing); with `/handoff`, **40 entries = 31 execution + 9 routing** and **23** fixture
+profiles.
+
+**Files updated in lockstep:** `.claude/skills/ship/evals/evals.json`,
+`scripts/skill-evals/lib/fixtures.mjs` (the two profiles; every PR fixture now carries `author`
+and `reviewDecision`), `scripts/skill-evals/lib/sandbox.mjs` (`headRefOid` filled from the
+branch's real head),
+`scripts/skill-evals/gh-stub/gh-stub.mjs` (dotted-path `--jq` on `pr view`),
+`tests/functional/skills/skill-contract.test.ts` (`EXPECTED_EXECUTION_IDS.ship`),
+`tests/functional/skills/gh-stub.test.ts`, `docs/design-skill-evals-harness.md`,
+`docs/strategy-skill-evals.md`, and this manifest.

@@ -44,10 +44,12 @@ test-results/
 # and re-include .claude/skills/ explicitly.
 .claude/*
 !.claude/skills/
-# checked-in shared permission rules (the /ship `gh pr merge` ask-gate, #353) — must ship in the
-# repo, so re-include it explicitly past the `.claude/*` exclusion. Per-machine overrides live in
-# .claude/settings.local.json, which stays ignored by the `.claude/*` rule above.
+# checked-in shared settings (the PreToolUse merge gate on `gh pr merge`) and the hook script it
+# runs — must ship in the repo, so re-include them explicitly past the `.claude/*` exclusion.
+# Per-machine overrides live in .claude/settings.local.json, which stays ignored by the
+# `.claude/*` rule above, as do the gate's per-machine opt-out and marker files.
 !.claude/settings.json
+!.claude/hooks/
 # agent definitions (.claude/agents/*.md) are team procedure in the same sense skills are —
 # they set model + reasoning effort + standing rules for delegated work. Re-include them past
 # the `.claude/*` exclusion so a fresh clone keeps the escalation path (decided 2026-09-16).

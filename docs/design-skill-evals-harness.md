@@ -150,15 +150,20 @@ file for the full rules.
   and the child suppresses its own announcement (`.claude/skills/ship/SKILL.md` step 3).
 - **Permission rule (`allow` / `ask` / `deny`)** — an entry in `.claude/settings.json` classifying a
   command pattern. Precedence is **deny → ask → allow, first match**, evaluated by Claude Code
-  _before_ the command runs — so above anything a sandbox controls. This repo checks in one `ask`
-  rule, on `Bash(gh pr merge *)` and the PowerShell equivalent
-  ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
+  _before_ the command runs — so above anything a sandbox controls. This repo checks in `ask`
+  rules for any `gh pr merge` with `--admin`, `--auto`, `-R` or `--repo` (Bash and PowerShell).
+- **Merge gate** — the checked-in PreToolUse hook `.claude/hooks/ship-merge-gate.mjs`, registered
+  in `.claude/settings.json` for Bash and PowerShell. It returns `ask` for every `gh pr merge`
+  unless the machine has `.claude/skip-merge-confirm.local` and the last message the human typed
+  is `/ship` ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail"). In an eval
+  every merge still asks: an executor's session never starts with a typed `/ship`, and the gate
+  reads the opt-out file from the session's project directory, not from the sandbox that
+  `ship-10`/`ship-11` put one in. Until 2026-11-24 this
+  gate was an `ask` permission rule; older ledger entries below say "`ask` rule" for it.
 - **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
-  how prompts behave. A checked-in `ask` cannot be weakened by a local `allow` or by
-  `bypassPermissions`, and **no mode auto-approves it, `auto` included**: it waits for a human's
-  one-time click in every session (`.claude/skills/ship/SKILL.md` step 12; corrected 2026-09-24
-  from the Claude Code docs and the 2026-09-23/24 batch record — an earlier note claimed `auto`
-  mode auto-approved it). §5 depends on this.
+  how prompts behave. The merge gate's `ask` holds in every mode, `auto` and `bypassPermissions`
+  included, and over a local `allow`: it waits for a human's one-time click
+  (`.claude/skills/ship/SKILL.md` step 12; headless probes 2026-11-24). §5 depends on this.
 - **Untrusted workspace** — a directory in which Claude Code silently ignores local
   `permissions.allow` entries. Every sandbox is one; that is issue #531 (§5, §10).
 - **Hook / `PreToolUse`** — a program Claude Code runs before a matching tool call, whose exit code
@@ -497,6 +502,8 @@ The first four columns are generated; the last is written by hand from each eval
 | `ship-7`     | execution | ship    | `feature-open-pr-unanswered-comment`     | A comment posted after the last push: it lists it, asks `1 unanswered since the last push — merge anyway?`, and does not merge on `no` |
 | `ship-8`     | execution | ship    | `feature-open-pr-bot-cards-only`         | Only a Vercel card, a clean Claude review and its own `/pr` note follow the push: all three are excluded, so it merges                 |
 | `ship-9`     | execution | ship    | `feature-open-pr-review-with-findings`   | A Claude review that reports issues after the push still counts: it lists it, asks, and does not merge on `no`                         |
+| `ship-10`    | execution | ship    | `feature-open-pr-merge-opt-out`          | Opted out of the merge prompt with no doubt: it says "Looks safe to me" and merges with exactly the command its grant covers           |
+| `ship-11`    | execution | ship    | `feature-open-pr-other-author-opt-out`   | Opted out, but a teammate's PR: the merge's description names that doubt instead of "Looks safe to me", so the gate asks               |
 | `handoff-1`  | execution | handoff | `feature-uncommitted-fix-no-pr`          | It reports the fix as uncommitted, contradicting the human's belief that it landed                                                     |
 | `handoff-2`  | execution | handoff | `feature-one-commit-clean-no-pr`         | An existing hand-off doc is updated in place, with the old state kept under `Historical`                                               |
 | `handoff-3`  | execution | handoff | `feature-one-commit-clean-no-pr`         | Nothing in flight: it asks what the hand-off is for instead of inventing work                                                          |
@@ -554,6 +561,7 @@ This is `commit-2`, trimmed:
 | `make-sandbox.mjs`              | Build one sandbox for a named fixture and print either the human activation block or the raw manifest.                             | argument helpers `has`/`value`/`firstPositional`/`printHelp`; delegates to `listFixtures()` and `buildSandbox()`                                                                                                                                                                        | humans, the batch prompt, the routing runner (indirectly, via `buildSandbox()`) |
 | `teardown-sandbox.mjs`          | Remove one sandbox or sweep all of them; `--archive <destDir>` captures evidence first, so archive-then-teardown is one operation. | delegates to `archiveEvidence()`, `teardownSandbox()`, `teardownAll()`                                                                                                                                                                                                                  | humans, the batch prompt                                                        |
 | `archive-evidence.mjs`          | Copy the harness-owned raw evidence legs into an eval's `outputs/` directory before teardown.                                      | delegates to `archiveEvidence()`                                                                                                                                                                                                                                                        | the batch prompt, the executor prompt                                           |
+| `grade-ship-merge-gate.mjs`     | Script-grade a `ship-10`/`ship-11` run from its archive and the executor's JSONL transcript; `--agent` finds the transcript.       | delegates to `gradeShipMergeGate()` in `lib/grade-ship-merge-gate.mjs`                                                                                                                                                                                                                  | `strategy-skill-evals.md` §6                                                    |
 | `selfcheck.mjs`                 | Run the whole safety checklist and exit non-zero if anything fails.                                                                | `checkFixtureCompleteness`, `checkStubBehaviors`, `checkEnvScrub`, `checkTeardown`, `checkWrapperOnPath`, `checkGitBashActivation`, `checkEvidenceArchive`, `checkMainUpstream`, `checkZeroMutation`, plus `runStub`, `findPosixShell`, `repoState`, `referencedFixtureNames`, `report` | humans, after any harness change                                                |
 | `fake-test.mjs`                 | The sandbox's `npm test`. Passes instantly; exits non-zero if a `.skill-eval-fail-test` sentinel exists in the working directory.  | —                                                                                                                                                                                                                                                                                       | copied into each sandbox as `.skill-eval-fake-test.mjs` by `buildSandbox()`     |
 | `routing/run-routing-evals.mjs` | Drive the eleven routing queries as graded trigger rates.                                                                          | `loadExpectations`, `buildInputJsonl`, `applySetupFiles`; top-level loop                                                                                                                                                                                                                | humans                                                                          |
@@ -565,13 +573,13 @@ contribute more than one row — `default-deny`, for example, yields `exit`, `lo
 
 ### 4.2 The library
 
-| File                 | Job                                                                                                                                                                                                                                              | Key exports                                                                                                                                                                                                                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/paths.mjs`      | Path resolution and the load-bearing location guard.                                                                                                                                                                                             | `HARNESS_DIR`, `REPO_ROOT`, `MARKER_FILENAME` (`.skill-eval-sandbox`), `SANDBOX_PREFIX` (`skill-eval-`), `sandboxRoot(override)`, `assertOutsideRepo(target)`, `isSandbox(dir)`                                                                                                                                                     |
-| `lib/engine.mjs`     | Node floor, enforced at runtime.                                                                                                                                                                                                                 | `NODE_ENGINE_FLOOR`, `assertNodeEngine()`                                                                                                                                                                                                                                                                                           |
-| `lib/fixtures.mjs`   | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Twenty-one profiles (as of #601) — a count that moves whenever an eval is added, in lockstep with the file's own `// The 21 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF`                                                                                                                                                     |
-| `lib/gh-fixture.mjs` | Turn a profile's `gh` block into the `gh-fixture.json` the stub answers from, deriving the reviewer display-name map.                                                                                                                            | `buildGhFixture(profile)`                                                                                                                                                                                                                                                                                                           |
-| `lib/sandbox.mjs`    | Build, tear down and archive. The biggest module.                                                                                                                                                                                                | `buildSandbox({fixture, root, note})`, `teardownSandbox(dir)`, `teardownAll(root)`, `archiveEvidence(sandboxDir, destDir)`; internal helpers `git`, `gitSafe`, `forceRemove`, `clearReadOnly`, `setLocalConfig`, `writeFiles`, `writeTeamCache`, `writeMarker`, `installGhStub`, `writeActivateScripts`; the constant `SCRUB_UNSET` |
+| File                 | Job                                                                                                                                                                                                                                                               | Key exports                                                                                                                                                                                                                                                                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/paths.mjs`      | Path resolution and the load-bearing location guard.                                                                                                                                                                                                              | `HARNESS_DIR`, `REPO_ROOT`, `MARKER_FILENAME` (`.skill-eval-sandbox`), `SANDBOX_PREFIX` (`skill-eval-`), `sandboxRoot(override)`, `assertOutsideRepo(target)`, `isSandbox(dir)`                                                                                                                                                     |
+| `lib/engine.mjs`     | Node floor, enforced at runtime.                                                                                                                                                                                                                                  | `NODE_ENGINE_FLOOR`, `assertNodeEngine()`                                                                                                                                                                                                                                                                                           |
+| `lib/fixtures.mjs`   | The fixture profiles, as plain data, plus the shared baseline files every sandbox commits first. Twenty-three profiles (as of `ship-10`/`ship-11`) — a count that moves whenever an eval is added, in lockstep with the file's own `// The 23 profiles.` comment. | `listFixtures()`, `getFixture(name)`, `assertNoCaseCollisions(name, profile)`, and the data constants `BASE_FILES`, `HUMANS`, `REVIEWER_COLLABORATORS`, `OWNER`, `REPO`, `SELF`                                                                                                                                                     |
+| `lib/gh-fixture.mjs` | Turn a profile's `gh` block into the `gh-fixture.json` the stub answers from, deriving the reviewer display-name map.                                                                                                                                             | `buildGhFixture(profile)`                                                                                                                                                                                                                                                                                                           |
+| `lib/sandbox.mjs`    | Build, tear down and archive. The biggest module.                                                                                                                                                                                                                 | `buildSandbox({fixture, root, note})`, `teardownSandbox(dir)`, `teardownAll(root)`, `archiveEvidence(sandboxDir, destDir)`; internal helpers `git`, `gitSafe`, `forceRemove`, `clearReadOnly`, `setLocalConfig`, `writeFiles`, `writeTeamCache`, `writeMarker`, `installGhStub`, `writeActivateScripts`; the constant `SCRUB_UNSET` |
 
 A fixture profile is a plain object. `getFixture()` returns it with a `name` key added; the fields
 a profile itself declares are:
@@ -913,17 +921,17 @@ The mechanisms, named to where they live:
 
 ### Above the stub
 
-One gate fires outside all of that: the checked-in `ask` permission rule on `Bash(gh pr merge *)`
-and `PowerShell(gh pr merge *)` in `.claude/settings.json`. It is evaluated at the Claude Code
-permission layer, before any command runs, so it sits **above** the sandbox rather than inside it.
+One gate fires outside all of that: the checked-in merge gate, a PreToolUse hook
+(`.claude/hooks/ship-merge-gate.mjs`) registered for Bash and PowerShell in `.claude/settings.json`.
+It runs at the Claude Code permission layer, before any command runs, so it sits **above** the
+sandbox rather than inside it.
 
 That has two consequences the harness is built around. First, it is the sturdiest gate C8 can point
-to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` step 12, which is the source of
-record for this rule's behavior: precedence is deny → ask → allow, first match, so the checked-in
-`ask` cannot be weakened by a local `allow` or by `bypassPermissions`, and **no permission mode
-auto-approves it: in every session, `auto` included, it waits for a human's one-time click** (corrected
-2026-09-24; the earlier claim that `auto` mode auto-approved it did not survive the docs or the
-2026-09-23/24 record, where two sandbox merges waited 6 h 52 min for the maintainer). A batch therefore
+to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` steps 11–12, the source of record
+for its behavior: an executor's session never starts with a typed `/ship`, so the gate returns
+`ask` for every sandbox merge, and **that `ask` waits for a human's one-time click in every permission mode, `auto`
+and `bypassPermissions` included, over a local `allow`** (headless probes 2026-11-24; on 2026-09-24,
+under the `ask` rule the hook replaced, two sandbox merges waited 6 h 52 min for the maintainer). A batch therefore
 needs a reachable human for its three positive `/ship` merges, or grades them as intercepted —
 `strategy-skill-evals.md` §6 "What you will be asked to approve" and #599. Second, it
 breaks naive merge grading — an intercepted `gh pr merge` never reaches the stub, so it is never
@@ -937,7 +945,7 @@ its home.
 ### What is not protected
 
 - **Sandbox `permissions.allow` entries are silently ignored.** An untrusted workspace does not
-  honor them, with no error. So the `ask` rule copied into a sandbox by `populateRoutingContext()`
+  honor them, with no error. So the merge gate copied into a sandbox by `populateRoutingContext()`
   cannot be locally relaxed for a headless run, and a future attempt to permit something inside a
   sandbox by settings alone will fail quietly. Tracked as **#531**.
 - **Nothing inside `.claude/` can be deleted headless.** Built-in Claude Code protection refuses

@@ -71,7 +71,7 @@ WHEN DONE, REPORT:
      record — every git/gh command you attempted, in order. Record an attempted
      `gh pr merge ...` even if a permission prompt intercepted or denied it before it ran:
      that attempt is the authoritative signal for whether the skill tried to merge, and the
-     grader relies on it (the checked-in `ask` rule on `gh pr merge *` can intercept the
+     grader relies on it (the checked-in merge gate on `gh pr merge` can intercept the
      command before the sandbox stub logs it, so the log alone cannot prove a merge did or
      did not happen — the merge-discrimination rule, docs/strategy-skill-evals.md).
   2. The final sandbox git state: `git log --oneline -5`, `git status --short`,
@@ -122,8 +122,8 @@ This writes `gh-calls.log`, `git-state.txt`, `gh-stub-state.json`, and `archive-
 The grader reads those raw files (plus the executor's transcript), never a prose summary of
 them — so the grade is reproducible by a third party who never saw the run.
 
-**The merge-discrimination rule (`gh pr merge`-adjacent assertions).** The checked-in `ask`
-rule on `gh pr merge *` can intercept the merge at the Claude Code permission layer BEFORE the
+**The merge-discrimination rule (`gh pr merge`-adjacent assertions).** The checked-in merge
+gate on `gh pr merge` can intercept the merge at the Claude Code permission layer BEFORE the
 sandbox stub logs it. So an empty gh call log is **not** proof no merge was attempted, and a
 missing log entry is **not** proof a correct merge failed. Grade every merge assertion from the
 **transcript's tool-call record** (authoritative for whether the skill attempted the merge),

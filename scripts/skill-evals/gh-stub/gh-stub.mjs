@@ -141,9 +141,19 @@ function handlePrView(fx) {
   // /ship step 4 (#597): the last-push cutoff, `--json commits --jq '.commits[-1].committedDate'`.
   // Only this one expression is answered, printed bare the way real gh prints a jq string;
   // every other form still gets the full object.
+  // /ship step 11's doubt checks read single fields (`.author.login`, `.reviewDecision`,
+  // `.headRefOid`); a plain dotted path is answered the way real gh prints it (strings bare,
+  // anything else as JSON). Every other form still gets the full object.
   const jq = flagValue("--jq");
-  if (jq != null && HEAD_COMMIT_DATE_JQ.has(stripSurroundingQuotes(jq))) {
+  const expr = jq == null ? null : stripSurroundingQuotes(jq);
+  if (expr != null && HEAD_COMMIT_DATE_JQ.has(expr)) {
     stdout(pr.commits?.at(-1)?.committedDate ?? "null");
+  } else if (expr != null && DOTTED_PATH_JQ.test(expr)) {
+    const value = expr
+      .replace(/^\./, "")
+      .split(".")
+      .reduce((obj, key) => (obj == null ? undefined : obj[key]), pr);
+    stdout(typeof value === "string" ? value : JSON.stringify(value ?? null));
   } else {
     emitObject(pr);
   }
@@ -151,6 +161,7 @@ function handlePrView(fx) {
   return 0;
 }
 const HEAD_COMMIT_DATE_JQ = new Set([".commits[-1].committedDate", "commits[-1].committedDate"]);
+const DOTTED_PATH_JQ = /^\.?[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
 
 function handlePrList(fx) {
   const list = fx.branchPr ? [fx.branchPr] : [];
@@ -208,13 +219,13 @@ function handlePrMerge(_fx) {
   // writing a merge commit to the sandbox origin here; it reverses this never-mutate rule and
   // needs a design ruling first.
   //
-  // CAVEAT (item 1 / F-B, #511): the checked-in `ask` rule on `gh pr merge *` usually
+  // CAVEAT (item 1 / F-B, #511): the checked-in merge gate on `gh pr merge` usually
   // intercepts the command at the Claude Code permission layer BEFORE the stub runs, so in a
   // Claude Code eval session this handler — and therefore this record and the log entry
   // below — is often never reached even for a genuine merge. An empty log/state is therefore
   // NOT proof no merge was attempted. The authoritative merge signal for grading is the
   // TRANSCRIPT's tool-call record (a `gh pr merge` attempt appears there whether or not the
-  // ask-rule lets it through). See the merge-discrimination rule in docs/strategy-skill-evals.md.
+  // merge gate lets it through). See the merge-discrimination rule in docs/strategy-skill-evals.md.
   recordMerge({
     prNumber: number,
     merge: hasFlag("--merge"),

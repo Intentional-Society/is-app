@@ -39,6 +39,10 @@ node scripts/skill-evals/selfcheck.mjs
 # Archive the raw evidence triad into an eval's outputs/ dir BEFORE teardown.
 node scripts/skill-evals/archive-evidence.mjs <sandboxDir> <eval-workspace>/outputs
 
+# Script-grade a ship-10 / ship-11 run from its archive and the executor's transcript
+# (--agent finds the subagent's transcript under ~/.claude/projects/*/*/subagents/).
+node scripts/skill-evals/grade-ship-merge-gate.mjs ship-11 --outputs <eval-workspace>/outputs --agent <agentId>
+
 # Tear down one sandbox (optionally archiving first), or sweep all of them.
 node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir>
 node scripts/skill-evals/teardown-sandbox.mjs <sandboxDir> --archive <eval-workspace>/outputs
@@ -161,7 +165,7 @@ legs the harness owns — `gh-calls.log`, a `git-state.txt` dump, `gh-stub-state
 `archive-manifest.json` — into an eval's `outputs/` dir **before** the sandbox is removed, so
 the grade is independently auditable and **executor-independent** (ruling 3, #511; the
 Phase-3 audit's F-A found these legs were never preserved). Grade merge-adjacent assertions
-from the **transcript's tool-call record**, not the log alone: the checked-in `ask` rule on
+from the **transcript's tool-call record**, not the log alone: the checked-in merge gate on
 `gh pr merge *` can intercept a merge before the stub logs it (the F-B merge-discrimination
 rule — full detail in [`docs/strategy-skill-evals.md`](../../docs/strategy-skill-evals.md) §6).
 

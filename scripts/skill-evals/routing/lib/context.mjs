@@ -4,7 +4,9 @@
 // three team skills must be *discovered* naturally — not handed to a subagent. This
 // module copies the real repo's routing context INTO a harness sandbox repo:
 //   - .claude/skills/{commit,pr,ship}/SKILL.md  (the skills to be discovered)
-//   - .claude/settings.json                      (the `ask` rule on `gh pr merge`)
+//   - .claude/settings.json                      (the PreToolUse merge gate on `gh pr merge`)
+//   - .claude/hooks/ship-merge-gate.mjs          (the gate's script; settings.json fails
+//                                                 every shell call closed without it)
 //   - CLAUDE.md                                  (carrying the real "AI Skills" section
 //                                                 verbatim so NL routing behaves faithfully)
 //
@@ -54,6 +56,9 @@ export function populateRoutingContext(repoDir, repoRoot = REPO_ROOT) {
   const settingsDest = path.join(resolved, ".claude", "settings.json");
   fs.mkdirSync(path.dirname(settingsDest), { recursive: true });
   fs.copyFileSync(path.join(repoRoot, ".claude", "settings.json"), settingsDest);
+  const hookDest = path.join(resolved, ".claude", "hooks", "ship-merge-gate.mjs");
+  fs.mkdirSync(path.dirname(hookDest), { recursive: true });
+  fs.copyFileSync(path.join(repoRoot, ".claude", "hooks", "ship-merge-gate.mjs"), hookDest);
 
   const aiSkills = extractAiSkillsSection(repoRoot);
   const sandboxMd = `# CLAUDE.md (skill-eval routing sandbox)
