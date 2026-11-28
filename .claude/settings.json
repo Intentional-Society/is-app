@@ -25,6 +25,14 @@
             "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
             "onFailure": "block",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "if": "Bash(*gh.exe* pr merge *)",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
+            "onFailure": "block",
+            "timeout": 10
           }
         ]
       },
@@ -34,6 +42,14 @@
           {
             "type": "command",
             "if": "PowerShell(gh pr merge *)",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
+            "onFailure": "block",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "if": "PowerShell(*gh.exe* pr merge *)",
             "command": "node",
             "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
             "onFailure": "block",

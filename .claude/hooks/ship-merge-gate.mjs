@@ -1,8 +1,9 @@
 // PreToolUse merge gate (registered in .claude/settings.json for Bash and PowerShell).
 //
 // It never allows anything; it only decides whether a `gh pr merge` must ask a human.
-// settings.json runs it only for a command with a `gh pr merge` subcommand (the handler's
-// `if` rule, which Claude Code matches per subcommand), so a command that only mentions the
+// settings.json runs it only for a command with a `gh pr merge` or `…gh.exe… pr merge`
+// subcommand (each handler's `if` rule, which Claude Code matches per subcommand; a handler
+// takes one rule, so each shell has two), so a command that only mentions the
 // words, such as a grep for them, never reaches it. Every grant in /shipit's `allowed-tools`
 // falls inside that `if` rule, so a merge the grant would allow always reaches this hook.
 // Once it runs, it asks unless all three hold:
@@ -29,7 +30,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const OPT_OUT_FILE = path.join(".claude", "skip-merge-confirm.local");
-const MERGE_RE = /\bgh(?:\.exe)?\s+pr\s+merge\b/i;
+// `gh`, `gh.exe`, or a quoted full path ending in either (`& 'C:\…\gh.exe' pr merge`).
+const MERGE_RE = /\bgh(?:\.exe)?["']?\s+pr\s+merge\b/i;
 // A typed /shipit: Claude Code stores it as `<command-message>shipit</command-message>` then
 // `<command-name>/shipit</command-name>`. Anchored, so pasted text that merely contains the
 // tag doesn't count.

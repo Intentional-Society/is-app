@@ -148,6 +148,12 @@ describe("decide", () => {
     expect(run('grep -rn "gh pr merge" docs')?.decision).toBe("ask");
     expect(run("cd x && gh pr merge 12 --merge --delete-branch && rm -rf ~")?.decision).toBe("ask");
   });
+
+  it("recognizes gh.exe and a quoted full path to it as merges", () => {
+    for (const command of ["gh.exe pr merge 12 --merge", "& 'C:\\Program Files\\GitHub CLI\\gh.exe' pr merge 12"]) {
+      expect(run(command, transcript(typed(SHIP)))?.reason, command).toMatch(/merge confirmation is on/);
+    }
+  });
 });
 
 describe("hook process", () => {
@@ -204,21 +210,21 @@ describe("checked-in settings and /shipit's grant", () => {
   const settings = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, ".claude", "settings.json"), "utf8"));
   const SHELLS = ["Bash", "PowerShell"];
   const ifRule = (shell: string) => `${shell}(gh pr merge *)`;
+  const gate = (rule: string) =>
+    expect.objectContaining({
+      type: "command",
+      if: rule,
+      command: "node",
+      // A Claude Code path placeholder, not a JS template.
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: literal settings.json value
+      args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
+      onFailure: "block",
+    });
 
-  it("registers the gate per shell, failing closed, only for a `gh pr merge` subcommand", () => {
+  it("registers the gate per shell, failing closed, only for a `gh` or `gh.exe` merge subcommand", () => {
     for (const shell of SHELLS) {
       const entry = settings.hooks.PreToolUse.find((e: { matcher: string }) => e.matcher === shell);
-      expect(entry?.hooks).toEqual([
-        expect.objectContaining({
-          type: "command",
-          if: ifRule(shell),
-          command: "node",
-          // A Claude Code path placeholder, not a JS template.
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: literal settings.json value
-          args: ["${CLAUDE_PROJECT_DIR}/.claude/hooks/ship-merge-gate.mjs"],
-          onFailure: "block",
-        }),
-      ]);
+      expect(entry?.hooks).toEqual([gate(ifRule(shell)), gate(`${shell}(*gh.exe* pr merge *)`)]);
     }
   });
 

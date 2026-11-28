@@ -299,5 +299,9 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
   `bypassPermissions`: plain, `&`-called and `;`-chained merges asked, `gh --repo … pr merge` asked,
   `Write-Output "gh pr merge 5"` ran without a prompt. Child `claude -p` sessions on Windows had no
   Bash tool, so the Bash side rests on the documented per-subcommand matching and the unit tests.
+  A second handler per shell, `if` `*gh.exe* pr merge *`, keeps `gh.exe` and a quoted full path to
+  it gated (probe: both asked); it also prompts for a mention that names `gh.exe`. Merges run
+  through another shell (`bash -c "…"`, `sh -c`, `env X=1 …`) match neither rule and fall to the
+  session's permission mode, as they did under the original `ask` rule.
 - Prior context: PRs #304/#305 shipped the Skills; explicit‑only invocation was P0.4 from PR #133 —
   this is a deliberate, dated revision of it.
