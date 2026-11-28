@@ -236,6 +236,7 @@ for (const q of queries) {
       const row = {
         run: k,
         invoked: obs.invokedThisSkill,
+        invokedBundledShip: obs.invokedBundledShip,
         passRate,
         ghPrMerge: obs.ghLog.hasPrMerge,
         ghLive: obs.ghLog.live,
@@ -243,7 +244,10 @@ for (const q of queries) {
       if (decision.error) row.error = decision.error;
       perRep.push(row);
       const passLabel = decision.voided ? "VOID" : passRate == null ? "?" : passRate;
-      process.stdout.write(`invoked=${obs.invokedThisSkill} pass=${passLabel} ${exec.timedOut ? "(timeout)" : ""}\n`);
+      const bundled = obs.invokedBundledShip ? " bundledShip=true" : "";
+      process.stdout.write(
+        `invoked=${obs.invokedThisSkill}${bundled} pass=${passLabel} ${exec.timedOut ? "(timeout)" : ""}\n`,
+      );
     } catch (e) {
       process.stdout.write(`ERROR: ${e.message}\n`);
       fs.writeFileSync(path.join(runDir, "runner-error.txt"), String(e.stack || e));

@@ -47,7 +47,7 @@ test-results/
 # checked-in shared settings (the PreToolUse merge gate on `gh pr merge`) and the hook script it
 # runs — must ship in the repo, so re-include them explicitly past the `.claude/*` exclusion.
 # Per-machine overrides live in .claude/settings.local.json, which stays ignored by the
-# `.claude/*` rule above, as do the gate's per-machine opt-out and marker files.
+# `.claude/*` rule above, as does the gate's per-machine opt-out file.
 !.claude/settings.json
 !.claude/hooks/
 # agent definitions (.claude/agents/*.md) are team procedure in the same sense skills are —

@@ -284,9 +284,20 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
   each doubt in plain words and the gate's prompt shows it. The hook never allows anything: the
   merge runs under `/shipit`'s `allowed-tools` grant for exactly `gh pr merge <N> --merge
   --delete-branch`, which Claude Code applies only during the typed `/shipit` turn and checks per
-  subcommand; `ask` rules catch `--admin`, `--auto` and another repository (`-R`, `--repo`). Allow decisions stay with Claude
+  subcommand; `ask` rules catch `--admin`, `--auto`, another repository (`-R`, `--repo`) and a flag between `gh` and `pr`. Allow decisions stay with Claude
   Code's own permission rules, so the hook parses no shell syntax. Headless probes on 2026‑11‑24 and 2026‑11‑28: the hook's `ask` held in default, `auto` and
   `bypassPermissions`, over a local `allow` and over the skill's grant; a crashing hook blocked the
   call; the grant ran the exact merge in default and `auto` and stopped `--admin` and chained commands.
+- 2026‑11‑28 (gate `if` filter) — the hook matched `gh pr merge` anywhere in a command's text, so a
+  `grep` or `echo` carrying the words prompted. Each shell's handler now has an `if` rule,
+  `Bash(gh pr merge *)` / `PowerShell(gh pr merge *)`, which Claude Code matches per subcommand;
+  `/shipit`'s grant falls inside it, so a granted merge still reaches the hook. The filter also
+  narrows `onFailure: "block"`: a hook script that fails to load (a merge-conflicted copy did)
+  blocks only merge commands, not every shell command. A merge with a flag
+  between `gh` and `pr` (`gh --repo x pr merge`) matched neither the hook nor the `ask` rules;
+  `ask` rules `gh -* pr merge *` now catch it. Headless PowerShell probe, default and
+  `bypassPermissions`: plain, `&`-called and `;`-chained merges asked, `gh --repo … pr merge` asked,
+  `Write-Output "gh pr merge 5"` ran without a prompt. Child `claude -p` sessions on Windows had no
+  Bash tool, so the Bash side rests on the documented per-subcommand matching and the unit tests.
 - Prior context: PRs #304/#305 shipped the Skills; explicit‑only invocation was P0.4 from PR #133 —
   this is a deliberate, dated revision of it.
