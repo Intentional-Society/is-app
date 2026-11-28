@@ -1,26 +1,28 @@
 ---
 
-name: ship
-description: "[is-app] Orchestrate the full commit → PR → merge → post-merge-watch chain for a branch or PR in the Intentional Society repo. Invoke explicitly as `/ship [PR#|URL|issue-or-context]`. Delegates dirty / on-main states to `/pr` (which delegates to `/commit`). Fetches `origin/main`, rebases if needed, dispatches the schema-expand workflow when a schema expand is pending and waits for the `prod-db` approval gate + post-deploy e2e, watches all required and visible advisory pre-merge checks for up to 5 minutes (offering `wait+5` / `troubleshoot` / `abort` — never `proceed anyway`), runs `gh pr merge --merge --delete-branch` (the only valid merge form per repo settings), tidies the local branch, then watches `main` for up to 5 minutes for the production deploy and post-merge e2e. Fires only on explicit `/ship` invocation."
+name: shipit
+description: "[is-app] Orchestrate the full commit → PR → merge → post-merge-watch chain for a branch or PR in the Intentional Society repo. Invoke explicitly as `/shipit [PR#|URL|issue-or-context]`. Delegates dirty / on-main states to `/pr` (which delegates to `/commit`). Fetches `origin/main`, rebases if needed, dispatches the schema-expand workflow when a schema expand is pending and waits for the `prod-db` approval gate + post-deploy e2e, watches all required and visible advisory pre-merge checks for up to 5 minutes (offering `wait+5` / `troubleshoot` / `abort` — never `proceed anyway`), runs `gh pr merge --merge --delete-branch` (the only valid merge form per repo settings), tidies the local branch, then watches `main` for up to 5 minutes for the production deploy and post-merge e2e. Fires only on explicit `/shipit` invocation."
 disable-model-invocation: true
 allowed-tools: ["Bash(gh pr merge * --merge --delete-branch)", "PowerShell(gh pr merge * --merge --delete-branch)"]
 ---
 
-# /ship
+# /shipit
 
-The orchestrator. `/ship` is the only way to run the chained commit → PR → merge sequence — there is no second path. It delegates downward (`/ship` → `/pr` → `/commit`) and never auto-acts past the merge: the post-merge watch reports, the human decides whether to hotfix or revert if anything goes red.
+The orchestrator. `/shipit` is the only way to run the chained commit → PR → merge sequence — there is no second path. It delegates downward (`/shipit` → `/pr` → `/commit`) and never auto-acts past the merge: the post-merge watch reports, the human decides whether to hotfix or revert if anything goes red.
 
 ## Invocation
 
-`/ship [PR#|URL|issue-or-context]`
+`/shipit [PR#|URL|issue-or-context]`
+
+Not `/ship`: that name belongs to Claude Code's bundled `/ship` skill, which commits, opens a PR and watches it but never merges. If the human typed `/ship` expecting this skill, tell them to type `/shipit`.
 
 Argument resolution: same order as `/pr` (PR URL → `gh pr view <N>` → `gh issue view <N>` → plain-language context).
 
-**Branch-switching policy.** If `[PR#|URL]` resolves to a PR on a branch different from the current checkout, `/ship` **may** switch branches — but only after verifying the current branch's working tree is clean. If the tree is dirty, refuse with a suggestion to commit or stash; never auto-stash (see Stash safety below). `/pr` refuses to switch under all conditions; `/ship` is the only Skill that switches.
+**Branch-switching policy.** If `[PR#|URL]` resolves to a PR on a branch different from the current checkout, `/shipit` **may** switch branches — but only after verifying the current branch's working tree is clean. If the tree is dirty, refuse with a suggestion to commit or stash; never auto-stash (see Stash safety below). `/pr` refuses to switch under all conditions; `/shipit` is the only Skill that switches.
 
 **No `--squash` flag.** Repo PR settings disable squash and rebase merging — only merge-commit is allowed. The merge command is always `gh pr merge --merge --delete-branch`. Re-enabling squash is a repo-policy decision, not a Skill flag.
 
-Natural-language phrasings ("ship it", "merge this PR") are guidance, not triggers. With `disable-model-invocation: true`, this Skill fires only on explicit `/ship`.
+Natural-language phrasings ("ship it", "merge this PR") are guidance, not triggers. With `disable-model-invocation: true`, this Skill fires only on explicit `/shipit`.
 
 ## Steps
 
@@ -28,7 +30,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
 
 2. **Parse arguments; resolve target PR.** If the argument names a different branch AND the current working tree is clean, `git switch <target-branch>`. If the current working tree is dirty, refuse with a clear suggestion (commit or stash). Do not auto-stash.
 
-3. **Working-tree pre-flight.** If dirty or on `main` with no PR for the current branch, delegate to `/pr` (which delegates to `/commit` per `/pr` step 4). **Immediately before invoking `/pr`, write the delegation marker `.claude/.nl-delegation-active` as `ship\t<current ISO-8601 UTC>`** so the delegated `/pr` (and, in turn, `/commit`) doesn't re-prompt for natural-language intent the human already gave by typing `/ship`. **As you write the marker and invoke `/pr`, print `Using /pr — delegated from /ship` as the first line** so the delegation cascade is visible; `/pr` suppresses its own announcement (marker present) and in turn narrates `Using /commit — delegated from /pr` when it delegates onward. Each skill consumes the marker on read at its Step 0 (honoring it only if <30s old) and re-writes a fresh one before its own downstream delegation; **after `/pr` returns, delete the marker if it still exists** (cleanup). When `/pr` returns with a PR URL, continue.
+3. **Working-tree pre-flight.** If dirty or on `main` with no PR for the current branch, delegate to `/pr` (which delegates to `/commit` per `/pr` step 4). **Immediately before invoking `/pr`, write the delegation marker `.claude/.nl-delegation-active` as `ship\t<current ISO-8601 UTC>`** so the delegated `/pr` (and, in turn, `/commit`) doesn't re-prompt for natural-language intent the human already gave by typing `/shipit`. **As you write the marker and invoke `/pr`, print `Using /pr — delegated from /shipit` as the first line** so the delegation cascade is visible; `/pr` suppresses its own announcement (marker present) and in turn narrates `Using /commit — delegated from /pr` when it delegates onward. Each skill consumes the marker on read at its Step 0 (honoring it only if <30s old) and re-writes a fresh one before its own downstream delegation; **after `/pr` returns, delete the marker if it still exists** (cleanup). When `/pr` returns with a PR URL, continue.
 
 4. **Fetch — no shallow shortcuts.** `git fetch origin main`. Do not use shallow-fetch shortcuts (`--depth=1` etc.) for freshness checks — a shallow fetch breaks `git merge-base` and was the root cause of a recent expand-workflow bug ([PR #254](https://github.com/Intentional-Society/is-app/pull/254)).
 
@@ -74,7 +76,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     - **Review threads' resolved state:** `gh api graphql -F owner=<owner> -F repo=<repo> -F n=<N> -f query='query($owner:String!,$repo:String!,$n:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$n){reviewThreads(first:100){pageInfo{hasNextPage} nodes{isResolved path comments(first:1){nodes{author{login} createdAt body}}}}}}}'`. The REST API has no resolved flag; GraphQL's `reviewThreads.isResolved` is the only place `gh` exposes it.
 
     **Unanswered** (the maintainer's definition, recorded on #580) means:
-    - any top-level comment, review or inline comment posted after the last push — by anyone, **including the PR's author and the account running `/ship`**, because agent sessions post under the maintainer's account, so authorship shows nothing;
+    - any top-level comment, review or inline comment posted after the last push — by anyone, **including the PR's author and the account running `/shipit`**, because agent sessions post under the maintainer's account, so authorship shows nothing;
     - plus every inline review thread with `isResolved: false`, however old;
     - except an approval with no text (`state: APPROVED`, empty `body`), which never counts. Every other review counts, even one with an empty body.
     - except three automated posts that never carry anything a human must answer (#601), each keyed on the poster's account type and posting app, never on a display name or wording alone:
@@ -88,14 +90,14 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     This stop is about the conversation, not the merge command, and fires only when something is unanswered or unread. An explicit yes here is the human's decision on those items; it is not a step 11 doubt.
 
 11. **Merge authorization.** Three pieces decide whether the merge asks a human:
-    - **This skill's `allowed-tools`** grants exactly `gh pr merge <N> --merge --delete-branch`, and Claude Code applies that grant only during the turn the human typed `/ship`. Claude Code checks each part of a compound command itself, so anything chained onto the merge still needs its own permission.
-    - **The merge gate**, a PreToolUse hook (`.claude/hooks/ship-merge-gate.mjs`, registered in `.claude/settings.json`), asks for every `gh pr merge` unless this machine has the opt-out file `.claude/skip-merge-confirm.local`, the last message the human typed is `/ship`, **and** the merge command's description starts with `Looks safe to me`. It never allows anything itself.
+    - **This skill's `allowed-tools`** grants exactly `gh pr merge <N> --merge --delete-branch`, and Claude Code applies that grant only during the turn the human typed `/shipit`. Claude Code checks each part of a compound command itself, so anything chained onto the merge still needs its own permission.
+    - **The merge gate**, a PreToolUse hook (`.claude/hooks/ship-merge-gate.mjs`, registered in `.claude/settings.json`), asks for every `gh pr merge` unless this machine has the opt-out file `.claude/skip-merge-confirm.local`, the last message the human typed is `/shipit`, **and** the merge command's description starts with `Looks safe to me`. It never allows anything itself.
     - **Checked-in `ask` rules** in `.claude/settings.json` ask for any merge with `--admin`, `--auto`, or another repository (`-R`, `--repo`).
 
-    So on an opted-out machine, typing `/ship` is the merge approval whenever you can honestly say the merge looks safe. Otherwise the gate's prompt is the question, and the description you write is what the human reads in it.
+    So on an opted-out machine, typing `/shipit` is the merge approval whenever you can honestly say the merge looks safe. Otherwise the gate's prompt is the question, and the description you write is what the human reads in it.
 
     **Doubt checks.** Run every check, opted out or not. Each hit is a doubt:
-    - **Someone else's PR.** The PR author (`gh pr view <N> --json author`) is not the account running `/ship` (`gh api user --jq .login`).
+    - **Someone else's PR.** The PR author (`gh pr view <N> --json author`) is not the account running `/shipit` (`gh api user --jq .login`).
     - **Changes requested.** The PR's `reviewDecision` is `CHANGES_REQUESTED`.
     - **Production database.** The PR adds or changes files under `drizzle/` or changes `src/server/schema.ts` (the production deploy runs `drizzle-kit migrate`), or this run dispatched a schema expand at step 7. Read the changed files from `git diff --name-only origin/main...HEAD` (local, and the same in a sandbox).
     - **Head moved.** The PR's head commit (`gh pr view <N> --json headRefOid`) differs from the commit whose checks went green at step 8, or from the local `git rev-parse HEAD`. The second case means the local branch isn't what will merge (someone pushed to the PR on GitHub), so the local diff the production-database check reads can't be trusted.
@@ -107,7 +109,7 @@ Natural-language phrasings ("ship it", "merge this PR") are guidance, not trigge
     - **No doubt:** start the description with `Looks safe to me.`, then the narration line. That sentence is what lets the gate stay silent, so write it only when every check above passed; it is a statement to the human, not a formality.
     - **Any doubt:** start the description with one `Asking for merge confirmation: <what> — <why>` line per doubt, in plain words (for example `Asking for merge confirmation: someone else's PR — PR 227 is by benjifriedman, not NorsemanSpiff`), then the narration line. The gate prompts, and Claude Code shows the description above the command in the approval dialog.
 
-    Never create `.claude/skip-merge-confirm.local` unless the human asks for it. Standard opt-out file contents: `Lets /ship merge without the merge-gate prompt when its doubt checks pass. Merges outside /ship still prompt. Delete this file to re-enable.`
+    Never create `.claude/skip-merge-confirm.local` unless the human asks for it. Standard opt-out file contents: `Lets /shipit merge without the merge-gate prompt when its doubt checks pass. Merges outside /shipit still prompt. Delete this file to re-enable.`
 
 12. **Merge.** First print the **required pre-merge narration** — one line with PR number, title, and check posture (e.g. `Merging PR #123 "Add dark mode" — required green (Lint & Functional ✓); advisories: E2E ✓.`) — then run `gh pr merge <N> --merge --delete-branch` with the description step 11 says to write: `Looks safe to me.` or the doubt lines, then the narration line.
     - **Run exactly `gh pr merge <N> --merge --delete-branch`, as its own command, with nothing appended** (no `2>&1`, no `; echo …`). This skill's `allowed-tools` grant covers only that form; anything else falls outside it and prompts.
@@ -167,7 +169,7 @@ Do not use `git stash && <command>; git stash pop` to switch branches across a d
 - `scripts/update-main-branch-protection.mjs` (required check name `Lint & Functional Tests`; `strict_required_status_checks_policy: true`)
 - `.github/workflows/ci.yml` (required check; `dorny/paths-filter` docs-only handling)
 - `.github/workflows/e2e.yml` (post-deploy advisory; gated on `deployment_status.environment` ∈ {Preview, Production})
-- `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/ship` dispatches for expand changes)
+- `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/shipit` dispatches for expand changes)
 - `gh` CLI (including `gh api` REST — `issues/<N>/comments` for poster identity, `pulls/<N>/comments` — and `gh api graphql` for step 10's conversation read)
 - Issue #580 (the maintainer's definition of "unanswered" that step 10 implements), #601 (its three automated-post exclusions) and #680 (the automated review's comments)
 - `.claude/skills/pr/SKILL.md` (delegated to on dirty / on-main pre-flight; delegates further to `/commit`)

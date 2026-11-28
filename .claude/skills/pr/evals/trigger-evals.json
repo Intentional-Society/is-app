@@ -52,7 +52,7 @@
   {
     "query": "what's the CI status on my PR — did the vercel preview e2e pass?",
     "should_trigger": false,
-    "note": "Near-miss: CI-status inspection. /pr explicitly does NOT watch CI (that's /ship). Mentions PR + e2e but is not open/update intent."
+    "note": "Near-miss: CI-status inspection. /pr explicitly does NOT watch CI (that's /shipit). Mentions PR + e2e but is not open/update intent."
   },
   {
     "query": "explain how /pr picks which reviewers to suggest — is it based on who reviewed before?",
@@ -65,7 +65,7 @@
     "note": "Near-miss: debugging an existing PR's conflict state. Mentions PR + main but is not open/update intent."
   },
   {
-    "query": "what's the difference between /pr and /ship — does /pr merge on its own?",
+    "query": "what's the difference between /pr and /shipit — does /pr merge on its own?",
     "should_trigger": false,
     "note": "Near-miss: compare/explain question. Answer is '/pr never merges' — the description says so. Not PR intent."
   },
@@ -77,12 +77,12 @@
   {
     "query": "ship it",
     "should_trigger": false,
-    "note": "Boundary near-miss (extends ship-4/ship-5 pattern): ship/merge intent. /pr must NOT fire (/pr never merges); /ship is explicit-only and won't auto-fire either. Correct behavior is neither routes."
+    "note": "Boundary near-miss (extends ship-4/ship-5 pattern): ship/merge intent. /pr must NOT fire (/pr never merges); /shipit is explicit-only and won't auto-fire either. Correct behavior is neither routes."
   },
   {
     "query": "merge this PR into main for me",
     "should_trigger": false,
-    "note": "Boundary near-miss: merge intent. /pr explicitly never merges; merging is /ship (explicit-only). Strong /pr-vs-/ship stressor."
+    "note": "Boundary near-miss: merge intent. /pr explicitly never merges; merging is /shipit (explicit-only). Strong /pr-vs-/shipit stressor."
   },
   {
     "query": "does the PR title `feat: add relations web` follow our conventional-commit convention?",

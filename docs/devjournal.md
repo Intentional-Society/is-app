@@ -6,6 +6,10 @@ Each entry: **Date** | **Author** | **Title**, followed by at most 360 character
 
 ---
 
+## 2026-11-27 | James (with Opus 5.5) | /ship is now /shipit
+
+Claude Code's bundled `/ship` (commit, PR, watch; never merges) owns that name, and Claude Code doesn't load a project skill called `ship`, so typing `/ship` ran the bundled one. Type `/shipit` to merge.
+
 ## 2026-11-27 | James (with Opus 5.5) | /ship can merge without the merge prompt
 
 The `gh pr merge` ask rule is now a PreToolUse hook that still prompts by default. Create the gitignored `.claude/skip-merge-confirm.local` and typing `/ship` becomes the approval; `/ship` still asks when a doubt check hits (someone else's PR, changes requested, a migration; ship SKILL.md step 11). Merges outside `/ship` always ask.

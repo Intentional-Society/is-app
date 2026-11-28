@@ -37,7 +37,7 @@ Enforced via a GitHub Ruleset, managed as code in `scripts/update-main-branch-pr
 
 ## Related Skills
 
-The `/ship` Skill (`.claude/skills/ship/SKILL.md`) reads the required + visible advisory checks via `gh pr checks <N> --watch`, refuses to merge through anything not green (no "Proceed" option), and runs `gh pr merge --merge --delete-branch` — the only merge form the repo accepts. It never passes `--merge-title` or `--body` flags, so the PR title and body land verbatim in `main` history per the `merge_commit_title` / `merge_commit_message` settings above.
+The `/shipit` Skill (`.claude/skills/shipit/SKILL.md`) reads the required + visible advisory checks via `gh pr checks <N> --watch`, refuses to merge through anything not green (no "Proceed" option), and runs `gh pr merge --merge --delete-branch` — the only merge form the repo accepts. It never passes `--merge-title` or `--body` flags, so the PR title and body land verbatim in `main` history per the `merge_commit_title` / `merge_commit_message` settings above.
 
 ## CI workflows
 

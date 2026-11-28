@@ -287,7 +287,7 @@ const agg = path.join(REPO_ROOT, ".claude", "skills", "skill-creator", "scripts"
 let aggregated = false;
 for (const py of ["python3", "python"]) {
   try {
-    execFileSync(py, [agg, outRoot, "--skill-name", "routing (commit/pr/ship)"], { stdio: "inherit" });
+    execFileSync(py, [agg, outRoot, "--skill-name", "routing (commit/pr/shipit)"], { stdio: "inherit" });
     aggregated = true;
     break;
   } catch {

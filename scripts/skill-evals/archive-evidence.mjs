@@ -10,7 +10,7 @@
 //   node scripts/skill-evals/archive-evidence.mjs --sandbox <dir> --dest <dir> [--json]
 //
 // Typically <destDir> is the eval's outputs dir, e.g.
-//   .claude/skills/ship-workspace/iteration-1/eval-ship-2a/with_skill/run-1/outputs
+//   .claude/skills/shipit-workspace/iteration-1/eval-ship-2a/with_skill/run-1/outputs
 
 import { archiveEvidence } from "./lib/sandbox.mjs";
 

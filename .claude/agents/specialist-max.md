@@ -12,7 +12,7 @@ say so and stop rather than guessing.
 
 Standing rules, regardless of task:
 
-- **Never ship.** No `/commit`, `/pr`, `/ship`, `git commit`, `git push`, or `gh pr
+- **Never ship.** No `/commit`, `/pr`, `/shipit`, `git commit`, `git push`, or `gh pr
   create`/`merge`. Return your result to the launching session, which ships (or hands to
   the maintainer) after its own verification. Posting a findings comment to the GitHub
   issue you were pointed at is fine and often expected.

@@ -197,7 +197,7 @@ export function renderTurnMarkdown(turn, heading = "Graded turn (response to the
  * Compute script-checkable routing observables for the graded (last) turn.
  * These corroborate the LLM grader; they are not a replacement for it.
  * @param {object[]} events
- * @param {{skill:string, ghCallLog?:string}} opts  skill = "commit"|"pr"|"ship"
+ * @param {{skill:string, ghCallLog?:string}} opts  skill = "commit"|"pr"|"shipit"
  */
 export function routingObservables(events, { skill, ghCallLog } = {}) {
   const turns = splitTurns(events);
@@ -214,7 +214,7 @@ export function routingObservables(events, { skill, ghCallLog } = {}) {
     .map((t) => String(t.input?.skill ?? t.input?.command ?? ""));
   const invokedThisSkill = skillInvocations.some((s) => new RegExp(`(^|[^a-z])${skill}([^a-z]|$)`, "i").test(s));
 
-  const announce = { commit: "Using /commit", pr: "Using /pr", ship: "Using /ship" }[skill];
+  const announce = { commit: "Using /commit", pr: "Using /pr", shipit: "Using /shipit" }[skill];
   // At the start of a line, plain or bold (`**Using /commit**`); a quoted mention inside a
   // sentence is not the announcement (#608).
   const announcementPresent = announce

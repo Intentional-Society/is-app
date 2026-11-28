@@ -1,5 +1,5 @@
 {
-  "$comment": "Acceptance evals for the VENDORED upstream skill-creator skill (.claude/skills/skill-creator/, pinned in its UPSTREAM.md). Run these after vendoring or refreshing the copy; capture results in the commit's Test Plan. These prove the vendored copy works in this repo — they are not CI gates and are separate from evals/evals.json, which holds the spec acceptance evals for the team's own /commit, /pr, /ship Skills. See docs/plan-skill-creator-vendoring.md (PR 1) and docs/doc-skill-creator.md.",
+  "$comment": "Acceptance evals for the VENDORED upstream skill-creator skill (.claude/skills/skill-creator/, pinned in its UPSTREAM.md). Run these after vendoring or refreshing the copy; capture results in the commit's Test Plan. These prove the vendored copy works in this repo — they are not CI gates and are separate from evals/evals.json, which holds the spec acceptance evals for the team's own /commit, /pr, /shipit Skills. See docs/plan-skill-creator-vendoring.md (PR 1) and docs/doc-skill-creator.md.",
   "skills": [
     {
       "skill_name": "skill-creator",
@@ -18,7 +18,7 @@
           "eval_name": "deterministic-bundled-validator-self-validates",
           "prompt": "python .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/skill-creator",
           "preconditions": "Python 3.x with PyYAML installed (python -m pip install --user pyyaml). Note the argument is the skill DIRECTORY, not the SKILL.md path.",
-          "expected_output": "Prints 'Skill is valid!' and exits 0 — proves the vendored Python machinery is intact and runnable in this repo. Known divergence, expected and accepted: running this validator against a team skill whose frontmatter carries the Claude Code key disable-model-invocation (e.g. /ship) exits 1 with 'Unexpected key(s) in SKILL.md frontmatter' — upstream's validator has a strict key allowlist. This is why the repo's CI gate is its own Vitest structural test (plan PR 2), not this script."
+          "expected_output": "Prints 'Skill is valid!' and exits 0 — proves the vendored Python machinery is intact and runnable in this repo. Known divergence, expected and accepted: running this validator against a team skill whose frontmatter carries the Claude Code key disable-model-invocation (e.g. /shipit) exits 1 with 'Unexpected key(s) in SKILL.md frontmatter' — upstream's validator has a strict key allowlist. This is why the repo's CI gate is its own Vitest structural test (plan PR 2), not this script."
         },
         {
           "id": "sc-3-end-to-end-authoring",

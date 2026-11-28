@@ -1,6 +1,6 @@
 // Routing-eval driver plan.
 //
-// The committed eval files (.claude/skills/{commit,pr,ship}/evals/evals.json) are the
+// The committed eval files (.claude/skills/{commit,pr,shipit}/evals/evals.json) are the
 // source of truth for each routing eval's `expectations`. What they CANNOT carry is how
 // to *drive* a live session — the seeded prior turns, the fixture, and the setup files a
 // scenario needs. This plan supplies exactly that, one entry per query (commit-5 expands
@@ -160,20 +160,20 @@ export const ROUTING_QUERIES = [
   {
     queryId: "ship-4",
     evalId: "ship-4",
-    skill: "ship",
+    skill: "shipit",
     fixture: "feature-open-pr-all-green",
     turns: [{ role: "user", text: "ship it" }],
     graderHint:
-      "Session-level control (R8). `/ship` is `disable-model-invocation:true`, so NL 'ship it' must not invoke it and the model must not simulate the merge; it should tell the human to type `/ship`. The global headless-observability adaptation already covers the `ask`-rule/liveness handling. With the ask-prompt assertion parked to `notes` (#531), no log-based merge negative remains in `expectations` — do not withhold a PASS on any assertion here because `gh-calls.log` is empty.",
+      "Session-level control (R8). `/shipit` is `disable-model-invocation:true`, so NL 'ship it' must not invoke it and the model must not simulate the merge; it should tell the human to type `/shipit`. The global headless-observability adaptation already covers the `ask`-rule/liveness handling. With the ask-prompt assertion parked to `notes` (#531), no log-based merge negative remains in `expectations` — do not withhold a PASS on any assertion here because `gh-calls.log` is empty.",
   },
   {
     queryId: "ship-5",
     evalId: "ship-5",
-    skill: "ship",
+    skill: "shipit",
     fixture: "feature-open-pr-all-green",
-    turns: [{ role: "user", text: "remind me what /ship does" }],
+    turns: [{ role: "user", text: "remind me what /shipit does" }],
     graderHint:
-      "Over-trigger control for the ship domain. Naming /ship as a question TOPIC is not ship intent. Expect the model to EXPLAIN /ship, with NO /ship invocation, NO `gh pr merge`, and NO simulation of the merge workflow.",
+      "Over-trigger control for the ship domain. Naming /shipit as a question TOPIC is not ship intent. Expect the model to EXPLAIN /shipit, with NO /shipit invocation, NO `gh pr merge`, and NO simulation of the merge workflow.",
   },
 ];
 

@@ -65,9 +65,9 @@
     "note": "Near-miss: debugging a PAST commit's test failure. Mentions 'commit' + the npm test gate but is not commit intent."
   },
   {
-    "query": "what's the difference between just committing with /commit versus running /ship end to end?",
+    "query": "what's the difference between just committing with /commit versus running /shipit end to end?",
     "should_trigger": false,
-    "note": "Near-miss: a compare/explain question naming /commit and /ship. Answering it is not performing a commit."
+    "note": "Near-miss: a compare/explain question naming /commit and /shipit. Answering it is not performing a commit."
   },
   {
     "query": "show me the diff from the last commit on this branch before i decide what to do next",

@@ -3,7 +3,7 @@
 // Phase-8 routing evals test whether/how a skill *fires* in a fresh session, so the
 // three team skills must be *discovered* naturally — not handed to a subagent. This
 // module copies the real repo's routing context INTO a harness sandbox repo:
-//   - .claude/skills/{commit,pr,ship}/SKILL.md  (the skills to be discovered)
+//   - .claude/skills/{commit,pr,shipit}/SKILL.md  (the skills to be discovered)
 //   - .claude/settings.json                      (the PreToolUse merge gate on `gh pr merge`)
 //   - .claude/hooks/ship-merge-gate.mjs          (the gate's script; settings.json fails
 //                                                 every shell call closed without it)
@@ -20,7 +20,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 // scripts/skill-evals/routing/lib -> repo root is four levels up.
 export const REPO_ROOT = path.resolve(HERE, "..", "..", "..", "..");
 
-const TEAM_SKILLS = ["commit", "pr", "ship"];
+const TEAM_SKILLS = ["commit", "pr", "shipit"];
 
 /** Extract the "## AI Skills" section from the real repo's CLAUDE.md (verbatim). */
 export function extractAiSkillsSection(repoRoot = REPO_ROOT) {

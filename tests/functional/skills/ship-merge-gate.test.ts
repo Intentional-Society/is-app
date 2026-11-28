@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { decide, lastTypedMessage, OPT_OUT_FILE } from "../../../.claude/hooks/ship-merge-gate.mjs";
 
 // The merge gate only ever asks; it never allows. These tests pin when it asks: always,
-// unless the machine opted out and the last message the human typed is `/ship`.
+// unless the machine opted out and the last message the human typed is `/shipit`.
 // Transcript entries mirror Claude Code's JSONL (checked with a headless probe, 2026-11-28):
 // a typed command is a `user` entry with string content; skill text Claude Code injects is
 // `isMeta: true`; tool output is a `user` entry whose content holds `tool_result` parts.
@@ -15,7 +15,7 @@ import { decide, lastTypedMessage, OPT_OUT_FILE } from "../../../.claude/hooks/s
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const HOOK = path.join(REPO_ROOT, ".claude", "hooks", "ship-merge-gate.mjs");
 const SHIP =
-  "<command-message>ship</command-message>\n<command-name>/ship</command-name>\n<command-args>717</command-args>";
+  "<command-message>shipit</command-message>\n<command-name>/shipit</command-name>\n<command-args>717</command-args>";
 
 let dir: string;
 beforeEach(() => {
@@ -51,13 +51,13 @@ const run = (command: string, transcriptPath?: string, description = SAFE) =>
   decide({ command, projectDir: dir, transcriptPath, description });
 
 describe("lastTypedMessage", () => {
-  it("returns the typed /ship command, skipping injected skill text and tool output after it", () => {
+  it("returns the typed /shipit command, skipping injected skill text and tool output after it", () => {
     expect(
       lastTypedMessage(jsonl(typed("hi"), typed(SHIP), meta("Base directory for this skill"), toolResult("ok"))),
     ).toBe(SHIP);
   });
 
-  it("does not count /ship text that arrives as tool output or injected text", () => {
+  it("does not count /shipit text that arrives as tool output or injected text", () => {
     expect(lastTypedMessage(jsonl(typed("merge it"), toolResult(SHIP), meta(SHIP), assistant(SHIP)))).toBe("merge it");
   });
 
@@ -88,13 +88,13 @@ describe("decide", () => {
     expect(run("git merge origin/main")).toBeNull();
   });
 
-  it("asks when the machine has not opted out, even inside /ship", () => {
+  it("asks when the machine has not opted out, even inside /shipit", () => {
     expect(run("gh pr merge 12 --merge --delete-branch", transcript(typed(SHIP)))?.reason).toMatch(
       /merge confirmation is on/,
     );
   });
 
-  it('stays silent on an opted-out machine after a typed /ship, when the merge says "Looks safe to me"', () => {
+  it('stays silent on an opted-out machine after a typed /shipit, when the merge says "Looks safe to me"', () => {
     optOut();
     expect(
       run("gh pr merge 12 --merge --delete-branch", transcript(typed(SHIP), meta("skill"), toolResult("ok"))),
@@ -113,14 +113,14 @@ describe("decide", () => {
     expect(run("gh pr merge 12 --merge --delete-branch", ship, `Merging. ${SAFE}`)?.decision).toBe("ask");
   });
 
-  it("asks on an opted-out machine when the human typed something after /ship", () => {
+  it("asks on an opted-out machine when the human typed something after /shipit", () => {
     optOut();
     const result = run("gh pr merge 12 --merge --delete-branch", transcript(typed(SHIP), typed("yes, merge anyway")));
     expect(result?.decision).toBe("ask");
-    expect(result?.reason).toMatch(/isn't \/ship/);
+    expect(result?.reason).toMatch(/isn't \/shipit/);
   });
 
-  it("asks on an opted-out machine when /ship only appears in tool output", () => {
+  it("asks on an opted-out machine when /shipit only appears in tool output", () => {
     optOut();
     expect(
       run("gh pr merge 12 --merge --delete-branch", transcript(typed("please merge"), toolResult(SHIP)))?.decision,
@@ -191,7 +191,7 @@ describe("hook process", () => {
   });
 });
 
-describe("checked-in settings and /ship's grant", () => {
+describe("checked-in settings and /shipit's grant", () => {
   const settings = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, ".claude", "settings.json"), "utf8"));
   const entry = settings.hooks.PreToolUse.find((e: { matcher: string }) => e.matcher === "Bash|PowerShell");
 
@@ -220,8 +220,8 @@ describe("checked-in settings and /ship's grant", () => {
     );
   });
 
-  it("/ship grants exactly the merge command it runs, and nothing broader", () => {
-    const skill = fs.readFileSync(path.join(REPO_ROOT, ".claude", "skills", "ship", "SKILL.md"), "utf8");
+  it("/shipit grants exactly the merge command it runs, and nothing broader", () => {
+    const skill = fs.readFileSync(path.join(REPO_ROOT, ".claude", "skills", "shipit", "SKILL.md"), "utf8");
     const front = skill.split(/^---$/m)[1];
     // A one-line YAML flow list, which is also valid JSON.
     const line = /^allowed-tools:\s*(\[.*\])\s*$/m.exec(front);

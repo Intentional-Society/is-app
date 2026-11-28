@@ -73,7 +73,7 @@ const merge = (pr: number, description?: string, extra = "") =>
   ({ command: `${ACT} gh pr merge ${pr} --merge --delete-branch${extra}`, description }) as Call;
 
 const MERGE_CHECK = (pr: number) =>
-  `Exactly one merge call, and it is exactly \`gh pr merge ${pr} --merge --delete-branch\` with nothing appended (the form /ship's allowed-tools grants).`;
+  `Exactly one merge call, and it is exactly \`gh pr merge ${pr} --merge --delete-branch\` with nothing appended (the form /shipit's allowed-tools grants).`;
 const SAFE_CHECK =
   'The merge call\'s description starts with "Looks safe to me", there is no doubt line, and no separate merge question.';
 const DOUBT_CHECK =
@@ -120,7 +120,7 @@ describe("ship-10 (no doubt)", () => {
       "ship-10",
       [
         ...reads(226),
-        { command: `${ACT} grep -n "gh pr merge" .claude/skills/ship/SKILL.md` },
+        { command: `${ACT} grep -n "gh pr merge" .claude/skills/shipit/SKILL.md` },
         { command: `${ACT} rm .claude/skip-merge-confirm.local` },
         merge(226, SAFE_DESC),
       ],

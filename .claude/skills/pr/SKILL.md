@@ -6,7 +6,7 @@ description: "[is-app] Open or update the PR for the current branch: fetch + reb
 
 # /pr
 
-The middle Skill in the commit → PR → ship chain. `/pr` ensures the branch is current with `origin/main`, runs `npm test` again if anything changed during rebase (a lighter check for a docs-only branch), and either opens a new PR or summarizes new commits on the existing one. It does **not** watch CI and it does **not** merge — that's `/ship`'s job.
+The middle Skill in the commit → PR → ship chain. `/pr` ensures the branch is current with `origin/main`, runs `npm test` again if anything changed during rebase (a lighter check for a docs-only branch), and either opens a new PR or summarizes new commits on the existing one. It does **not** watch CI and it does **not** merge — that's `/shipit`'s job.
 
 ## Invocation
 
@@ -19,19 +19,19 @@ Argument resolution order:
 3. **Integer resolves via `gh issue view <N>`** → issue context (treated the same as `/commit`'s issue-or-context — used for branch naming, PR-title hints, and `Closes #N` linking).
 4. **Anything else** → plain-language context.
 
-No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow; `/pr` stops after opening or updating the PR.
+No `/pr --auto-ship` and no `/pr --auto-merge`. `/shipit` is the chained workflow; `/pr` stops after opening or updating the PR.
 
-**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR") — **including when _you_ offered to open a PR and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the PR with ad-hoc `git`/`gh` commands. Scope it to your own PR offer: a bare "yes" to an _unrelated_ offer (a refactor, rename, or search) is **not** a PR trigger — don't fire `/pr` on it. On **every** model-invoked (natural-language) run, **announce `Using /pr` as you route — the first line of the message in which you call the `Skill` tool, before the call** so the human can see the Skill fired (a delegated call is the exception — the parent announces the handoff; see Step 0). On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/pr` and delegated calls (`/ship` → `/pr`) skip the _confirmation_, but the announcement still applies to any model-invoked run.
+**Invocation paths.** This Skill fires on an explicit `/pr` **and** on natural-language PR intent ("open a PR for this branch", "make a PR") — **including when _you_ offered to open a PR and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the PR with ad-hoc `git`/`gh` commands. Scope it to your own PR offer: a bare "yes" to an _unrelated_ offer (a refactor, rename, or search) is **not** a PR trigger — don't fire `/pr` on it. On **every** model-invoked (natural-language) run, **announce `Using /pr` as you route — the first line of the message in which you call the `Skill` tool, before the call** so the human can see the Skill fired (a delegated call is the exception — the parent announces the handoff; see Step 0). On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/pr` and delegated calls (`/shipit` → `/pr`) skip the _confirmation_, but the announcement still applies to any model-invoked run.
 
 ## Steps
 
 0. **Announce + NL intent gate (model-invoked only).**
 
-   **Announcement — at the routing decision; backstop here.** You should already have announced `Using /pr` as you routed — the first line of the message in which you invoked the `Skill` tool, before the call (see CLAUDE.md / Invocation paths). **If you have not, announce it now as the first visible line of your response** — exactly once, never doubled. **Exception — delegated calls:** when the delegation marker (below) is present **and fresh** (its timestamp within the last 30s — the same lease the intent gate applies below), do **not** announce; the parent already printed `Using /pr — delegated from /ship` on your behalf. A **stale** marker (older than 30s, e.g. from a crashed delegation) is _not_ a delegated call — announce as normal (the gate deletes it and treats this as a standalone run). The opt-out file does **not** suppress the announcement (it suppresses only the _confirmation_ below); only delegation does. The announcement is the forcing function that keeps this flow inside the Skill — an ad-hoc `gh pr create` can't honestly print it.
+   **Announcement — at the routing decision; backstop here.** You should already have announced `Using /pr` as you routed — the first line of the message in which you invoked the `Skill` tool, before the call (see CLAUDE.md / Invocation paths). **If you have not, announce it now as the first visible line of your response** — exactly once, never doubled. **Exception — delegated calls:** when the delegation marker (below) is present **and fresh** (its timestamp within the last 30s — the same lease the intent gate applies below), do **not** announce; the parent already printed `Using /pr — delegated from /shipit` on your behalf. A **stale** marker (older than 30s, e.g. from a crashed delegation) is _not_ a delegated call — announce as normal (the gate deletes it and treats this as a standalone run). The opt-out file does **not** suppress the announcement (it suppresses only the _confirmation_ below); only delegation does. The announcement is the forcing function that keeps this flow inside the Skill — an ad-hoc `gh pr create` can't honestly print it.
 
    **Intent gate.** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
    - **Verified slash entry** — a `<command-name>` tag for `/pr` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward _firing_ the gate).
-   - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 later.
+   - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/shipit` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 later.
    - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
 
    When the gate fires, **before any other action** (no `gh auth`, no git/`gh` commands), present via `AskUserQuestion`: "Open a PR with: _[detected context — echo any user guidance]_?" with options **Proceed** / **Proceed and don't ask again** (creates `.claude/skip-nl-confirm-commit-pr.local` with the standard note) / **Stop** (zero side effects).
@@ -44,7 +44,7 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 2. **Resolve the argument** using the order above.
 
-3. **Refuse to switch branches.** If the resolved PR is on a branch different from the current checkout, refuse — `/pr` does not switch branches. Name both branches and suggest `/ship <PR#>` (which is allowed to switch when the working tree is clean).
+3. **Refuse to switch branches.** If the resolved PR is on a branch different from the current checkout, refuse — `/pr` does not switch branches. Name both branches and suggest `/shipit <PR#>` (which is allowed to switch when the working tree is clean).
 
 4. **Working-tree pre-flight.** If `git status --porcelain` is non-empty OR HEAD is `main`, delegate to `/commit` with the same argument. **Immediately before invoking `/commit`, write the delegation marker `.claude/.nl-delegation-active` as `pr\t<current ISO-8601 UTC>`** so `/commit`'s Step 0 doesn't re-prompt for intent the human already gave to `/pr`. **As you write the marker and invoke `/commit`, print `Using /commit — delegated from /pr` as the first line** so the delegated Skill is visible in the cascade; `/commit` suppresses its own announcement because the marker is present. `/commit` consumes it on read; **after `/commit` returns, delete the marker if it still exists** (belt-and-suspenders cleanup so a crashed delegation can't leave it behind). When `/commit` returns, continue with this Skill from step 5.
 
@@ -143,16 +143,16 @@ No `/pr --auto-ship` and no `/pr --auto-merge`. `/ship` is the chained workflow;
 
 10. **If an open PR for this branch exists — comment-by-default, body-update only on material scope change.**
 
-    Post a short PR-conversation comment summarizing each new commit pushed in this run — **its first line is exactly `_/pr: new commits since the PR body was written_`** (so `/ship` step 10 can recognize the note as the skill's own and not count it as unanswered, #601) — then one bullet per commit: subject + short rationale.
+    Post a short PR-conversation comment summarizing each new commit pushed in this run — **its first line is exactly `_/pr: new commits since the PR body was written_`** (so `/shipit` step 10 can recognize the note as the skill's own and not count it as unanswered, #601) — then one bullet per commit: subject + short rationale.
 
     Update the PR body **only** if the new commits materially change the PR's scope. Because the body is the durable merge commit message, ask for human approval before saving any body update. Phrase the question concretely — show the proposed diff to the body, not just "want me to update?"
 
-11. **Print the PR URL and stop.** `/pr` does not poll CI checks. Watching CI and merging is `/ship`'s job.
+11. **Print the PR URL and stop.** `/pr` does not poll CI checks. Watching CI and merging is `/shipit`'s job.
 
 ## Failure modes
 
 - **`gh` unavailable or unauthenticated.** Refuse loudly; print `gh auth login`.
-- **Argument resolves to a PR on a different branch from the current checkout.** Refuse; name both branches; suggest `/ship <PR#>` for switching.
+- **Argument resolves to a PR on a different branch from the current checkout.** Refuse; name both branches; suggest `/shipit <PR#>` for switching.
 - **Rebase conflict during `git rebase origin/main`.** Abort the rebase; report conflicted files; hand to human. Do not auto-resolve.
 - **`npm test` fails after rebase, or a docs-only branch fails step 7's lighter check.** Refuse; surface the failing output.
 - **`gh pr create` fails or the PR-comment update fails.** Report the error; do not retry blindly.

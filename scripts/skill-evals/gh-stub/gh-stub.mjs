@@ -12,7 +12,7 @@
 //     logged) — it NEVER passes through to the real gh.
 //   * "No marker, no run": refuses unless the sandbox marker is present.
 //
-// Stubbed surface (traced from .claude/skills/{commit,pr,ship}/SKILL.md):
+// Stubbed surface (traced from .claude/skills/{commit,pr,shipit}/SKILL.md):
 //   auth status | issue view | pr view | pr list | pr create | pr checks | pr merge |
 //   pr comment | run list | run watch |
 //   api {user, users/<login>, repos/<owner>/<repo>/collaborators,
@@ -138,10 +138,10 @@ function handlePrView(fx) {
     logCall({ decision: "answered", exitCode: 1 });
     return 1;
   }
-  // /ship step 4 (#597): the last-push cutoff, `--json commits --jq '.commits[-1].committedDate'`.
+  // /shipit step 4 (#597): the last-push cutoff, `--json commits --jq '.commits[-1].committedDate'`.
   // Only this one expression is answered, printed bare the way real gh prints a jq string;
   // every other form still gets the full object.
-  // /ship step 11's doubt checks read single fields (`.author.login`, `.reviewDecision`,
+  // /shipit step 11's doubt checks read single fields (`.author.login`, `.reviewDecision`,
   // `.headRefOid`); a plain dotted path is answered the way real gh prints it (strings bare,
   // anything else as JSON). Every other form still gets the full object.
   const jq = flagValue("--jq");
@@ -215,7 +215,7 @@ function handlePrMerge(_fx) {
   //
   // #597 item 5, deferred by the maintainer 2026-09-24: the stub writes no merge commit, so the
   // merge-SHA assertions (ship-1 [8], ship-3 [6]) cannot tell a captured SHA from the pre-merge
-  // tip. If a /ship change ever touches steps 13–14 (tidy, merge SHA, post-merge runs), consider
+  // tip. If a /shipit change ever touches steps 13–14 (tidy, merge SHA, post-merge runs), consider
   // writing a merge commit to the sandbox origin here; it reverses this never-mutate rule and
   // needs a design ruling first.
   //
@@ -313,7 +313,7 @@ function handleApi(fx) {
     logCall({ decision: "answered", exitCode: 0, api: "collaborators" });
     return 0;
   }
-  // /ship step 10 (#580): the PR's inline review comments. One page holds everything, so
+  // /shipit step 10 (#580): the PR's inline review comments. One page holds everything, so
   // `--paginate` needs no handling beyond being accepted. Read-only: a write to the same
   // endpoint (`-X POST` / `--method POST`, e.g. posting a review comment) is NOT this route
   // and falls through to default-deny like every other un-stubbed mutation.
@@ -322,7 +322,7 @@ function handleApi(fx) {
     logCall({ decision: "answered", exitCode: 0, api: "pulls/comments", paginate: hasFlag("--paginate") });
     return 0;
   }
-  // /ship step 10 (#601): the PR's top-level comments via the REST issue-comments endpoint,
+  // /shipit step 10 (#601): the PR's top-level comments via the REST issue-comments endpoint,
   // the only read that shows the poster's account type (`user.type`, `[bot]`-suffixed
   // `user.login`) and posting app (`performed_via_github_app.slug`). Served from the
   // fixture's `issueComments` array. GET-only, like the pulls/<N>/comments route above: a
@@ -332,7 +332,7 @@ function handleApi(fx) {
     logCall({ decision: "answered", exitCode: 0, api: "issues/comments", paginate: hasFlag("--paginate") });
     return 0;
   }
-  // /ship step 10 (#580): review threads' resolved state. Only a query that names
+  // /shipit step 10 (#580): review threads' resolved state. Only a query that names
   // `reviewThreads` is answered; any other GraphQL query stays default-deny.
   if (endpoint === "graphql" && /\breviewThreads\b/.test(graphqlQuery())) {
     emitObject({

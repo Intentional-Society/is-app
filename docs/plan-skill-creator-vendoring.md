@@ -10,7 +10,7 @@
 
 ## Problem
 
-The team's `/commit`, `/pr`, and `/ship` Skills were built with Anthropic's upstream
+The team's `/commit`, `/pr`, and `/shipit` Skills were built with Anthropic's upstream
 [`skill-creator`](https://github.com/anthropics/skills/tree/main/skills/skill-creator) skill, but
 skill-creator itself is not in the repo — each person must manually mount a dumped copy. That
 doesn't scale to the team. We want repo-local access on clone, while still benefiting from
@@ -68,7 +68,7 @@ without silent drift.
    PR #304 were run locally by the author per the skill-creator workflow.
 4. The NL-invocation revision (**implemented 2026-06-24**, #353/#433/#459/#460;
    `docs/plan-skill-nl-invocation.md`) removed `disable-model-invocation: true` from `/commit`
-   and `/pr` and kept it on `/ship`. Any gate asserting that key must be per-skill, not uniform.
+   and `/pr` and kept it on `/shipit`. Any gate asserting that key must be per-skill, not uniform.
 5. Upstream skill-creator bundles `SKILL.md`, `LICENSE.txt` (Apache-2.0), `agents/`, `assets/`,
    `eval-viewer/`, `references/`, and `scripts/` (all Python). Python is needed only when a human
    runs those scripts — never by CI or the app.
@@ -79,11 +79,11 @@ The NL-invocation revision was implemented between PR 1 and PR 2 as planned. PRs
 the post-NL repo state, which is now live. **Verified post-NL state (don't re-derive):**
 
 - **PR 2:** invocation-policy expectation table — `disable-model-invocation` absent on `/commit`
-  and `/pr`; `true` on `/ship`. Eval counts on current `main`: commit=5, pr=8, ship=4 (all ≥3).
+  and `/pr`; `true` on `/shipit`. Eval counts on current `main`: commit=5, pr=8, ship=4 (all ≥3).
   Line counts: commit=198, pr=163, ship=121 (all well under 500). Re-derive
   `docs/spec-portable-ai-procedures.md` section/line citations at implementation time.
   **If PR #484 (`skill-nl-announce-affirmation`) has merged first:** counts become 8/9/6 (still
-  ≥3); it touches `/ship` SKILL.md too, but body-only (delegation narration) — the
+  ≥3); it touches `/shipit` SKILL.md too, but body-only (delegation narration) — the
   `disable-model-invocation: true` frontmatter is unchanged, so the expectation table holds. It
   also edits spec §2, so re-deriving the citations matters more.
 - **PR 3:** _(Superseded 2026-07-02 — PR 3 was redesigned to the scheduled drift workflow and
@@ -95,7 +95,7 @@ the post-NL repo state, which is now live. **Verified post-NL state (don't re-de
   issue #463) is **RESOLVED** — a two-merge same-session test (2026-06-26) showed the harness
   `ask` on `gh pr merge` **does** fire per-merge in **default** mode; PR #460 merged silently
   because that session was in **`auto` mode** (auto-approves), not a gate defect. Decision: **keep
-  #459 (no Y/n)**; the default-mode `ask` is the confirmation. No `/ship` step-10 change needed.
+  #459 (no Y/n)**; the default-mode `ask` is the confirmation. No `/shipit` step-10 change needed.
 
 ---
 
@@ -256,7 +256,7 @@ Build when the issue-based cadence proves annoying, not before.
 ## PR 5 — Behavioral evals in CI, advisory/scheduled (deferred)
 
 Reuse the existing `anthropics/claude-code-action` + `CLAUDE_CODE_OAUTH_TOKEN` plumbing. Scope to
-human-authored PRs touching `.claude/skills/{commit,pr,ship}/**`, or a nightly schedule.
+human-authored PRs touching `.claude/skills/{commit,pr,shipit}/**`, or a nightly schedule.
 Non-required/advisory (like `e2e.yml`); results as a PR comment. Implementation caveats carried
 from planning: (a) the action is PR-event-shaped — the scheduled variant needs a custom headless
 Claude job; (b) the action refuses bot actors — this check can never gate PR 4's auto-drift PRs;
@@ -274,8 +274,8 @@ unverified — spike before committing to this PR.
   fires only on refresh commits (never when upstream moves) and duplicates the refresh script's
   own printed eval instructions. PR 3 remains the closing PR for #396. Exit-2 path proven live
   pre-merge via a throwaway `pull_request`-trigger + pin-rollback commit, dropped before merge.
-- 2026-07-02 — Blake: PR 2 (deterministic structural gate) implemented **on top of #484**, reversing the 2026-07-01 "independent, branch off `main`" call: `skill-nl-announce-affirmation` (#484) was merged first (`92984dc`) and the gate is written against the post-#484 repo state — eval counts 8/9/6 (commit/pr/ship), skill-creator 3, all ≥3. Gate lives at `tests/functional/skills/skill-contract.test.ts` in a **new `functional-skills` Vitest project** (its own home rather than folded into `functional-server`, so a skills contract test doesn't masquerade as a server test — and the `tests/functional/skills/` path is otherwise collected by no project and would silently not run). Runs in the required `Lint & Functional Tests` check. Allowlist `{commit, pr, ship}` only (skill-creator not held to our contract). Asserts: SKILL.md present; frontmatter parses with `name` + `description`; `name` == dir; per-skill invocation policy (commit/pr: `disable-model-invocation` absent, ship: `true`); body sections Invocation → Steps → Failure modes → `## Depends on` as a **subsequence**; >500 lines warns only; both eval JSONs' every `skill_path` resolves with ≥3 evals per skill. Spec citations re-derived post-#484: §2 L52–61, §3 L79–117.
-- 2026-07-01 — Blake: Studied PR #484 (`skill-nl-announce-affirmation`, now open — announce at the routing decision + delegation narration + semantic over-trigger evals). Confirmed still independent of PRs 2/3 (verified assertion-by-assertion). Corrections folded into the Sequencing note and PR 2 assertions: post-#484 eval counts are 8/9/6 (not 5/8/4); #484 touches `/ship` SKILL.md body-only (frontmatter untouched); Step 14 shifts +4 (→~109). Also hardened two PR 2 assertions against the real file shapes: section-order is a subsequence check, and `evals.json` nests cases under one `skill_path` per skill (count within group).
+- 2026-07-02 — Blake: PR 2 (deterministic structural gate) implemented **on top of #484**, reversing the 2026-07-01 "independent, branch off `main`" call: `skill-nl-announce-affirmation` (#484) was merged first (`92984dc`) and the gate is written against the post-#484 repo state — eval counts 8/9/6 (commit/pr/shipit), skill-creator 3, all ≥3. Gate lives at `tests/functional/skills/skill-contract.test.ts` in a **new `functional-skills` Vitest project** (its own home rather than folded into `functional-server`, so a skills contract test doesn't masquerade as a server test — and the `tests/functional/skills/` path is otherwise collected by no project and would silently not run). Runs in the required `Lint & Functional Tests` check. Allowlist `{commit, pr, ship}` only (skill-creator not held to our contract). Asserts: SKILL.md present; frontmatter parses with `name` + `description`; `name` == dir; per-skill invocation policy (commit/pr: `disable-model-invocation` absent, ship: `true`); body sections Invocation → Steps → Failure modes → `## Depends on` as a **subsequence**; >500 lines warns only; both eval JSONs' every `skill_path` resolves with ≥3 evals per skill. Spec citations re-derived post-#484: §2 L52–61, §3 L79–117.
+- 2026-07-01 — Blake: Studied PR #484 (`skill-nl-announce-affirmation`, now open — announce at the routing decision + delegation narration + semantic over-trigger evals). Confirmed still independent of PRs 2/3 (verified assertion-by-assertion). Corrections folded into the Sequencing note and PR 2 assertions: post-#484 eval counts are 8/9/6 (not 5/8/4); #484 touches `/shipit` SKILL.md body-only (frontmatter untouched); Step 14 shifts +4 (→~109). Also hardened two PR 2 assertions against the real file shapes: section-order is a subsequence check, and `evals.json` nests cases under one `skill_path` per skill (count within group).
 - 2026-06-26 — Blake: Prereq correction — `skill-nl-announce-affirmation` is not required before PR 2 or PR 3. PR 2's assertions (key absence, section order, eval count ≥3) are insensitive to Step 0 announce content; eval ≥3 threshold is already satisfied (5/8/4). PR #468 is a procedural prerequisite (implementer should start from current `main`) but not a technical one.
 - 2026-06-26 — Blake: Thread 15 resolved — two-merge same-session test (default mode) showed
   harness `ask` fires per-merge; #460 was `auto` mode. Y/n stays deleted (#459 stands). PR 3

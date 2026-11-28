@@ -9,7 +9,7 @@ import { buildGhFixture } from "../../../scripts/skill-evals/lib/gh-fixture.mjs"
 
 // Unit coverage for the skill-eval `gh` stub's read-only conversation routes (#580, #601):
 // the pull-request review-comments REST endpoint, the issue-comments REST endpoint (poster
-// account type and posting app) and the review-threads GraphQL query that `/ship` step 10
+// account type and posting app) and the review-threads GraphQL query that `/shipit` step 10
 // reads right before the merge. Each test lays out the minimal directory
 // shape the stub expects (bin/gh-stub.mjs, repo/.skill-eval-sandbox, gh-fixture.json) in a
 // temp dir — no git, no make-sandbox, no network — and runs the stub as a child process.
@@ -375,7 +375,7 @@ describe("fixtures — check links name the fixture's own PR (#597)", () => {
   });
 });
 
-// #597 item 1: /ship step 4's last-push cutoff read.
+// #597 item 1: /shipit step 4's last-push cutoff read.
 describe("gh stub — pr view --json commits --jq '.commits[-1].committedDate' (#597)", () => {
   const fx = () => buildGhFixture(getFixture("feature-open-pr-all-green"));
 
@@ -403,7 +403,7 @@ describe("gh stub — pr view --json commits --jq '.commits[-1].committedDate' (
   });
 });
 
-describe("gh stub — pr view --jq <dotted path> (/ship step 11 doubt checks)", () => {
+describe("gh stub — pr view --jq <dotted path> (/shipit step 11 doubt checks)", () => {
   const fx = (name: string) => buildGhFixture(getFixture(name));
 
   it.each([
@@ -428,7 +428,7 @@ describe("fixtures — the merge-gate opt-out worlds (ship-10, ship-11)", () => 
     const profile = getFixture(name) as ReturnType<typeof getFixture> & {
       working: { write: Record<string, string> };
     };
-    expect(profile.working.write[".claude/skip-merge-confirm.local"]).toMatch(/^Lets \/ship merge/);
+    expect(profile.working.write[".claude/skip-merge-confirm.local"]).toMatch(/^Lets \/shipit merge/);
     const fx = buildGhFixture(profile);
     expect(fx.branchPr.author.login).toBe(author);
     expect(fx.prs[String(fx.branchPr.number)].author.login).toBe(author);

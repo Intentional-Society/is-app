@@ -25,7 +25,7 @@ const flag = (name) => {
 if (args.includes("--help") || args.includes("-h") || args.length === 0) {
   process.stdout.write(
     "grade-ship-merge-gate <ship-10|ship-11> --outputs <dir> (--transcript <file.jsonl> | --agent <agentId>)\n" +
-      "Grades /ship step 11's merge authorization from the transcript and the evidence archive.\n",
+      "Grades /shipit step 11's merge authorization from the transcript and the evidence archive.\n",
   );
   process.exit(args.length === 0 ? 2 : 0);
 }

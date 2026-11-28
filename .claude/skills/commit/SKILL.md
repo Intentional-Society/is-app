@@ -6,7 +6,7 @@ description: "[is-app] Stage, commit, and push the current changes via the team'
 
 # /commit
 
-The leaf Skill in the commit → PR → ship chain. `/commit` is the only place changes leave the working tree; both `/pr` and `/ship` delegate here when the tree is dirty or HEAD is `main`.
+The leaf Skill in the commit → PR → ship chain. `/commit` is the only place changes leave the working tree; both `/pr` and `/shipit` delegate here when the tree is dirty or HEAD is `main`.
 
 ## Invocation
 
@@ -18,7 +18,7 @@ The leaf Skill in the commit → PR → ship chain. `/commit` is the only place 
 | `#<N>` or bare `<N>` | Treat as a GitHub issue number; resolve with `gh issue view <N>`.                              |
 | Any other text       | Use as plain-language context for branch naming, issue-lookup hints, and commit-message draft. |
 
-Cache the argument for `/pr` and `/ship` in this session so chained invocations reuse the same context.
+Cache the argument for `/pr` and `/shipit` in this session so chained invocations reuse the same context.
 
 **Invocation paths.** This Skill fires on an explicit `/commit` **and** on natural-language commit intent ("commit this", "commit these changes in two commits: X then Y") — **including when _you_ offered to commit and the human merely affirms** ("yes", "go ahead", "do it"). That affirmation is the trigger: route it through this Skill via the `Skill` tool — never hand-roll the commit with ad-hoc `git` commands. Scope it to your own commit offer: a bare "yes" to an _unrelated_ offer (a refactor, rename, or search) is **not** a commit trigger — don't fire `/commit` on it. On **every** model-invoked (natural-language) run, **announce `Using /commit` as you route — the first line of the message in which you call the `Skill` tool, before the call** so the human can see the Skill fired (a delegated call is the exception — the parent announces the handoff; see Step 0). On the natural-language path the model-invoked **Step 0** also confirms intent first (see Steps); explicit `/commit` and delegated calls skip the _confirmation_, but the announcement still applies to any model-invoked run.
 
@@ -32,7 +32,7 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
 
    **Intent gate.** Fire this gate only when this Skill was invoked via the `Skill` tool **and none** of the following holds; otherwise go straight to step 1:
    - **Verified slash entry** — a `<command-name>` tag for `/commit` is present in the turn (heuristic; if that signal isn't reliably visible, bias toward _firing_ the gate — a redundant confirm is harmless, a missed one isn't).
-   - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/pr` or `/ship` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 on a later standalone run.
+   - **Live delegation marker** — `.claude/.nl-delegation-active` exists (a parent `/pr` or `/shipit` wrote it as `<parent-skill>\t<ISO-8601 UTC>` immediately before delegating here). If it exists **and its timestamp is within the last 30s**: **delete it (clear-on-read) and proceed to step 1**. If it exists but is **older than 30s** (a stale leftover from an interrupted run): delete it and **continue this gate** (treat as a standalone invocation). The 30s lease — plus the parent deleting the marker after the delegated call returns — keeps a crashed delegation from silently suppressing Step 0 on a later standalone run.
    - **Opt-out file** — `.claude/skip-nl-confirm-commit-pr.local` exists.
 
    When the gate fires, **before any other action** (no `gh auth`, no git commands), present via `AskUserQuestion`: "Run `/commit` with: _[detected context — echo any user guidance such as issue refs or commit-splitting instructions]_?" with options:
@@ -42,11 +42,11 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
 
    **If `AskUserQuestion` is not available** (headless, cloud, or any non-interactive session), present the same question and the same three options as plain text, and **stop**. Do not proceed without an answer. A missing prompter is not a skip condition — the only skip conditions are the three listed above.
 
-   Standard opt-out file contents: `Skips only the natural-language intent confirmation (Step 0) for /commit and /pr. All approval checkpoints still apply. /ship is unaffected. Delete this file to re-enable.`
+   Standard opt-out file contents: `Skips only the natural-language intent confirmation (Step 0) for /commit and /pr. All approval checkpoints still apply. /shipit is unaffected. Delete this file to re-enable.`
 
    This gate confirms only _intent detection_ on the natural-language path; it is not the content-approval checkpoint (step 14), which still runs regardless. If you change this gate, re-run the verification checklist in `docs/plan-skill-nl-invocation.md`.
 
-1. **Parse the argument** and cache it for downstream Skills (`/pr`, `/ship`) in the same session.
+1. **Parse the argument** and cache it for downstream Skills (`/pr`, `/shipit`) in the same session.
 
 2. **Inspect working state.** Run `git status --short`, `git diff --name-status`, and `git diff --cached --name-status`. Inspect `git log origin/main..HEAD` for branch-history context.
 
@@ -72,7 +72,7 @@ Run these in order. Each step's failure mode is in the Failure modes section bel
 
 9. **Schema-change handling.** If the staged payload includes `src/server/schema.ts` or anything under `drizzle/`, identify the expand vs contract phase per `docs/strategy-committing.md`.
    - **Refuse combined expand+contract payloads.** The two phases must ship as separate commits so deploy ordering can be preserved. Ask the human to split.
-   - **Expand-phase change.** In the eventual approval block, note that `npm run prod:db:expand` will need to be dispatched after PR creation (the dispatcher pauses on a maintainer approval gate in the `prod-db` environment before injecting prod credentials), and that the post-deploy `e2e.yml` run must pass before `/ship` merges.
+   - **Expand-phase change.** In the eventual approval block, note that `npm run prod:db:expand` will need to be dispatched after PR creation (the dispatcher pauses on a maintainer approval gate in the `prod-db` environment before injecting prod credentials), and that the post-deploy `e2e.yml` run must pass before `/shipit` merges.
    - **Contract-phase change.** No dispatch needed; the migration runs in Vercel's production build per `vercel.json`.
 
 10. **Validate issue argument if present.** If the parsed argument looks like an issue, `gh issue view <N>` to confirm it exists and is open. **Fail fast and hard if `gh` is unavailable or unauthenticated** — suggest `gh auth login` / `gh auth status` as the next command.
@@ -197,5 +197,5 @@ Do not use `git stash && <command>; git stash pop` to "test against a clean slat
 - `docs/doc-github.md` (GitHub settings, merge-commit-only, `merge_commit_message: PR_BODY`)
 - `docs/strategy-project-management.md` (issue → board automation; closing-keyword behavior)
 - `.github/workflows/ci.yml` (the gate the local `npm test` mirrors)
-- `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/ship` dispatches for expand changes)
+- `.github/workflows/forward-migrate-prod-schema-expansion.yml` (the workflow `/shipit` dispatches for expand changes)
 - `gh` CLI (issue lookup, authentication state)

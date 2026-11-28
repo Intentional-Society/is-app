@@ -2,7 +2,7 @@
 
 Anthropic's [skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator)
 skill — the workflow the team uses to build, eval, and description-optimize Claude Code Skills
-(it built `/commit`, `/pr`, `/ship`; see `docs/spec-portable-ai-procedures.md`) — is vendored at
+(it built `/commit`, `/pr`, `/shipit`; see `docs/spec-portable-ai-procedures.md`) — is vendored at
 `.claude/skills/skill-creator/` so every teammate has it on clone with zero setup.
 
 Design, alternatives considered, and the full PR sequence: `docs/plan-skill-creator-vendoring.md`.

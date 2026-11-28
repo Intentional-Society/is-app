@@ -41,4 +41,4 @@ Default to a merge commit (`gh pr merge --merge --delete-branch`). The merge com
 
 ### Related Skills
 
-`/commit` (`.claude/skills/commit/SKILL.md`) auto-creates a feature branch when invoked on `main`; `/pr` (`.claude/skills/pr/SKILL.md`) rebases onto `origin/main` when main has moved and re-runs `npm test` before pushing; `/ship` (`.claude/skills/ship/SKILL.md`) handles the merge step (`gh pr merge --merge --delete-branch`) and tidies the local branch.
+`/commit` (`.claude/skills/commit/SKILL.md`) auto-creates a feature branch when invoked on `main`; `/pr` (`.claude/skills/pr/SKILL.md`) rebases onto `origin/main` when main has moved and re-runs `npm test` before pushing; `/shipit` (`.claude/skills/shipit/SKILL.md`) handles the merge step (`gh pr merge --merge --delete-branch`) and tidies the local branch.

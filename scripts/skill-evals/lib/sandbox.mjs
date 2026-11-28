@@ -15,7 +15,7 @@ import { assertOutsideRepo, HARNESS_DIR, MARKER_FILENAME, SANDBOX_PREFIX, sandbo
 
 const GH_STUB_SRC = path.join(HARNESS_DIR, "gh-stub");
 const FAKE_TEST_SRC = path.join(HARNESS_DIR, "fake-test.mjs");
-// The real docs-only classifier, which /commit, /pr and /ship call. Copied verbatim into
+// The real docs-only classifier, which /commit, /pr and /shipit call. Copied verbatim into
 // every baseline so the skills' docs-only step runs as it does in the repo.
 const DOCS_ONLY_SRC = path.join(HARNESS_DIR, "..", "docs-only.mjs");
 const SCRUB_UNSET = ["GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"];
@@ -105,7 +105,7 @@ export function buildSandbox({ fixture, root, note }) {
   installGhStub(binDir);
 
   const ghFixture = buildGhFixture(profile);
-  // A PR on this branch reports the branch's real head as `headRefOid`, so /ship step 11's
+  // A PR on this branch reports the branch's real head as `headRefOid`, so /shipit step 11's
   // head-moved doubt agrees with local git. Only the builder knows the SHA.
   if (profile.branch) {
     const head = git(["-C", repoDir, "rev-parse", profile.branch]).trim();

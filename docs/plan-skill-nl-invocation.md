@@ -1,4 +1,4 @@
-# Plan: Natural-Language Invocation for /commit /pr /ship
+# Plan: Natural-Language Invocation for /commit /pr /shipit
 
 > **How to use this doc.** Everything here is live policy: PR1, PR2 and PR3 (#484, 2026-07-02) have all shipped. Other files link here by path; the routing eval text (`routing-plan.mjs`) names two sections by title and item number, and the `/commit` and `/pr` skills send Step 0 editors to Verification (PR3) below. Keep these titles and item numbers stable: Shared mechanism facts, Design (two-tier), PR3 Design, Verification (PR3), PR1/PR2 acceptance checklist, Key constraints, Decision log.
 > The build history (pick-up guide, scope, cold verification, PR3 evals, what PR1/PR2 shipped, replay scenarios, preflight) is archived, marked do-not-follow, in [`old-archive/plan-skill-nl-invocation-history.md`](old-archive/plan-skill-nl-invocation-history.md) (split at commit `23ace81`, #609); a "below" or "see Findings" here that no longer resolves points there.
@@ -8,7 +8,7 @@
 | Phase                      | Scope                                                                                                                                                                             | State                     |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
 | **PR1** (#353)             | NL invocation for `/commit`+`/pr`: drop `disable-model-invocation`, **Step 0** intent gate, single‑use **delegation marker**, v1.1 docs sweep, 4 NL‑routing evals                 | ✅ **Merged**             |
-| **PR2** (#353 fast‑follow) | Harness **merge gate** (checked‑in `.claude/settings.json` `ask` on `gh pr merge`), `/ship` Y/n deletion (Thread‑14 proof), `strategy-security` line                              | ✅ **Merged**             |
+| **PR2** (#353 fast‑follow) | Harness **merge gate** (checked‑in `.claude/settings.json` `ask` on `gh pr merge`), `/shipit` Y/n deletion (Thread‑14 proof), `strategy-security` line                            | ✅ **Merged**             |
 | **PR3** (#484)             | **`Using /commit`/`/pr` announcement** + **affirmation routing** + over‑trigger scope + **delegation‑announce**; announcement reliability relocation; semantic over‑trigger evals | ✅ **Shipped 2026‑07‑02** |
 
 **Tracking:** #353 (`Closes`‑ed by PR1+PR2). **PR3 is a follow‑on** — no issue filed; motivated by the
@@ -28,7 +28,7 @@ Finding 2, both resolved before merge.
    `bypassPermissions`). A checked‑in `ask` rule can't be weakened locally — why PR2's `gh pr merge`
    `ask` was an un‑weakenable merge guard in every permission mode, `auto` included (verified
    2026‑09‑23/24, #599). Since 2026‑11‑24 a PreToolUse hook replaces that rule so a machine can opt
-   out for `/ship`'s own merges (see Decision log).
+   out for `/shipit`'s own merges (see Decision log).
 3. **Removing `disable-model-invocation` puts the Skill's `description` into every session's context**
    — a permanent token cost and the NL‑matching surface. _(PR3 uses the description as the
    announcement's primary home — see PR3 Design.)_
@@ -37,15 +37,15 @@ Finding 2, both resolved before merge.
 
 ## Design (two‑tier, all phases)
 
-| Tier        | Skills           | NL‑invocable               | Gate                                           | Enforcement                            |
-| ----------- | ---------------- | -------------------------- | ---------------------------------------------- | -------------------------------------- |
-| Lower risk  | `/commit`, `/pr` | Yes                        | Step‑0 intent prompt; local opt‑out file       | Model‑level (in‑Skill)                 |
-| Higher risk | `/ship`          | No — explicit `/ship` only | Harness permission prompt on the merge command | Harness‑level (flag + merge‑gate hook) |
+| Tier        | Skills           | NL‑invocable                 | Gate                                           | Enforcement                            |
+| ----------- | ---------------- | ---------------------------- | ---------------------------------------------- | -------------------------------------- |
+| Lower risk  | `/commit`, `/pr` | Yes                          | Step‑0 intent prompt; local opt‑out file       | Model‑level (in‑Skill)                 |
+| Higher risk | `/shipit`        | No — explicit `/shipit` only | Harness permission prompt on the merge command | Harness‑level (flag + merge‑gate hook) |
 
-**Problem this solves:** contributors who don't know the Skills exist express commit/PR/ship intent
+**Problem this solves:** contributors who don't know the Skills exist express commit/PR/shipit intent
 in natural language, and agents approximate the workflow instead of routing through the official
 Skills — bypassing the team guardrails. Intent confirmation is useful by default; experienced
-contributors opt out; `/ship` is held to a stricter, harness‑enforced standard.
+contributors opt out; `/shipit` is held to a stricter, harness‑enforced standard.
 
 ---
 
@@ -60,7 +60,7 @@ over‑trigger clause (next). Shipped in `ba9dc59`; verified 5/5 in the cold run
 ### Announcement — value, placement, delegation, contract
 
 **Value (two real jobs).** (i) A prominent, transcript‑portable, model‑_stated_ cue on direct NL;
-(ii) **making the `/ship` → `/pr` → `/commit` delegation cascade legible** — "Using /pr → Using
+(ii) **making the `/shipit` → `/pr` → `/commit` delegation cascade legible** — "Using /pr → Using
 /commit" tells the handoff story. The harness `commit skill`/`pr skill` **badge** is a deterministic
 _backstop_ (it appears on every Skill‑tool call, direct or delegated), but it doesn't replace the
 text line's value.
@@ -74,11 +74,11 @@ occurred.)_
 
 **Delegation coverage (Finding 1).** Delegation is the worst case (the child is always invoked
 tool‑first — the exact skip‑prone pattern). **Single owner per hop: the parent owns the
-announcement.** Each parent narrates the handoff at its delegation step (`/pr` step 4, `/ship`
+announcement.** Each parent narrates the handoff at its delegation step (`/pr` step 4, `/shipit`
 step 3) — prints "Using /commit — delegated from /pr" as it writes the delegation marker and invokes
 the child — because the parent is at its reliable routing‑decision moment. The child, seeing the
 marker, **suppresses its own self‑announce** (the marker already means "your parent announced and
-confirmed you"). So the cascade reads exactly once per hop: `/ship` → "Using /pr" → "Using /commit".
+confirmed you"). So the cascade reads exactly once per hop: `/shipit` → "Using /pr" → "Using /commit".
 _(The marker now suppresses **both** the child's Step‑0 confirmation **and** its self‑announce —
 without this, parent‑narration + child‑self‑announce would double the line. This replaced the earlier
 `ba9dc59` behavior, where the child self‑announced on delegation.)_
@@ -120,19 +120,19 @@ look like, and the human starts every session from a **fresh terminal after `cd`
 worktree, never the IDE's Claude panel**. Result on #587: A×3, B, C, D all passed on Opus 5.5 /
 Claude Code 2.1.281; attestation on #581.
 
-| #           | Scenario                                                                                                                                                                                                                                                                                                                           | Pass                                                                                               | Eval                             |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------- |
-| A           | Affirm a `/commit` offer ("…then ask whether to commit" → "yes"), ×3 cold                                                                                                                                                                                                                                                          | first line `Using /commit` (**exactly once**); routes via Skill; Stop = clean                      | `commit-4`, `commit-6`           |
-| B           | Affirm a `/pr` offer                                                                                                                                                                                                                                                                                                               | first line `Using /pr`; routes via Skill                                                           | `pr-8`, `pr-9`                   |
-| C           | Opt‑out present → "commit this"                                                                                                                                                                                                                                                                                                    | `Using /commit` still prints; **no** Step‑0 confirm                                                | `commit-5(c)`                    |
-| D           | Typed `/commit` (slash)                                                                                                                                                                                                                                                                                                            | **no** announce, **no** Step 0                                                                     | `commit-5(a)`                    |
-| E           | "ship it" / `gh pr merge 99999`                                                                                                                                                                                                                                                                                                    | redirect to typed `/ship`; merge blocked                                                           | `ship-4`                         |
-| F2/F3/F4    | Semantic over‑triggers (affirm‑explain / keyword‑as‑topic / explain‑`/ship`)                                                                                                                                                                                                                                                       | Skill does **not** fire                                                                            | `commit-7`, `commit-8`, `ship-5` |
-| **G (new)** | **Delegation cascade** — `/pr` (dirty tree); `/ship` (dirty / on‑`main`‑no‑PR). **⚠️ "Stop at Step 0" does NOT apply** — the delegation marker suppresses the child's confirmation, so `/pr` would push + open a PR and `/ship` would head to merge. **Interrupt (Esc) the instant the cascade prints**, before any push/PR/merge. | `/pr` → `Using /commit`; `/ship` → `Using /pr` then `Using /commit` — **one per hop, no doubling** | `pr-3` (ext.), `ship-6`          |
+| #           | Scenario                                                                                                                                                                                                                                                                                                                               | Pass                                                                                                 | Eval                             |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------- |
+| A           | Affirm a `/commit` offer ("…then ask whether to commit" → "yes"), ×3 cold                                                                                                                                                                                                                                                              | first line `Using /commit` (**exactly once**); routes via Skill; Stop = clean                        | `commit-4`, `commit-6`           |
+| B           | Affirm a `/pr` offer                                                                                                                                                                                                                                                                                                                   | first line `Using /pr`; routes via Skill                                                             | `pr-8`, `pr-9`                   |
+| C           | Opt‑out present → "commit this"                                                                                                                                                                                                                                                                                                        | `Using /commit` still prints; **no** Step‑0 confirm                                                  | `commit-5(c)`                    |
+| D           | Typed `/commit` (slash)                                                                                                                                                                                                                                                                                                                | **no** announce, **no** Step 0                                                                       | `commit-5(a)`                    |
+| E           | "ship it" / `gh pr merge 99999`                                                                                                                                                                                                                                                                                                        | redirect to typed `/shipit`; merge blocked                                                           | `ship-4`                         |
+| F2/F3/F4    | Semantic over‑triggers (affirm‑explain / keyword‑as‑topic / explain‑`/shipit`)                                                                                                                                                                                                                                                         | Skill does **not** fire                                                                              | `commit-7`, `commit-8`, `ship-5` |
+| **G (new)** | **Delegation cascade** — `/pr` (dirty tree); `/shipit` (dirty / on‑`main`‑no‑PR). **⚠️ "Stop at Step 0" does NOT apply** — the delegation marker suppresses the child's confirmation, so `/pr` would push + open a PR and `/shipit` would head to merge. **Interrupt (Esc) the instant the cascade prints**, before any push/PR/merge. | `/pr` → `Using /commit`; `/shipit` → `Using /pr` then `Using /commit` — **one per hop, no doubling** | `pr-3` (ext.), `ship-6`          |
 
 _(Scenario numbering: was 1–9 in the #353 checklist; renumbered A–G here. Old 8 ≈ A/B; old 9 ≈ F2/F3/F4.)_
 
-**Results — initial cold run (`ba9dc59`+`48d497c`, pre‑fix):** routing 5/5; opt‑out/slash/ship
+**Results — initial cold run (`ba9dc59`+`48d497c`, pre‑fix):** routing 5/5; opt‑out/slash/shipit
 clean; over‑trigger semantic pass; **announcement 5/6** (across the model‑invoked runs where it was
 required — A×4 + B + C; D/E/F excluded, announce N/A); delegation **not yet tested** (A–F were all
 direct NL).
@@ -151,8 +151,8 @@ explicitly recognized the already‑made announce and did not double), routed vi
 line with a one‑sentence routing preamble — announce present and at the routing decision, just not the
 literal first line; accepted.)_ **Cascade R4 (`/pr`→`/commit`):** the parent printed `Using /commit —
 delegated from /pr`, and the child consumed the marker and proceeded **without re‑announcing**.
-**Cascade R5 (`/ship`→`/pr`→`/commit`):** two hops, one announce each — `/ship` printed `Using /pr —
-delegated from /ship`; the **middle‑link `/pr` suppressed its own announce** (marker present) yet
+**Cascade R5 (`/shipit`→`/pr`→`/commit`):** two hops, one announce each — `/shipit` printed `Using /pr —
+delegated from /shipit`; the **middle‑link `/pr` suppressed its own announce** (marker present) yet
 still narrated `Using /commit — delegated from /pr` onward. No child self‑announced; no doubled or
 missing hops.
 
@@ -171,12 +171,12 @@ One prompt per fresh session; human reviewer re‑ran one before approving.
 2. NL "open a PR" → `/pr`, Step‑0 first; Stop = clean.
 3. Guidance preserved ("…two commits: schema then UI") → Step‑0 echoes it.
 4. Opt‑out works + scoped (don't‑ask‑again writes the file; later session skips Step 0; delete after).
-5. `/ship` stays gated — "ship it" redirects; `gh pr merge 99999` hits the harness prompt (decline).
+5. `/shipit` stays gated — "ship it" redirects; `gh pr merge 99999` hits the harness prompt (decline).
 6. Slash `/commit` → no Step‑0; starts at Step 1.
 7. Delegation doesn't double‑prompt — typed `/pr` on dirty tree delegates to `/commit`, which does
    **not** fire Step 0 (marker consumed); a later standalone NL "commit this" **does**.
 
-**Thread‑14 `/ship` ask‑path proof — ✅ PASSED 2026‑06‑24.** 3 cold `/ship 433` runs against the real
+**Thread‑14 `/shipit` ask‑path proof — ✅ PASSED 2026‑06‑24.** 3 cold `/shipit 433` runs against the real
 PR #433 merge: narration + `ask` fired every run; `ask` beat a local `Bash(gh pr merge *)` allow
 (Run 2); declines left #433 unmerged, approve merged it (commit `20361c4`). Evidence: the run
 notes stayed local, outside the repo; the outcome is recorded in the Decision log (Thread 14).
@@ -212,24 +212,24 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
 ## Key constraints (do not relax)
 
 - Step 0 is the **first action** when model‑invoked; "Stop" produces zero side effects.
-- The opt‑out file affects **only** Step 0 in `/commit`/`/pr` — never `/ship`, never any approval
+- The opt‑out file affects **only** Step 0 in `/commit`/`/pr` — never `/shipit`, never any approval
   checkpoint, test gate, or refusal rule. **It does not suppress the PR3 announcement.**
 - The delegation marker is **single‑use** (set immediately before delegation, consumed+cleared at
   Step 0). Never a sticky session flag.
-- `/ship` keeps `disable-model-invocation: true`; the merge ask‑rules live in checked‑in
+- `/shipit` keeps `disable-model-invocation: true`; the merge ask‑rules live in checked‑in
   `.claude/settings.json`.
-- Explicit slash invocation stays prompt‑free (the merge permission prompt inside `/ship` is the one
+- Explicit slash invocation stays prompt‑free (the merge permission prompt inside `/shipit` is the one
   deliberate exception — it _is_ the merge confirmation).
 - **PR3 announcement goal is "every NL run"** — prompt‑level relocation first; the hook is the
   deferred hard guarantee.
 
 ## Decision log
 
-- 2026‑06‑12 — Blake + James: two‑tier risk model; `/ship` stricter than `/commit`//`pr`.
-- 2026‑06‑12 — Blake: single opt‑out flag; in‑skill marker over PreToolUse hook; `/ship`
+- 2026‑06‑12 — Blake + James: two‑tier risk model; `/shipit` stricter than `/commit`//`pr`.
+- 2026‑06‑12 — Blake: single opt‑out flag; in‑skill marker over PreToolUse hook; `/shipit`
   explicit‑only; `gh pr merge` ask‑rule backstop; manual checklist over headless smoke.
 - 2026‑06‑12 (peer review) — Blake: Step 0 via AskUserQuestion with "don't ask again" → opt‑out file;
-  approved replacing `/ship` Y/n with the harness prompt (supersedes #133 step‑10); checklist
+  approved replacing `/shipit` Y/n with the harness prompt (supersedes #133 step‑10); checklist
   hardened (tracked‑file fixture, fake‑PR merge test, reviewer spot‑check).
 - 2026‑06‑16 (replay + evals) — Blake: replay against real PRs; found the #245→#319 expand→contract
   pair (replacing the weak #331 fixture). Confirmed no scope conflict with #396.
@@ -243,7 +243,7 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
   #396).
 - 2026‑06‑17 (impl hardening — Blake) — delegation marker upgraded to `<parent>\tISO` + 30s TTL +
   parent post‑return cleanup (release‑in‑`finally` + lease).
-- 2026‑06‑24 (Thread‑14 proof + Y/n deletion — Blake) — 3 cold `/ship 433` runs against the real #433
+- 2026‑06‑24 (Thread‑14 proof + Y/n deletion — Blake) — 3 cold `/shipit 433` runs against the real #433
   merge; PASSED; Y/n deleted in the #353 fast‑follow. Evidence `.scratch/ship-proof-results.md`.
 - 2026‑06‑26 (Thread 15 — merge‑gate finding — Blake) — PR #460 merged silently → investigated: in
   **default** mode the `ask` fires per‑merge (verified); #460 was an **auto‑mode** session (not a gate
@@ -266,7 +266,7 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
 - 2026‑07‑01 (**Thread 16** post‑fix cold re‑verify — Blake) — applied the Finding‑1/2 fixes (announce
   relocated to the routing decision + descriptions at ≤350; Step‑0 conditional backstop; parent‑narrated
   delegation with child‑suppress; `commit-7` rewrite + `commit-8`/`ship-5`/`ship-6`/`pr-3` evals) and
-  re‑verified cold. **Bar MET:** direct announce **3/3**; `/pr`→`/commit` and `/ship`→`/pr`→`/commit`
+  re‑verified cold. **Bar MET:** direct announce **3/3**; `/pr`→`/commit` and `/shipit`→`/pr`→`/commit`
   cascades each narrated every hop exactly once (the middle‑link `/pr` suppressed its own announce yet
   narrated onward). **Decision: prompt‑level is sufficient — the `PreToolUse` hook stays deferred**
   (standing escalation if drift recurs). Lone blemish: one direct run prefaced `Using /commit` with a
@@ -274,16 +274,16 @@ Tracking: #396 comment `4728284766`. (Combined expand+contract refusal is alread
 - 2026‑09‑24 (#599/#600 — hub, merge‑gate correction) — the merge `ask` fires in **every** permission
   mode, `auto` included: seven real merges and every sandbox merge prompted once on 2026‑09‑23/24, and
   Claude Code's docs list `ask` rules among the actions no mode auto‑approves. Thread 15's `auto`
-  caveat (2026‑06‑26) is withdrawn; `ship/SKILL.md` step 12 was corrected in #600, shared fact 2 here in #609.
+  caveat (2026‑06‑26) is withdrawn; `shipit/SKILL.md` step 12 was corrected in #600, shared fact 2 here in #609.
 - 2026‑11‑24 (merge gate → hook) — in about six months the merge prompt never changed an outcome:
-  typing `/ship` was already the decision. The checked‑in `ask` rule is replaced by a PreToolUse hook
+  typing `/shipit` was already the decision. The checked‑in `ask` rule is replaced by a PreToolUse hook
   (`.claude/hooks/ship-merge-gate.mjs`, `onFailure: "block"`) that asks for every `gh pr merge`
   unless the per‑machine `.claude/skip-merge-confirm.local` exists, the last message the human
-  typed is `/ship`, and the merge command's description starts with "Looks safe to me", which
-  `/ship` writes only when its doubt checks (step 11) all pass; otherwise the description names
+  typed is `/shipit`, and the merge command's description starts with "Looks safe to me", which
+  `/shipit` writes only when its doubt checks (step 11) all pass; otherwise the description names
   each doubt in plain words and the gate's prompt shows it. The hook never allows anything: the
-  merge runs under `/ship`'s `allowed-tools` grant for exactly `gh pr merge <N> --merge
-  --delete-branch`, which Claude Code applies only during the typed `/ship` turn and checks per
+  merge runs under `/shipit`'s `allowed-tools` grant for exactly `gh pr merge <N> --merge
+  --delete-branch`, which Claude Code applies only during the typed `/shipit` turn and checks per
   subcommand; `ask` rules catch `--admin`, `--auto` and another repository (`-R`, `--repo`). Allow decisions stay with Claude
   Code's own permission rules, so the hook parses no shell syntax. Headless probes on 2026‑11‑24 and 2026‑11‑28: the hook's `ask` held in default, `auto` and
   `bypassPermissions`, over a local `allow` and over the skill's grant; a crashing hook blocked the

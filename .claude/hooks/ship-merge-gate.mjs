@@ -4,14 +4,14 @@
 // asks for every command that mentions `gh pr merge`, unless all three hold:
 //
 //   1. `.claude/skip-merge-confirm.local` exists (per-machine opt-out, gitignored),
-//   2. the most recent message the human typed in this session is `/ship`, and
-//   3. the command's description starts with "Looks safe to me", which /ship writes only
+//   2. the most recent message the human typed in this session is `/shipit`, and
+//   3. the command's description starts with "Looks safe to me", which /shipit writes only
 //      when none of its doubt checks hit. Staying silent takes that positive statement, so
 //      a model that skips a step gets a prompt rather than a silent merge.
 //
-// When it stays silent, Claude Code's own permission rules decide. /ship's `allowed-tools`
+// When it stays silent, Claude Code's own permission rules decide. /shipit's `allowed-tools`
 // grants exactly `gh pr merge <N> --merge --delete-branch` for the turn the human typed
-// `/ship`, Claude Code checks each part of a compound command itself, and checked-in `ask`
+// `/shipit`, Claude Code checks each part of a compound command itself, and checked-in `ask`
 // rules catch `--admin` and `--auto`. So a mistake here can only add a prompt or fail to add
 // one; it can never grant a command.
 //
@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 
 export const OPT_OUT_FILE = path.join(".claude", "skip-merge-confirm.local");
 const MERGE_RE = /\bgh(?:\.exe)?\s+pr\s+merge\b/i;
-const SHIP_COMMAND = "<command-name>/ship</command-name>";
+const SHIP_COMMAND = "<command-name>/shipit</command-name>";
 export const SAFE_DECLARATION = "Looks safe to me";
 
 // User entries Claude Code writes itself rather than the human: a background task finishing,
@@ -77,13 +77,13 @@ export function decide({ command, projectDir, transcriptPath, description = "" }
   try {
     typed = lastTypedMessage(fs.readFileSync(transcriptPath, "utf8"));
   } catch {
-    return ask("could not read this session's transcript to confirm a typed /ship.");
+    return ask("could not read this session's transcript to confirm a typed /shipit.");
   }
   if (!typed.includes(SHIP_COMMAND)) {
-    return ask("the last message you typed isn't /ship, so this merge isn't covered by the opt-out.");
+    return ask("the last message you typed isn't /shipit, so this merge isn't covered by the opt-out.");
   }
   if (!String(description).trim().startsWith(SAFE_DECLARATION)) {
-    return ask(`/ship didn't say this merge "${SAFE_DECLARATION}"; its description above says why it's asking.`);
+    return ask(`/shipit didn't say this merge "${SAFE_DECLARATION}"; its description above says why it's asking.`);
   }
   return null;
 }
