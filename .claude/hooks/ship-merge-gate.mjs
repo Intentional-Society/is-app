@@ -7,7 +7,14 @@
 //      /ship step 12 after its doubt checks pass, no older than MARKER_TTL_MS, naming the
 //      same PR as the command.
 //
-// The marker is single-use: any merge attempt deletes it. Merges outside /ship never
+// Only a plain merge can skip the prompt: `gh pr merge <N> --merge --delete-branch`,
+// optionally after `cd <this repo or a folder in it> &&`, with no other command, pipe,
+// redirect or substitution. An allowed command skips every permission check (the prompt in
+// default mode, the classifier in auto mode), so nothing may ride along with the merge; and
+// `gh` picks the repository from the working directory, so `cd` may not leave this repo.
+// Any other command mentioning `gh pr merge` asks and leaves the marker alone.
+//
+// The marker is single-use: a plain merge command deletes it. Merges outside /ship never
 // carry one, so they always ask, opt-out or not.
 //
 // The hook returns "ask" explicitly instead of staying silent, because a silent hook
@@ -23,22 +30,50 @@ export const OPT_OUT_FILE = path.join(".claude", "skip-merge-confirm.local");
 export const MARKER_FILE = path.join(".claude", ".ship-merge-authorized");
 export const MARKER_TTL_MS = 120_000;
 
-const MERGE_RE = /\bgh(?:\.exe)?\s+pr\s+merge\b/gi;
+const MERGE_RE = /\bgh(?:\.exe)?\s+pr\s+merge\b/i;
+const PLAIN_MERGE_RE = /^gh(?:\.exe)?\s+pr\s+merge\s+(\d+)\s+(?:--merge\s+--delete-branch|--delete-branch\s+--merge)$/i;
+const CD_RE = /^cd\s+(?:"([^"]+)"|'([^']+)'|(\S+))$/i;
+// Anything that could chain, pipe, redirect or substitute another command. `&&` is the one
+// joiner allowed, so it is removed before this check.
+const SHELL_CONTROL_RE = /[;|<>`&\r\n]|\$\(/;
+const NOT_PLAIN =
+  "only a plain `gh pr merge <N> --merge --delete-branch`, optionally after `cd <this repo> &&`, can skip the prompt.";
 
-/** The PR number a `gh pr merge` command targets, or null when it names none. */
-export function mergeTarget(command) {
-  const match = /\bgh(?:\.exe)?\s+pr\s+merge\b/i.exec(command);
-  if (!match) return null;
-  const rest = command
-    .slice(match.index + match[0].length)
-    .trim()
-    .split(/\s+/);
-  const arg = rest.find((token) => token && !token.startsWith("-"));
-  if (!arg) return null;
-  const cleaned = arg.replace(/^["']|["';]+$/g, "");
-  if (/^\d+$/.test(cleaned)) return Number(cleaned);
-  const url = /\/pull\/(\d+)(?:[/?#].*)?$/.exec(cleaned);
-  return url ? Number(url[1]) : null;
+const GIT_BASH_DRIVE_RE = /^\/([a-z])(?=\/|$)/i;
+
+function normalizeDir(dir) {
+  const p = path.resolve(dir);
+  return process.platform === "win32" ? p.toLowerCase() : p;
+}
+
+/** Whether `cd <target>`, run from `projectDir`, stays inside `projectDir`. */
+function staysInProject(target, projectDir) {
+  // The shell expands these (home, previous dir, variables, globs); the hook can't follow.
+  if (/^-|[~$*?]/.test(target)) return false;
+  // Git Bash spells C:\x as /c/x.
+  const absolute = process.platform === "win32" ? target.replace(GIT_BASH_DRIVE_RE, "$1:") : target;
+  const root = normalizeDir(projectDir);
+  const dest = normalizeDir(path.resolve(projectDir, absolute));
+  return dest === root || dest.startsWith(root + path.sep);
+}
+
+/**
+ * Parse a command as a plain merge. Returns { pr } for `gh pr merge <N> --merge
+ * --delete-branch`, optionally after `cd <dir inside projectDir> &&`; else { reason }.
+ */
+export function parsePlainMerge(command, projectDir) {
+  const segments = command.trim().split(/\s*&&\s*/);
+  if (segments.some((s) => SHELL_CONTROL_RE.test(s)) || segments.length > 2) return { reason: NOT_PLAIN };
+  const merge = PLAIN_MERGE_RE.exec(segments.at(-1));
+  if (!merge) return { reason: NOT_PLAIN };
+  if (segments.length === 2) {
+    const cd = CD_RE.exec(segments[0]);
+    if (!cd) return { reason: NOT_PLAIN };
+    if (!staysInProject(cd[1] ?? cd[2] ?? cd[3], projectDir)) {
+      return { reason: "the command changes to a directory outside this repo before merging." };
+    }
+  }
+  return { pr: Number(merge[1]) };
 }
 
 function readMarker(markerPath) {
@@ -58,11 +93,14 @@ function readMarker(markerPath) {
  * { decision: "ask" | "allow", reason }.
  */
 export function decide({ command, projectDir, now = Date.now() }) {
-  if (typeof command !== "string") return null;
-  const merges = command.match(MERGE_RE);
-  if (!merges) return null;
+  if (typeof command !== "string" || !MERGE_RE.test(command)) return null;
 
   const ask = (reason) => ({ decision: "ask", reason: `Merge gate: ${reason}` });
+  // Not a plain merge (extra commands, other flags, a URL, a mention in an argument): ask,
+  // and leave any marker for the real merge.
+  const plain = parsePlainMerge(command, projectDir);
+  if (plain.pr == null) return ask(plain.reason);
+  const target = plain.pr;
   const markerPath = path.join(projectDir, MARKER_FILE);
 
   if (!fs.existsSync(path.join(projectDir, OPT_OUT_FILE))) {
@@ -70,9 +108,6 @@ export function decide({ command, projectDir, now = Date.now() }) {
     return ask("merge confirmation is on (no .claude/skip-merge-confirm.local).");
   }
   const marker = readMarker(markerPath);
-  if (merges.length > 1) return ask("more than one `gh pr merge` in one command.");
-  const target = mergeTarget(command);
-  if (target === null) return ask("the command names no PR number or URL.");
   if (!marker) {
     return ask("/ship did not authorize this merge (a merge outside /ship, or /ship raised a doubt).");
   }

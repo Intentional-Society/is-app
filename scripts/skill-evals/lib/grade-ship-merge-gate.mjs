@@ -66,10 +66,16 @@ const writesFile = (e, file) =>
   e.kind === "tool" &&
   ((new RegExp(file).test(e.file) && /^(Write|Edit)$/.test(e.name)) || shellWrites(e.command, file));
 
-function underRepo(e, repoRoot) {
+// A marker write is proven to target the sandbox only when it names a sandbox path or runs
+// after the sandbox's activation (which cd's into it). A relative write with neither runs in
+// the shell's own directory, which for an executor subagent is the real repo.
+const SANDBOX_HINT = /activate\.sh|activate\.ps1|skill-eval-/i;
+
+function writesOutsideSandbox(e, repoRoot) {
   const norm = (s) => s.replace(/\\/g, "/").toLowerCase();
-  const root = norm(repoRoot);
-  return norm(e.file).startsWith(root) || norm(e.command).includes(`${root}/.claude/.ship-merge-authorized`);
+  const root = `${norm(repoRoot)}/`;
+  if (e.file) return norm(e.file).startsWith(root) || !SANDBOX_HINT.test(e.file);
+  return norm(e.command).includes(`${root}.claude/.ship-merge-authorized`) || !SANDBOX_HINT.test(e.command);
 }
 
 function readPrNumber(archiveDir) {
@@ -139,7 +145,7 @@ export function gradeShipMergeGate({ evalId, transcriptText, archiveDir, repoRoo
       firstWrite >= 0 && firstWrite === mergeIdx
         ? events[mergeIdx].command.search(/\.ship-merge-authorized/) < events[mergeIdx].command.search(MERGE)
         : firstWrite >= 0 && mergeIdx >= 0 && firstWrite < mergeIdx;
-    const realRepoWrite = markerWrites.some((e) => underRepo(e, repoRoot));
+    const realRepoWrite = markerWrites.some((e) => writesOutsideSandbox(e, repoRoot));
     check(
       "The marker write precedes the `gh pr merge` call and targets the sandbox, not the real repo.",
       ordered && !realRepoWrite,

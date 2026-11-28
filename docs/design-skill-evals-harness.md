@@ -156,7 +156,9 @@ file for the full rules.
   in `.claude/settings.json` for Bash and PowerShell. It returns `ask` for every `gh pr merge`
   unless the machine has `.claude/skip-merge-confirm.local` and `/ship` wrote a fresh authorization
   marker for that PR ([`strategy-security.md`](strategy-security.md), "Agent merge guardrail").
-  Sandboxes never carry the opt-out file, so in an eval every merge asks. Until 2026-11-24 this
+  In an eval every merge still asks: the gate reads both files from the session's project
+  directory, never the sandbox, so the opt-out file and marker that `ship-10`/`ship-11` put in
+  their sandboxes never reach it. Until 2026-11-24 this
   gate was an `ask` permission rule; older ledger entries below say "`ask` rule" for it.
 - **Permission modes (`default`, `auto`, `bypassPermissions`)** — session-wide settings that change
   how prompts behave. The merge gate's `ask` holds in every mode, `auto` and `bypassPermissions`
@@ -928,8 +930,8 @@ sandbox rather than inside it.
 
 That has two consequences the harness is built around. First, it is the sturdiest gate C8 can point
 to, though not an absolute one. Per `.claude/skills/ship/SKILL.md` steps 11–12, the source of record
-for its behavior: a sandbox has no `.claude/skip-merge-confirm.local`, so the gate returns `ask` for
-every merge, and **that `ask` waits for a human's one-time click in every permission mode, `auto`
+for its behavior: the gate reads the opt-out file and the marker from the session's project
+directory, never the sandbox, so it returns `ask` for every sandbox merge, and **that `ask` waits for a human's one-time click in every permission mode, `auto`
 and `bypassPermissions` included, over a local `allow`** (headless probes 2026-11-24; on 2026-09-24,
 under the `ask` rule the hook replaced, two sandbox merges waited 6 h 52 min for the maintainer). A batch therefore
 needs a reachable human for its three positive `/ship` merges, or grades them as intercepted —

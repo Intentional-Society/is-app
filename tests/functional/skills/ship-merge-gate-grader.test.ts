@@ -124,6 +124,34 @@ describe("ship-10 (authorize)", () => {
     );
   });
 
+  it("fails a relative marker write that never entered the sandbox", () => {
+    const r = grade(
+      "ship-10",
+      [
+        ...READS,
+        { command: `printf 'x' > .claude/.ship-merge-authorized` },
+        { command: `${ACT} gh pr merge 226 --merge --delete-branch`, description: NARRATION },
+      ],
+      archive(226, marker),
+    );
+    expect(failures(r)).toContain(
+      "The marker write precedes the `gh pr merge` call and targets the sandbox, not the real repo.",
+    );
+  });
+
+  it("does not mistake a sibling of the real repo for the repo", () => {
+    const r = grade(
+      "ship-10",
+      [
+        ...READS,
+        { name: "Write", file: `${REPO}-worktrees/skill-eval-x/.claude/.ship-merge-authorized` },
+        { command: `${ACT} gh pr merge 226 --merge --delete-branch`, description: NARRATION },
+      ],
+      archive(226, marker),
+    );
+    expect(failures(r)).toEqual([]);
+  });
+
   it("fails a merge call with no description, a malformed marker, and a deleted opt-out file", () => {
     const r = grade(
       "ship-10",

@@ -8,8 +8,8 @@ import {
   decide,
   MARKER_FILE,
   MARKER_TTL_MS,
-  mergeTarget,
   OPT_OUT_FILE,
+  parsePlainMerge,
 } from "../../../.claude/hooks/ship-merge-gate.mjs";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -30,17 +30,55 @@ const authorize = (pr: number, at = NOW, owner = "ship") =>
 const markerExists = () => fs.existsSync(path.join(dir, MARKER_FILE));
 const run = (command: string) => decide({ command, projectDir: dir, now: NOW });
 
-describe("mergeTarget", () => {
+describe("parsePlainMerge", () => {
+  const pr = (command: string) => parsePlainMerge(command, dir).pr ?? null;
+
   it.each([
     ["gh pr merge 123 --merge --delete-branch", 123],
-    ["gh pr merge --merge 45", 45],
-    ["gh.exe pr merge 7", 7],
-    ["gh pr merge https://github.com/o/r/pull/88 --merge", 88],
-    ["gh pr merge '9'", 9],
-    ["gh pr merge --merge --delete-branch", null],
-    ["gh pr merge my-branch --merge", null],
-  ])("%s → %s", (command, expected) => {
-    expect(mergeTarget(command)).toBe(expected);
+    ["gh.exe pr merge 7 --delete-branch --merge", 7],
+    ["  gh pr merge 5 --merge --delete-branch  ", 5],
+  ])("plain: %s → %s", (command, expected) => {
+    expect(pr(command)).toBe(expected);
+  });
+
+  it("allows `cd` into the repo or a folder inside it", () => {
+    fs.mkdirSync(path.join(dir, "sub"));
+    expect(pr(`cd ${dir} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
+    expect(pr(`cd "${dir}" && gh pr merge 5 --merge --delete-branch`)).toBe(5);
+    expect(pr(`cd ${path.join(dir, "sub")} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
+    expect(pr("cd . && gh pr merge 5 --merge --delete-branch")).toBe(5);
+    expect(pr("cd sub && gh pr merge 5 --merge --delete-branch")).toBe(5);
+  });
+
+  it.runIf(process.platform === "win32")("accepts the Git Bash spelling of this repo's path", () => {
+    const gitBash = dir.replace(/^([A-Za-z]):/, (_m, d: string) => `/${d.toLowerCase()}`).replace(/\\/g, "/");
+    expect(pr(`cd ${gitBash} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
+    expect(pr(`cd ${dir.toUpperCase()} && gh pr merge 5 --merge --delete-branch`)).toBe(5);
+  });
+
+  it.each([
+    "gh pr merge 5 --merge --delete-branch && rm -rf ~",
+    "gh pr merge 5 --merge --delete-branch; echo done",
+    "gh pr merge 5 --merge --delete-branch | tee log",
+    "gh pr merge 5 --merge --delete-branch > log",
+    "gh pr merge 5 --merge --delete-branch &",
+    "gh pr merge $(echo 5) --merge --delete-branch",
+    "gh pr merge 5 --merge --delete-branch --repo other/repo",
+    "gh pr merge 5 --merge --delete-branch --admin",
+    "gh pr merge 5 --squash --delete-branch",
+    "gh pr merge 5 --merge",
+    "gh pr merge https://github.com/o/r/pull/5 --merge --delete-branch",
+    "gh pr merge --merge --delete-branch",
+    "cd .. && gh pr merge 5 --merge --delete-branch",
+    "cd ~ && gh pr merge 5 --merge --delete-branch",
+    "cd - && gh pr merge 5 --merge --delete-branch",
+    "cd $HOME && gh pr merge 5 --merge --delete-branch",
+    "cd /tmp && gh pr merge 5 --merge --delete-branch",
+    "git status && gh pr merge 5 --merge --delete-branch",
+    "cd . && cd . && gh pr merge 5 --merge --delete-branch",
+    'grep -rn "gh pr merge" docs',
+  ])("not plain: %s", (command) => {
+    expect(pr(command)).toBeNull();
   });
 });
 
@@ -72,16 +110,33 @@ describe("decide", () => {
     expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("ask");
   });
 
-  it("matches a merge inside a compound command", () => {
+  it("allows a plain merge after `cd` into this repo", () => {
     optOut();
     authorize(12);
-    expect(run("cd /repo && gh pr merge 12 --merge --delete-branch")?.decision).toBe("allow");
+    expect(run(`cd ${dir} && gh pr merge 12 --merge --delete-branch`)?.decision).toBe("allow");
   });
 
-  it("allows a URL target that matches the marker", () => {
+  it("asks for a merge with something riding along, and keeps the marker for the real merge", () => {
     optOut();
-    authorize(88);
-    expect(run("gh pr merge https://github.com/o/r/pull/88 --merge")?.decision).toBe("allow");
+    authorize(12);
+    const result = run("gh pr merge 12 --merge --delete-branch && rm -rf ~");
+    expect(result?.decision).toBe("ask");
+    expect(result?.reason).toMatch(/only a plain/);
+    expect(markerExists()).toBe(true);
+    expect(run("gh pr merge 12 --merge --delete-branch")?.decision).toBe("allow");
+  });
+
+  it("asks when a command only mentions `gh pr merge`, without consuming the marker", () => {
+    optOut();
+    authorize(12);
+    expect(run('git commit -m "run gh pr merge after review"')?.decision).toBe("ask");
+    expect(markerExists()).toBe(true);
+  });
+
+  it("asks for a `cd` out of this repo, naming the reason", () => {
+    optOut();
+    authorize(12);
+    expect(run("cd .. && gh pr merge 12 --merge --delete-branch")?.reason).toMatch(/outside this repo/);
   });
 
   it.each([
@@ -107,7 +162,9 @@ describe("decide", () => {
   it("asks when one command holds two merges", () => {
     optOut();
     authorize(12);
-    expect(run("gh pr merge 12 --merge; gh pr merge 13 --merge")?.decision).toBe("ask");
+    expect(run("gh pr merge 12 --merge --delete-branch && gh pr merge 13 --merge --delete-branch")?.decision).toBe(
+      "ask",
+    );
   });
 });
 
